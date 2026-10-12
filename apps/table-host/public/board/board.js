@@ -236,6 +236,8 @@ function joinPanel() {
     <div class="eyebrow">Scan to join</div>
     <img src="/qr.svg?u=${encodeURIComponent(state.joinUrl)}" alt="QR code to join this table">
     <div><div class="url">${esc(state.joinUrl)}</div><div class="code" style="text-align:center;margin-top:6px">${esc(code)}</div></div>
+    <div class="faint" style="font-size:.7em;text-align:center">Everyone at the table scans this same code</div>
+    <button data-new-code style="font-size:.7em">New code</button>
   </aside>`;
 }
 
@@ -406,6 +408,7 @@ center.addEventListener("click", async (e) => {
   else if ("again" in d) act("POST", "/game/select", { gameId: state.game.id, settings: state.game.settings });
   else if ("sim" in d) openSimulation();
   else if ("invite" in d) openInvite();
+  else if ("newCode" in d && (await confirmDialog("New join code?", "The current QR code stops working. Players already at the table stay in.", "New code"))) act("POST", "/join/new");
 });
 
 lobbyBtn.addEventListener("click", openLobbyOverlay);

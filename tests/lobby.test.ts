@@ -28,13 +28,37 @@ describe("access", () => {
 });
 
 describe("joining", () => {
-  it("issues short, speakable join codes that rotate after each use", async () => {
+  it("issues one short, speakable join code that every player at the table can use", async () => {
     const { token, url } = await t.ok("GET", "/join");
     expect(token).toMatch(/^[A-HJ-NP-Z2-9]{8}$/);
     expect(url).toContain(`/j/${token}`);
+    for (const name of ["Ann", "Ben", "Cleo"]) await Deck.connect(t.base, { joinToken: token, name }).then((d) => t.decks.push(d));
+    expect(t.host.table.state().players.map((p) => p.name)).toEqual(["Ann", "Ben", "Cleo"]);
+    expect((await t.ok("GET", "/join")).token).toBe(token); // same QR code on the board all along
+  });
+
+  it("makes a new code on request; the old one stops working and players stay in", async () => {
+    const { token } = await t.ok("GET", "/join");
     await Deck.connect(t.base, { joinToken: token, name: "Ann" }).then((d) => t.decks.push(d));
+    const fresh = await t.ok("POST", "/join/new");
+    expect(fresh.token).not.toBe(token);
+    expect(t.host.table.state().joinUrl).toContain(fresh.token);
     await expect(Deck.connect(t.base, { joinToken: token, name: "Mallory" })).rejects.toThrow(/invalid or expired/);
-    expect((await t.ok("GET", "/join")).token).not.toBe(token);
+    await Deck.connect(t.base, { joinToken: fresh.token, name: "Ben" }).then((d) => t.decks.push(d));
+    expect(t.host.table.state().players.map((p) => p.name)).toEqual(["Ann", "Ben"]);
+  });
+
+  it("keeps the code while the table runs, even when everyone leaves, and makes a new one at every start", async () => {
+    const { token } = await t.ok("GET", "/join");
+    const a = await Deck.connect(t.base, { joinToken: token, name: "Ann" });
+    await t.ok("DELETE", `/players/${a.playerId}`);
+    expect((await t.ok("GET", "/join")).token).toBe(token);
+    const other = await testHost(); // a restart of the table PC
+    try {
+      expect((await other.ok("GET", "/join")).token).not.toBe(token);
+    } finally {
+      await other.close();
+    }
   });
 
   it("redirects the short join URL to the deck page", async () => {

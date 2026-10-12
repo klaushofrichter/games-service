@@ -43,7 +43,7 @@ export async function startHost(o: HostOptions = {}) {
     publicUrl: o.publicUrl ?? "",
     graceMs: o.graceMs ?? 60_000,
     aiDelayMs: o.aiDelayMs ?? 800,
-    joinTokenTtlMs: o.joinTokenTtlMs ?? 5 * 60_000,
+    joinTokenTtlMs: o.joinTokenTtlMs ?? 0, // no expiry: a new code at every start, or "New code" on the board (D-066)
     requireCloud: o.requireCloud ?? false,
     maxRemotePlayers: o.maxRemotePlayers ?? 4,
     showTestGames: o.showTestGames ?? true,

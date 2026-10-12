@@ -164,6 +164,7 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
       return res.end(await QRCode.toString(text, { type: "svg", margin: 1, color: { dark: "#111111", light: "#ffffff" } }));
     }
     if (m === "GET" && path === "/join") return json(res, 200, table.currentJoin());
+    if (m === "POST" && path === "/join/new") return json(res, 200, table.newJoinCode());
     if (m === "GET" && path === "/games") return json(res, 200, table.availability());
     if (m === "GET" && path === "/metrics") return json(res, 200, table.metrics);
     if (m === "POST" && path === "/layout") return (table.setLayout(Number(body.seats)), json(res, 200, table.state()));

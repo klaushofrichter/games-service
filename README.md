@@ -66,6 +66,7 @@ Everything the board can do is available over HTTP on the table PC, for tests an
 ```sh
 K="X-Table-Key: dev"; H=http://localhost:8080/api/v1
 curl -s -H "$K" $H/state                                   # lobby state
+curl -s -H "$K" -X POST $H/join/new                       # new join code (the board's QR code changes)
 curl -s -H "$K" $H/games                                   # games, selectable + reasons
 curl -s -H "$K" -X POST $H/ai -d '{}'                      # add an AI seat
 curl -s -H "$K" -X POST $H/rotate -d '{"degrees":180}'

@@ -24,15 +24,17 @@ function expectConsistentSeats(state: { layout: number; players: { seat: number 
 }
 
 describe("concurrency", () => {
-  it("lets exactly one of several phones that scanned the same code in; the others are told to scan again", async () => {
+  it("lets eight phones that scanned the same code at the same moment all in, each on their own seat", async () => {
     const t = await host();
+    await t.ok("POST", "/layout", { seats: 8 });
     const { token } = await t.ok("GET", "/join");
-    const results = await Promise.allSettled(Array.from({ length: 6 }, (_, i) => Deck.connect(t.base, { joinToken: token, name: `P${i}` })));
-    const ok = results.filter((r) => r.status === "fulfilled");
-    expect(ok).toHaveLength(1);
-    for (const r of results.filter((r) => r.status === "rejected")) expect(String((r as PromiseRejectedResult).reason)).toMatch(/scan the QR code again/);
-    expect(t.host.table.state().players).toHaveLength(1);
-    for (const r of ok) (r as PromiseFulfilledResult<Deck>).value.ws.close();
+    const decks = await Promise.all(Array.from({ length: 8 }, (_, i) => Deck.connect(t.base, { joinToken: token, name: `P${i}` })));
+    const st = t.host.table.state();
+    expect(st.players).toHaveLength(8);
+    expect(new Set(decks.map((d) => d.playerId)).size).toBe(8);
+    expect(st.players.map((p) => p.seat).sort()).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
+    expectConsistentSeats(st);
+    for (const d of decks) d.ws.close();
   });
 
   it("seats eight players joining one after another as fast as they can", async () => {

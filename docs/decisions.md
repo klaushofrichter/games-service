@@ -41,7 +41,7 @@ Format: **D-nnn · date · decided by** — decision. *Why:* reason.
 
 - **D-031 · 2026-10-12 · Claude** — TypeScript end to end, run natively by Node 22.18+ (type stripping, no build step). *Why:* one language for host, SDK, games and cloud; simpler containers.
 - **D-032 · 2026-10-12 · Claude** — Rules are pure functions; all randomness comes from a seeded RNG in the game context, and the host logs every input (intents, timer firings, seat changes). `replay()` rebuilds a game and the tests compare state hashes. *Why:* D-008 and D-022 need exact replay.
-- **D-033 · 2026-10-12 · Claude** — Join codes and invite codes use a 32-character alphabet without 0/O and 1/I. Join codes are single-use and rotate every 5 minutes.
+- **D-033 · 2026-10-12 · Claude** — Join codes and invite codes use a 32-character alphabet without 0/O and 1/I. Join codes are single-use and rotate every 5 minutes. *Superseded by D-066.*
 - **D-034 · 2026-10-12 · Claude** — The board page is served only to loopback clients and receives the table key there; everything else needs `X-Table-Key`. *Why:* decks on the LAN must not be able to drive the board API.
 - **D-035 · 2026-10-12 · Claude** — Phase 1a runs game rules in-process. The isolated sandbox is deferred until third-party games (D-016).
 - **D-036 · 2026-10-12 · Claude** — The cloud skeleton stores state in memory (single replica) and tables authenticate with an issued bearer token. PostgreSQL and key-pair authentication come before production.
@@ -89,3 +89,7 @@ Format: **D-nnn · date · decided by** — decision. *Why:* reason.
 
 - **D-064 · 2026-10-12 · Claude** — AI-only simulations hand the table's thread back every ~15 ms. *Why:* a 1,000-game Hold'em simulation froze the board, decks, game timers and liveness pings for about 14 s; now the longest pause is under 0.5 s (packing the log zip at the end).
 - **D-065 · 2026-10-12 · Claude** — Deck UIs must work from a 320 × 568 phone up, checked in a real browser by `scripts/e2e/layout.py`: no sideways scrolling, nothing sticking out of its panel, buttons at least 40 px high, and on your turn an action button on screen without scrolling. Hold'em's community cards now shrink with the screen, its hole cards scale with the screen height, and its action bar stays pinned to the bottom. *Why:* on small phones the five cards overflowed and Fold/Call/Raise sat below the fold.
+
+## Join code (12 Oct 2026)
+
+- **D-066 · 2026-10-12 · Klaus** — One join code and QR code for all players at the table, replacing the single-use, rotating codes of D-033. The code is new at every start of the Table Host (the table PC is powered down often) and otherwise changes only when someone taps *New code* on the board; the old code stops working at once, players already in stay in. No expiry. Remote players still need their own single-use invite.

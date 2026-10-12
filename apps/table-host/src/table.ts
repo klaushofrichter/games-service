@@ -194,9 +194,23 @@ export class Table extends EventEmitter {
 
   // ---------- joining ----------
 
+  /**
+   * One code for everyone at the table (D-066). It lives in memory only, so every start of the Table Host
+   * makes a new one; otherwise it changes only when someone taps "New code" on the board.
+   * (`joinTokenTtlMs` > 0 adds an expiry; off by default.)
+   */
   rotateJoinToken() {
-    this.joinToken = shortToken();
-    this.joinTokenExpires = Date.now() + this.config.joinTokenTtlMs;
+    let next = shortToken();
+    while (next === this.joinToken) next = shortToken();
+    this.joinToken = next;
+    this.joinTokenExpires = this.config.joinTokenTtlMs > 0 ? Date.now() + this.config.joinTokenTtlMs : Infinity;
+  }
+
+  /** "New code" on the board: the old QR code stops working at once; players already in stay in. */
+  newJoinCode() {
+    this.rotateJoinToken();
+    this.changed();
+    return this.currentJoin();
   }
 
   currentJoin() {
@@ -241,7 +255,6 @@ export class Table extends EventEmitter {
     const sessionToken = randomBytes(24).toString("base64url");
     const p: Player = { id, name, kind: "human", location, seat: null, connected: true, ready: false, sessionToken, remoteSession };
     this.players.set(id, p);
-    if (location === "local") this.rotateJoinToken(); // one-time use
     this.seatNewcomer(p);
     this.changed();
     return { playerId: id, sessionToken };
