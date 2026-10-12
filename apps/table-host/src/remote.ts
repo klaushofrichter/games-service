@@ -5,6 +5,8 @@
 //   page → table  {k:"req", id, method, path, body?}              an HTTP request (board/deck files, API)
 //   table → page  {k:"res", id, status, type, part, parts, b64}   the response, base64 in chunks
 //   both ways     {k:"ws", sid, op:"open"|"msg"|"close", data?}   a virtual WebSocket (board or deck)
+//   table → page  {k:"ping"}  and  page → table {k:"pong"}         liveness: a browser that vanishes
+//                                                                  without closing is dropped
 import { EventEmitter } from "node:events";
 import { Readable } from "node:stream";
 import type { IncomingMessage, ServerResponse } from "node:http";
@@ -93,6 +95,8 @@ class Session {
   readonly sockets = new Map<number, ChannelSocket>();
   channel: RTCDataChannel | null = null;
   openTimer: NodeJS.Timeout | undefined;
+  private pingTimer: NodeJS.Timeout | undefined;
+  private lastSeen = Date.now();
   readonly id: string;
   readonly pc: RTCPeerConnection;
   private readonly gw: RemoteGateway;
@@ -106,13 +110,25 @@ class Session {
     if (this.channel?.readyState === "open") this.channel.send(JSON.stringify(frame));
   }
 
+  /** Ping while the channel is open; drop the session when the page stops answering. */
+  startLiveness() {
+    this.lastSeen = Date.now();
+    this.pingTimer = setInterval(() => {
+      if (Date.now() - this.lastSeen > this.gw.timeoutMs) return this.gw.dropSession(this.id, this);
+      this.send({ k: "ping" });
+    }, this.gw.pingMs);
+    this.pingTimer.unref?.();
+  }
+
   async onFrame(raw: string) {
+    this.lastSeen = Date.now();
     let f: any;
     try {
       f = JSON.parse(raw);
     } catch {
       return;
     }
+    if (f?.k === "pong") return;
     const ctx: RemoteContext = { session: this.id };
     if (f.k === "req" && typeof f.path === "string" && Number.isInteger(f.id)) {
       const method = String(f.method ?? "GET").toUpperCase();
@@ -145,6 +161,7 @@ class Session {
 
   close() {
     clearTimeout(this.openTimer);
+    clearInterval(this.pingTimer);
     for (const s of this.sockets.values()) s.closed(1001);
     this.sockets.clear();
     try {
@@ -155,6 +172,9 @@ class Session {
 
 export class RemoteGateway {
   private sessions = new Map<string, Session>();
+  /** Liveness over the data channel (a closed laptop sends no goodbye). */
+  pingMs = 5_000;
+  timeoutMs = 20_000;
   readonly handler: Handler;
   readonly attach: Attach;
 
@@ -181,6 +201,7 @@ export class RemoteGateway {
         if (s.channel) return; // one channel per connection
         s.channel = ch;
         clearTimeout(s.openTimer);
+        s.startLiveness();
         ch.onMessage.subscribe((m) => void s.onFrame(typeof m === "string" ? m : m.toString("utf8")).catch(() => {}));
         ch.stateChanged.subscribe((st) => st === "closed" && this.drop(session, s));
       });
@@ -200,6 +221,10 @@ export class RemoteGateway {
       this.drop(session, s);
       throw err;
     }
+  }
+
+  dropSession(id: string, s: Session) {
+    this.drop(id, s);
   }
 
   private drop(id: string, s: Session) {

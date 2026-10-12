@@ -60,6 +60,9 @@ export async function startHost(o: HostOptions = {}) {
   const gateway = new RemoteGateway(server.handler, server.attachSocket);
   if (!config.publicUrl) config.publicUrl = `http://${lanAddress()}:${server.port}`;
   await logs.prune();
+  // Tables run for weeks: prune once a day too, not only at start.
+  const pruneTimer = setInterval(() => void logs.prune().catch(() => {}), 24 * 3600_000);
+  pruneTimer.unref();
   let cloud: CloudLink | null = null;
   if (o.cloudUrl) {
     cloud = new CloudLink(table, logs, { cloudUrl: o.cloudUrl.replace(/\/$/, ""), dataDir, pollMs: o.cloudPollMs, heartbeatMs: o.cloudHeartbeatMs });
@@ -67,6 +70,7 @@ export async function startHost(o: HostOptions = {}) {
     await cloud.start();
   }
   const close = async () => {
+    clearInterval(pruneTimer);
     cloud?.stop();
     gateway.close();
     await server.close();

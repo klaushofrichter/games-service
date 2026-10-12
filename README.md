@@ -116,7 +116,7 @@ A remote player gets an invite link (`https://games.skylar.technology/i/CODE`) f
 ## Testing
 
 ```sh
-npm test                                   # rules, lobby, cloud and host integration (Vitest)
+npm test                                   # rules, lobby, platform edges, cloud service, remote play, host integration (Vitest)
 node scripts/soak.ts 100                   # 100 AI-only games per game and player count
 # browser end-to-end (needs Python Playwright and a running host on port 8090 with TABLE_KEY=devkey)
 python3 scripts/e2e/play.py roulette out/  # also: pachisi, holdem, coinflip, dialogs

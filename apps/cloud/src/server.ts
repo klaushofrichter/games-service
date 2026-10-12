@@ -84,6 +84,11 @@ export function startCloud(o: CloudOptions) {
   const bearer = (req: IncomingMessage) => (req.headers.authorization ?? "").replace(/^Bearer\s+/i, "");
   const same = (a: string, b: string) => a.length === b.length && timingSafeEqual(Buffer.from(a), Buffer.from(b));
   const isAdmin = (req: IncomingMessage) => same(bearer(req), o.adminToken);
+  /** A lifetime from a request: positive and finite, else the default; never above the cap. */
+  const lifetime = (v: unknown, fallback: number, cap: number) => {
+    const n = Number(v);
+    return Math.min(Number.isFinite(n) && n > 0 ? n : fallback, cap);
+  };
   const tableFor = (req: IncomingMessage) => {
     const t = bearer(req);
     return [...tables.values()].find((x) => x.status === "approved" && x.tableToken && same(x.tableToken, t));
@@ -154,6 +159,8 @@ export function startCloud(o: CloudOptions) {
       if (m === "PUT" && (match = p.match(/^\/api\/tables\/logs\/([\w-]+)$/))) {
         const t = tableFor(req);
         if (!t) return json(res, 401, { error: "unknown or revoked table" });
+        const existing = logs.get(match[1]);
+        if (existing && existing.meta.tableId !== t.tableId) return json(res, 409, { error: "a log with this id belongs to another table" });
         const data = await body(req, 50 * 1024 * 1024);
         const gameId = String(url.searchParams.get("gameId") ?? "");
         logs.set(match[1], { meta: { id: match[1], tableId: t.tableId, gameId, simulation: url.searchParams.get("simulation") === "1", bytes: data.length, uploadedAt: Date.now() }, data });
@@ -163,7 +170,7 @@ export function startCloud(o: CloudOptions) {
         const t = tableFor(req);
         if (!t) return json(res, 401, { error: "unknown or revoked table" });
         const b = await jsonBody(req);
-        const ttl = Math.min(Number(b.ttlMinutes ?? 120), 24 * 60) * 60_000;
+        const ttl = lifetime(b.ttlMinutes, 120, 24 * 60) * 60_000;
         let token = code(8);
         while (invites.has(token)) token = code(8);
         invites.set(token, { tableId: t.tableId, expiresAt: Date.now() + ttl, used: false });
@@ -232,7 +239,7 @@ export function startCloud(o: CloudOptions) {
         if (m === "POST" && p === "/admin/api/download-tokens") {
           const b = await jsonBody(req);
           const token = secret();
-          const hours = Math.min(Number(b.expiresInHours ?? 24), 24 * 90);
+          const hours = lifetime(b.expiresInHours, 24, 24 * 90);
           downloadTokens.set(token, { gameId: b.gameId ? String(b.gameId) : null, expiresAt: Date.now() + hours * 3600_000 });
           return json(res, 201, { token, url: `${o.publicUrl}/dl/${token}`, expiresAt: new Date(Date.now() + hours * 3600_000).toISOString() });
         }

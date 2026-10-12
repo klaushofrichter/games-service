@@ -76,10 +76,16 @@ export class LogStore {
     }
   }
 
-  /** Delete logs older than the retention period (synced from the cloud service). */
+  /** Delete logs and saved games older than the retention period (synced from the cloud service). */
   async prune(now = Date.now()) {
+    const limit = this.retentionDays * 86400_000;
     for (const l of await this.list()) {
-      if (now - Date.parse(l.modified) > this.retentionDays * 86400_000) await unlink(join(this.dir, `${l.id}.zip`));
+      if (now - Date.parse(l.modified) > limit) await unlink(join(this.dir, `${l.id}.zip`)).catch(() => {});
+    }
+    await mkdir(this.savesDir, { recursive: true });
+    for (const f of (await readdir(this.savesDir)).filter((f) => f.endsWith(".json"))) {
+      const file = join(this.savesDir, f);
+      if (now - (await stat(file)).mtimeMs > limit) await unlink(file).catch(() => {});
     }
   }
 

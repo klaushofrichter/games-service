@@ -45,6 +45,7 @@ class RemotePeer {
   pc = new RTCPeerConnection({ iceServers: [] });
   ch!: RTCDataChannel;
   session = "";
+  answerPings = true;
   private reqId = 0;
   private sid = 0;
   private pending = new Map<number, { parts: string[]; resolve: (r: Res) => void }>();
@@ -54,6 +55,14 @@ class RemotePeer {
     const p = new RemotePeer();
     cleanup.push(() => p.pc.close());
     await p.signal(`invite=${invite}`);
+    return p;
+  }
+
+  /** A new connection for an existing session (the invite is used up by then). */
+  static async reconnect(session: string) {
+    const p = new RemotePeer();
+    cleanup.push(() => p.pc.close());
+    await p.signal(`session=${session}`);
     return p;
   }
 
@@ -80,6 +89,7 @@ class RemotePeer {
 
   private onFrame(raw: string) {
     const f = JSON.parse(raw);
+    if (f.k === "ping" && this.answerPings) return void this.ch.send(JSON.stringify({ k: "pong" }));
     if (f.k === "res") {
       const p = this.pending.get(f.id)!;
       p.parts[f.part] = f.b64;
@@ -265,6 +275,63 @@ describe("remote play", { timeout: 60_000 }, () => {
     cleanup.push(() => first.close());
     await new Promise((r) => first.once("message", r)); // hello: session created, invite claimed
     await expect(RemotePeer.connect(token)).rejects.toThrow(/404/);
+  });
+
+  it("reconnects a dropped remote player through their session, to the same seat", async () => {
+    const t = await pairedHost({ graceMs: 60_000 });
+    t.host.gateway.pingMs = 100;
+    t.host.gateway.timeoutMs = 400;
+    const { token } = await t.ok("POST", "/invites");
+    const first = await RemotePeer.connect(token);
+    const deck = await first.socket({ name: "Rita" });
+    const welcome = (await deck.next((m) => m.type === "welcome")).payload;
+    const seat = t.host.table.state().players.find((p) => p.id === welcome.playerId)!.seat;
+
+    await sleep(600);
+    expect(t.host.table.state().players[0].connected).toBe(true); // answering pings keeps the player in
+    first.answerPings = false; // the laptop lid closes: no goodbye, just silence
+    await until(() => !t.host.table.state().players.find((p) => p.id === welcome.playerId)?.connected, 3000);
+    expect(t.host.gateway.count).toBe(0);
+    first.pc.close();
+    await expect(RemotePeer.connect(token)).rejects.toThrow(/404/); // the invite can't be reused
+
+    const again = await RemotePeer.reconnect(first.session);
+    expect(again.session).toBe(first.session);
+    const d2 = await again.socket({ sessionToken: welcome.sessionToken }); // the deck resumes with its token
+    expect((await d2.next((m) => m.type === "welcome")).payload.playerId).toBe(welcome.playerId);
+    const rita = t.host.table.state().players.find((p) => p.id === welcome.playerId)!;
+    expect(rita).toMatchObject({ connected: true, seat, location: "remote" });
+    expect(t.host.table.state().players).toHaveLength(1);
+  });
+
+  it("carries large files over the channel in chunks, byte for byte", async () => {
+    const t = await pairedHost();
+    const peer = await RemotePeer.connect((await t.ok("POST", "/invites")).token);
+    for (const path of ["/games/holdem/board.js", "/board/board.js", "/shared/theme.css"]) {
+      const direct = Buffer.from(await (await fetch(`${t.base}${path}`)).arrayBuffer());
+      const viaChannel = await peer.request("GET", path);
+      expect(viaChannel.status, path).toBe(200);
+      expect(viaChannel.body.equals(direct), path).toBe(true);
+    }
+    expect((await fetch(`${t.base}/board/board.js`).then((r) => r.arrayBuffer())).byteLength).toBeGreaterThan(12 * 1024); // more than one chunk
+    // and many requests at once stay matched to their answers
+    const paths = ["/shared/theme.css", "/deck/deck.js", "/board/board.css", "/games/roulette/deck.js", "/api/v1/state"];
+    const results = await Promise.all(paths.map((p) => peer.request("GET", p)));
+    results.forEach((r, i) => expect(r.status, paths[i]).toBe(200));
+    expect(JSON.parse(results[4].body.toString()).tableName).toBeTruthy();
+  });
+
+  it("keeps the join QR code and the board's key away from remote players", async () => {
+    const t = await pairedHost();
+    const peer = await RemotePeer.connect((await t.ok("POST", "/invites")).token);
+    expect((await peer.request("GET", "/qr.svg")).status).not.toBe(200);
+    expect((await peer.request("GET", "/j/ABCD1234")).status).toBe(404); // outside the paths a remote page needs
+    const board = (await peer.request("GET", "/board/index.html")).body.toString();
+    expect(board).not.toContain("test-key");
+    const s = await peer.socket({ role: "board", key: "test-key" }); // even with the key, it's a remote board
+    expect((await s.next((m) => m.type === "welcome")).payload.remote).toBe(true);
+    await until(() => s.lastState());
+    expect(s.lastState().joinUrl).toBe("");
   });
 
   it("refuses unknown invites at the cloud", async () => {

@@ -64,7 +64,9 @@ export const manifestSchema = z.object({
   sdk: z.string(),
   description: z.string().optional(),
   players: z.union([
-    z.object({ min: z.number().int().min(1).max(8), max: z.number().int().min(1).max(8) }),
+    z
+      .object({ min: z.number().int().min(1).max(8), max: z.number().int().min(1).max(8) })
+      .refine((p) => p.min <= p.max, "players.min must not be above players.max"),
     z.array(z.number().int().min(1).max(8)).nonempty(),
   ]),
   turnModel: z.enum(["sequential", "simultaneous"]),

@@ -88,9 +88,12 @@
     return out.buffer;
   }
 
+  let lastFrame = Date.now();
   function onFrame(raw) {
+    lastFrame = Date.now();
     let f;
     try { f = JSON.parse(raw); } catch { return; }
+    if (f.k === "ping") return void sendFrame({ k: "pong" });
     if (f.k === "res") {
       const r = requests.get(f.id);
       if (!r) return;
@@ -181,7 +184,7 @@
           const peer = (pc = new RTCPeerConnection({ iceServers: m.iceServers || [] }));
           const ch = (dc = peer.createDataChannel("gt"));
           ch.onmessage = (e) => live() && onFrame(typeof e.data === "string" ? e.data : "");
-          ch.onopen = () => { if (!live()) return; attempts = 0; ws.onclose = null; ws.close(); start(); };
+          ch.onopen = () => { if (!live()) return; attempts = 0; lastFrame = Date.now(); ws.onclose = null; ws.close(); start(); };
           ch.onclose = () => live() && retry();
           peer.onconnectionstatechange = () => live() && peer.connectionState === "failed" && retry();
           await peer.setLocalDescription(await peer.createOffer());
@@ -251,6 +254,11 @@
     playing = true;
     show("play");
   }
+
+  // The table pings every few seconds; silence means the connection is gone even if nobody said so.
+  setInterval(() => {
+    if (playing && dc && dc.readyState === "open" && Date.now() - lastFrame > 25000) retry();
+  }, 5000);
 
   $("deck-min").addEventListener("click", () => {
     const w = $("deck-wrap");

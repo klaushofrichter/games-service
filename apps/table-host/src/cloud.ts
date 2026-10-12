@@ -156,7 +156,10 @@ export class CloudLink {
   }
 
   private applyConfig(c: { logRetentionDays: number }) {
-    if (Number.isInteger(c.logRetentionDays)) this.logs.retentionDays = c.logRetentionDays;
+    if (!Number.isInteger(c.logRetentionDays) || c.logRetentionDays === this.logs.retentionDays) return;
+    const shorter = c.logRetentionDays < this.logs.retentionDays;
+    this.logs.retentionDays = c.logRetentionDays;
+    if (shorter) void this.logs.prune().catch(() => {}); // a shorter period applies now, not at the next restart
   }
 
   async upload(id: string) {

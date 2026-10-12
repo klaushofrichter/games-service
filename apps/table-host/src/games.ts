@@ -18,6 +18,8 @@ export async function loadGames(dir: string): Promise<Map<string, InstalledGame>
     if (!(await stat(gameDir)).isDirectory()) continue;
     try {
       const manifest = manifestSchema.parse(JSON.parse(await readFile(join(gameDir, "manifest.json"), "utf8")));
+      // The folder name is the id: two packages can't claim the same game, whatever order the disk lists them in.
+      if (manifest.id !== entry) throw new Error(`manifest id "${manifest.id}" must match the folder name`);
       const rulesFile = (await readdir(gameDir)).find((f) => f === "rules.ts" || f === "rules.js");
       if (!rulesFile) throw new Error("no rules.ts or rules.js");
       // Phase 1a: rules run in-process. Phase 1 later: isolated worker sandbox (see architecture doc).
