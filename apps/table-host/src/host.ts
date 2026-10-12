@@ -8,6 +8,7 @@ import { LogStore } from "./logs.ts";
 import { startServer } from "./server.ts";
 import { Table, type TableConfig } from "./table.ts";
 import { CloudLink } from "./cloud.ts";
+import { RemoteGateway } from "./remote.ts";
 
 const here = fileURLToPath(new URL(".", import.meta.url));
 
@@ -54,17 +55,21 @@ export async function startHost(o: HostOptions = {}) {
     tableKey,
     publicDir: resolve(join(here, "../public")),
     allowRemoteBoard: o.allowRemoteBoard ?? false,
+    createInvite: o.cloudUrl ? () => cloud!.createInvite() : undefined,
   });
+  const gateway = new RemoteGateway(server.handler, server.attachSocket);
   if (!config.publicUrl) config.publicUrl = `http://${lanAddress()}:${server.port}`;
   await logs.prune();
   let cloud: CloudLink | null = null;
   if (o.cloudUrl) {
     cloud = new CloudLink(table, logs, { cloudUrl: o.cloudUrl.replace(/\/$/, ""), dataDir, pollMs: o.cloudPollMs, heartbeatMs: o.cloudHeartbeatMs });
+    cloud.gateway = gateway;
     await cloud.start();
   }
   const close = async () => {
     cloud?.stop();
+    gateway.close();
     await server.close();
   };
-  return { table, logs, tableKey, port: server.port, close, cloud };
+  return { table, logs, tableKey, port: server.port, close, cloud, gateway };
 }

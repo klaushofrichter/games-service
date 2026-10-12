@@ -3,9 +3,23 @@
 import { esc } from "/shared/board-kit.js";
 
 const app = document.getElementById("app");
-const SESSION_KEY = `gametable.session.${location.host}`;
 const params = new URLSearchParams(location.search);
 const joinToken = params.get("t");
+// Remote players (phase 1c) load this page inside the cloud's invite page, which carries the socket
+// over a WebRTC channel to the table; their name comes from that page, and no join code is needed.
+const REMOTE = params.get("remote") === "1";
+const remoteName = params.get("name") ?? "";
+// Tell the invite page's service worker which page this frame belongs to (it forgets when restarted).
+if (REMOTE && navigator.serviceWorker) {
+  const own = () => navigator.serviceWorker.controller?.postMessage({ type: "gt-own", page: new URLSearchParams(location.search).get("gtp") });
+  own();
+  setInterval(own, 10000);
+}
+const SESSION_KEY = REMOTE ? `gametable.remote.${params.get("inv") ?? ""}` : `gametable.session.${location.host}`;
+const openSocket = () =>
+  REMOTE && window.parent !== window && window.parent.gameTableSocket
+    ? window.parent.gameTableSocket()
+    : new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`);
 
 let ws = null;
 let me = null; // playerId
@@ -45,7 +59,7 @@ function toast(msg) {
 }
 
 function connect(hello) {
-  ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`);
+  ws = openSocket();
   ws.onopen = () => send("system", "hello", hello);
   ws.onmessage = (ev) => {
     const m = JSON.parse(ev.data);
@@ -121,7 +135,7 @@ function render() {
   if (removed) {
     closeGame();
     top.innerHTML = "";
-    body.innerHTML = `<div class="card center"><h1>You left the table</h1><p class="muted">Scan the QR code on the board to join again.</p></div>`;
+    body.innerHTML = `<div class="card center"><h1>You left the table</h1><p class="muted">${REMOTE ? "Ask the table for a new invite to join again." : "Scan the QR code on the board to join again."}</p></div>`;
     return;
   }
   if (!me) return renderJoin();
@@ -144,6 +158,13 @@ function renderJoin() {
   if (saved && !ws) {
     connect({ sessionToken: saved });
     body.innerHTML = `<p class="muted center">Reconnecting…</p>`;
+    return;
+  }
+  if (REMOTE) {
+    if (!ws || ws.readyState > 1) {
+      if (!banner) connect({ name: remoteName });
+      body.innerHTML = banner ? `<div class="card center"><h1>Could not join</h1><p class="muted">${esc(banner)}</p></div>` : `<p class="muted center">Taking a seat…</p>`;
+    }
     return;
   }
   if (!joinToken) {

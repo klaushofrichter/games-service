@@ -5,8 +5,17 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { randomBytes, randomInt, timingSafeEqual } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
+import { WebSocketServer, type WebSocket } from "ws";
 
 const ADMIN_PAGE = fileURLToPath(new URL("../public/admin.html", import.meta.url));
+const REMOTE_PAGE = fileURLToPath(new URL("../public/remote.html", import.meta.url));
+const REMOTE_SW = fileURLToPath(new URL("../public/remote-sw.js", import.meta.url));
+
+export interface IceServer {
+  urls: string | string[];
+  username?: string;
+  credential?: string;
+}
 
 const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const code = (n: number) => Array.from({ length: n }, () => ALPHABET[randomInt(ALPHABET.length)]).join("");
@@ -18,6 +27,10 @@ export interface CloudOptions {
   adminToken: string;
   publicUrl: string; // https://games.skylar.technology
   logRetentionDays?: number;
+  /** STUN/TURN servers handed to both ends of a remote connection. */
+  iceServers?: IceServer[];
+  /** Behind a reverse proxy (the Kubernetes ingress): take the client address from X-Forwarded-For. */
+  trustProxy?: boolean;
 }
 
 interface TableRecord {
@@ -47,6 +60,22 @@ export function startCloud(o: CloudOptions) {
   const downloadTokens = new Map<string, { gameId: string | null; expiresAt: number }>();
   const settings = { logRetentionDays: o.logRetentionDays ?? 90 };
   const lookups = new Map<string, { n: number; reset: number }>(); // invite lookup rate limit per IP
+  const iceServers = o.iceServers ?? [{ urls: "stun:stun.l.google.com:19302" }];
+  // Remote play signaling (D-020): tables hold a socket here; remote browsers get a session per invite.
+  const tableSockets = new Map<string, WebSocket>();
+  const remoteSessions = new Map<string, { tableId: string; invite: string; expiresAt: number; ws: WebSocket | null }>();
+  /** The client's address; behind the ingress, the last X-Forwarded-For entry (the one the ingress added). */
+  const clientIp = (req: IncomingMessage) => {
+    const xff = o.trustProxy ? String(req.headers["x-forwarded-for"] ?? "").split(",").map((x) => x.trim()).filter(Boolean).pop() : "";
+    return xff || req.socket.remoteAddress || "?";
+  };
+  const limited = (ip: string, max = 20) => {
+    const l = lookups.get(ip) ?? { n: 0, reset: Date.now() + 60_000 };
+    if (Date.now() > l.reset) Object.assign(l, { n: 0, reset: Date.now() + 60_000 });
+    l.n++;
+    lookups.set(ip, l);
+    return l.n > max;
+  };
 
   const json = (res: ServerResponse, status: number, body: unknown) => {
     res.writeHead(status, { "content-type": "application/json", "cache-control": "no-store" });
@@ -78,8 +107,10 @@ export function startCloud(o: CloudOptions) {
     for (const [id, l] of logs) if (l.meta.uploadedAt < cutoff) logs.delete(id);
     for (const [t, i] of invites) if (i.expiresAt < Date.now()) invites.delete(t);
     for (const [t, d] of downloadTokens) if (d.expiresAt < Date.now()) downloadTokens.delete(t);
+    for (const [id, r] of remoteSessions) if (r.expiresAt < Date.now()) (r.ws?.close(4002, "expired"), remoteSessions.delete(id));
+    for (const [ip, l] of lookups) if (l.reset < Date.now()) lookups.delete(ip);
   };
-  const pruneTimer = setInterval(prune, 3600_000);
+  const pruneTimer = setInterval(prune, 600_000);
   pruneTimer.unref();
 
   const server = createServer(async (req, res) => {
@@ -139,18 +170,22 @@ export function startCloud(o: CloudOptions) {
         return json(res, 201, { token, url: `${o.publicUrl}/i/${token}`, expiresAt: new Date(Date.now() + ttl).toISOString() });
       }
       if (m === "GET" && (match = p.match(/^\/i\/([A-Za-z0-9]{1,12})$/))) {
-        const ip = req.socket.remoteAddress ?? "?";
-        const l = lookups.get(ip) ?? { n: 0, reset: Date.now() + 60_000 };
-        if (Date.now() > l.reset) Object.assign(l, { n: 0, reset: Date.now() + 60_000 });
-        l.n++;
-        lookups.set(ip, l);
-        if (l.n > 20) return json(res, 429, { error: "too many attempts; wait a minute" });
+        if (limited(clientIp(req))) return json(res, 429, { error: "too many attempts; wait a minute" });
         const inv = invites.get(match[1].toUpperCase());
-        if (!inv || inv.used || inv.expiresAt < Date.now()) return json(res, 404, { error: "invite not found or expired" });
-        res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
-        return res.end(`<!doctype html><meta name=viewport content="width=device-width,initial-scale=1"><title>Game Table invite</title>
-          <body style="font-family:system-ui;background:#0f2a24;color:#f3eee2;display:grid;place-items:center;min-height:100vh;margin:0">
-          <div style="max-width:420px;padding:24px;text-align:center"><h1>You're invited</h1><p>Remote play connects you directly to the table. It arrives in phase 1c.</p></div></body>`);
+        // A used invite still serves the page: the player who claimed it reconnects with their session.
+        if (!inv || inv.expiresAt < Date.now()) {
+          res.writeHead(404, { "content-type": "text/html; charset=utf-8" });
+          return res.end(`<!doctype html><meta name=viewport content="width=device-width,initial-scale=1"><title>Game Table</title>
+            <body style="font-family:system-ui;background:#0f2a24;color:#f3eee2;display:grid;place-items:center;min-height:100vh;margin:0">
+            <div style="max-width:420px;padding:24px;text-align:center"><h1>Invite not found</h1><p>This invite has expired or the code is wrong. Ask for a new one.</p></div></body>`);
+        }
+        res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "referrer-policy": "no-referrer" });
+        return res.end(await readFile(REMOTE_PAGE));
+      }
+      if (m === "GET" && p === "/remote-sw.js") {
+        // The remote page's service worker routes board and deck files over the WebRTC channel.
+        res.writeHead(200, { "content-type": "text/javascript; charset=utf-8", "service-worker-allowed": "/", "cache-control": "no-cache" });
+        return res.end(await readFile(REMOTE_SW));
       }
 
       // ----- admin -----
@@ -170,6 +205,7 @@ export function startCloud(o: CloudOptions) {
           if (!t) return json(res, 404, { error: "no such table" });
           t.status = "revoked";
           t.tableToken = null;
+          tableSockets.get(t.tableId)?.close(4001, "revoked");
           return json(res, 200, { tableId: t.tableId, status: t.status });
         }
         if (m === "GET" && p === "/admin/api/metrics") {
@@ -222,12 +258,94 @@ export function startCloud(o: CloudOptions) {
     }
   });
 
+  // ----- signaling sockets -----
+  const wss = new WebSocketServer({ noServer: true, maxPayload: 256 * 1024 });
+  const sendJson = (ws: WebSocket | null | undefined, v: unknown) => ws && ws.readyState === ws.OPEN && ws.send(JSON.stringify(v));
+
+  server.on("upgrade", (req, socket, head) => {
+    const url = new URL(req.url ?? "/", "http://cloud");
+    const reject = (code: number) => {
+      socket.write(`HTTP/1.1 ${code} No\r\n\r\n`);
+      socket.destroy();
+    };
+    if (url.pathname === "/api/tables/ws") {
+      const t = tableFor(req as IncomingMessage);
+      if (!t) return reject(401);
+      return wss.handleUpgrade(req, socket, head, (ws) => onTableSocket(ws, t));
+    }
+    if (url.pathname === "/api/remote/ws") {
+      if (limited(clientIp(req))) return reject(429);
+      const sessionId = url.searchParams.get("session");
+      let session = sessionId ? remoteSessions.get(sessionId) : undefined;
+      let id = sessionId ?? "";
+      if (!session || session.expiresAt < Date.now()) {
+        const code = (url.searchParams.get("invite") ?? "").toUpperCase();
+        const inv = invites.get(code);
+        if (!inv || inv.used || inv.expiresAt < Date.now()) return reject(404);
+        // Claimed now, not when the table answers: a second tab or a forwarded link can't open another session.
+        inv.used = true;
+        id = secret();
+        session = { tableId: inv.tableId, invite: code, expiresAt: inv.expiresAt + 12 * 3600_000, ws: null };
+        remoteSessions.set(id, session);
+      }
+      const s = session;
+      return wss.handleUpgrade(req, socket, head, (ws) => onRemoteSocket(ws, id, s));
+    }
+    reject(404);
+  });
+
+  function onTableSocket(ws: WebSocket, t: TableRecord) {
+    tableSockets.get(t.tableId)?.close(4000, "replaced");
+    tableSockets.set(t.tableId, ws);
+    ws.on("message", (raw) => {
+      let msg: any;
+      try {
+        msg = JSON.parse(String(raw));
+      } catch {
+        return;
+      }
+      const s = remoteSessions.get(String(msg.session));
+      if (!s || s.tableId !== t.tableId) return;
+      if (msg.type === "answer" && typeof msg.sdp === "string") {
+        sendJson(s.ws, { type: "answer", sdp: msg.sdp });
+      } else if (msg.type === "error") sendJson(s.ws, { type: "error", message: String(msg.message ?? "the table refused the connection") });
+    });
+    ws.on("close", () => tableSockets.get(t.tableId) === ws && tableSockets.delete(t.tableId));
+  }
+
+  function onRemoteSocket(ws: WebSocket, id: string, s: { tableId: string; expiresAt: number; ws: WebSocket | null }) {
+    s.ws?.close(4000, "replaced");
+    s.ws = ws;
+    const t = tables.get(s.tableId);
+    sendJson(ws, { type: "hello", session: id, iceServers, tableName: t?.name ?? "Game Table" });
+    ws.on("message", (raw) => {
+      let msg: any;
+      try {
+        msg = JSON.parse(String(raw));
+      } catch {
+        return;
+      }
+      if (msg.type !== "offer" || typeof msg.sdp !== "string" || msg.sdp.length > 100_000) return;
+      const tws = tableSockets.get(s.tableId);
+      if (!tws || t?.status !== "approved") return sendJson(ws, { type: "error", message: "The table is not connected right now. Try again in a moment." });
+      sendJson(tws, { type: "offer", session: id, sdp: msg.sdp, iceServers });
+    });
+    ws.on("close", () => s.ws === ws && (s.ws = null));
+  }
+
   return new Promise<{ port: number; close: () => Promise<void> }>((resolve) => {
     server.listen(o.port, o.host ?? "0.0.0.0", () => {
       const a = server.address();
       resolve({
         port: typeof a === "object" && a ? a.port : o.port,
-        close: () => new Promise((r) => (clearInterval(pruneTimer), server.closeAllConnections(), server.close(() => r()))),
+        close: () =>
+          new Promise((r) => {
+            clearInterval(pruneTimer);
+            for (const c of wss.clients) c.terminate();
+            wss.close();
+            server.closeAllConnections();
+            server.close(() => r());
+          }),
       });
     });
   });

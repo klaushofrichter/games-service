@@ -137,6 +137,8 @@ export interface LobbyState {
   cloud: CloudStatus;
   /** Why the running game is paused and what the board may offer. */
   pause: { reason: "cloud"; since: number; canSave: boolean } | null;
+  /** Remote play: whether remote boards may act, and how many remote players fit. */
+  remote: { boardControl: boolean; maxPlayers: number; players: number };
 }
 
 export interface CloudStatus {

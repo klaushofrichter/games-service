@@ -41,6 +41,7 @@ export interface TableConfig {
 
 interface Player extends PlayerInfo {
   sessionToken: string | null; // null for AI players
+  remoteSession?: string; // the cloud session a remote player came through: one player per invite
   graceTimer?: NodeJS.Timeout;
   aiSeed?: number;
 }
@@ -110,7 +111,7 @@ export class Table extends EventEmitter {
       layout: this.layout,
       seatEdges: seatEdges(this.layout),
       frontEdge: this.frontEdge,
-      players: [...this.players.values()].map(({ sessionToken, graceTimer, aiSeed, ...info }) => info),
+      players: [...this.players.values()].map(({ sessionToken, graceTimer, aiSeed, remoteSession, ...info }) => info),
       phase: this.phase,
       game: this.selected
         ? {
@@ -126,6 +127,7 @@ export class Table extends EventEmitter {
       joinUrl: this.currentJoin().url,
       cloud: this.cloud,
       pause: this.pause,
+      remote: { boardControl: this.remoteBoardControl, maxPlayers: this.config.maxRemotePlayers, players: this.humans().filter((p) => p.location === "remote").length },
     };
   }
 
@@ -202,16 +204,44 @@ export class Table extends EventEmitter {
     return { token: this.joinToken, url: `${this.config.publicUrl}/j/${this.joinToken}` };
   }
 
-  join(joinToken: string, rawName: unknown, location: "local" | "remote" = "local") {
-    if (!joinToken || joinToken.toUpperCase() !== this.currentJoin().token) throw new TableError(403, "join code is invalid or expired; scan the QR code again");
+  /** Remote boards may act unless switched off at the table or by the running game's manifest (D-006). */
+  remoteBoardControl = true;
+
+  setRemoteBoardControl(on: boolean) {
+    this.remoteBoardControl = !!on;
+    this.changed();
+  }
+
+  remoteControlAllowed(): boolean {
+    if (!this.remoteBoardControl) return false;
+    const m = this.selected?.game.manifest;
+    return !(m && (this.phase === "active" || this.phase === "paused") && !m.remoteBoardControl);
+  }
+
+  /**
+   * A remote player arriving through an invite (already checked by the cloud): no join code needed.
+   * One invite seats one player: a second hello from the same session gets that same player back.
+   */
+  joinRemote(rawName: unknown, remoteSession: string) {
+    const existing = [...this.players.values()].find((p) => p.remoteSession === remoteSession);
+    if (existing?.sessionToken) {
+      this.resume(existing.sessionToken);
+      return { playerId: existing.id, sessionToken: existing.sessionToken };
+    }
+    return this.join("", rawName, "remote", remoteSession);
+  }
+
+  join(joinToken: string, rawName: unknown, location: "local" | "remote" = "local", remoteSession?: string) {
+    if (location === "local" && (!joinToken || joinToken.toUpperCase() !== this.currentJoin().token))
+      throw new TableError(403, "join code is invalid or expired; scan the QR code again");
     if (location === "remote" && this.humans().filter((p) => p.location === "remote").length >= this.config.maxRemotePlayers)
-      throw new TableError(409, "remote player limit reached");
+      throw new TableError(409, "the table has no room for more remote players");
     const name = this.cleanName(rawName);
     const id = newId("p");
     const sessionToken = randomBytes(24).toString("base64url");
-    const p: Player = { id, name, kind: "human", location, seat: null, connected: true, ready: false, sessionToken };
+    const p: Player = { id, name, kind: "human", location, seat: null, connected: true, ready: false, sessionToken, remoteSession };
     this.players.set(id, p);
-    this.rotateJoinToken(); // one-time use
+    if (location === "local") this.rotateJoinToken(); // one-time use
     this.seatNewcomer(p);
     this.changed();
     return { playerId: id, sessionToken };

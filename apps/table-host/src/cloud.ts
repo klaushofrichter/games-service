@@ -3,8 +3,10 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { randomBytes } from "node:crypto";
+import WebSocket from "ws";
 import type { Table } from "./table.ts";
 import type { LogStore } from "./logs.ts";
+import type { RemoteGateway } from "./remote.ts";
 
 export interface CloudLinkOptions {
   cloudUrl: string;
@@ -46,6 +48,55 @@ export class CloudLink {
   stop() {
     this.stopped = true;
     if (this.timer) clearTimeout(this.timer);
+    if (this.socketRetry) clearTimeout(this.socketRetry);
+    this.socket?.close();
+  }
+
+  // ----- signaling socket for remote play (opened once the table is approved) -----
+
+  gateway: RemoteGateway | null = null;
+  private socket: WebSocket | null = null;
+  private socketRetry: NodeJS.Timeout | null = null;
+
+  private openSocket() {
+    if (this.stopped || this.socket || !this.identity.tableToken || !this.gateway) return;
+    const url = this.o.cloudUrl.replace(/^http/, "ws") + "/api/tables/ws";
+    const ws = new WebSocket(url, { headers: { authorization: `Bearer ${this.identity.tableToken}` } });
+    this.socket = ws;
+    ws.on("message", async (raw) => {
+      let msg: any;
+      try {
+        msg = JSON.parse(String(raw));
+      } catch {
+        return;
+      }
+      if (msg.type !== "offer" || !this.gateway) return;
+      try {
+        const sdp = await this.gateway.answer(String(msg.session), String(msg.sdp), msg.iceServers ?? []);
+        ws.send(JSON.stringify({ type: "answer", session: msg.session, sdp }));
+      } catch (err) {
+        ws.send(JSON.stringify({ type: "error", session: msg.session, message: (err as Error).message }));
+      }
+    });
+    // Keep proxies (ingress idle timeouts) from closing the socket between invites.
+    const keepAlive = setInterval(() => ws.readyState === WebSocket.OPEN && ws.ping(), 30_000);
+    keepAlive.unref();
+    ws.on("error", () => {});
+    ws.on("close", () => {
+      clearInterval(keepAlive);
+      if (this.socket === ws) this.socket = null;
+      if (!this.stopped) {
+        this.socketRetry = setTimeout(() => this.openSocket(), 3000);
+        this.socketRetry.unref();
+      }
+    });
+  }
+
+  /** Ask the service for an invite to this table (8 characters, read out loud). */
+  async createInvite(): Promise<{ token: string; url: string; expiresAt: string }> {
+    const r = await this.req("POST", "/api/tables/invites", {});
+    if (!r.ok) throw new Error(`the service refused the invite (${r.status})`);
+    return (await r.json()) as { token: string; url: string; expiresAt: string };
   }
 
   private async save() {
@@ -97,6 +148,7 @@ export class CloudLink {
       const b = (await r.json()) as { config?: { logRetentionDays: number } };
       if (b.config) this.applyConfig(b.config);
       this.table.setCloud({ status: "online" });
+      this.openSocket();
     } catch {
       this.table.setCloud({ status: "offline" });
     }

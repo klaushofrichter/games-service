@@ -11,6 +11,9 @@ const cloud = await startCloud({
   adminToken,
   publicUrl: process.env.PUBLIC_URL ?? "https://games.skylar.technology",
   logRetentionDays: Number(process.env.LOG_RETENTION_DAYS ?? 90),
+  // e.g. [{"urls":"stun:stun.l.google.com:19302"},{"urls":"turn:turn.example:3478","username":"u","credential":"p"}]
+  iceServers: process.env.ICE_SERVERS ? JSON.parse(process.env.ICE_SERVERS) : undefined,
+  trustProxy: process.env.TRUST_PROXY === "1",
 });
 console.log(`[cloud] listening on ${cloud.port}`);
 for (const sig of ["SIGINT", "SIGTERM"] as const) process.on(sig, async () => (await cloud.close(), process.exit(0)));

@@ -1,9 +1,11 @@
 html, body { overflow: hidden; }
 
-#stage { position: fixed; inset: 0; display: grid; place-items: center; }
+#stage { position: fixed; inset: 0; }
+/* Centred by position, not by grid: a grid start-aligns an item wider than the window (any screen under 1920 px). */
 #surface {
-  position: relative;
+  position: absolute; left: 50%; top: 50%;
   width: 1920px; height: 1080px;
+  margin: -540px 0 0 -960px;
   transform-origin: center center;
   background:
     radial-gradient(ellipse 70% 60% at 50% 50%, rgba(255, 255, 255, 0.06), transparent 70%),
@@ -154,3 +156,11 @@ pre.raw { font-family: var(--mono); font-size: 0.7em; color: var(--ink-soft); ba
 .overlay .group { margin: 18px 0; }
 .overlay label { display: flex; flex-direction: column; gap: 6px; font-size: 0.9em; }
 .overlay input { font: inherit; background: var(--felt-deep); color: var(--ink); border: 1px solid var(--felt-line); border-radius: 10px; padding: 8px 12px; }
+
+/* remote invite dialog (phase 1c) */
+.invite-body { display: flex; gap: 24px; align-items: center; margin: 18px 0; }
+.invite-body .qr svg { width: 220px; height: 220px; display: block; border-radius: 10px; background: #fff; padding: 6px; }
+.invite-body .url { font-family: var(--mono); font-size: 0.8em; word-break: break-all; }
+.invite-body .code { font-family: var(--mono); font-size: 1.6em; letter-spacing: 0.18em; color: var(--brass); margin-top: 8px; }
+.invite-control { display: flex; align-items: center; gap: 14px; padding-top: 14px; border-top: 1px solid var(--felt-line); cursor: pointer; }
+.invite-control input { width: 26px; height: 26px; accent-color: var(--brass); flex: none; }

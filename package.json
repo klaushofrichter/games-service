@@ -1,7 +1,7 @@
 {
   "name": "games-service",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Game Table platform: table host, lobby, SDK, cloud service and example games",
   "type": "module",
   "engines": {

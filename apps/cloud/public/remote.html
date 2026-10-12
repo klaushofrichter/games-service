@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Game Table</title>
+<style>
+  :root { --felt: #0f2a24; --felt-deep: #0a1d19; --line: #1f4a40; --ink: #f3eee2; --soft: #b9b3a3; --faint: #7d8a83; --brass: #d6a94a; --danger: #d9614c; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--felt-deep); color: var(--ink); font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+  [hidden] { display: none !important; }
+  .center { min-height: 100%; display: grid; place-items: center; padding: 24px 16px; }
+  .card { width: 100%; max-width: 420px; background: var(--felt); border: 1px solid var(--line); border-radius: 16px; padding: 28px; }
+  .eyebrow { text-transform: uppercase; letter-spacing: .16em; font-size: .75em; color: var(--brass); }
+  h1 { margin: 8px 0 12px; font-size: 1.6em; }
+  p { color: var(--soft); line-height: 1.45; }
+  input { width: 100%; font: inherit; font-size: 1.1em; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--felt-deep); color: var(--ink); }
+  button { font: inherit; cursor: pointer; border-radius: 10px; border: 1px solid var(--line); background: var(--felt); color: var(--ink); padding: 10px 16px; }
+  button.primary { background: var(--brass); border-color: var(--brass); color: #1b1407; font-weight: 600; width: 100%; padding: 14px; margin-top: 14px; }
+  .err { color: var(--danger); }
+  /* playing: the board fills the window beside the private deck, which sits on the right (or below on phones) */
+  #play { position: fixed; inset: 0; }
+  /* (an iframe doesn't stretch between left and right: it needs an explicit size) */
+  #board { position: absolute; top: 0; left: 0; width: calc(100% - 412px); height: 100%; border: 0; background: var(--felt-deep); }
+  #play.deck-min #board { width: 100%; }
+  #deck-wrap { position: absolute; right: 16px; bottom: 16px; width: 380px; height: min(640px, calc(100% - 32px)); display: flex; flex-direction: column;
+    border: 1px solid var(--line); border-radius: 16px; overflow: hidden; box-shadow: 0 18px 50px rgba(0,0,0,.55); background: var(--felt-deep); }
+  #deck-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 10px; background: var(--felt); font-size: .85em; color: var(--soft); }
+  #deck-bar button { padding: 4px 10px; font-size: .9em; }
+  #deck { flex: 1; width: 100%; border: 0; }
+  #deck-wrap.min { height: auto; }
+  #deck-wrap.min #deck { display: none; }
+  #status { position: absolute; left: 50%; top: 16px; transform: translateX(-50%); background: rgba(0,0,0,.7); padding: 8px 16px; border-radius: 999px; font-size: .9em; }
+  @media (max-width: 700px) {
+    #board { width: 100%; height: 45%; }
+    #play.deck-min #board { height: calc(100% - 44px); }
+    #deck-wrap { left: 0; right: 0; bottom: 0; width: auto; height: 55%; border-radius: 16px 16px 0 0; }
+  }
+</style>
+</head>
+<body>
+<div id="intro" class="center" hidden>
+  <form id="join" class="card">
+    <div class="eyebrow">Invitation</div>
+    <h1 id="title">Join the game table</h1>
+    <p>You're invited to play at a game table. You'll see the board and your own cards. No account needed — any name works.</p>
+    <input name="name" maxlength="24" autocomplete="nickname" placeholder="Your name" required>
+    <button class="primary" type="submit">Join the table</button>
+    <p class="err" id="join-err" hidden></p>
+    <p style="font-size:.8em;color:var(--faint)">The game runs on the table; this page connects to it directly. <a href="#" id="terms" style="color:var(--brass)">Terms</a> are shown once you're connected.</p>
+  </form>
+</div>
+<div id="wait" class="center" hidden><div class="card"><div class="eyebrow">Game Table</div><h1 id="wait-title">Connecting…</h1><p id="wait-text">Reaching the table.</p></div></div>
+<div id="play" hidden>
+  <iframe id="board" title="Game board"></iframe>
+  <div id="deck-wrap"><div id="deck-bar"><span>Your deck · private</span><button id="deck-min" type="button">Hide</button></div><iframe id="deck" title="Your deck"></iframe></div>
+  <div id="status" hidden></div>
+</div>
+<script>
+(() => {
+  "use strict";
+  const CODE = location.pathname.split("/").pop().toUpperCase();
+  const PAGE = (crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2));
+  const STORE = `gametable.invite.${CODE}`;
+  const $ = (id) => document.getElementById(id);
+  const store = {
+    get() { try { return JSON.parse(localStorage.getItem(STORE) || "null"); } catch { return null; } },
+    set(v) { try { localStorage.setItem(STORE, JSON.stringify(v)); } catch {} },
+  };
+  const show = (id) => ["intro", "wait", "play"].forEach((x) => ($(x).hidden = x !== id));
+  const wait = (title, text) => { $("wait-title").textContent = title; $("wait-text").textContent = text; show("wait"); };
+
+  let saved = store.get() || {};
+  let name = saved.name || "";
+  let pc = null, dc = null, signal = null, attempts = 0, playing = false;
+
+  // ---------- requests and virtual sockets over the data channel ----------
+  let reqId = 0, sockId = 0;
+  const requests = new Map(); // id -> { port, parts[] }
+  const sockets = new Map(); // sid -> fake socket
+  const sendFrame = (f) => dc && dc.readyState === "open" && (dc.send(JSON.stringify(f)), true);
+
+  function b64ToBuffer(b64) {
+    const bin = atob(b64);
+    const out = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out.buffer;
+  }
+
+  function onFrame(raw) {
+    let f;
+    try { f = JSON.parse(raw); } catch { return; }
+    if (f.k === "res") {
+      const r = requests.get(f.id);
+      if (!r) return;
+      r.parts[f.part] = f.b64;
+      if (r.parts.filter((x) => x !== undefined).length < f.parts) return;
+      requests.delete(f.id);
+      const body = b64ToBuffer(r.parts.join(""));
+      r.port.postMessage({ status: f.status, type: f.type, body }, [body]);
+    } else if (f.k === "ws") {
+      const s = sockets.get(f.sid);
+      if (!s) return;
+      if (f.op === "open") { s.readyState = 1; s.onopen && s.onopen({}); }
+      else if (f.op === "msg") s.onmessage && s.onmessage({ data: String(f.data) });
+      else if (f.op === "close") s._closed(f.code || 1000);
+    }
+  }
+
+  navigator.serviceWorker && navigator.serviceWorker.addEventListener("message", (e) => {
+    const m = e.data;
+    if (!m || m.type !== "gt-req" || !e.ports[0]) return;
+    const id = ++reqId;
+    requests.set(id, { port: e.ports[0], parts: [] });
+    if (!sendFrame({ k: "req", id, method: m.method, path: m.path, body: m.body })) {
+      requests.delete(id);
+      const body = new TextEncoder().encode('{"error":"not connected to the table"}').buffer;
+      e.ports[0].postMessage({ status: 503, type: "application/json", body }, [body]);
+    }
+  });
+
+  /** A WebSocket look-alike for the board and deck frames (they call window.parent.gameTableSocket()). */
+  window.gameTableSocket = () => {
+    const sid = ++sockId;
+    const s = {
+      readyState: 0, onopen: null, onmessage: null, onclose: null, onerror: null,
+      send(data) { if (s.readyState === 1) sendFrame({ k: "ws", sid, op: "msg", data: String(data) }); },
+      close(code) { if (s.readyState > 1) return; sendFrame({ k: "ws", sid, op: "close", code: code || 1000 }); s._closed(code || 1000); },
+      _closed(code) { if (s.readyState === 3) return; s.readyState = 3; sockets.delete(sid); s.onclose && s.onclose({ code, reason: "" }); },
+    };
+    sockets.set(sid, s);
+    setTimeout(() => { if (!sendFrame({ k: "ws", sid, op: "open" })) s._closed(1006); }, 0);
+    return s;
+  };
+
+  // ---------- connecting ----------
+  let swReady = null;
+  const serviceWorker = () => (swReady = swReady || registerWorker().catch((e) => { swReady = null; throw e; }));
+  async function registerWorker() {
+    if (!("serviceWorker" in navigator)) throw new Error("This browser can't open the table. Try a current Chrome, Edge, Firefox or Safari.");
+    const reg = await navigator.serviceWorker.register("/remote-sw.js", { scope: "/" });
+    await navigator.serviceWorker.ready;
+    const w = reg.active || navigator.serviceWorker.controller;
+    const register = () => (navigator.serviceWorker.controller || reg.active)?.postMessage({ type: "gt-register", page: PAGE });
+    register();
+    setInterval(register, 10000); // also keeps the worker's page map warm after a restart
+    return w;
+  }
+
+  function gathered(peer) {
+    return new Promise((resolve) => {
+      if (peer.iceGatheringState === "complete") return resolve();
+      const t = setTimeout(resolve, 4000);
+      peer.addEventListener("icegatheringstatechange", () => peer.iceGatheringState === "complete" && (clearTimeout(t), resolve()));
+    });
+  }
+
+  let gen = 0; // connection generation: handlers of an older attempt ignore their events
+  let retryTimer = null;
+
+  function connect() {
+    teardown();
+    const g = ++gen;
+    const live = () => g === gen;
+    wait(playing ? "Reconnecting…" : "Connecting…", "Reaching the table.");
+    const q = new URLSearchParams({ invite: CODE });
+    if (saved.session) q.set("session", saved.session);
+    const ws = (signal = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/api/remote/ws?${q}`));
+    let answered = false;
+    ws.onmessage = async (ev) => {
+      if (!live()) return;
+      let m;
+      try { m = JSON.parse(ev.data); } catch { return; }
+      try {
+        if (m.type === "hello") {
+          saved = { ...saved, session: m.session, name };
+          store.set(saved);
+          if (!playing) $("title").textContent = m.tableName;
+          wait(playing ? "Reconnecting…" : "Connecting…", `Opening a direct connection to ${m.tableName}.`);
+          const peer = (pc = new RTCPeerConnection({ iceServers: m.iceServers || [] }));
+          const ch = (dc = peer.createDataChannel("gt"));
+          ch.onmessage = (e) => live() && onFrame(typeof e.data === "string" ? e.data : "");
+          ch.onopen = () => { if (!live()) return; attempts = 0; ws.onclose = null; ws.close(); start(); };
+          ch.onclose = () => live() && retry();
+          peer.onconnectionstatechange = () => live() && peer.connectionState === "failed" && retry();
+          await peer.setLocalDescription(await peer.createOffer());
+          await gathered(peer);
+          if (live()) ws.send(JSON.stringify({ type: "offer", sdp: peer.localDescription.sdp }));
+        } else if (m.type === "answer" && pc) {
+          answered = true;
+          await pc.setRemoteDescription({ type: "answer", sdp: m.sdp });
+        } else if (m.type === "error") {
+          fail(m.message);
+        }
+      } catch (err) {
+        if (live()) retry();
+      }
+    };
+    ws.onclose = () => {
+      if (!live() || (dc && dc.readyState === "open")) return;
+      if (!answered) retry();
+    };
+  }
+
+  function fail(msg) {
+    if (playing) return retry();
+    teardown();
+    gen++;
+    $("join-err").textContent = msg;
+    $("join-err").style.color = "";
+    $("join-err").hidden = false;
+    show("intro");
+  }
+
+  function retry() {
+    teardown();
+    gen++;
+    if (retryTimer) return;
+    if (!playing && attempts >= 5) {
+      attempts = 0;
+      saved = { name };
+      store.set(saved);
+      return fail("The table can't be reached. Check that the invite is still valid, or ask for a new one.");
+    }
+    const delay = Math.min(10000, 1000 * 2 ** attempts++);
+    wait(playing ? "Reconnecting…" : "Connecting…", `The table can't be reached right now. Trying again in ${Math.round(delay / 1000)} s.`);
+    retryTimer = setTimeout(() => { retryTimer = null; connect(); }, delay);
+  }
+
+  /** Close everything of the current attempt, quietly, and fail what was waiting on it. */
+  function teardown() {
+    for (const s of [...sockets.values()]) s._closed(1006);
+    for (const [id, r] of requests) {
+      const body = new TextEncoder().encode('{"error":"connection to the table lost"}').buffer;
+      r.port.postMessage({ status: 503, type: "application/json", body }, [body]);
+      requests.delete(id);
+    }
+    if (dc) { dc.onclose = dc.onmessage = dc.onopen = null; try { dc.close(); } catch {} }
+    if (pc) { pc.onconnectionstatechange = null; try { pc.close(); } catch {} }
+    if (signal) { signal.onclose = signal.onmessage = null; try { signal.close(); } catch {} }
+    dc = pc = signal = null;
+  }
+
+  function start() {
+    // (Re)load the board and the deck so their sockets reopen over the new channel.
+    show("play"); // first, so the frames load at their real size
+    const q = (extra) => `?remote=1&gtp=${encodeURIComponent(PAGE)}${extra}`;
+    $("board").src = `/board/${q("")}`;
+    $("deck").src = `/deck/${q(`&inv=${encodeURIComponent(CODE)}&name=${encodeURIComponent(name)}`)}`;
+    playing = true;
+    show("play");
+  }
+
+  $("deck-min").addEventListener("click", () => {
+    const w = $("deck-wrap");
+    w.classList.toggle("min");
+    $("play").classList.toggle("deck-min", w.classList.contains("min"));
+    $("deck-min").textContent = w.classList.contains("min") ? "Show" : "Hide";
+  });
+  $("terms").addEventListener("click", (e) => { e.preventDefault(); alertTerms(); });
+  function alertTerms() {
+    $("join-err").hidden = false;
+    $("join-err").style.color = "var(--soft)";
+    $("join-err").textContent = "Play fair, be kind, no real money. The full terms open from your deck once you're connected.";
+  }
+
+  $("join").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    name = String(new FormData(e.target).get("name") || "").trim();
+    if (!name) return;
+    $("join-err").hidden = true;
+    try {
+      await serviceWorker();
+      connect();
+    } catch (err) {
+      fail(err.message);
+    }
+  });
+
+  if (saved.session && saved.name) {
+    name = saved.name;
+    serviceWorker().then(connect, (err) => fail(err.message));
+  } else {
+    if (saved.name) document.querySelector("#join input").value = saved.name;
+    show("intro");
+  }
+})();
+</script>
+</body>
+</html>

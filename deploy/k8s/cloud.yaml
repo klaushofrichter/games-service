@@ -32,11 +32,14 @@ spec:
       securityContext: { runAsNonRoot: true, runAsUser: 1000 }
       containers:
         - name: cloud
-          image: ghcr.io/klaushofrichter/games-cloud:0.2.0
+          image: ghcr.io/klaushofrichter/games-cloud:0.3.0
           ports: [{ containerPort: 8081, name: http }]
           env:
             - { name: PUBLIC_URL, value: "https://games.skylar.technology" }
             - { name: LOG_RETENTION_DAYS, value: "90" }
+            - { name: TRUST_PROXY, value: "1" } # client address from the ingress X-Forwarded-For (rate limits)
+            # STUN/TURN for remote play (phase 1c). With a TURN server, put this in the secret instead (it holds credentials).
+            - { name: ICE_SERVERS, value: '[{"urls":"stun:stun.l.google.com:19302"}]' }
           envFrom: [{ secretRef: { name: games-cloud } }]
           readinessProbe: { httpGet: { path: /health, port: http }, periodSeconds: 10 }
           livenessProbe: { httpGet: { path: /health, port: http }, periodSeconds: 30 }
@@ -62,6 +65,9 @@ metadata:
   annotations:
     cert-manager.io/cluster-issuer: letsencrypt-prod
     nginx.ingress.kubernetes.io/proxy-body-size: 64m # game log uploads
+    # signaling WebSockets (/api/tables/ws stays open for as long as a table is on)
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
 spec:
   ingressClassName: nginx
   tls:

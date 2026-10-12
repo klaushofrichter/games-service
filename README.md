@@ -2,7 +2,7 @@
 
 Game Table platform: a touchscreen **board** lying flat on a table, players' phones as private **decks**, a Linux **Table Host** that runs the games, and a **cloud service** at `games.skylar.technology` that enrolls tables, collects metrics and logs, and (from phase 1c) brokers remote players.
 
-This repository implements phases 1a and 1b of the *Game Table — Concept & Architecture* document: lobby, seats, game selection, the game runtime with replayable logs, AI-only simulation, the board control API, automated tests, and three playable games with their own board and phone UIs: **Roulette**, **Pachisi** and **Hold'em**. Remote play (phase 1c) builds on it. Decisions are recorded in [`docs/decisions.md`](docs/decisions.md).
+This repository implements phases 1a, 1b and 1c of the *Game Table — Concept & Architecture* document: lobby, seats, game selection, the game runtime with replayable logs, AI-only simulation, the board control API, pause on a lost service connection, the admin portal, a table PC kit, **remote play** over WebRTC, automated tests, and three playable games with their own board and phone UIs: **Roulette**, **Pachisi** and **Hold'em**. Decisions are recorded in [`docs/decisions.md`](docs/decisions.md).
 
 ## Quick start
 
@@ -28,15 +28,16 @@ curl -X POST -H "Authorization: Bearer $ADMIN_TOKEN" http://localhost:8081/admin
 | --- | --- |
 | `packages/protocol` | Message envelope, manifest schema (zod), seat layouts and edges, lobby types |
 | `packages/sdk` | `defineGame`, seeded RNG, the `GameContext` games receive |
-| `apps/table-host/src` | HTTP + WebSocket server, lobby (`table.ts`), game runtime and replay (`runtime.ts`), logs, simulation, cloud link |
+| `apps/table-host/src` | HTTP + WebSocket server, lobby (`table.ts`), game runtime and replay (`runtime.ts`), logs, simulation, cloud link, remote-play gateway (`remote.ts`, WebRTC) |
 | `apps/table-host/public` | Board and deck pages (plain HTML/CSS/JS) |
-| `apps/cloud/src` | Cloud service skeleton: pairing, heartbeat, metrics, log upload/download, download tokens, invite codes |
+| `apps/cloud/src` | Cloud service: pairing, heartbeat, metrics, log upload/download, download tokens, invites and WebRTC signaling |
+| `apps/cloud/public` | Admin portal (`/admin`) and the remote player's invite page (`/i/CODE`) with its service worker |
 | `games/roulette` | European roulette, 1–6 players, simultaneous betting, three AI styles |
 | `games/pachisi` | Ludo-style race with dice and captures, 2–4 players, two AI levels |
 | `games/holdem` | Fixed-limit Texas Hold'em, 2–6 players, private hole cards, side pots, two AI styles |
 | `games/coin-flip` | Stub game: 1–8 players, simultaneous, AI, dynamic players, timers |
 | `games/quartet` | Stub game: exactly 4 humans, no AI, sequential turns, ends if a player leaves |
-| `scripts/e2e/play.py` | Browser end-to-end check per game (Playwright): board plus phone decks, screenshots |
+| `scripts/e2e/` | Browser end-to-end checks (Playwright): `play.py` per game, `admin.py` for the portal, `remote.py` for remote play |
 | `scripts/soak.ts` | AI-only soak run over every game and player count |
 | `docs/` | Decision log, hand-off for deploying the cloud on Kubernetes |
 | `tests/` | Vitest suites that drive a real host through the board control API and fake decks |
@@ -73,7 +74,7 @@ curl -s -H "$K" -X POST $H/simulation -d '{"gameId":"coin-flip","players":4,"gam
 curl -s -H "$K" $H/logs/<id>.zip -o run.zip                # JSONL game logs
 ```
 
-Full list: `GET /state, /join, /games, /metrics, /game/board, /logs, /logs/{id}.zip` and `POST /layout, /rotate, /seats/move, /ai, /game/select, /game/start, /game/end, /game/close, /simulation`, `DELETE /players/{id}`.
+Full list: `GET /state, /join, /games, /metrics, /game/board, /logs, /logs/{id}.zip` and `POST /layout, /rotate, /seats/move, /ai, /game/select, /game/start, /game/end, /game/close, /game/resume, /game/save, /simulation, /players/{id}/ai-options, /invites, /remote`, `GET /saves, /qr?text=URL`, `DELETE /players/{id}`.
 
 Decks speak JSON envelopes over `/ws`: `system.hello {joinToken, name}` or `{sessionToken}`, then `lobby.ready {ready}` and `game.intent {name, payload}`. The host answers with `lobby.state`, `game.view` (this seat only) and `system.ack | reject | error`.
 
@@ -97,13 +98,29 @@ The UI modules export `mount(root, ctx)` returning `{ update(view, events, info)
 
 Rules must be deterministic: all randomness through `ctx.random()`. The host logs the seed and every input (intents, timer firings, seat changes), so `replay()` rebuilds any game exactly; the tests check this for live games and simulations.
 
+## Remote play
+
+A remote player gets an invite link (`https://games.skylar.technology/i/CODE`) from the board (*Invite…*). Opening it asks for a name, then connects the browser **directly to the table** over WebRTC; the service only relays the connection offer and answer. The browser shows the same board as the table, with the player's private deck beside it.
+
+```
+ remote browser ──(1) /api/remote/ws: offer──▶ service ──(2) /api/tables/ws──▶ table host
+        ◀──────────────(3) answer─────────────          ◀──────────────────────
+        ◀═════════(4) WebRTC data channel "gt": board/deck files, API, live sockets═════════▶
+```
+
+- The service's `ICE_SERVERS` (JSON) sets STUN/TURN for both sides; without it, Google's public STUN is used. Add a TURN server for players behind strict NATs.
+- The table needs outbound UDP; the table PC kit uses host networking. In bridged Docker (the dev `docker-compose.yml`) remote play only works with a TURN server.
+- `POST /api/v1/remote {"boardControl": false}` (or the checkbox in the invite dialog) makes the board read-only for remote players.
+
 ## Testing
 
 ```sh
 npm test                                   # rules, lobby, cloud and host integration (Vitest)
 node scripts/soak.ts 100                   # 100 AI-only games per game and player count
 # browser end-to-end (needs Python Playwright and a running host on port 8090 with TABLE_KEY=devkey)
-python3 scripts/e2e/play.py roulette out/  # also: pachisi, holdem, coinflip
+python3 scripts/e2e/play.py roulette out/  # also: pachisi, holdem, coinflip, dialogs
+python3 scripts/e2e/admin.py out/          # admin portal (starts its own cloud and host)
+python3 scripts/e2e/remote.py out/         # remote play in a second browser (starts its own cloud and host)
 ```
 
 ## Known limits
@@ -111,5 +128,6 @@ python3 scripts/e2e/play.py roulette out/  # also: pachisi, holdem, coinflip
 - Game rules run in-process; the isolated sandbox for third-party games comes later.
 - The cloud keeps its state in memory: one replica, data lost on restart, until PostgreSQL is added.
 - Tables authenticate to the cloud with an issued bearer token, not yet a key pair or certificate.
-- AI seat configuration (`ai.options`) and host-side AI configuration (`ai.hostConfig`) are parsed but not yet shown.
-- Pausing on a lost cloud connection during a game is not implemented yet; new games are blocked when `REQUIRE_CLOUD=1`.
+- Host-side AI configuration (`ai.hostConfig`, e.g. API keys) is parsed but has no screen yet.
+- The remote board shows the table's orientation, which may be upside down for a remote player.
+- werift waits up to 5 s for STUN during connection setup when STUN is unreachable.

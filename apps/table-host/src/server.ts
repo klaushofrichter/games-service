@@ -16,9 +16,25 @@ export interface ServerOptions {
   tableKey: string;
   publicDir: string;
   allowRemoteBoard: boolean;
+  /** Ask the cloud for an invite (remote play); absent when the table runs without the cloud. */
+  createInvite?: () => Promise<{ token: string; url: string; expiresAt: string }>;
 }
 
-type Client = { ws: WebSocket; role: "board" } | { ws: WebSocket; role: "deck"; playerId: string } | { ws: WebSocket; role: "pending" };
+/** A request or socket that arrived over a remote player's WebRTC channel (see remote.ts). */
+export interface RemoteContext {
+  session: string;
+}
+export const remoteOf = (req: IncomingMessage): RemoteContext | undefined => (req as IncomingMessage & { gtRemote?: RemoteContext }).gtRemote;
+
+type Client = ({ ws: WebSocket; role: "board" } | { ws: WebSocket; role: "deck"; playerId: string } | { ws: WebSocket; role: "pending" }) & { remote?: boolean };
+
+/** Reads a remote client may make: lobby and game state, never logs, saves, simulations or local join codes. */
+const REMOTE_DENIED = /^\/(join|simulation|logs|saves|invites|remote|qr)(\/|$)/;
+/**
+ * Changes a remote client may make (an allowlist): turn the board and run games. Never remove or move
+ * players, add AI seats, change AI options, save, or resume — those stay with the people at the table.
+ */
+const REMOTE_ACTIONS = /^\/(rotate|layout|game\/(select|start|end|close))$/;
 
 const MIME: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
@@ -50,8 +66,11 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
     if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(e));
   };
 
+  // Remote clients never see the local join code (it would let them join as if they sat at the table).
+  const forClient = (c: Client, state: ReturnType<Table["state"]>) => (c.remote ? { ...state, joinUrl: "" } : state);
+
   table.on("state", (state) => {
-    for (const c of clients) if (c.role !== "pending") send(c.ws, envelope("lobby", "state", state, { stateRev: state.stateRev }));
+    for (const c of clients) if (c.role !== "pending") send(c.ws, envelope("lobby", "state", forClient(c, state), { stateRev: state.stateRev }));
   });
 
   table.on("game", (events) => {
@@ -117,12 +136,32 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
   };
 
   const api = async (req: IncomingMessage, res: ServerResponse, path: string) => {
-    if (!keyOk(req.headers["x-table-key"])) return json(res, 401, { error: "missing or wrong X-Table-Key" });
+    const remote = remoteOf(req);
     const m = req.method ?? "GET";
+    if (remote) {
+      // Remote boards are authorised by their invite (checked by the cloud), not by the table key.
+      if (REMOTE_DENIED.test(path)) return json(res, 403, { error: "not available to remote players" });
+      if (m !== "GET") {
+        if (!REMOTE_ACTIONS.test(path)) return json(res, 403, { error: "only players at the table can do that" });
+        if (!table.remoteControlAllowed()) return json(res, 403, { error: "board control is switched off for remote players" });
+      }
+    } else if (!keyOk(req.headers["x-table-key"])) return json(res, 401, { error: "missing or wrong X-Table-Key" });
     const body = m === "GET" || m === "DELETE" ? {} : await readBody(req);
     let match: RegExpMatchArray | null;
 
-    if (m === "GET" && path === "/state") return json(res, 200, table.state());
+    if (m === "GET" && path === "/state") return json(res, 200, remote ? { ...table.state(), joinUrl: "" } : table.state());
+    if (m === "POST" && path === "/remote") return (table.setRemoteBoardControl(!!body.boardControl), json(res, 200, table.state()));
+    if (m === "POST" && path === "/invites") {
+      if (!opts.createInvite) throw new TableError(409, "remote play needs the Game Table service (CLOUD_URL)");
+      if (table.cloud.status !== "online") throw new TableError(409, "the table is not connected to the service right now");
+      return json(res, 201, await opts.createInvite());
+    }
+    if (m === "GET" && path === "/qr") {
+      const text = new URL(req.url ?? "/", "http://t").searchParams.get("text") ?? "";
+      if (!/^https?:\/\/[\w.:/-]+$/.test(text) || text.length > 200) throw new TableError(400, "text must be a URL");
+      res.writeHead(200, { "content-type": "image/svg+xml", "cache-control": "no-store" });
+      return res.end(await QRCode.toString(text, { type: "svg", margin: 1, color: { dark: "#111111", light: "#ffffff" } }));
+    }
     if (m === "GET" && path === "/join") return json(res, 200, table.currentJoin());
     if (m === "GET" && path === "/games") return json(res, 200, table.availability());
     if (m === "GET" && path === "/metrics") return json(res, 200, table.metrics);
@@ -174,7 +213,7 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
     json(res, 404, { error: "unknown endpoint" });
   };
 
-  const server = createServer(async (req, res) => {
+  const handler = async (req: IncomingMessage, res: ServerResponse) => {
     const url = new URL(req.url ?? "/", "http://table");
     const path = url.pathname;
     try {
@@ -190,12 +229,14 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
         return res.end();
       }
       if (path === "/qr.svg") {
-        if (!boardAllowed(req)) return json(res, 403, { error: "board only" });
+        if (!boardAllowed(req) || remoteOf(req)) return json(res, 403, { error: "board only" });
         const svg = await QRCode.toString(table.currentJoin().url, { type: "svg", margin: 1, color: { dark: "#111111", light: "#ffffff" } });
         res.writeHead(200, { "content-type": "image/svg+xml", "cache-control": "no-store" });
         return res.end(svg);
       }
       if (path === "/board" || path === "/board/" || path === "/board/index.html") {
+        // Remote players get the same board, without the key: their channel is their authorisation.
+        if (remoteOf(req)) return await serveFile(res, "board/index.html", (s) => s.replace(`window.TABLE_KEY = "__TABLE_KEY__";`, `window.TABLE_KEY = ""; window.REMOTE_BOARD = true;`));
         if (!boardAllowed(req)) return json(res, 403, { error: "the board is only served on the table PC" });
         // The board page talks to the board control API; it gets the key only on the table PC itself.
         return await serveFile(res, "board/index.html", (s) => s.replace("__TABLE_KEY__", opts.tableKey));
@@ -214,14 +255,17 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
       console.error(err);
       json(res, 500, { error: "internal error" });
     }
-  });
+  };
+  const server = createServer(handler);
 
   // ---------- WebSocket ----------
 
   const wss = new WebSocketServer({ server, path: "/ws", maxPayload: 64 * 1024 });
 
-  wss.on("connection", (ws, req) => {
-    const client: Client & { alive?: boolean } = { ws, role: "pending", alive: true };
+  const onConnection = (ws: WebSocket, req: IncomingMessage) => {
+    const remoteCtx = remoteOf(req);
+    const remote = !!remoteCtx;
+    const client: Client & { alive?: boolean } = { ws, role: "pending", alive: true, remote };
     clients.add(client);
     ws.on("pong", () => (client.alive = true));
 
@@ -239,22 +283,22 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
         if (msg.ch === "system" && msg.type === "hello") {
           const p = msg.payload ?? {};
           if (p.role === "board") {
-            if (!keyOk(p.key)) throw new TableError(401, "board needs the table key");
+            if (!remote && !keyOk(p.key)) throw new TableError(401, "board needs the table key");
             c.role = "board";
-            reply("welcome", { role: "board" }, msg.seq);
+            reply("welcome", { role: "board", remote }, msg.seq);
           } else if (p.sessionToken) {
             const info = table.resume(String(p.sessionToken));
             c.role = "deck";
             c.playerId = info.id;
             reply("welcome", { role: "deck", playerId: info.id }, msg.seq);
           } else {
-            const { playerId, sessionToken } = table.join(String(p.joinToken ?? ""), p.name);
+            const { playerId, sessionToken } = remoteCtx ? table.joinRemote(p.name, remoteCtx.session) : table.join(String(p.joinToken ?? ""), p.name);
             c.role = "deck";
             c.playerId = playerId;
             reply("welcome", { role: "deck", playerId, sessionToken }, msg.seq);
           }
-          send(ws, envelope("lobby", "state", table.state()));
-          if (table.runtime && table.phase === "active") table.emit("game", []);
+          send(ws, envelope("lobby", "state", forClient(c, table.state())));
+          if (table.runtime && (table.phase === "active" || table.phase === "paused")) table.emit("game", []);
           return;
         }
         if (c.role !== "deck" && c.role !== "board") throw new TableError(401, "say hello first");
@@ -284,7 +328,8 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
         if (!stillOpen) table.disconnected(id);
       }
     });
-  });
+  };
+  wss.on("connection", onConnection);
 
   const ping = setInterval(() => {
     for (const c of clients) {
@@ -297,12 +342,15 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
     }
   }, 10_000);
 
-  return new Promise<{ port: number; close: () => Promise<void> }>((resolve) => {
+  return new Promise<{ port: number; close: () => Promise<void>; handler: typeof handler; attachSocket: typeof onConnection }>((resolve) => {
     server.listen(opts.port, opts.host ?? "0.0.0.0", () => {
       const addr = server.address();
       const port = typeof addr === "object" && addr ? addr.port : opts.port;
       resolve({
         port,
+        // Used by remote.ts: requests and sockets that arrive over a WebRTC channel take the same paths.
+        handler,
+        attachSocket: onConnection,
         close: async () => {
           await table.flush();
           await new Promise<void>((r) => {
