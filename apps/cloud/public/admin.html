@@ -47,9 +47,10 @@
 <body>
 <header><h1>Game Table</h1><span class="faint">service admin</span><span class="eyebrow" id="who"></span><button id="signout" hidden>Sign out</button></header>
 
+<!-- Only used in local development, where Google sign-in is not configured. In the cluster /admin is for signed-in admins. -->
 <section id="signin" hidden>
   <h2>Sign in</h2>
-  <p class="muted">Paste the admin token configured for this service (ADMIN_TOKEN).</p>
+  <p class="muted">Development mode: paste the admin token configured for this service (ADMIN_TOKEN).</p>
   <form id="signin-form" class="row"><input type="password" id="token" placeholder="Admin token" style="flex:1" autocomplete="current-password"><button class="primary">Sign in</button></form>
   <div class="msg err" id="signin-msg"></div>
 </section>
@@ -93,6 +94,8 @@
 
 <script>
 const KEY = "gametable.admin";
+// "google": the session cookie authenticates every request. "token": development mode, a bearer token instead.
+let mode = null;
 let token = (() => { try { return sessionStorage.getItem(KEY) || ""; } catch { return ""; } })();
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
@@ -100,8 +103,13 @@ const ago = (t) => { if (!t) return "never"; const s = Math.round((Date.now() - 
 const size = (b) => (b > 1e6 ? `${(b / 1e6).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1e3))} kB`);
 
 async function api(method, path, body) {
-  const r = await fetch(path, { method, headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
-  if (r.status === 401) { signOut(); throw new Error("Signed out: the token was not accepted"); }
+  const headers = { "content-type": "application/json" };
+  if (mode === "token") headers.authorization = `Bearer ${token}`;
+  const r = await fetch(path, { method, headers, body: body ? JSON.stringify(body) : undefined });
+  if (r.status === 401) {
+    if (mode === "google") { location.href = "/"; throw new Error("Your session ended. Please sign in again."); }
+    signOut(); throw new Error("Signed out: the token was not accepted");
+  }
   const ct = r.headers.get("content-type") || "";
   const data = ct.includes("json") ? await r.json() : await r.blob();
   if (!r.ok) throw new Error(data.error || `Request failed (${r.status})`);
@@ -109,10 +117,23 @@ async function api(method, path, body) {
 }
 function msg(id, text, ok) { const el = $(id); el.textContent = text; el.className = `msg ${ok ? "ok" : "err"}`; }
 
-function signOut() { token = ""; try { sessionStorage.removeItem(KEY); } catch {} show(); }
+function signOut() {
+  // Google: the server clears the cookie and lands on the public page (200, with a Sign in link).
+  if (mode === "google") { location.href = "/auth/logout"; return; }
+  token = ""; try { sessionStorage.removeItem(KEY); } catch {} show();
+}
+const signedIn = () => mode === "google" || (mode === "token" && !!token);
 function show() {
-  $("#signin").hidden = !!token; $("#app").hidden = !token; $("#signout").hidden = !token;
-  if (token) { refresh(); loadSettings(); }
+  $("#signin").hidden = signedIn() || mode !== "token"; $("#app").hidden = !signedIn(); $("#signout").hidden = !signedIn();
+  if (signedIn()) { refresh(); loadSettings(); }
+}
+async function start() {
+  const r = await fetch("/admin/api/me", { headers: token ? { authorization: `Bearer ${token}` } : {} });
+  const me = await r.json().catch(() => ({}));
+  if (r.ok) { mode = me.via; if (me.via === "google") $("#who").textContent = me.email; }
+  else if (me.signIn) { location.href = "/"; return; }
+  else { mode = "token"; token = ""; }
+  show();
 }
 async function loadSettings() { try { const s = await api("GET", "/admin/api/settings"); $("#ret-days").value = s.logRetentionDays; } catch {} }
 
@@ -135,12 +156,12 @@ async function refresh() {
     $("#logs").innerHTML = logs.sort((a, b) => b.uploadedAt - a.uploadedAt).map((l) => `<tr>
       <td class="mono">${esc(l.id)}</td><td>${esc(l.gameId)}${l.simulation ? ` <span class="pill">sim</span>` : ""}</td><td>${size(l.bytes)}</td>
       <td style="text-align:right"><button data-log="${esc(l.id)}">Download</button></td></tr>`).join("") || `<tr><td colspan="4" class="faint">No logs uploaded yet.</td></tr>`;
-  } catch (e) { if (token) msg("#pair-msg", e.message); }
+  } catch (e) { if (signedIn()) msg("#pair-msg", e.message); }
 }
 
 $("#signin-form").addEventListener("submit", async (e) => {
   e.preventDefault();
-  token = $("#token").value.trim();
+  token = $("#token").value.trim(); mode = "token";
   try { await api("GET", "/admin/api/metrics"); try { sessionStorage.setItem(KEY, token); } catch {} $("#token").value = ""; show(); }
   catch { token = ""; msg("#signin-msg", "That token was not accepted."); }
 });
@@ -182,8 +203,8 @@ $("#ret-form").addEventListener("submit", async (e) => {
   catch (err) { msg("#ret-msg", err.message); }
 });
 
-show();
-setInterval(() => token && refresh(), 10000);
+start();
+setInterval(() => signedIn() && refresh(), 10000);
 </script>
 </body>
 </html>

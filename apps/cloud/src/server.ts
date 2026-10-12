@@ -5,7 +5,9 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { randomBytes, randomInt, timingSafeEqual } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
+import { BlockList, isIPv4, isIPv6 } from "node:net";
 import { WebSocketServer, type WebSocket } from "ws";
+import { createAdminAuth, esc, publicPage, type GoogleAuthOptions } from "./auth.ts";
 
 const ADMIN_PAGE = fileURLToPath(new URL("../public/admin.html", import.meta.url));
 const REMOTE_PAGE = fileURLToPath(new URL("../public/remote.html", import.meta.url));
@@ -24,13 +26,20 @@ const secret = () => randomBytes(24).toString("base64url");
 export interface CloudOptions {
   port: number;
   host?: string;
-  adminToken: string;
+  /** Optional bearer token for scripts and pipelines (ADMIN_TOKEN). People sign in with Google. */
+  adminToken?: string;
+  /** Google sign-in for the admin portal; null only for local development (the portal then asks for ADMIN_TOKEN). */
+  google?: GoogleAuthOptions | null;
   publicUrl: string; // https://games.skylar.technology
   logRetentionDays?: number;
   /** STUN/TURN servers handed to both ends of a remote connection. */
   iceServers?: IceServer[];
-  /** Behind a reverse proxy (the Kubernetes ingress): take the client address from X-Forwarded-For. */
-  trustProxy?: boolean;
+  /**
+   * Behind a reverse proxy (the cluster's Traefik): take the client address from X-Forwarded-For, but only when the
+   * direct peer is one of these networks. A CIDR list, never a hop count (default: loopback and the k3s pod and
+   * service networks).
+   */
+  trustProxy?: boolean | string[];
 }
 
 interface TableRecord {
@@ -65,8 +74,22 @@ export function startCloud(o: CloudOptions) {
   const tableSockets = new Map<string, WebSocket>();
   const remoteSessions = new Map<string, { tableId: string; invite: string; expiresAt: number; ws: WebSocket | null }>();
   /** The client's address; behind the ingress, the last X-Forwarded-For entry (the one the ingress added). */
+  const proxies = new BlockList();
+  if (o.trustProxy) {
+    for (const c of o.trustProxy === true ? ["127.0.0.0/8", "::1/128", "10.42.0.0/16", "10.43.0.0/16"] : o.trustProxy) {
+      const [net, bits] = c.split("/");
+      proxies.addSubnet(net, Number(bits), isIPv6(net) ? "ipv6" : "ipv4");
+    }
+  }
+  const fromProxy = (addr: string | undefined) => {
+    if (!o.trustProxy || !addr) return false;
+    const a = addr.replace(/^::ffff:/, "");
+    return isIPv4(a) ? proxies.check(a, "ipv4") : isIPv6(a) && proxies.check(a, "ipv6");
+  };
+  const auth = createAdminAuth(o.google ?? null, o.publicUrl);
+  const ownOrigin = new URL(o.publicUrl).origin;
   const clientIp = (req: IncomingMessage) => {
-    const xff = o.trustProxy ? String(req.headers["x-forwarded-for"] ?? "").split(",").map((x) => x.trim()).filter(Boolean).pop() : "";
+    const xff = fromProxy(req.socket.remoteAddress) ? String(req.headers["x-forwarded-for"] ?? "").split(",").map((x) => x.trim()).filter(Boolean).pop() : "";
     return xff || req.socket.remoteAddress || "?";
   };
   const limited = (ip: string, max = 20) => {
@@ -83,7 +106,19 @@ export function startCloud(o: CloudOptions) {
   };
   const bearer = (req: IncomingMessage) => (req.headers.authorization ?? "").replace(/^Bearer\s+/i, "");
   const same = (a: string, b: string) => a.length === b.length && timingSafeEqual(Buffer.from(a), Buffer.from(b));
-  const isAdmin = (req: IncomingMessage) => same(bearer(req), o.adminToken);
+  const tokenAdmin = (req: IncomingMessage) => !!o.adminToken && same(bearer(req), o.adminToken);
+  /**
+   * The signed-in admin (Google session) or a script holding ADMIN_TOKEN. A cookie-authenticated change must also come
+   * from our own origin: SameSite=Lax already keeps cross-site POSTs cookieless, this is the second layer.
+   */
+  const admin = (req: IncomingMessage): { via: "google"; email: string } | { via: "token" } | null => {
+    if (tokenAdmin(req)) return { via: "token" };
+    const email = auth.session(req);
+    if (!email) return null;
+    const m = req.method ?? "GET";
+    if (m !== "GET" && m !== "HEAD" && req.headers.origin !== ownOrigin) return null;
+    return { via: "google", email };
+  };
   /** A lifetime from a request: positive and finite, else the default; never above the cap. */
   const lifetime = (v: unknown, fallback: number, cap: number) => {
     const n = Number(v);
@@ -126,9 +161,27 @@ export function startCloud(o: CloudOptions) {
     try {
       // {status, version}: the deploy smoke test and the cluster's version-exporter read the version (APP_VERSION, "dev" outside a release build).
       if (p === "/health") return json(res, 200, { status: "ok", ok: true, version: process.env.APP_VERSION || "dev" });
+      if (await auth.handle(req, res, p)) return;
+      if (m === "GET" && p === "/") {
+        // Public landing page; also where logout lands (200, with a Sign in link, never a bounce to Google).
+        const signedIn = auth.session(req);
+        const note = url.searchParams.has("signed-out") ? `<p class="muted">You are signed out.</p>` : "";
+        const action = signedIn
+          ? `<p class="muted">Signed in as ${esc(signedIn)}.</p><p><a class="btn" href="/admin">Open the admin portal</a></p>`
+          : auth.enabled
+            ? `<p><a class="btn" href="/auth/google/login">Administrators: sign in with Google</a></p>`
+            : `<p><a class="btn" href="/admin">Admin portal</a></p>`;
+        res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-frame-options": "DENY", "referrer-policy": "no-referrer" });
+        return res.end(publicPage("Game Table", `<p class="muted">The service behind Game Table: it pairs tables, relays invites for remote players and keeps game logs.</p>${note}${action}`));
+      }
       if (m === "GET" && (p === "/admin" || p === "/admin/")) {
-        // The page itself is public; everything it shows comes from /admin/api with the admin token.
-        res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-cache", "x-frame-options": "DENY", "referrer-policy": "no-referrer" });
+        // With Google sign-in configured the portal is for signed-in admins only; anonymous visitors go to the public
+        // page with its Sign in link (the deploy smoke test asserts this 302 as an auth-enforcement check).
+        if (auth.enabled && !auth.session(req)) {
+          res.writeHead(302, { location: "/", "cache-control": "no-store" });
+          return res.end();
+        }
+        res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-frame-options": "DENY", "referrer-policy": "no-referrer" });
         return res.end(await readFile(ADMIN_PAGE));
       }
 
@@ -198,7 +251,9 @@ export function startCloud(o: CloudOptions) {
 
       // ----- admin -----
       if (p.startsWith("/admin/api/")) {
-        if (!isAdmin(req)) return json(res, 401, { error: "admin token required" });
+        const who = admin(req);
+        if (!who) return json(res, 401, { error: "sign in required", signIn: auth.enabled ? "/auth/google/login" : null, tokenSignIn: !auth.enabled });
+        if (m === "GET" && p === "/admin/api/me") return json(res, 200, who);
         if (m === "GET" && p === "/admin/api/tables") {
           return json(res, 200, [...tables.values()].map(({ tableToken, ...t }) => ({ ...t, online: !!t.lastSeen && Date.now() - t.lastSeen < 60_000 })));
         }
