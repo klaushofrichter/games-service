@@ -62,7 +62,7 @@ export function wins(bet: Pick<Bet, "type" | "target">, n: number): boolean {
 /** Total returned to the player for a bet (stake plus winnings, or 0). */
 export const returnFor = (bet: Bet, n: number) => (wins(bet, n) ? bet.amount * (PAYOUT[bet.type] + 1) : 0);
 
-export const betKey = (b: Pick<Bet, "type" | "target">) => (b.target === undefined ? b.type : `${b.type}:${b.target}`);
+export const betKey = (b: Pick<Bet, "type" | "target">) => (b.target === undefined || b.target === null ? b.type : `${b.type}:${b.target}`);
 
 export function betLabel(b: Pick<Bet, "type" | "target">): string {
   switch (b.type) {

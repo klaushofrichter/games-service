@@ -2,7 +2,7 @@
 
 Game Table platform: a touchscreen **board** lying flat on a table, players' phones as private **decks**, a Linux **Table Host** that runs the games, and a **cloud service** at `games.skylar.technology` that enrolls tables, collects metrics and logs, and (from phase 1c) brokers remote players.
 
-This repository is the phase 1a implementation of the *Game Table — Concept & Architecture* document: lobby, seats, game selection, the game runtime with replayable logs, AI-only simulation, the board control API, and the automated lobby test suite. Roulette (phase 1b) and remote play (phase 1c) build on it.
+This repository implements phases 1a and 1b of the *Game Table — Concept & Architecture* document: lobby, seats, game selection, the game runtime with replayable logs, AI-only simulation, the board control API, automated tests, and three playable games with their own board and phone UIs: **Roulette**, **Pachisi** and **Hold'em**. Remote play (phase 1c) builds on it. Decisions are recorded in [`docs/decisions.md`](docs/decisions.md).
 
 ## Quick start
 
@@ -10,7 +10,7 @@ Requires Node.js 22.18 or newer (TypeScript runs natively, no build step).
 
 ```sh
 npm install
-npm test                 # 34 automated lobby and cloud tests
+npm test                 # 80 automated tests: lobby, cloud, and each game's rules
 TABLE_KEY=dev npm run host
 ```
 
@@ -31,8 +31,14 @@ curl -X POST -H "Authorization: Bearer $ADMIN_TOKEN" http://localhost:8081/admin
 | `apps/table-host/src` | HTTP + WebSocket server, lobby (`table.ts`), game runtime and replay (`runtime.ts`), logs, simulation, cloud link |
 | `apps/table-host/public` | Board and deck pages (plain HTML/CSS/JS) |
 | `apps/cloud/src` | Cloud service skeleton: pairing, heartbeat, metrics, log upload/download, download tokens, invite codes |
+| `games/roulette` | European roulette, 1–6 players, simultaneous betting, three AI styles |
+| `games/pachisi` | Ludo-style race with dice and captures, 2–4 players, two AI levels |
+| `games/holdem` | Fixed-limit Texas Hold'em, 2–6 players, private hole cards, side pots, two AI styles |
 | `games/coin-flip` | Stub game: 1–8 players, simultaneous, AI, dynamic players, timers |
 | `games/quartet` | Stub game: exactly 4 humans, no AI, sequential turns, ends if a player leaves |
+| `scripts/e2e/play.py` | Browser end-to-end check per game (Playwright): board plus phone decks, screenshots |
+| `scripts/soak.ts` | AI-only soak run over every game and player count |
+| `docs/` | Decision log, hand-off for deploying the cloud on Kubernetes |
 | `tests/` | Vitest suites that drive a real host through the board control API and fake decks |
 | `deploy/` | Dockerfiles, docker-compose, Kubernetes manifest for the cloud |
 
@@ -73,7 +79,7 @@ Decks speak JSON envelopes over `/ws`: `system.hello {joinToken, name}` or `{ses
 
 ## Writing a game
 
-A game is a folder with `manifest.json` (validated by `packages/protocol`) and `rules.ts`:
+A game is a folder with `manifest.json` (validated by `packages/protocol`), `rules.ts`, and optionally its own UI: `board.js`, `deck.js`, CSS files and an `assets/` folder. The host serves the UI files to boards and decks but never the rules. `rules.ts`:
 
 ```ts
 import { defineGame } from "../../packages/sdk/src/index.ts";
@@ -87,13 +93,23 @@ export default defineGame<State>({
 });
 ```
 
+The UI modules export `mount(root, ctx)` returning `{ update(view, events, info), destroy() }`. `info` carries the players, seat positions, the front edge and rotation, settings, and host timer deadlines for countdowns; the deck's `ctx.send(name, payload)` submits an intent and resolves with `{ ok, reason }`. `/shared/board-kit.js` has helpers for seat plates, rotation and countdowns, and `packages/sdk/src/cards.ts` has a deck, seeded shuffle and poker hand evaluation.
+
 Rules must be deterministic: all randomness through `ctx.random()`. The host logs the seed and every input (intents, timer firings, seat changes), so `replay()` rebuilds any game exactly; the tests check this for live games and simulations.
 
-## Known phase 1a limits
+## Testing
+
+```sh
+npm test                                   # rules, lobby, cloud and host integration (Vitest)
+node scripts/soak.ts 100                   # 100 AI-only games per game and player count
+# browser end-to-end (needs Python Playwright and a running host on port 8090 with TABLE_KEY=devkey)
+python3 scripts/e2e/play.py roulette out/  # also: pachisi, holdem, coinflip
+```
+
+## Known limits
 
 - Game rules run in-process; the isolated sandbox for third-party games comes later.
 - The cloud keeps its state in memory: one replica, data lost on restart, until PostgreSQL is added.
 - Tables authenticate to the cloud with an issued bearer token, not yet a key pair or certificate.
-- Board and deck render the two stub games with built-in views; real games will ship their own board and deck UI.
 - AI seat configuration (`ai.options`) and host-side AI configuration (`ai.hostConfig`) are parsed but not yet shown.
 - Pausing on a lost cloud connection during a game is not implemented yet; new games are blocked when `REQUIRE_CLOUD=1`.

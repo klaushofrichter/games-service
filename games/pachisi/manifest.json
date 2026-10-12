@@ -1,0 +1,30 @@
+{
+  "id": "pachisi",
+  "name": "Pachisi",
+  "version": "1.0.0",
+  "sdk": "^0.1",
+  "description": "Race your tokens around the board and home. Roll a 6 to leave the start; land on someone to send them back.",
+  "players": { "min": 2, "max": 4 },
+  "turnModel": "sequential",
+  "seatLayouts": [2, 4, 6],
+  "edges": ["north", "south"],
+  "seatConstraints": null,
+  "dynamicPlayers": false,
+  "saveGame": false,
+  "settings": [
+    { "key": "tokens", "type": "int", "min": 1, "max": 4, "default": 4, "label": "Tokens per player" },
+    { "key": "turnSeconds", "type": "int", "min": 0, "max": 120, "default": 30, "label": "Seconds per move (0 = no limit)" }
+  ],
+  "ai": {
+    "supported": true,
+    "options": [
+      { "key": "level", "type": "enum", "values": ["beginner", "average"], "default": "average", "label": "Level" }
+    ],
+    "hostConfig": []
+  },
+  "simulation": { "supported": true, "headless": true },
+  "remoteBoardControl": true,
+  "lobbyButton": "bottom-right",
+  "deck": { "minWidth": 320, "orientation": "portrait" },
+  "permissions": []
+}

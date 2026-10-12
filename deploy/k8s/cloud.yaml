@@ -32,7 +32,7 @@ spec:
       securityContext: { runAsNonRoot: true, runAsUser: 1000 }
       containers:
         - name: cloud
-          image: ghcr.io/klaushofrichter/games-cloud:0.1.0
+          image: ghcr.io/klaushofrichter/games-cloud:0.2.0
           ports: [{ containerPort: 8081, name: http }]
           env:
             - { name: PUBLIC_URL, value: "https://games.skylar.technology" }
@@ -61,6 +61,7 @@ metadata:
   namespace: games
   annotations:
     cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/proxy-body-size: 64m # game log uploads
 spec:
   ingressClassName: nginx
   tls:

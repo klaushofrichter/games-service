@@ -179,7 +179,7 @@ describe("through the table host", () => {
       await b.request("game", "intent", { name: "placeBet", payload: { type: "straight", target: 17, amount: 50 } });
 
       const board = await t.ok("GET", "/game/board");
-      expect(board.view.bets.map((x: any) => x.seat).sort()).toEqual([0, 1]);
+      expect(board.view.bets.map((x: any) => x.seat)).toEqual(expect.arrayContaining([0, 1])); // the AI seat may have bet too
 
       await sleep(60); // the AI seat finishes betting
       await a.request("game", "intent", { name: "done" });
@@ -204,6 +204,39 @@ describe("through the table host", () => {
       expect((await fetch(`${t.base}/games/roulette/rules.ts`)).status).toBe(404);
       expect((await fetch(`${t.base}/games/roulette/manifest.json`)).status).toBe(404);
       expect((await fetch(`${t.base}/games/roulette/assets/../rules.ts`)).status).toBe(404);
+    } finally {
+      await t.close();
+    }
+  });
+});
+
+describe("regressions from review", () => {
+  it("does not let a null target bypass the per-spot maximum", () => {
+    const { rt } = start(game, 1, { maxBet: 100 });
+    expect(rt.submit(0, { name: "placeBet", payload: { type: "red", amount: 100 } }, "human").ok).toBe(true);
+    expect(rt.submit(0, { name: "placeBet", payload: { type: "red", target: null, amount: 100 } }, "human")).toMatchObject({ ok: false, reason: /maximum/ });
+  });
+
+  it("keeps the maximum bet at or above the minimum", () => {
+    const { state } = start(game, 1, { minBet: 500, maxBet: 100 });
+    expect(state().maxBet).toBe(500);
+  });
+
+  it("AI players keep playing after a timer moves the game on", async () => {
+    const t = await testHost();
+    try {
+      const a = await t.joinDeck("Ann");
+      await t.ok("POST", "/ai", {});
+      await t.ok("POST", "/game/select", { gameId: "roulette", settings: { rounds: 2, bettingSeconds: 5, resultSeconds: 2 } });
+      await a.request("lobby", "ready", { ready: true });
+      await t.ok("POST", "/game/start");
+      await a.waitView((v) => v.view.phase === "betting");
+      await a.request("game", "intent", { name: "done" });
+      await a.waitView((v) => v.view.round === 2 && v.view.phase === "betting", );
+      await a.request("game", "intent", { name: "done" });
+      // round 2 was opened by the result timer; the AI must still act for the wheel to spin early
+      const r2 = await a.waitView((v) => v.view.round === 2 && v.view.phase === "result");
+      expect(r2.view.last.round).toBe(2);
     } finally {
       await t.close();
     }

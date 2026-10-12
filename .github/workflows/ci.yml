@@ -17,6 +17,9 @@ jobs:
   images:
     needs: test
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     steps:
       - uses: actions/checkout@v4
       - run: docker build -f deploy/table-host.Dockerfile -t games-table-host:ci .
@@ -26,3 +29,14 @@ jobs:
           docker run -d --name th -p 8080:8080 -e TABLE_KEY=ci games-table-host:ci
           for i in $(seq 1 20); do curl -fs localhost:8080/health && break; sleep 1; done
           curl -fs -H 'x-table-key: ci' localhost:8080/api/v1/games
+      - name: publish images to GitHub Container Registry (main only)
+        if: github.ref == 'refs/heads/main'
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+          V=$(node -p "require('./package.json').version")
+          for img in table-host cloud; do
+            docker tag games-$img:ci ghcr.io/${{ github.repository_owner }}/games-$img:$V
+            docker tag games-$img:ci ghcr.io/${{ github.repository_owner }}/games-$img:latest
+            docker push ghcr.io/${{ github.repository_owner }}/games-$img:$V
+            docker push ghcr.io/${{ github.repository_owner }}/games-$img:latest
+          done

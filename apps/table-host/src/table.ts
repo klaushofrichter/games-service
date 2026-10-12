@@ -237,6 +237,7 @@ export class Table extends EventEmitter {
     const overflow = this.seated().filter((p) => p.seat! >= layout);
     for (const p of overflow) p.seat = null;
     for (const p of overflow) p.seat = this.freeSeats()[0] ?? null;
+    if (this.phase === "ready") this.revalidateSelection();
     this.changed();
   }
 
@@ -383,6 +384,10 @@ export class Table extends EventEmitter {
 
   start() {
     if (this.phase !== "ready" || !this.selected) throw new TableError(409, "select a game first");
+    this.phase = "idle"; // judge the seats as they are now, as selection did
+    const reasons = this.reasonsFor(this.selected.game.manifest.id);
+    this.phase = "ready";
+    if (reasons.length) throw new TableError(409, `${this.selected.game.manifest.name} ${reasons.join("; ")}`);
     const notReady = this.seated().filter((p) => p.kind === "human" && (!p.ready || !p.connected));
     if (notReady.length) throw new TableError(409, `waiting for ${notReady.map((p) => p.name).join(", ")}`);
     const { game, settings } = this.selected;
@@ -395,7 +400,10 @@ export class Table extends EventEmitter {
     this.phase = "active";
     rt.onChange((kind, events) => {
       if (kind === "over") void this.onGameOver();
-      else this.emit("game", events);
+      else {
+        this.emit("game", events);
+        this.scheduleAi(); // timers and leaving players move games on too, not only intents
+      }
     });
     this.changed();
     this.emit("game", []);
@@ -455,26 +463,38 @@ export class Table extends EventEmitter {
     if (p.seat === null || !this.runtime.seats.some((s) => s.seat === p.seat)) throw new TableError(409, "you are not playing in this game");
     if (!intent || typeof intent.name !== "string") throw new TableError(400, "intent needs a name");
     const r = this.runtime.submit(p.seat, { name: intent.name, payload: intent.payload }, p.kind === "ai" ? "ai" : "human");
-    if (r.ok) this.scheduleAi();
     return r;
   }
 
-  private aiTimers = new Set<NodeJS.Timeout>();
+  private aiTimers = new Map<string, NodeJS.Timeout>(); // one pending move per AI player
   private aiRngs = new Map<string, () => number>();
 
-  private scheduleAi() {
+  /**
+   * Give every AI player a chance to act after any change to the game (an intent, a timer, a player
+   * joining or leaving). Each AI has at most one pending move, replaced on every change, so it always
+   * decides from the latest view. A rejected AI move is retried once after a pause.
+   */
+  private scheduleAi(retryMs?: number) {
     if (this.phase !== "active" || !this.runtime) return;
     for (const p of this.players.values()) {
       if (p.kind !== "ai" || p.seat === null) continue;
+      const old = this.aiTimers.get(p.id);
+      if (old) clearTimeout(old);
       const t = setTimeout(() => {
-        this.aiTimers.delete(t);
-        if (this.phase !== "active" || !this.runtime || !this.players.has(p.id)) return;
+        this.aiTimers.delete(p.id);
+        if (this.phase !== "active" || !this.runtime || !this.players.has(p.id) || this.runtime.over) return;
         let rng = this.aiRngs.get(p.id);
         if (!rng) this.aiRngs.set(p.id, (rng = createRng(p.aiSeed ?? 1)));
         const intent = this.runtime.aiIntent(p.seat!, rng);
-        if (intent) this.intent(p.id, intent);
-      }, this.config.aiDelayMs);
-      this.aiTimers.add(t);
+        if (!intent) return;
+        try {
+          const r = this.intent(p.id, intent);
+          if (!r.ok && retryMs === undefined) this.scheduleAi(this.config.aiDelayMs * 4 + 200);
+        } catch {
+          // the game moved on (ended, seat gone): nothing to do
+        }
+      }, retryMs ?? this.config.aiDelayMs);
+      this.aiTimers.set(p.id, t);
     }
   }
 
@@ -500,7 +520,7 @@ export class Table extends EventEmitter {
   shutdown() {
     this.closed = true;
     clearInterval(this.joinTimer);
-    for (const t of this.aiTimers) clearTimeout(t);
+    for (const t of this.aiTimers.values()) clearTimeout(t);
     for (const p of this.players.values()) if (p.graceTimer) clearTimeout(p.graceTimer);
     this.runtime?.clearAllTimers();
   }

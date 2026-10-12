@@ -100,6 +100,110 @@ def roulette(browser, board):
     return decks
 
 
+@scenario
+def pachisi(browser, board):
+    api("POST", "/layout", {"seats": 4})
+    decks = [join(browser, n) for n in ["Klaus", "Mira"]]
+    api("POST", "/ai", {})
+    api("POST", "/game/select", {"gameId": "pachisi", "settings": {"turnSeconds": 60, "tokens": 4}})
+    time.sleep(0.4)
+    for d in decks:
+        d.click("#ready")
+    time.sleep(0.4)
+    api("POST", "/game/start")
+    decks[0].wait_for_selector(".pc-what")
+    moves = 0
+    shot_move = False
+    for _ in range(160):
+        v = api("GET", "/game/board")["view"]
+        if v["over"]:
+            break
+        seat = v["turn"]
+        if seat > 1:  # AI seat plays by itself
+            time.sleep(0.35)
+            continue
+        d = decks[seat]
+        if v["phase"] == "roll":
+            d.wait_for_selector(".pc-roll:not([hidden])", timeout=3000)
+            d.click(".pc-roll")
+        else:
+            d.wait_for_selector("button[data-token]", timeout=3000)
+            if not shot_move and moves > 6:
+                shot(d, "deck-move")
+                shot_move = True
+            d.click("button[data-token]")
+            moves += 1
+            if moves == 14:
+                time.sleep(0.8)
+                shot(board, "board-midgame")
+        time.sleep(0.25)
+    assert moves >= 10, f"only {moves} human moves"
+    shot(decks[1], "deck-waiting")
+    return decks
+
+
+@scenario
+def holdem(browser, board):
+    api("POST", "/layout", {"seats": 4})
+    decks = [join(browser, n) for n in ["Klaus", "Mira", "Jonas"]]
+    api("POST", "/ai", {})
+    api("POST", "/game/select", {"gameId": "holdem", "settings": {"hands": 3, "turnSeconds": 60, "showdownSeconds": 20}})
+    time.sleep(0.4)
+    for d in decks:
+        d.click("#ready")
+    time.sleep(0.4)
+    api("POST", "/game/start")
+    decks[0].wait_for_selector(".he-mine .hc")
+    took = set()
+    for step in range(60):
+        v = api("GET", "/game/board")["view"]
+        if v["phase"] == "handOver":
+            time.sleep(0.6)
+            shot(board, "board-showdown")
+            shot(decks[0], "deck-result")
+            break
+        if v["toAct"] is None or v["toAct"] > 2:
+            time.sleep(0.35)
+            continue
+        d = decks[v["toAct"]]
+        d.wait_for_selector(".he-actions:not([hidden]) .he-call", timeout=3000)
+        if v["street"] == "flop" and "flop" not in took:
+            time.sleep(0.5)
+            shot(board, "board-flop")
+            shot(d, "deck-turn")
+            took.add("flop")
+        # one player raises once on the turn to exercise betting
+        if v["street"] == "turn" and "raise" not in took:
+            d.click(".he-raise")
+            took.add("raise")
+        else:
+            d.click(".he-call")
+        time.sleep(0.3)
+    assert "flop" in took, "never reached the flop"
+    v = api("GET", "/game/board")["view"]
+    assert v["phase"] == "handOver", v["phase"]
+    return decks
+
+
+@scenario
+def coinflip(browser, board):
+    decks = [join(browser, n) for n in ["Klaus", "Mira"]]
+    api("POST", "/game/select", {"gameId": "coin-flip", "settings": {"rounds": 2, "roundMs": 30000}})
+    time.sleep(0.4)
+    for d in decks:
+        d.click("#ready")
+    time.sleep(0.3)
+    api("POST", "/game/start")
+    decks[0].wait_for_selector("[data-guess=heads]")
+    decks[0].click("[data-guess=heads]")
+    decks[1].click("[data-guess=tails]")
+    time.sleep(1.2)
+    shot(board, "board")
+    shot(decks[0], "deck")
+    assert api("GET", "/game/board")["view"]["round"] == 2
+    return decks
+
+
 def main():
     with sync_playwright() as p:
         browser = p.chromium.launch()

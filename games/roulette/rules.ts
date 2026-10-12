@@ -80,7 +80,7 @@ export default defineGame<State>({
       round: 1,
       rounds: Number(settings.rounds ?? 10),
       minBet: Number(settings.minBet ?? 10),
-      maxBet: Number(settings.maxBet ?? 1000),
+      maxBet: Math.max(Number(settings.maxBet ?? 1000), Number(settings.minBet ?? 10)),
       bettingMs: Number(settings.bettingSeconds ?? 25) * 1000,
       resultMs: Number(settings.resultSeconds ?? 7) * 1000,
       startPoints: start,
@@ -117,7 +117,7 @@ export default defineGame<State>({
         if ((existing?.amount ?? 0) + amount > s.maxBet) return { reject: `maximum ${s.maxBet} per spot` };
         const bets = existing
           ? mine.map((b) => (b === existing ? { ...b, amount: b.amount + amount } : b))
-          : [...mine, { type: p.type!, ...(p.target === undefined ? {} : { target: p.target }), amount }];
+          : [...mine, { type: p.type!, ...(p.target === undefined || p.target === null ? {} : { target: p.target }), amount }];
         const next = { ...s, bets: { ...s.bets, [seat]: bets }, balances: { ...s.balances, [seat]: s.balances[seat] - amount } };
         return { state: next, events: [{ name: "betPlaced", data: { seat, type: p.type, target: p.target, amount } }] };
       }

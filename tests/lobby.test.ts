@@ -339,3 +339,14 @@ describe("AI-only simulation", () => {
     expect(r.status).toBe(409);
   });
 });
+
+describe("regressions from review", () => {
+  it("re-checks the selected game when the layout changes, and again at start", async () => {
+    for (const n of ["A", "B"]) await t.joinDeck(n);
+    await t.ok("POST", "/game/select", { gameId: "roulette" });
+    const s = await t.ok("POST", "/layout", { seats: 8 }); // roulette does not support 8 seats
+    expect(s.phase).toBe("idle");
+    expect(s.game).toBeNull();
+    expect((await t.api("POST", "/game/start")).status).toBe(409);
+  });
+});
