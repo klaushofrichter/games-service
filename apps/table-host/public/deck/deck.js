@@ -109,7 +109,8 @@ function renderTop() {
   if (!me || !state || removed) return;
   const p = self();
   const inGame = gameMsg && (state.phase === "active" || state.phase === "paused");
-  top.innerHTML = `${banner ? `<div class="banner">${esc(banner)}</div>` : ""}
+  const paused = state.phase === "paused" ? `<div class="banner">Game paused: the table lost its connection. It continues by itself when the connection is back.</div>` : "";
+  top.innerHTML = `${paused}${banner ? `<div class="banner">${esc(banner)}</div>` : ""}
     <div><div class="eyebrow">${esc(state.tableName)}${inGame ? ` · ${esc(state.game?.name)}` : ""}</div><h1>${esc(p?.name ?? "")}</h1></div>
     ${inGame ? "" : `<div class="card seatcard"><div class="badge">${p?.seat == null ? "–" : p.seat + 1}</div>
       <div>${p?.seat == null ? `<div>No seat yet</div><div class="muted" style="font-size:.85em">You'll get one when a seat opens.</div>`

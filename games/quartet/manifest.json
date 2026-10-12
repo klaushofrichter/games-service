@@ -16,5 +16,6 @@
   "simulation": { "supported": false, "headless": false },
   "remoteBoardControl": true,
   "lobbyButton": "top-right",
-  "permissions": []
+  "permissions": [],
+  "test": true
 }

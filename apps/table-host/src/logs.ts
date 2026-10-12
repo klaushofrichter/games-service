@@ -37,6 +37,26 @@ export class LogStore {
     return file;
   }
 
+  private get savesDir() {
+    return join(this.dir, "..", "saves");
+  }
+
+  /** A saved game: its log replays to the saved state; kept for the same retention period. */
+  async saveGame(id: string, save: unknown) {
+    await mkdir(this.savesDir, { recursive: true });
+    await writeFile(join(this.savesDir, `${id}.json`), JSON.stringify(save));
+  }
+
+  async listSaves(): Promise<{ id: string; gameId: string; savedAt: string; players: unknown }[]> {
+    await mkdir(this.savesDir, { recursive: true });
+    const out = [];
+    for (const f of (await readdir(this.savesDir)).filter((f) => f.endsWith(".json"))) {
+      const s = JSON.parse(await readFile(join(this.savesDir, f), "utf8"));
+      out.push({ id: s.id, gameId: s.gameId, savedAt: s.savedAt, players: s.players });
+    }
+    return out.sort((a, b) => b.savedAt.localeCompare(a.savedAt));
+  }
+
   async list(): Promise<{ id: string; bytes: number; modified: string }[]> {
     await mkdir(this.dir, { recursive: true });
     const out = [];

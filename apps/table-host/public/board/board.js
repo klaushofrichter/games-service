@@ -9,6 +9,7 @@ const center = document.getElementById("center");
 const lobbyBtn = document.getElementById("lobby-button");
 const overlayRoot = document.getElementById("overlay-root");
 const gameLayer = document.getElementById("game-layer");
+const pauseLayer = document.getElementById("pause-layer");
 
 let state = null;
 let games = [];
@@ -63,6 +64,58 @@ function confirmDialog(title, text, okLabel = "Confirm") {
   });
 }
 
+/**
+ * A small form for manifest-described fields (game settings, AI options). Resolves with the values,
+ * or null when cancelled.
+ */
+function formDialog(title, intro, fields, values = {}, okLabel = "OK") {
+  return new Promise((resolve) => {
+    const d = document.createElement("div");
+    d.className = "dialog-backdrop";
+    const input = (f) => {
+      const v = values[f.key] ?? f.default;
+      if (f.type === "enum") return `<select name="${f.key}">${f.values.map((x) => `<option ${String(v) === x ? "selected" : ""}>${esc(x)}</option>`).join("")}</select>`;
+      if (f.type === "bool") return `<input type="checkbox" name="${f.key}" ${v ? "checked" : ""}>`;
+      if (f.type === "int" || f.type === "number") return `<input type="number" name="${f.key}" value="${esc(v)}" ${f.min !== undefined ? `min="${f.min}"` : ""} ${f.max !== undefined ? `max="${f.max}"` : ""}>`;
+      return `<input type="text" name="${f.key}" value="${esc(v ?? "")}">`;
+    };
+    d.innerHTML = `<div class="dialog form"><h2>${esc(title)}</h2>${intro ? `<div class="muted">${esc(intro)}</div>` : ""}
+      <div class="fields">${fields.map((f) => `<label><span>${esc(f.label ?? f.key)}</span>${input(f)}</label>`).join("") || `<div class="faint">Nothing to set for this game.</div>`}</div>
+      <div class="actions"><button data-x="no">Cancel</button><button class="primary" data-x="yes">${esc(okLabel)}</button></div></div>`;
+    d.addEventListener("click", (e) => {
+      const x = e.target.closest("button")?.dataset.x;
+      if (!x && e.target !== d) return;
+      let out = null;
+      if (x === "yes") {
+        out = {};
+        for (const f of fields) {
+          const el = d.querySelector(`[name="${f.key}"]`);
+          out[f.key] = f.type === "bool" ? el.checked : f.type === "int" || f.type === "number" ? Number(el.value) : el.value;
+        }
+      }
+      d.remove();
+      resolve(out);
+    });
+    faceFront(d.querySelector(".dialog"));
+    overlayRoot.appendChild(d);
+  });
+}
+
+async function chooseGame(id) {
+  const g = games.find((x) => x.id === id);
+  if (!g) return;
+  const settings = await formDialog(g.name, g.description, g.settings ?? [], {}, "Choose this game");
+  if (settings) act("POST", "/game/select", { gameId: id, settings });
+}
+
+async function configureAi(playerId) {
+  const p = state.players.find((x) => x.id === playerId);
+  if (!state.game) return toast("Pick a game first: AI options depend on the game");
+  const g = games.find((x) => x.id === state.game.id);
+  const opts = await formDialog(`${p.name} · ${g.name}`, "How this AI player plays.", g.aiOptions ?? [], p.aiOptions ?? {}, "Save");
+  if (opts) act("POST", `/players/${playerId}/ai-options`, { options: opts });
+}
+
 // ---------- scaling ----------
 function fit() {
   const s = Math.min(window.innerWidth / W, window.innerHeight / H);
@@ -96,7 +149,7 @@ function renderSeats() {
         ? "Reconnecting…"
         : state.phase === "ready" && pl.kind === "human"
           ? `<span class="dot"></span>${pl.ready ? "Ready" : "Not ready"}`
-          : pl.kind === "ai" ? "AI player" : pl.location === "remote" ? "Remote" : "";
+          : pl.kind === "ai" ? `AI player${pl.aiOptions ? ` · ${esc(Object.values(pl.aiOptions).join(", "))}` : ""}` : pl.location === "remote" ? "Remote" : "";
     el.innerHTML = `<div class="num">Seat ${seat + 1} · ${p.edge}</div>
       <div class="name">${pl ? esc(pl.name) : "—"}</div><div class="status">${status}</div>`;
     if (!playing) el.addEventListener("click", () => onSeatTap(seat, pl));
@@ -126,6 +179,7 @@ function render() {
   lobbyBtn.hidden = !playing;
   lobbyBtn.className = state.game?.lobbyButton ?? "bottom-right";
 
+  renderPause();
   seatsEl.hidden = playing;
   center.hidden = playing;
   gameLayer.hidden = !playing;
@@ -160,6 +214,7 @@ function toolbar() {
     <button data-rotate="90">⟳ 90°</button>
     <button data-rotate="180">⟳ 180°</button>
     <button data-add-ai>+ AI player</button>
+    ${sel?.kind === "ai" ? `<button data-config="${sel.id}">Configure ${esc(sel.name)}</button>` : ""}
     ${sel ? `<button class="danger" data-remove="${sel.id}">Remove ${esc(sel.name)}</button>` : ""}
     <span class="spacer"></span>
     <button data-sim>Simulation…</button>
@@ -196,6 +251,7 @@ function renderReady() {
       <div class="sub">Everyone taps <b>Ready</b> on their phone.</div></div>
       <div class="ready-list">${humans.map((p) => `<span class="chip ${p.ready ? "ok" : ""}"><span class="dot" style="background:${p.ready ? "var(--jade)" : ""}"></span>${esc(p.name)}</span>`).join("")}</div>
       <div class="toolbar"><button class="primary" data-start ${all ? "" : "disabled"}>Start game</button><button data-close>Change game</button>
+      ${(() => { const sel = state.players.find((p) => p.id === selectedPlayer); return sel?.kind === "ai" ? `<button data-config="${sel.id}">Configure ${esc(sel.name)}</button>` : state.players.some((p) => p.kind === "ai") ? `<span class="faint" style="font-size:.7em">Tap an AI seat to configure it</span>` : ""; })()}
       <span class="spacer"></span><button data-rotate="180">⟳ 180°</button></div>
     </section>${joinPanel()}`;
 }
@@ -208,6 +264,32 @@ function renderFinished() {
       <div class="toolbar"><button class="primary" data-again>Play again</button><button data-close>Back to lobby</button></div></div>
     </section>${joinPanel()}`;
 }
+
+// ---------- pause screen ----------
+function renderPause() {
+  const p = state.phase === "paused" ? state.pause : null;
+  pauseLayer.hidden = !p;
+  if (!p) return;
+  const online = state.cloud.status === "online" || state.cloud.status === "disabled";
+  pauseLayer.innerHTML = `<div class="panel" style="transform:rotate(${ROT[state.frontEdge]}deg)">
+    ${online ? "" : `<div class="spinner"></div>`}
+    <h2>${online ? "Connection is back" : "Game paused"}</h2>
+    <p>${online ? "Continue where you left off." : "The table lost its connection to the Game Table service. The game continues by itself when the connection returns."}</p>
+    <div class="row">
+      ${online ? `<button class="primary" data-pause="resume">Continue</button>` : `<button disabled>Waiting…</button>`}
+      ${p.canSave ? `<button data-pause="save">Save and exit</button>` : ""}
+      <button class="danger" data-pause="end">End game</button></div></div>`;
+}
+
+pauseLayer.addEventListener("click", async (e) => {
+  const a = e.target.closest("button[data-pause]")?.dataset.pause;
+  if (a === "resume") act("POST", "/game/resume");
+  if (a === "save" && (await confirmDialog("Save and exit?", "The game is saved on this table and ends for now. Resuming saved games comes in a later update.", "Save and exit"))) {
+    const r = await api("POST", "/game/save").catch(() => null);
+    if (r) toast(`Saved as ${r.saveId}`);
+  }
+  if (a === "end" && (await confirmDialog("End this game?", "The game stops for everyone and the result is recorded as ended.", "End game"))) act("POST", "/game/end");
+});
 
 // ---------- game surface: the game's own board.js ----------
 // A game package may ship board.js exporting mount(root, ctx) -> { update(view, events, info), destroy() }.
@@ -270,7 +352,8 @@ center.addEventListener("click", async (e) => {
   const b = e.target.closest("button");
   if (!b) return;
   const d = b.dataset;
-  if (d.game) act("POST", "/game/select", { gameId: d.game });
+  if (d.game) chooseGame(d.game);
+  else if (d.config) configureAi(d.config);
   else if (d.layout) act("POST", "/layout", { seats: Number(d.layout) });
   else if (d.rotate) act("POST", "/rotate", { degrees: Number(d.rotate) });
   else if ("addAi" in d) act("POST", "/ai", {});

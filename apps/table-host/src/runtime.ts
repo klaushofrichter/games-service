@@ -74,6 +74,8 @@ export class GameRuntime {
   private rng: () => number;
   private timers = new Map<string, unknown>();
   private deadlines = new Map<string, number>();
+  /** While paused: remaining time of each timer, re-armed on resume. */
+  private paused: Map<string, number> | null = null;
   private listeners: Listener[] = [];
   private replaying = false;
 
@@ -127,6 +129,10 @@ export class GameRuntime {
 
   private setTimer(id: string, ms: number) {
     if (this.replaying) return; // timer firings come from the log during replay
+    if (this.paused) {
+      this.paused.set(id, ms); // set while paused (e.g. a player left): armed on resume
+      return;
+    }
     this.clearTimer(id);
     const h = this.clock.setTimeout(() => {
       this.timers.delete(id);
@@ -137,7 +143,29 @@ export class GameRuntime {
     this.deadlines.set(id, this.clock.now() + ms);
   }
 
+  /** Stop the clock: pending timers keep their remaining time. Timer firings are logged, so replay is unaffected. */
+  pause() {
+    if (this.paused || this.over) return;
+    const now = this.clock.now();
+    const left = new Map<string, number>();
+    for (const [id, deadline] of this.deadlines) left.set(id, Math.max(0, deadline - now));
+    this.clearAllTimers();
+    this.paused = left;
+  }
+
+  resume() {
+    if (!this.paused) return;
+    const left = this.paused;
+    this.paused = null;
+    for (const [id, ms] of left) this.setTimer(id, ms);
+  }
+
+  get isPaused() {
+    return this.paused !== null;
+  }
+
   private clearTimer(id: string) {
+    this.paused?.delete(id);
     const h = this.timers.get(id);
     if (h !== undefined) this.clock.clearTimeout(h);
     this.timers.delete(id);

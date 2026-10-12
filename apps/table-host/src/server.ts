@@ -133,6 +133,10 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
       const id = table.addAi(body.seat === undefined ? undefined : Number(body.seat));
       return json(res, 201, { playerId: id });
     }
+    if (m === "POST" && (match = path.match(/^\/players\/([\w-]+)\/ai-options$/))) {
+      table.setAiOptions(match[1], (body.options ?? {}) as Record<string, unknown>);
+      return json(res, 200, table.state());
+    }
     if (m === "DELETE" && (match = path.match(/^\/players\/([\w-]+)$/))) return (table.removePlayer(match[1], "evicted"), json(res, 200, table.state()));
     if (m === "POST" && path === "/game/select") {
       table.selectGame(String(body.gameId), (body.settings as Record<string, unknown>) ?? {});
@@ -141,6 +145,9 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
     if (m === "POST" && path === "/game/start") return (table.start(), json(res, 200, table.state()));
     if (m === "POST" && path === "/game/end") return (table.end(), json(res, 200, table.state()));
     if (m === "POST" && path === "/game/close") return (table.close(), json(res, 200, table.state()));
+    if (m === "POST" && path === "/game/resume") return (table.resumeGame(), json(res, 200, table.state()));
+    if (m === "POST" && path === "/game/save") return json(res, 200, { saveId: await table.saveAndExit(), state: table.state() });
+    if (m === "GET" && path === "/saves") return json(res, 200, await logs.listSaves());
     if (m === "GET" && path === "/game/board") {
       if (!table.runtime) throw new TableError(409, "no game loaded");
       return json(res, 200, { view: table.runtime.boardView(), over: table.runtime.over, summary: table.runtime.summary });

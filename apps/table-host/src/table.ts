@@ -36,6 +36,7 @@ export interface TableConfig {
   joinTokenTtlMs: number;
   requireCloud: boolean; // phase 1a dev mode may run without the cloud
   maxRemotePlayers: number;
+  showTestGames: boolean; // stub games used by the automated tests
 }
 
 interface Player extends PlayerInfo {
@@ -124,6 +125,7 @@ export class Table extends EventEmitter {
       summary: this.summary,
       joinUrl: this.currentJoin().url,
       cloud: this.cloud,
+      pause: this.pause,
     };
   }
 
@@ -133,9 +135,59 @@ export class Table extends EventEmitter {
 
   setCloud(c: CloudStatus) {
     if (c.status === this.cloud.status && c.pairingCode === this.cloud.pairingCode) return;
+    const wasOnline = this.cloud.status === "online";
     this.cloud = c;
     this.cloudOnline = c.status === "online";
+    // D-015: losing the service pauses a running game; it resumes by itself when the link returns.
+    if (wasOnline && !this.cloudOnline && this.phase === "active") this.pauseGame("cloud");
+    else if (this.cloudOnline && this.phase === "paused" && this.pause?.reason === "cloud") this.resumeGame();
     this.changed();
+  }
+
+  pause: LobbyState["pause"] = null;
+
+  pauseGame(reason: "cloud") {
+    if (this.phase !== "active" || !this.runtime) return;
+    this.runtime.pause();
+    for (const t of this.aiTimers.values()) clearTimeout(t);
+    this.aiTimers.clear();
+    this.phase = "paused";
+    this.pause = { reason, since: Date.now(), canSave: !!this.selected?.game.manifest.saveGame };
+    this.emit("game", [{ name: "paused", data: { reason } }]);
+  }
+
+  /** Resume a paused game (automatic when the cloud returns, or from the board once it is back). */
+  resumeGame() {
+    if (this.phase !== "paused" || !this.runtime) throw new TableError(409, "the game is not paused");
+    if (this.cloud.status !== "disabled" && !this.cloudOnline) throw new TableError(409, "still offline; the game resumes by itself when the connection returns");
+    this.runtime.resume();
+    this.phase = "active";
+    this.pause = null;
+    this.emit("game", [{ name: "resumed" }]);
+    this.scheduleAi();
+    this.changed();
+  }
+
+  /** Save the paused or running game to the table and end it. Resuming a save comes in a later phase. */
+  async saveAndExit(): Promise<string> {
+    if (!this.runtime || (this.phase !== "active" && this.phase !== "paused")) throw new TableError(409, "no game is running");
+    const m = this.selected!.game.manifest;
+    if (!m.saveGame) throw new TableError(409, `${m.name} cannot be saved`);
+    const id = logId(`${m.id}-save`);
+    const save = {
+      id,
+      format: "gametable-save/1",
+      gameId: m.id,
+      gameVersion: m.version,
+      savedAt: new Date().toISOString(),
+      players: this.seated().map((p) => ({ seat: p.seat, name: p.name, kind: p.kind })),
+      // The log replays to the saved state exactly (D-032), so it is the whole save.
+      log: [...this.runtime.log],
+    };
+    await this.logs.saveGame(id, save);
+    this.phase = "terminating";
+    this.runtime.finish("terminated", { text: `The game was saved (${id}) and can be resumed later.`, highlights: { saveId: id } });
+    return id;
   }
 
   // ---------- joining ----------
@@ -209,7 +261,7 @@ export class Table extends EventEmitter {
   }
 
   private seatNewcomer(p: Player) {
-    if (this.phase === "active" && this.runtime) {
+    if ((this.phase === "active" || this.phase === "paused") && this.runtime) {
       if (!this.selected!.game.manifest.dynamicPlayers) return; // waits for the next game
       const seat = this.freeSeats()[0];
       if (seat === undefined) return;
@@ -276,13 +328,31 @@ export class Table extends EventEmitter {
     return p.id;
   }
 
+  /** Set an AI player's options (play style, level). Checked against the selected game when there is one. */
+  setAiOptions(playerId: string, options: Record<string, unknown>) {
+    const p = this.mustPlayer(playerId);
+    if (p.kind !== "ai") throw new TableError(400, "only AI players have options");
+    this.assertNotPlaying("change AI options");
+    if (!options || typeof options !== "object") throw new TableError(400, "options must be an object");
+    const m = this.selected?.game.manifest;
+    if (m) {
+      for (const [k, v] of Object.entries(options)) {
+        const o = m.ai.options.find((x) => x.key === k);
+        if (!o) throw new TableError(400, `${m.name} has no AI option ${k}`);
+        if (o.values && !o.values.includes(String(v))) throw new TableError(400, `${k} must be one of ${o.values.join(", ")}`);
+      }
+    }
+    p.aiOptions = { ...(p.aiOptions ?? {}), ...options };
+    this.changed();
+  }
+
   /** Evict a human (revokes the session) or remove an AI. */
   removePlayer(playerId: string, reason: "evicted" | "left" = "evicted") {
     const p = this.mustPlayer(playerId);
     if (p.graceTimer) clearTimeout(p.graceTimer);
     this.players.delete(playerId);
     this.emit("removed", playerId, reason);
-    if (this.phase === "active" && this.runtime && p.seat !== null) {
+    if ((this.phase === "active" || this.phase === "paused") && this.runtime && p.seat !== null) {
       this.runtime.seatLeft(p.seat); // may end the game -> onGameOver
     }
     if (this.phase === "ready") this.revalidateSelection();
@@ -310,7 +380,7 @@ export class Table extends EventEmitter {
   // ---------- games ----------
 
   availability(): GameAvailability[] {
-    return [...this.games.values()].map(({ manifest: m }) => {
+    return [...this.games.values()].filter(({ manifest: m }) => this.config.showTestGames || !m.test).map(({ manifest: m }) => {
       const reasons = this.reasonsFor(m.id);
       return {
         id: m.id,
@@ -322,6 +392,8 @@ export class Table extends EventEmitter {
         ai: m.ai.supported,
         simulation: m.simulation.supported && m.ai.supported,
         players: allowedPlayerCounts(m),
+        settings: m.settings,
+        aiOptions: m.ai.options,
       };
     });
   }
@@ -393,7 +465,7 @@ export class Table extends EventEmitter {
     const { game, settings } = this.selected;
     const seats = this.seated().map((p) => this.seatInfo(p));
     const aiOptions: Record<number, Record<string, unknown>> = {};
-    for (const p of this.seated()) if (p.kind === "ai") aiOptions[p.seat!] = aiDefaults(game.manifest);
+    for (const p of this.seated()) if (p.kind === "ai") aiOptions[p.seat!] = aiDefaults(game.manifest, p.aiOptions);
     const rt = new GameRuntime(game.manifest, game.def, randomInt(2 ** 31), settings, seats, realClock, { aiOptions });
     this.runtime = rt;
     this.gameStartedAt = Date.now();
@@ -431,6 +503,7 @@ export class Table extends EventEmitter {
     const rt = this.runtime!;
     const terminated = rt.log.at(-1)?.t === "end" && (rt.log.at(-1) as { reason: string }).reason === "terminated";
     this.phase = "finished";
+    this.pause = null;
     this.summary = rt.summary;
     const ms = Date.now() - this.gameStartedAt;
     if (terminated) this.metrics.gamesTerminated++;
@@ -459,6 +532,7 @@ export class Table extends EventEmitter {
 
   intent(playerId: string, intent: Intent) {
     const p = this.mustPlayer(playerId);
+    if (this.phase === "paused") throw new TableError(409, "the game is paused");
     if (this.phase !== "active" || !this.runtime) throw new TableError(409, "no game is running");
     if (p.seat === null || !this.runtime.seats.some((s) => s.seat === p.seat)) throw new TableError(409, "you are not playing in this game");
     if (!intent || typeof intent.name !== "string") throw new TableError(400, "intent needs a name");

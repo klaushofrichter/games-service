@@ -10,7 +10,7 @@
   "edges": ["north", "south"],
   "seatConstraints": null,
   "dynamicPlayers": false,
-  "saveGame": false,
+  "saveGame": true,
   "settings": [
     { "key": "tokens", "type": "int", "min": 1, "max": 4, "default": 4, "label": "Tokens per player" },
     { "key": "turnSeconds", "type": "int", "min": 0, "max": 120, "default": 30, "label": "Seconds per move (0 = no limit)" }

@@ -17,6 +17,7 @@ const host = await startHost({
   allowRemoteBoard: env.ALLOW_REMOTE_BOARD === "1",
   maxRemotePlayers: num(env.MAX_REMOTE_PLAYERS, 4),
   cloudUrl: env.CLOUD_URL,
+  showTestGames: env.SHOW_TEST_GAMES === "1",
 });
 
 console.log(`[table-host] ${host.table.config.tableName} on port ${host.port}`);

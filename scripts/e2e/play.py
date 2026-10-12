@@ -204,6 +204,34 @@ def coinflip(browser, board):
     return decks
 
 
+@scenario
+def dialogs(browser, board):
+    api("POST", "/layout", {"seats": 4})
+    decks = [join(browser, "Klaus")]
+    ai = api("POST", "/ai", {})["playerId"]
+    time.sleep(0.5)
+    board.click("button.tile[data-game=roulette]")
+    board.wait_for_selector(".dialog.form")
+    board.fill(".dialog [name=rounds]", "4")
+    shot(board, "settings-dialog")
+    board.click(".dialog [data-x=yes]")
+    time.sleep(0.5)
+    st = api("GET", "/state")
+    assert st["phase"] == "ready" and st["game"]["settings"]["rounds"] == 4, st
+    seat = next(p["seat"] for p in st["players"] if p["id"] == ai)
+    board.locator(".seat").nth(seat).click()
+    board.click(f"[data-config='{ai}']")
+    board.wait_for_selector(".dialog.form select[name=style]")
+    board.select_option(".dialog select[name=style]", "aggressive")
+    shot(board, "ai-dialog")
+    board.click(".dialog [data-x=yes]")
+    time.sleep(0.5)
+    st = api("GET", "/state")
+    assert next(p for p in st["players"] if p["id"] == ai)["aiOptions"] == {"style": "aggressive"}
+    shot(board, "ready-with-ai")
+    return decks
+
+
 def main():
     with sync_playwright() as p:
         browser = p.chromium.launch()

@@ -45,6 +45,7 @@ export async function startHost(o: HostOptions = {}) {
     joinTokenTtlMs: o.joinTokenTtlMs ?? 5 * 60_000,
     requireCloud: o.requireCloud ?? false,
     maxRemotePlayers: o.maxRemotePlayers ?? 4,
+    showTestGames: o.showTestGames ?? true,
   };
   const table = new Table(config, games, logs);
   const server = await startServer(table, logs, {

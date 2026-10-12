@@ -350,3 +350,27 @@ describe("regressions from review", () => {
     expect((await t.api("POST", "/game/start")).status).toBe(409);
   });
 });
+
+describe("AI configuration", () => {
+  it("stores per-seat AI options, checks them against the selected game, and passes them to the game", async () => {
+    const a = await t.joinDeck("Ann");
+    const { playerId: ai1 } = await t.ok("POST", "/ai", {});
+    const { playerId: ai2 } = await t.ok("POST", "/ai", {});
+    expect((await t.api("POST", `/players/${a.playerId}/ai-options`, { options: { style: "erratic" } })).status).toBe(400);
+    await t.ok("POST", "/game/select", { gameId: "roulette" });
+    const games = await t.ok("GET", "/games");
+    expect(games.find((g: any) => g.id === "roulette").aiOptions[0]).toMatchObject({ key: "style", values: ["conservative", "aggressive", "erratic"] });
+    expect(games.find((g: any) => g.id === "roulette").settings.map((s: any) => s.key)).toContain("bettingSeconds");
+    expect((await t.api("POST", `/players/${ai1}/ai-options`, { options: { style: "reckless" } })).body.error).toMatch(/one of/);
+    expect((await t.api("POST", `/players/${ai1}/ai-options`, { options: { mood: "x" } })).body.error).toMatch(/no AI option mood/);
+    const s = await t.ok("POST", `/players/${ai1}/ai-options`, { options: { style: "aggressive" } });
+    expect(s.players.find((p: any) => p.id === ai1).aiOptions).toEqual({ style: "aggressive" });
+    await a.request("lobby", "ready", { ready: true });
+    await t.ok("POST", "/game/start");
+    const start = t.host.table.runtime!.log[0] as any;
+    const seatOf = (id: string) => s.players.find((p: any) => p.id === id).seat;
+    expect(start.aiOptions[seatOf(ai1)]).toEqual({ style: "aggressive" });
+    expect(start.aiOptions[seatOf(ai2)]).toEqual({ style: "conservative" }); // manifest default
+    expect((await t.api("POST", `/players/${ai2}/ai-options`, { options: { style: "erratic" } })).status).toBe(409); // not while playing
+  });
+});

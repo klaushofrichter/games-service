@@ -10,7 +10,7 @@
   "edges": ["north", "south"],
   "seatConstraints": null,
   "dynamicPlayers": false,
-  "saveGame": false,
+  "saveGame": true,
   "settings": [
     { "key": "startPoints", "type": "int", "min": 100, "max": 100000, "default": 500, "label": "Starting points" },
     { "key": "smallBet", "type": "int", "min": 2, "max": 1000, "default": 10, "label": "Small bet (big blind)" },

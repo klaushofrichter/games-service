@@ -89,6 +89,8 @@ export const manifestSchema = z.object({
   lobbyButton: z.enum(["top-left", "top-right", "bottom-left", "bottom-right"]).default("bottom-right"),
   deck: z.object({ minWidth: z.number().optional(), orientation: z.string().optional() }).optional(),
   permissions: z.array(z.string()).default([]),
+  /** Test games are hidden on the board unless the table is configured to show them. */
+  test: z.boolean().default(false),
 });
 
 export type Manifest = z.infer<typeof manifestSchema>;
@@ -112,6 +114,8 @@ export interface PlayerInfo {
   seat: number | null;
   connected: boolean;
   ready: boolean;
+  /** AI players: options chosen on the board (e.g. play style); manifest defaults fill the rest at start. */
+  aiOptions?: Record<string, unknown>;
 }
 
 export interface GameSummary {
@@ -131,6 +135,8 @@ export interface LobbyState {
   summary: GameSummary | null;
   joinUrl: string;
   cloud: CloudStatus;
+  /** Why the running game is paused and what the board may offer. */
+  pause: { reason: "cloud"; since: number; canSave: boolean } | null;
 }
 
 export interface CloudStatus {
@@ -148,4 +154,6 @@ export interface GameAvailability {
   ai: boolean;
   simulation: boolean;
   players: number[];
+  settings: Manifest["settings"];
+  aiOptions: Manifest["ai"]["options"];
 }
