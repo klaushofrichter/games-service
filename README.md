@@ -1,22 +1,33 @@
 # games-service
 
+[![Release](https://img.shields.io/github/v/release/klaushofrichter/games-service?label=release&color=blue)](https://github.com/klaushofrichter/games-service/releases)
+[![PR checks](https://github.com/klaushofrichter/games-service/actions/workflows/production-checks.yml/badge.svg)](https://github.com/klaushofrichter/games-service/actions/workflows/production-checks.yml)
+[![Build main](https://github.com/klaushofrichter/games-service/actions/workflows/build-push.yml/badge.svg?branch=main)](https://github.com/klaushofrichter/games-service/actions/workflows/build-push.yml)
+[![Deploy](https://github.com/klaushofrichter/games-service/actions/workflows/deploy-production.yml/badge.svg?branch=production)](https://github.com/klaushofrichter/games-service/actions/workflows/deploy-production.yml)
+<!-- Static assertion: GitHub publishes no endpoint for alert status. -->
+[![Dependabot](https://img.shields.io/badge/dependabot-enabled-025E8C?logo=dependabot&logoColor=white)](https://github.com/klaushofrichter/games-service/security/dependabot)
+
+<!-- The repo is private, so these badges render blank: they are fetched anonymously and no token can help.
+     They start working if the repo ever goes public. Versions live on the release badge and the releases page,
+     never in this text. -->
+
 Game Table platform: a touchscreen **board** lying flat on a table, players' phones as private **decks**, a Linux **Table Host** that runs the games, and a **cloud service** at `games.skylar.technology` that enrolls tables, collects metrics and logs, and (from phase 1c) brokers remote players.
 
 This repository implements phases 1a, 1b and 1c of the *Game Table — Concept & Architecture* document: lobby, seats, game selection, the game runtime with replayable logs, AI-only simulation, the board control API, pause on a lost service connection, the admin portal, a table PC kit, **remote play** over WebRTC, automated tests, and three playable games with their own board and phone UIs: **Roulette**, **Pachisi** and **Hold'em**. Decisions are recorded in [`docs/decisions.md`](docs/decisions.md).
 
 ## Quick start
 
-Requires Node.js 22.18 or newer (TypeScript runs natively, no build step).
+Requires Node.js 26 (TypeScript runs natively, no build step).
 
 ```sh
 npm install
-npm test                 # 80 automated tests: lobby, cloud, and each game's rules
+npm test                 # the automated tests: lobby, cloud, sign-in and each game's rules
 TABLE_KEY=dev npm run host
 ```
 
 Open `http://localhost:8080/board/` on the table PC (full screen, 1920 × 1080 or 4K). Phones on the same WiFi scan the QR code, or type the URL shown under it.
 
-With Docker: `docker compose -f deploy/docker-compose.yml up --build` starts a cloud service and a table host. The table shows a 6-character pairing code; approve it with
+With Docker: `docker compose -f deploy/docker-compose.yml up --build` starts a cloud service and a table host. The table shows a 6-character pairing code; approve it in the admin portal at `http://localhost:8081/admin` (in local development it asks for `ADMIN_TOKEN`), or with
 
 ```sh
 curl -X POST -H "Authorization: Bearer $ADMIN_TOKEN" http://localhost:8081/admin/api/tables/pair/<CODE>
@@ -37,11 +48,14 @@ curl -X POST -H "Authorization: Bearer $ADMIN_TOKEN" http://localhost:8081/admin
 | `games/holdem` | Fixed-limit Texas Hold'em, 2–6 players, private hole cards, side pots, two AI styles |
 | `games/coin-flip` | Stub game: 1–8 players, simultaneous, AI, dynamic players, timers |
 | `games/quartet` | Stub game: exactly 4 humans, no AI, sequential turns, ends if a player leaves |
-| `scripts/e2e/` | Browser end-to-end checks (Playwright): `play.py` per game, `admin.py` for the portal, `remote.py` for remote play |
+| `scripts/e2e/` | Browser end-to-end checks (Playwright): `run-all.sh` runs them all, `play.py` per game, `layout.py`, `admin.py` for the portal and sign-in, `remote.py` for remote play |
+| `scripts/sync-secrets.sh` | Puts the values from your local `.env` into GitHub and the cluster, without printing them |
+| `scripts/release-notes.sh`, `release.sh` | The release step of the deploy |
 | `scripts/soak.ts` | AI-only soak run over every game and player count |
-| `docs/` | Decision log, hand-off for deploying the cloud on Kubernetes |
+| `docs/` | Decision log; the request to the kube-setup session for the cluster side |
 | `tests/` | Vitest suites that drive a real host through the board control API and fake decks |
-| `deploy/` | Dockerfiles, docker-compose, Kubernetes manifest for the cloud |
+| `deploy/` | Dockerfiles, docker-compose, the table PC kit |
+| `.github/` | The three workflows, Dependabot, the CodeQL gate and its accepted-findings list |
 
 ## Table Host configuration
 
@@ -114,14 +128,48 @@ A remote player gets an invite link (`https://games.skylar.technology/i/CODE`) f
 - The remote board turns so the remote player's own seat is at the bottom of their screen.
 - `POST /api/v1/remote {"boardControl": false}` (or the checkbox in the invite dialog) makes the board read-only for remote players.
 
+## Cloud service configuration
+
+In the cluster these come from the `games-oauth` Secret (created by `scripts/sync-secrets.sh` from your `.env`) and the Deployment.
+
+| Variable | Meaning |
+| --- | --- |
+| `PUBLIC_URL` | `https://games.skylar.technology`; an https URL requires Google sign-in |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | The service's own OAuth client, in Google Cloud project `skylar-technology` |
+| `GOOGLE_REDIRECT_URI` | Exactly `PUBLIC_URL/auth/google/callback`; the service refuses to start otherwise |
+| `ALLOWED_EMAILS` | Comma-separated admin allow-list, checked at sign-in and on every request |
+| `COOKIE_SECRET` | Signs the session cookie (`openssl rand -hex 32`). Replace it and restart to end every session |
+| `ADMIN_TOKEN` | Optional bearer token for scripts (`Authorization: Bearer …`); in local development it is the portal sign-in |
+| `TRUST_PROXY` | `1` = trust `X-Forwarded-For` from loopback and the k3s pod/service networks, or a CIDR list |
+| `LOG_RETENTION_DAYS`, `ICE_SERVERS` | Log retention (default 90); STUN/TURN for remote play |
+| `APP_VERSION` | Stamped into the image by the deploy (`YYYY.MM.DD.N`); `/health` reports it, `dev` otherwise |
+
+## Branches, CI and deployment
+
+Same shape as every service on the cluster (kube-setup's vault, *Building a New Service*):
+
+```
+feature branch → PR → main → (PR) → production → deploy
+```
+
+| Workflow | Trigger | Does |
+| --- | --- | --- |
+| `production-checks.yml` | PR to `main` or `production` | `test` (tests, typecheck, `npm audit --audit-level=high`, both images built and run non-root), `e2e` (all browser checks), `codeql` (fails on any finding not in `.github/codeql-accepted.tsv`) |
+| `build-push.yml` | push to `main` | tests, then both images as `:main`, and nothing else |
+| `deploy-production.yml` | push to `production` | on the in-cluster runner: calendar version, images as `:<sha>`, `:v<version>`, `:latest`, kube-setup manifest updated (push, then apply), rollout, smoke test until `/health` serves the new version, then a GitHub release with what the deploy verified |
+
+`main` is built but never deployed. Releases are versioned `YYYY.MM.DD.N` (America/Chicago) at deploy time; nothing in the sources carries a version. Curated release notes go under `## [Unreleased]` in `CHANGELOG.md`.
+
 ## Testing
 
 ```sh
-npm test                                   # rules, fuzzing, lobby, concurrency, API limits, platform, cloud, remote play (Vitest)
+npm test                                   # rules, fuzzing, lobby, concurrency, API limits, platform, cloud, sign-in, remote play (Vitest)
+npm run typecheck                          # tsconfig.check.json: apps, packages, games, tests, scripts
 node scripts/soak.ts 100                   # 100 AI-only games per game and player count
-# browser end-to-end (needs Python Playwright and a running host on port 8090 with TABLE_KEY=devkey)
+scripts/e2e/run-all.sh out/                # every browser check, as CI runs them (pip install -r scripts/e2e/requirements.txt)
+# single checks; play.py and layout.py need a running host on port 8090 with TABLE_KEY=devkey
 python3 scripts/e2e/play.py roulette out/  # also: pachisi, holdem, coinflip, dialogs
-python3 scripts/e2e/admin.py out/          # admin portal (starts its own cloud and host)
+python3 scripts/e2e/admin.py out/          # admin portal, sign-in and logout (starts its own cloud and host)
 python3 scripts/e2e/remote.py out/         # remote play in a second browser (starts its own cloud and host)
 python3 scripts/e2e/layout.py out/         # decks at 4 phone sizes x 3 games, the board at 5 screen sizes
 ```

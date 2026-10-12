@@ -1,0 +1,108 @@
+# PR checks. Required on `production`: test, codeql, e2e (kube-setup docs/cluster-deployment-requirements.md, 3 and 4).
+# Triggers on PRs to main too, so Dependabot's PRs are checked; the gate bites at the main -> production promotion.
+name: PR checks
+on:
+  pull_request:
+    branches: [main, production]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      # noEmit over apps, packages, games, tests and scripts: vitest strips types, so nothing else checks them.
+      - run: npm run typecheck
+      # Dependabot notices a vulnerable dependency; noticing is not blocking. `high`, so a moderate advisory whose
+      # only fix is a major upgrade cannot wedge unrelated merges.
+      - run: npm audit --audit-level=high
+      # Every artifact is built by the PR checks, not only by the deploy: both images, run the way the cluster runs them.
+      - name: Build both images
+        run: |
+          docker build -f deploy/cloud.Dockerfile --build-arg APP_VERSION=ci -t games-cloud:ci .
+          docker build -f deploy/table-host.Dockerfile --build-arg APP_VERSION=ci -t games-table-host:ci .
+      - name: Run them non-root with every capability dropped
+        run: |
+          set -euo pipefail
+          for img in games-cloud games-table-host; do
+            user=$(docker image inspect "$img:ci" --format '{{.Config.User}}')
+            [ "$user" = "1000:1000" ] || { echo "::error::$img declares USER '$user', not 1000:1000"; exit 1; }
+          done
+          # No --user flag: this runs the image's own USER, which is what proves it non-root.
+          docker run -d --name cloud -p 8081:8081 --cap-drop ALL --security-opt no-new-privileges --read-only \
+            -e PUBLIC_URL=http://127.0.0.1:8081 -e ADMIN_TOKEN=ci-admin-token-0123456789 games-cloud:ci
+          docker run -d --name host -p 8080:8080 --cap-drop ALL --security-opt no-new-privileges -e TABLE_KEY=ci games-table-host:ci
+          ok() { for i in $(seq 1 30); do curl -fs "$1" > /tmp/h.json && return 0; sleep 1; done; return 1; }
+          for port in 8081 8080; do
+            ok "http://127.0.0.1:$port/health" || { docker logs cloud; docker logs host; exit 1; }
+            grep -q '"version":"ci"' /tmp/h.json || { echo "::error::/health on $port does not report the stamped version"; cat /tmp/h.json; exit 1; }
+          done
+          for c in cloud host; do
+            [ "$(docker exec "$c" id -u)" = "1000" ] || { echo "::error::$c is not running as uid 1000"; exit 1; }
+          done
+          curl -fs -H 'x-table-key: ci' http://127.0.0.1:8080/api/v1/games > /dev/null || { docker logs host; exit 1; }
+
+  e2e:
+    # On GitHub's runners, never the self-hosted one (Playwright OOM-kills at its 512Mi).
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26
+          cache: npm
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+      - run: npm ci
+      - run: pip install -r scripts/e2e/requirements.txt
+      - run: python -m playwright install --with-deps chromium
+      - run: scripts/e2e/run-all.sh e2e-out
+      - if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-screenshots
+          path: e2e-out
+          retention-days: 14
+
+  codeql-scan:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+      actions: read # codeql-action reads the run's own metadata; without it: "Resource not accessible by integration"
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [javascript-typescript, python, actions]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+      - uses: github/codeql-action/analyze@v4
+        with:
+          # Private repo without Advanced Security: no upload; keep the SARIF and gate on it below.
+          upload: never
+          output: sarif-results
+      # The analyze action never fails the job on findings; this does. Accepted ones: .github/codeql-accepted.tsv.
+      - run: .github/scripts/codeql-gate.sh sarif-results
+
+  # One context named `codeql` for the whole matrix, which is what branch protection requires.
+  codeql:
+    if: always()
+    needs: codeql-scan
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          RESULT: ${{ needs.codeql-scan.result }}
+        run: '[ "$RESULT" = "success" ] || { echo "::error::CodeQL: $RESULT"; exit 1; }'
