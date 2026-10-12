@@ -8,6 +8,9 @@ COPY packages ./packages
 COPY apps/table-host ./apps/table-host
 COPY games ./games
 ENV PORT=8080 DATA_DIR=/data GAMES_DIR=/app/games
+# Create /data owned by 'node' before declaring the volume, so new volumes inherit that owner.
+# (The table PC kit mounts /var/lib/gametable here and chowns it to uid 1000 itself.)
+RUN mkdir -p /data && chown node:node /data
 VOLUME ["/data"]
 EXPOSE 8080
 USER node
