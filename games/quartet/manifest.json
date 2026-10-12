@@ -1,0 +1,20 @@
+{
+  "id": "quartet",
+  "name": "Quartet",
+  "version": "0.1.0",
+  "sdk": "^0.1",
+  "description": "Exactly four humans pass a token around the table twice. A stub game for turn order and manifest gating.",
+  "players": [4],
+  "turnModel": "sequential",
+  "seatLayouts": [4, 6, 8],
+  "edges": ["north", "south"],
+  "seatConstraints": null,
+  "dynamicPlayers": false,
+  "saveGame": false,
+  "settings": [{ "key": "laps", "type": "int", "min": 1, "max": 5, "default": 2, "label": "Laps" }],
+  "ai": { "supported": false, "options": [], "hostConfig": [] },
+  "simulation": { "supported": false, "headless": false },
+  "remoteBoardControl": true,
+  "lobbyButton": "top-right",
+  "permissions": []
+}

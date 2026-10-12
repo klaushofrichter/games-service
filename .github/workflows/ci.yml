@@ -1,0 +1,28 @@
+name: ci
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+
+  images:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -f deploy/table-host.Dockerfile -t games-table-host:ci .
+      - run: docker build -f deploy/cloud.Dockerfile -t games-cloud:ci .
+      - name: smoke test the table host image
+        run: |
+          docker run -d --name th -p 8080:8080 -e TABLE_KEY=ci games-table-host:ci
+          for i in $(seq 1 20); do curl -fs localhost:8080/health && break; sleep 1; done
+          curl -fs -H 'x-table-key: ci' localhost:8080/api/v1/games

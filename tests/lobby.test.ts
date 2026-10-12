@@ -1,0 +1,341 @@
+// Automated lobby tests: drive the board control API and fake decks against a real Table Host.
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { Deck, sleep, testHost } from "./helpers.ts";
+import { LogStore } from "../apps/table-host/src/logs.ts";
+import { replay } from "../apps/table-host/src/runtime.ts";
+
+let t: Awaited<ReturnType<typeof testHost>>;
+beforeEach(async () => {
+  t = await testHost();
+});
+afterEach(async () => {
+  await t.close();
+});
+
+describe("access", () => {
+  it("rejects board control calls without the table key", async () => {
+    expect((await t.api("GET", "/state", undefined, "wrong")).status).toBe(401);
+    expect((await t.api("GET", "/state")).status).toBe(200);
+  });
+
+  it("serves health and the deck page to anyone, the board only to the table PC", async () => {
+    expect((await fetch(`${t.base}/health`)).status).toBe(200);
+    expect((await fetch(`${t.base}/deck/`)).status).toBe(200);
+    const board = await fetch(`${t.base}/board/`); // tests connect from loopback
+    expect(board.status).toBe(200);
+    expect(await board.text()).toContain("test-key");
+  });
+});
+
+describe("joining", () => {
+  it("issues short, speakable join codes that rotate after each use", async () => {
+    const { token, url } = await t.ok("GET", "/join");
+    expect(token).toMatch(/^[A-HJ-NP-Z2-9]{8}$/);
+    expect(url).toContain(`/j/${token}`);
+    await Deck.connect(t.base, { joinToken: token, name: "Ann" }).then((d) => t.decks.push(d));
+    await expect(Deck.connect(t.base, { joinToken: token, name: "Mallory" })).rejects.toThrow(/invalid or expired/);
+    expect((await t.ok("GET", "/join")).token).not.toBe(token);
+  });
+
+  it("redirects the short join URL to the deck page", async () => {
+    const res = await fetch(`${t.base}/j/abcd2345`, { redirect: "manual" });
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toBe("/deck/?t=ABCD2345");
+  });
+
+  it("seats players automatically in seat order and cleans up names", async () => {
+    const a = await t.joinDeck("  Ann   Lee ");
+    const b = await t.joinDeck("");
+    const s = await t.ok("GET", "/state");
+    expect(s.players.map((p: any) => [p.name, p.seat])).toEqual([
+      ["Ann Lee", 0],
+      ["Player 2", 1],
+    ]);
+    expect(a.lastState()).toBeDefined();
+    expect(b.playerId).toMatch(/^p_/);
+  });
+
+  it("leaves extra players without a seat when the layout is full", async () => {
+    await t.ok("POST", "/layout", { seats: 2 });
+    await t.joinDeck("A");
+    await t.joinDeck("B");
+    await t.joinDeck("C");
+    const s = await t.ok("GET", "/state");
+    expect(s.players.map((p: any) => p.seat)).toEqual([0, 1, null]);
+  });
+});
+
+describe("seats and orientation", () => {
+  it("moves players between seats and swaps when a seat is taken", async () => {
+    const a = await t.joinDeck("A");
+    const b = await t.joinDeck("B");
+    await t.ok("POST", "/seats/move", { playerId: a.playerId, seat: 3 });
+    await t.ok("POST", "/seats/move", { playerId: b.playerId, seat: 3 });
+    const s = await t.ok("GET", "/state");
+    const seatOf = (id: string) => s.players.find((p: any) => p.id === id).seat;
+    expect(seatOf(b.playerId)).toBe(3);
+    expect(seatOf(a.playerId)).toBe(1);
+  });
+
+  it("rotates the front edge without moving anyone's seat", async () => {
+    const a = await t.joinDeck("A");
+    expect((await t.ok("GET", "/state")).frontEdge).toBe("south");
+    expect((await t.ok("POST", "/rotate", { degrees: 90 })).frontEdge).toBe("west");
+    expect((await t.ok("POST", "/rotate", { degrees: 180 })).frontEdge).toBe("east");
+    const s = await t.ok("POST", "/rotate", { degrees: 90 });
+    expect(s.frontEdge).toBe("south");
+    expect(s.players.find((p: any) => p.id === a.playerId).seat).toBe(0);
+    expect((await t.api("POST", "/rotate", { degrees: 45 })).status).toBe(400);
+  });
+
+  it("refuses 90° rotation for a game that only supports north and south", async () => {
+    for (const n of ["A", "B", "C", "D"]) await t.joinDeck(n);
+    await t.ok("POST", "/game/select", { gameId: "quartet" });
+    const r = await t.api("POST", "/rotate", { degrees: 90 });
+    expect(r.status).toBe(409);
+    expect((await t.ok("POST", "/rotate", { degrees: 180 })).frontEdge).toBe("north");
+  });
+
+  it("names the edge of every seat for each layout", async () => {
+    expect((await t.ok("POST", "/layout", { seats: 8 })).seatEdges).toEqual(["south", "south", "south", "north", "north", "north", "east", "west"]);
+    expect((await t.ok("POST", "/layout", { seats: 2 })).seatEdges).toEqual(["south", "north"]);
+  });
+
+  it("refuses a smaller layout than the number of seated players", async () => {
+    for (const n of ["A", "B", "C"]) await t.joinDeck(n);
+    expect((await t.api("POST", "/layout", { seats: 2 })).status).toBe(409);
+  });
+});
+
+describe("game selection gating", () => {
+  const avail = async (id: string) => (await t.ok("GET", "/games")).find((g: any) => g.id === id);
+
+  it("lists installed games from their manifests", async () => {
+    const games = await t.ok("GET", "/games");
+    expect(games.map((g: any) => g.id).sort()).toEqual(["coin-flip", "quartet"]);
+  });
+
+  it("requires at least one player at the table", async () => {
+    await t.ok("POST", "/ai", {});
+    const g = await avail("coin-flip");
+    expect(g.selectable).toBe(false);
+    expect(g.reasons.join()).toMatch(/at least one player at the table/);
+  });
+
+  it("only allows a 4-player game without AI when exactly four humans are seated", async () => {
+    for (const n of ["A", "B", "C"]) await t.joinDeck(n);
+    expect((await avail("quartet")).reasons.join()).toMatch(/exactly 4/);
+    await t.ok("POST", "/ai", {});
+    const withAi = await avail("quartet");
+    expect(withAi.reasons.join()).toMatch(/no AI players/);
+    const s = await t.ok("GET", "/state");
+    await t.ok("DELETE", `/players/${s.players.find((p: any) => p.kind === "ai").id}`);
+    await t.joinDeck("D");
+    expect((await avail("quartet")).selectable).toBe(true);
+    expect((await t.api("POST", "/game/select", { gameId: "quartet" })).status).toBe(200);
+  });
+
+  it("explains why selection was refused", async () => {
+    const r = await t.api("POST", "/game/select", { gameId: "quartet" });
+    expect(r.status).toBe(409);
+    expect(r.body.error).toMatch(/Quartet needs exactly 4 players/);
+  });
+
+  it("validates settings against the manifest", async () => {
+    await t.joinDeck("A");
+    expect((await t.api("POST", "/game/select", { gameId: "coin-flip", settings: { rounds: 99 } })).status).toBe(400);
+    const s = await t.ok("POST", "/game/select", { gameId: "coin-flip", settings: { rounds: 2 } });
+    expect(s.game.settings).toMatchObject({ rounds: 2, roundMs: 15000 });
+  });
+});
+
+describe("ready flow and play", () => {
+  it("starts only when every human is ready", async () => {
+    const a = await t.joinDeck("A");
+    const b = await t.joinDeck("B");
+    await t.ok("POST", "/game/select", { gameId: "coin-flip", settings: { rounds: 1, roundMs: 0 } });
+    expect((await a.request("lobby", "ready", { ready: true })).type).toBe("ack");
+    const r = await t.api("POST", "/game/start");
+    expect(r.status).toBe(409);
+    expect(r.body.error).toMatch(/waiting for B/);
+    await b.request("lobby", "ready", { ready: true });
+    expect((await t.ok("POST", "/game/start")).phase).toBe("active");
+  });
+
+  it("plays coin flip: intents reach the game, views stay private, summary and log at the end", async () => {
+    const a = await t.joinDeck("A");
+    const b = await t.joinDeck("B");
+    await t.ok("POST", "/game/select", { gameId: "coin-flip", settings: { rounds: 2, roundMs: 0 } });
+    await a.request("lobby", "ready", { ready: true });
+    await b.request("lobby", "ready", { ready: true });
+    await t.ok("POST", "/game/start");
+    await a.waitView((v) => v.view.round === 1);
+
+    expect((await a.request("game", "intent", { name: "guess", payload: "heads" })).type).toBe("ack");
+    expect((await a.request("game", "intent", { name: "guess", payload: "tails" })).payload.reason).toMatch(/already guessed/);
+    expect((await a.request("game", "intent", { name: "guess", payload: "edge" })).type).toBe("reject");
+    // B's view never shows A's guess
+    const bView = await b.waitView((v) => v.view.round === 1);
+    expect(JSON.stringify(bView)).not.toContain("heads");
+
+    await b.request("game", "intent", { name: "guess", payload: "tails" });
+    await a.waitView((v) => v.view.round === 2);
+    await a.request("game", "intent", { name: "guess", payload: "heads" });
+    await b.request("game", "intent", { name: "guess", payload: "heads" });
+
+    const done = await a.waitState((s) => s.phase === "finished");
+    expect(done.summary?.text).toMatch(/wins|Tie/);
+    expect(done.summary?.highlights).toHaveProperty("flips");
+    await sleep(100);
+    expect((await t.ok("GET", "/metrics")).gamesPlayed).toBe(1);
+
+    // the log replays to the same final state
+    const logs = await t.ok("GET", "/logs");
+    expect(logs).toHaveLength(1);
+    const zip = (await t.api("GET", `/logs/${logs[0].id}.zip`)).body as Buffer;
+    const { meta, games } = await LogStore.unzip(zip);
+    expect(meta).toMatchObject({ gameId: "coin-flip", simulation: false, format: "gametable-log/1" });
+    const g = t.host.table.games.get("coin-flip")!;
+    const end = games[0].at(-1) as any;
+    expect(end.t).toBe("end");
+    expect(replay(g.manifest, g.def, games[0])).toBe(end.stateHash);
+  });
+
+  it("lets an AI seat play by itself", async () => {
+    const a = await t.joinDeck("A");
+    await t.ok("POST", "/ai", {});
+    await t.ok("POST", "/game/select", { gameId: "coin-flip", settings: { rounds: 1, roundMs: 0 } });
+    await a.request("lobby", "ready", { ready: true });
+    await t.ok("POST", "/game/start");
+    await sleep(50);
+    const board = await t.ok("GET", "/game/board");
+    expect(board.view.seats.find((s: any) => s.seat === 1).hasGuessed).toBe(true);
+    await a.request("game", "intent", { name: "guess", payload: "tails" });
+    expect((await a.waitState((s) => s.phase === "finished")).summary).not.toBeNull();
+  });
+
+  it("refuses seat and layout changes while a game is running", async () => {
+    const a = await t.joinDeck("A");
+    await t.ok("POST", "/game/select", { gameId: "coin-flip", settings: { roundMs: 0 } });
+    await a.request("lobby", "ready", { ready: true });
+    await t.ok("POST", "/game/start");
+    expect((await t.api("POST", "/seats/move", { playerId: a.playerId, seat: 2 })).status).toBe(409);
+    expect((await t.api("POST", "/layout", { seats: 6 })).status).toBe(409);
+    expect((await t.api("POST", "/ai", {})).status).toBe(409);
+  });
+
+  it("seats a newcomer into a running game that allows dynamic players", async () => {
+    const a = await t.joinDeck("A");
+    await t.ok("POST", "/game/select", { gameId: "coin-flip", settings: { rounds: 3, roundMs: 0 } });
+    await a.request("lobby", "ready", { ready: true });
+    await t.ok("POST", "/game/start");
+    const b = await t.joinDeck("B");
+    const v = await b.waitView((v) => v.seat === 1);
+    expect(v.view.round).toBe(1);
+    expect((await b.request("game", "intent", { name: "guess", payload: "heads" })).type).toBe("ack");
+  });
+
+  it("ends a running game from the lobby, then returns to idle", async () => {
+    const a = await t.joinDeck("A");
+    await t.ok("POST", "/game/select", { gameId: "coin-flip" });
+    await a.request("lobby", "ready", { ready: true });
+    await t.ok("POST", "/game/start");
+    await t.ok("POST", "/game/end");
+    const s = await a.waitState((s) => s.phase === "finished");
+    expect(s.summary?.text).toMatch(/ended from the lobby/);
+    await sleep(50);
+    expect((await t.ok("GET", "/metrics")).gamesTerminated).toBe(1);
+    expect((await t.ok("POST", "/game/close")).phase).toBe("idle");
+  });
+
+  it("ends a non-dynamic game when a player leaves", async () => {
+    const decks = [];
+    for (const n of ["A", "B", "C", "D"]) decks.push(await t.joinDeck(n));
+    await t.ok("POST", "/game/select", { gameId: "quartet" });
+    for (const d of decks) await d.request("lobby", "ready", { ready: true });
+    await t.ok("POST", "/game/start");
+    const first = await decks[0].waitView((v) => v.view.myTurn === true);
+    expect(first.seat).toBe(0);
+    expect((await decks[1].request("game", "intent", { name: "pass" })).payload.reason).toMatch(/not your turn/);
+    await t.ok("DELETE", `/players/${decks[2].playerId}`);
+    const s = await decks[0].waitState((s) => s.phase === "finished");
+    expect(s.summary?.text).toMatch(/a player left/);
+  });
+});
+
+describe("disconnects and eviction", () => {
+  it("keeps the seat through a short disconnect and resumes with the session token", async () => {
+    const a = await t.joinDeck("A");
+    await t.joinDeck("B");
+    a.close();
+    await sleep(80);
+    let s = await t.ok("GET", "/state");
+    expect(s.players.find((p: any) => p.id === a.playerId)).toMatchObject({ connected: false, seat: 0 });
+    const again = await Deck.connect(t.base, { sessionToken: a.sessionToken });
+    t.decks.push(again);
+    expect(again.playerId).toBe(a.playerId);
+    await sleep(400); // past the grace period
+    s = await t.ok("GET", "/state");
+    expect(s.players.find((p: any) => p.id === a.playerId)).toMatchObject({ connected: true, seat: 0 });
+  });
+
+  it("frees the seat once the grace period runs out", async () => {
+    const a = await t.joinDeck("A");
+    a.close();
+    await sleep(450);
+    expect((await t.ok("GET", "/state")).players).toHaveLength(0);
+    await expect(Deck.connect(t.base, { sessionToken: a.sessionToken })).rejects.toThrow(/session expired/);
+  });
+
+  it("evicts a deck: its socket is closed and its session revoked", async () => {
+    const a = await t.joinDeck("A");
+    const removed = a.next((m) => m.ch === "system" && m.type === "removed");
+    await t.ok("DELETE", `/players/${a.playerId}`);
+    expect((await removed).payload.reason).toBe("evicted");
+    await sleep(50);
+    expect(a.closeCode).toBe(4001);
+    await expect(Deck.connect(t.base, { sessionToken: a.sessionToken })).rejects.toThrow(/session expired/);
+  });
+
+  it("removes a disconnected player from a running dynamic game after the grace period", async () => {
+    const a = await t.joinDeck("A");
+    const b = await t.joinDeck("B");
+    await t.ok("POST", "/game/select", { gameId: "coin-flip", settings: { rounds: 2, roundMs: 0 } });
+    await a.request("lobby", "ready", { ready: true });
+    await b.request("lobby", "ready", { ready: true });
+    await t.ok("POST", "/game/start");
+    await a.request("game", "intent", { name: "guess", payload: "heads" });
+    b.close();
+    await sleep(450);
+    // with B gone, A's guess completes the round
+    const v = await a.waitView((v) => v.view.round === 2);
+    expect(v.view.lastFlip).toMatch(/heads|tails/);
+    expect((await t.ok("GET", "/state")).phase).toBe("active");
+  });
+});
+
+describe("AI-only simulation", () => {
+  it("runs headless games and writes a replayable log zip", async () => {
+    const r = await t.ok("POST", "/simulation", { gameId: "coin-flip", players: 4, games: 3, seed: 42, settings: { rounds: 5 } });
+    expect(r.games).toHaveLength(3);
+    expect(r.games.every((g: any) => g.reason === "finished")).toBe(true);
+    const zip = (await t.api("GET", `/logs/${r.logId}.zip`)).body as Buffer;
+    const { meta, games } = await LogStore.unzip(zip);
+    expect(meta).toMatchObject({ simulation: true, games: 3 });
+    expect(games).toHaveLength(3);
+    const g = t.host.table.games.get("coin-flip")!;
+    for (const log of games) expect(replay(g.manifest, g.def, log)).toBe((log.at(-1) as any).stateHash);
+    expect((await t.ok("GET", "/metrics")).simulations).toBe(1);
+  });
+
+  it("is deterministic for a given seed", async () => {
+    const one = await t.ok("POST", "/simulation", { gameId: "coin-flip", players: 3, games: 2, seed: 7 });
+    const two = await t.ok("POST", "/simulation", { gameId: "coin-flip", players: 3, games: 2, seed: 7 });
+    expect(two.games.map((g: any) => g.summary)).toEqual(one.games.map((g: any) => g.summary));
+  });
+
+  it("refuses games without AI or simulation support", async () => {
+    const r = await t.api("POST", "/simulation", { gameId: "quartet", players: 4, games: 1, seed: 1 });
+    expect(r.status).toBe(409);
+  });
+});

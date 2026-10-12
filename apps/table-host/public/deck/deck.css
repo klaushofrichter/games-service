@@ -1,0 +1,33 @@
+body {
+  min-height: 100dvh;
+  display: flex; flex-direction: column;
+  background: radial-gradient(ellipse 120% 60% at 50% 0%, #17392f, var(--felt-deep) 70%);
+  font-size: 17px;
+}
+#app { flex: 1; width: 100%; max-width: 440px; margin: 0 auto; padding: max(20px, env(safe-area-inset-top)) 20px 20px; display: flex; flex-direction: column; gap: 18px; }
+footer { text-align: center; padding: 12px 0 max(14px, env(safe-area-inset-bottom)); font-size: 0.8em; }
+footer a { color: var(--ink-faint); }
+
+h1 { font-family: var(--display); font-weight: 600; font-size: 1.9em; margin: 4px 0 0; line-height: 1.1; }
+.card { background: rgba(255, 255, 255, 0.04); border: 1px solid var(--felt-line); border-radius: var(--radius); padding: 16px 18px; }
+.seatcard { display: flex; align-items: center; gap: 14px; }
+.seatcard .badge { width: 54px; height: 54px; border-radius: 14px; display: grid; place-items: center; background: var(--brass); color: #1b1407; font-family: var(--display); font-size: 1.6em; font-weight: 700; flex: none; }
+.list { display: flex; flex-direction: column; }
+.list .row { display: flex; justify-content: space-between; padding: 9px 0; border-bottom: 1px solid var(--felt-line); font-size: 0.95em; }
+.list .row:last-child { border-bottom: 0; }
+.me { color: var(--brass); }
+
+input[type=text] {
+  font: inherit; width: 100%; padding: 14px 16px; border-radius: 12px;
+  border: 1px solid var(--felt-line); background: var(--felt-deep); color: var(--ink);
+}
+input[type=text]:focus { outline: 2px solid var(--brass); outline-offset: 1px; }
+button.big { width: 100%; padding: 16px; font-size: 1.1em; }
+.choices { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.choices button { padding: 28px 0; border-radius: var(--radius); font-family: var(--display); font-size: 1.4em; }
+.choices button.picked, .choices button.picked:disabled { background: var(--brass); color: #1b1407; border-color: var(--brass); opacity: 1; }
+.stat { display: flex; justify-content: space-between; align-items: baseline; }
+.stat .n { font-family: var(--display); font-size: 2em; color: var(--brass); }
+.banner { padding: 10px 14px; border-radius: 12px; background: #2a1512; border: 1px solid var(--ruby); color: #f6d5cf; font-size: 0.9em; }
+.center { text-align: center; }
+pre { font-family: var(--mono); font-size: 0.75em; white-space: pre-wrap; color: var(--ink-soft); }

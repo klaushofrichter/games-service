@@ -1,0 +1,301 @@
+// HTTP + WebSocket server of the Table Host: board and deck pages, board control API, live updates.
+import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import { readFile } from "node:fs/promises";
+import { extname, join, normalize } from "node:path";
+import { timingSafeEqual } from "node:crypto";
+import { WebSocketServer, type WebSocket } from "ws";
+import QRCode from "qrcode";
+import { envelope, PROTOCOL_VERSION, type Envelope } from "../../../packages/protocol/src/index.ts";
+import { Table, TableError } from "./table.ts";
+import { runSimulation } from "./simulation.ts";
+import type { LogStore } from "./logs.ts";
+
+export interface ServerOptions {
+  port: number;
+  host?: string;
+  tableKey: string;
+  publicDir: string;
+  allowRemoteBoard: boolean;
+}
+
+type Client = { ws: WebSocket; role: "board" } | { ws: WebSocket; role: "deck"; playerId: string } | { ws: WebSocket; role: "pending" };
+
+const MIME: Record<string, string> = {
+  ".html": "text/html; charset=utf-8",
+  ".js": "text/javascript; charset=utf-8",
+  ".css": "text/css; charset=utf-8",
+  ".svg": "image/svg+xml",
+  ".png": "image/png",
+  ".json": "application/json",
+};
+
+export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
+  const clients = new Set<Client & { alive?: boolean }>();
+
+  const keyOk = (k: unknown) => {
+    if (typeof k !== "string") return false;
+    const a = Buffer.from(k);
+    const b = Buffer.from(opts.tableKey);
+    return a.length === b.length && timingSafeEqual(a, b);
+  };
+  const isLoopback = (req: IncomingMessage) => {
+    const a = req.socket.remoteAddress ?? "";
+    return a === "127.0.0.1" || a === "::1" || a === "::ffff:127.0.0.1";
+  };
+  const boardAllowed = (req: IncomingMessage) => opts.allowRemoteBoard || isLoopback(req);
+
+  // ---------- broadcasting ----------
+
+  const send = (ws: WebSocket, e: Envelope) => {
+    if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(e));
+  };
+
+  table.on("state", (state) => {
+    for (const c of clients) if (c.role !== "pending") send(c.ws, envelope("lobby", "state", state, { stateRev: state.stateRev }));
+  });
+
+  table.on("game", (events) => {
+    const rt = table.runtime;
+    if (!rt) return;
+    const board = rt.boardView();
+    const views = new Map(table.views().map((v) => [v.playerId, v]));
+    for (const c of clients) {
+      if (c.role === "board") send(c.ws, envelope("game", "board", { view: board, events, over: rt.over }));
+      if (c.role === "deck") {
+        const v = views.get(c.playerId);
+        if (v) send(c.ws, envelope("game", "view", { seat: v.seat, view: v.view, events, over: rt.over }));
+      }
+    }
+  });
+
+  table.on("removed", (playerId: string, reason: string) => {
+    for (const c of clients) {
+      if (c.role === "deck" && c.playerId === playerId) {
+        send(c.ws, envelope("system", "removed", { reason }));
+        c.ws.close(4001, reason);
+      }
+    }
+  });
+
+  // ---------- HTTP ----------
+
+  const json = (res: ServerResponse, status: number, body: unknown) => {
+    res.writeHead(status, { "content-type": "application/json", "cache-control": "no-store" });
+    res.end(JSON.stringify(body));
+  };
+
+  const readBody = async (req: IncomingMessage): Promise<Record<string, unknown>> => {
+    const chunks: Buffer[] = [];
+    let size = 0;
+    for await (const c of req) {
+      size += (c as Buffer).length;
+      if (size > 64 * 1024) throw new TableError(413, "body too large");
+      chunks.push(c as Buffer);
+    }
+    if (!chunks.length) return {};
+    try {
+      const v = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+      return v && typeof v === "object" ? v : {};
+    } catch {
+      throw new TableError(400, "body must be JSON");
+    }
+  };
+
+  const serveFile = async (res: ServerResponse, rel: string, transform?: (s: string) => string) => {
+    const root = opts.publicDir;
+    const file = normalize(join(root, rel));
+    if (!file.startsWith(root)) return json(res, 404, { error: "not found" });
+    try {
+      let data: Buffer | string = await readFile(file);
+      if (transform) data = transform(data.toString("utf8"));
+      res.writeHead(200, { "content-type": MIME[extname(file)] ?? "application/octet-stream", "cache-control": "no-cache" });
+      res.end(data);
+    } catch {
+      json(res, 404, { error: "not found" });
+    }
+  };
+
+  const api = async (req: IncomingMessage, res: ServerResponse, path: string) => {
+    if (!keyOk(req.headers["x-table-key"])) return json(res, 401, { error: "missing or wrong X-Table-Key" });
+    const m = req.method ?? "GET";
+    const body = m === "GET" || m === "DELETE" ? {} : await readBody(req);
+    let match: RegExpMatchArray | null;
+
+    if (m === "GET" && path === "/state") return json(res, 200, table.state());
+    if (m === "GET" && path === "/join") return json(res, 200, table.currentJoin());
+    if (m === "GET" && path === "/games") return json(res, 200, table.availability());
+    if (m === "GET" && path === "/metrics") return json(res, 200, table.metrics);
+    if (m === "POST" && path === "/layout") return (table.setLayout(Number(body.seats)), json(res, 200, table.state()));
+    if (m === "POST" && path === "/rotate") return (table.rotate(Number(body.degrees)), json(res, 200, table.state()));
+    if (m === "POST" && path === "/seats/move") return (table.moveSeat(String(body.playerId), Number(body.seat)), json(res, 200, table.state()));
+    if (m === "POST" && path === "/ai") {
+      const id = table.addAi(body.seat === undefined ? undefined : Number(body.seat));
+      return json(res, 201, { playerId: id });
+    }
+    if (m === "DELETE" && (match = path.match(/^\/players\/([\w-]+)$/))) return (table.removePlayer(match[1], "evicted"), json(res, 200, table.state()));
+    if (m === "POST" && path === "/game/select") {
+      table.selectGame(String(body.gameId), (body.settings as Record<string, unknown>) ?? {});
+      return json(res, 200, table.state());
+    }
+    if (m === "POST" && path === "/game/start") return (table.start(), json(res, 200, table.state()));
+    if (m === "POST" && path === "/game/end") return (table.end(), json(res, 200, table.state()));
+    if (m === "POST" && path === "/game/close") return (table.close(), json(res, 200, table.state()));
+    if (m === "GET" && path === "/game/board") {
+      if (!table.runtime) throw new TableError(409, "no game loaded");
+      return json(res, 200, { view: table.runtime.boardView(), over: table.runtime.over, summary: table.runtime.summary });
+    }
+    if (m === "POST" && path === "/simulation") {
+      const g = table.games.get(String(body.gameId));
+      if (!g) throw new TableError(404, "no such game");
+      const r = await runSimulation(g, { players: Number(body.players), games: Number(body.games ?? 1), seed: Number(body.seed ?? Date.now()), settings: body.settings as Record<string, unknown> }, logs, table.config.tableName);
+      table.metrics.simulations++;
+      return json(res, 200, r);
+    }
+    if (m === "GET" && path === "/logs") return json(res, 200, await logs.list());
+    if (m === "GET" && (match = path.match(/^\/logs\/([\w-]+)\.zip$/))) {
+      const buf = await logs.read(match[1]);
+      if (!buf) return json(res, 404, { error: "no such log" });
+      res.writeHead(200, { "content-type": "application/zip", "content-disposition": `attachment; filename="${match[1]}.zip"` });
+      return res.end(buf);
+    }
+    json(res, 404, { error: "unknown endpoint" });
+  };
+
+  const server = createServer(async (req, res) => {
+    const url = new URL(req.url ?? "/", "http://table");
+    const path = url.pathname;
+    try {
+      if (path === "/health") return json(res, 200, { ok: true, protocol: PROTOCOL_VERSION });
+      if (path.startsWith("/api/v1/")) return await api(req, res, path.slice("/api/v1".length));
+      if (path === "/") {
+        res.writeHead(302, { location: boardAllowed(req) ? "/board/" : "/deck/" });
+        return res.end();
+      }
+      let match: RegExpMatchArray | null;
+      if ((match = path.match(/^\/j\/([A-Za-z0-9]{4,12})$/))) {
+        res.writeHead(302, { location: `/deck/?t=${match[1].toUpperCase()}` });
+        return res.end();
+      }
+      if (path === "/qr.svg") {
+        if (!boardAllowed(req)) return json(res, 403, { error: "board only" });
+        const svg = await QRCode.toString(table.currentJoin().url, { type: "svg", margin: 1, color: { dark: "#111111", light: "#ffffff" } });
+        res.writeHead(200, { "content-type": "image/svg+xml", "cache-control": "no-store" });
+        return res.end(svg);
+      }
+      if (path === "/board" || path === "/board/" || path === "/board/index.html") {
+        if (!boardAllowed(req)) return json(res, 403, { error: "the board is only served on the table PC" });
+        // The board page talks to the board control API; it gets the key only on the table PC itself.
+        return await serveFile(res, "board/index.html", (s) => s.replace("__TABLE_KEY__", opts.tableKey));
+      }
+      if (path === "/deck" || path === "/deck/") return await serveFile(res, "deck/index.html");
+      if (path.startsWith("/board/") || path.startsWith("/deck/") || path.startsWith("/shared/")) return await serveFile(res, path.slice(1));
+      json(res, 404, { error: "not found" });
+    } catch (err) {
+      if (err instanceof TableError) return json(res, err.status, { error: err.message });
+      console.error(err);
+      json(res, 500, { error: "internal error" });
+    }
+  });
+
+  // ---------- WebSocket ----------
+
+  const wss = new WebSocketServer({ server, path: "/ws", maxPayload: 64 * 1024 });
+
+  wss.on("connection", (ws, req) => {
+    const client: Client & { alive?: boolean } = { ws, role: "pending", alive: true };
+    clients.add(client);
+    ws.on("pong", () => (client.alive = true));
+
+    const reply = (type: string, payload: unknown, seq?: number) => send(ws, envelope("system", type, payload, seq === undefined ? {} : { seq }));
+
+    ws.on("message", (raw) => {
+      let msg: Envelope<any>;
+      try {
+        msg = JSON.parse(String(raw));
+      } catch {
+        return reply("error", { message: "invalid JSON" });
+      }
+      const c = client as any;
+      try {
+        if (msg.ch === "system" && msg.type === "hello") {
+          const p = msg.payload ?? {};
+          if (p.role === "board") {
+            if (!keyOk(p.key)) throw new TableError(401, "board needs the table key");
+            c.role = "board";
+            reply("welcome", { role: "board" }, msg.seq);
+          } else if (p.sessionToken) {
+            const info = table.resume(String(p.sessionToken));
+            c.role = "deck";
+            c.playerId = info.id;
+            reply("welcome", { role: "deck", playerId: info.id }, msg.seq);
+          } else {
+            const { playerId, sessionToken } = table.join(String(p.joinToken ?? ""), p.name);
+            c.role = "deck";
+            c.playerId = playerId;
+            reply("welcome", { role: "deck", playerId, sessionToken }, msg.seq);
+          }
+          send(ws, envelope("lobby", "state", table.state()));
+          if (table.runtime && table.phase === "active") table.emit("game", []);
+          return;
+        }
+        if (c.role !== "deck" && c.role !== "board") throw new TableError(401, "say hello first");
+        if (c.role === "deck" && msg.ch === "lobby" && msg.type === "ready") {
+          table.setReady(c.playerId, !!msg.payload?.ready);
+          return reply("ack", {}, msg.seq);
+        }
+        if (c.role === "deck" && msg.ch === "game" && msg.type === "intent") {
+          const r = table.intent(c.playerId, msg.payload);
+          return r.ok ? reply("ack", {}, msg.seq) : reply("reject", { reason: r.reason }, msg.seq);
+        }
+        throw new TableError(400, `unexpected ${msg.ch}.${msg.type}`);
+      } catch (err) {
+        const message = err instanceof TableError ? err.message : "internal error";
+        if (!(err instanceof TableError)) console.error(err);
+        reply("error", { message, status: err instanceof TableError ? err.status : 500 }, msg.seq);
+        if (msg.type === "hello") ws.close(4003, message);
+      }
+    });
+
+    ws.on("close", () => {
+      clients.delete(client);
+      const c = client as Client;
+      if (c.role === "deck") {
+        const id = c.playerId;
+        const stillOpen = [...clients].some((o) => o.role === "deck" && o.playerId === id);
+        if (!stillOpen) table.disconnected(id);
+      }
+    });
+  });
+
+  const ping = setInterval(() => {
+    for (const c of clients) {
+      if (c.alive === false) {
+        c.ws.terminate();
+        continue;
+      }
+      c.alive = false;
+      c.ws.ping();
+    }
+  }, 10_000);
+
+  return new Promise<{ port: number; close: () => Promise<void> }>((resolve) => {
+    server.listen(opts.port, opts.host ?? "0.0.0.0", () => {
+      const addr = server.address();
+      const port = typeof addr === "object" && addr ? addr.port : opts.port;
+      resolve({
+        port,
+        close: async () => {
+          await table.flush();
+          await new Promise<void>((r) => {
+            clearInterval(ping);
+            table.shutdown();
+            for (const c of clients) c.ws.terminate();
+            wss.close();
+            server.closeAllConnections();
+            server.close(() => r());
+          });
+        },
+      });
+    });
+  });
+}

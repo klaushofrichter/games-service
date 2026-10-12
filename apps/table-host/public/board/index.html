@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Game Table</title>
+  <link rel="stylesheet" href="/shared/theme.css">
+  <link rel="stylesheet" href="/board/board.css">
+  <script>window.TABLE_KEY = "__TABLE_KEY__";</script>
+</head>
+<body>
+  <!-- The board renders at 1920 × 1080 logical pixels and scales to the screen. -->
+  <div id="stage">
+    <div id="surface">
+      <div id="seats"></div>
+      <div id="center"></div>
+      <button id="lobby-button" hidden aria-label="Open lobby">☰ Lobby</button>
+    </div>
+  </div>
+  <div id="overlay-root"></div>
+  <script type="module" src="/board/board.js"></script>
+</body>
+</html>

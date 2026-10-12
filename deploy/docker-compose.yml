@@ -1,0 +1,25 @@
+# Local development: a cloud service and a table host on one machine.
+#   docker compose -f deploy/docker-compose.yml up --build
+# Board: http://localhost:8080/board/   Cloud: http://localhost:8081
+services:
+  cloud:
+    build: { context: .., dockerfile: deploy/cloud.Dockerfile }
+    environment:
+      ADMIN_TOKEN: ${ADMIN_TOKEN:-change-me-dev-admin-token}
+      PUBLIC_URL: http://localhost:8081
+    ports: ["8081:8081"]
+
+  table-host:
+    build: { context: .., dockerfile: deploy/table-host.Dockerfile }
+    environment:
+      TABLE_NAME: ${TABLE_NAME:-Dev Table}
+      TABLE_KEY: ${TABLE_KEY:-dev-table-key}
+      CLOUD_URL: http://cloud:8081
+      PUBLIC_URL: ${PUBLIC_URL:-http://localhost:8080}
+      ALLOW_REMOTE_BOARD: "1" # the board is opened from the host browser, not loopback inside the container
+    ports: ["8080:8080"]
+    volumes: ["table-data:/data"]
+    depends_on: [cloud]
+
+volumes:
+  table-data:

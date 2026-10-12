@@ -1,0 +1,75 @@
+# Cloud service on the Kubernetes cluster maintained with klaushofrichter/kube-setup.
+# Adjust the ingress class, cert issuer and image registry to what kube-setup provides.
+# Phase 1a keeps state in memory: run exactly one replica until PostgreSQL is added.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: games
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: games-cloud
+  namespace: games
+type: Opaque
+stringData:
+  ADMIN_TOKEN: "replace-with-a-long-random-token"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: games-cloud
+  namespace: games
+spec:
+  replicas: 1
+  strategy: { type: Recreate }
+  selector:
+    matchLabels: { app: games-cloud }
+  template:
+    metadata:
+      labels: { app: games-cloud }
+    spec:
+      securityContext: { runAsNonRoot: true, runAsUser: 1000 }
+      containers:
+        - name: cloud
+          image: ghcr.io/klaushofrichter/games-cloud:0.1.0
+          ports: [{ containerPort: 8081, name: http }]
+          env:
+            - { name: PUBLIC_URL, value: "https://games.skylar.technology" }
+            - { name: LOG_RETENTION_DAYS, value: "90" }
+          envFrom: [{ secretRef: { name: games-cloud } }]
+          readinessProbe: { httpGet: { path: /health, port: http }, periodSeconds: 10 }
+          livenessProbe: { httpGet: { path: /health, port: http }, periodSeconds: 30 }
+          resources:
+            requests: { cpu: 50m, memory: 96Mi }
+            limits: { memory: 512Mi }
+          securityContext: { allowPrivilegeEscalation: false, readOnlyRootFilesystem: true }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: games-cloud
+  namespace: games
+spec:
+  selector: { app: games-cloud }
+  ports: [{ port: 80, targetPort: http, name: http }]
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: games-cloud
+  namespace: games
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts: [games.skylar.technology]
+      secretName: games-skylar-technology-tls
+  rules:
+    - host: games.skylar.technology
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend: { service: { name: games-cloud, port: { name: http } } }

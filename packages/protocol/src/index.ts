@@ -1,0 +1,151 @@
+// Shared protocol for the Game Table: envelope, manifest schema, lobby types.
+import { z } from "zod";
+
+export const PROTOCOL_VERSION = 1;
+
+// ---------- Envelope ----------
+
+export type Channel = "system" | "lobby" | "game";
+
+export interface Envelope<P = unknown> {
+  v: number;
+  ch: Channel;
+  type: string; // e.g. "hello", "welcome", "state", "intent", "view", "error"
+  seq?: number;
+  stateRev?: number;
+  payload?: P;
+}
+
+export function envelope<P>(ch: Channel, type: string, payload?: P, extra: Partial<Envelope> = {}): Envelope<P> {
+  return { ...extra, v: PROTOCOL_VERSION, ch, type, payload } as Envelope<P>;
+}
+
+// ---------- Board geometry ----------
+
+export type Edge = "north" | "east" | "south" | "west";
+export const EDGES_CLOCKWISE: Edge[] = ["south", "west", "north", "east"];
+export type SeatLayout = 2 | 4 | 6 | 8;
+
+/** Edge of every seat for a layout. Seats are numbered South first, then North, then East, then West. */
+export function seatEdges(layout: SeatLayout): Edge[] {
+  switch (layout) {
+    case 2:
+      return ["south", "north"];
+    case 4:
+      return ["south", "south", "north", "north"];
+    case 6:
+      return ["south", "south", "south", "north", "north", "north"];
+    case 8:
+      return ["south", "south", "south", "north", "north", "north", "east", "west"];
+  }
+}
+
+export function rotateEdge(edge: Edge, degrees: 90 | 180): Edge {
+  const i = EDGES_CLOCKWISE.indexOf(edge);
+  return EDGES_CLOCKWISE[(i + degrees / 90) % 4];
+}
+
+// ---------- Manifest ----------
+
+const settingSchema = z.object({
+  key: z.string(),
+  type: z.enum(["int", "number", "string", "bool", "enum"]),
+  min: z.number().optional(),
+  max: z.number().optional(),
+  values: z.array(z.string()).optional(),
+  default: z.unknown().optional(),
+  label: z.string().optional(),
+});
+
+export const manifestSchema = z.object({
+  id: z.string().regex(/^[a-z0-9-]+$/),
+  name: z.string(),
+  version: z.string(),
+  sdk: z.string(),
+  description: z.string().optional(),
+  players: z.union([
+    z.object({ min: z.number().int().min(1).max(8), max: z.number().int().min(1).max(8) }),
+    z.array(z.number().int().min(1).max(8)).nonempty(),
+  ]),
+  turnModel: z.enum(["sequential", "simultaneous"]),
+  seatLayouts: z.array(z.union([z.literal(2), z.literal(4), z.literal(6), z.literal(8)])).nonempty(),
+  edges: z.array(z.enum(["north", "east", "south", "west"])).refine(
+    (e) => e.includes("north") && e.includes("south"),
+    "every game must support north and south",
+  ),
+  seatConstraints: z.unknown().nullable().optional(),
+  dynamicPlayers: z.boolean().default(false),
+  saveGame: z.boolean().default(false),
+  settings: z.array(settingSchema).default([]),
+  ai: z
+    .object({
+      supported: z.boolean(),
+      options: z.array(settingSchema).default([]),
+      hostConfig: z.array(z.unknown()).default([]),
+    })
+    .default({ supported: false, options: [], hostConfig: [] }),
+  simulation: z.object({ supported: z.boolean(), headless: z.boolean() }).default({ supported: false, headless: false }),
+  remoteBoardControl: z.boolean().default(true),
+  lobbyButton: z.enum(["top-left", "top-right", "bottom-left", "bottom-right"]).default("bottom-right"),
+  deck: z.object({ minWidth: z.number().optional(), orientation: z.string().optional() }).optional(),
+  permissions: z.array(z.string()).default([]),
+});
+
+export type Manifest = z.infer<typeof manifestSchema>;
+
+export function allowedPlayerCounts(m: Manifest): number[] {
+  if (Array.isArray(m.players)) return [...m.players];
+  const out: number[] = [];
+  for (let n = m.players.min; n <= m.players.max; n++) out.push(n);
+  return out;
+}
+
+// ---------- Lobby ----------
+
+export type Phase = "idle" | "loading" | "ready" | "active" | "paused" | "terminating" | "finished";
+
+export interface PlayerInfo {
+  id: string;
+  name: string;
+  kind: "human" | "ai";
+  location: "local" | "remote";
+  seat: number | null;
+  connected: boolean;
+  ready: boolean;
+}
+
+export interface GameSummary {
+  text: string;
+  highlights: Record<string, unknown>;
+}
+
+export interface LobbyState {
+  stateRev: number;
+  tableName: string;
+  layout: SeatLayout;
+  seatEdges: Edge[];
+  frontEdge: Edge;
+  players: PlayerInfo[];
+  phase: Phase;
+  game: { id: string; name: string; settings: Record<string, unknown>; lobbyButton: string; edges: Edge[] } | null;
+  summary: GameSummary | null;
+  joinUrl: string;
+  cloud: CloudStatus;
+}
+
+export interface CloudStatus {
+  status: "disabled" | "pending" | "online" | "offline" | "revoked";
+  pairingCode?: string;
+}
+
+export interface GameAvailability {
+  id: string;
+  name: string;
+  version: string;
+  description?: string;
+  selectable: boolean;
+  reasons: string[];
+  ai: boolean;
+  simulation: boolean;
+  players: number[];
+}
