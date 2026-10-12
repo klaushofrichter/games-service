@@ -110,6 +110,7 @@ A remote player gets an invite link (`https://games.skylar.technology/i/CODE`) f
 
 - The service's `ICE_SERVERS` (JSON) sets STUN/TURN for both sides; without it, Google's public STUN is used. Add a TURN server for players behind strict NATs.
 - The table needs outbound UDP; the table PC kit uses host networking. In bridged Docker (the dev `docker-compose.yml`) remote play only works with a TURN server.
+- The remote board turns so the remote player's own seat is at the bottom of their screen.
 - `POST /api/v1/remote {"boardControl": false}` (or the checkbox in the invite dialog) makes the board read-only for remote players.
 
 ## Testing
@@ -129,5 +130,4 @@ python3 scripts/e2e/remote.py out/         # remote play in a second browser (st
 - The cloud keeps its state in memory: one replica, data lost on restart, until PostgreSQL is added.
 - Tables authenticate to the cloud with an issued bearer token, not yet a key pair or certificate.
 - Host-side AI configuration (`ai.hostConfig`, e.g. API keys) is parsed but has no screen yet.
-- The remote board shows the table's orientation, which may be upside down for a remote player.
 - werift waits up to 5 s for STUN during connection setup when STUN is unreachable.

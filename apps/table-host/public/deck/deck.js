@@ -71,6 +71,7 @@ function connect(hello) {
       }
       if (m.type === "welcome") {
         me = m.payload.playerId;
+        if (REMOTE) try { localStorage.setItem(`gametable.remote.${params.get("inv") ?? ""}.player`, me); } catch {} // the remote board turns to this seat
         if (m.payload.sessionToken) storage.set(m.payload.sessionToken);
         retry = 0;
         banner = "";

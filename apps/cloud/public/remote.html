@@ -246,7 +246,7 @@
     // (Re)load the board and the deck so their sockets reopen over the new channel.
     show("play"); // first, so the frames load at their real size
     const q = (extra) => `?remote=1&gtp=${encodeURIComponent(PAGE)}${extra}`;
-    $("board").src = `/board/${q("")}`;
+    $("board").src = `/board/${q(`&inv=${encodeURIComponent(CODE)}`)}`;
     $("deck").src = `/deck/${q(`&inv=${encodeURIComponent(CODE)}&name=${encodeURIComponent(name)}`)}`;
     playing = true;
     show("play");

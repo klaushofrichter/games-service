@@ -31,10 +31,11 @@ type Client = ({ ws: WebSocket; role: "board" } | { ws: WebSocket; role: "deck";
 /** Reads a remote client may make: lobby and game state, never logs, saves, simulations or local join codes. */
 const REMOTE_DENIED = /^\/(join|simulation|logs|saves|invites|remote|qr)(\/|$)/;
 /**
- * Changes a remote client may make (an allowlist): turn the board and run games. Never remove or move
- * players, add AI seats, change AI options, save, or resume — those stay with the people at the table.
+ * Changes a remote client may make (an allowlist): seat layout and running games. Never turn the table's
+ * board (remote boards face their own seat), remove or move players, add AI seats, change AI options,
+ * save, or resume — those stay with the people at the table.
  */
-const REMOTE_ACTIONS = /^\/(rotate|layout|game\/(select|start|end|close))$/;
+const REMOTE_ACTIONS = /^\/(layout|game\/(select|start|end|close))$/;
 
 const MIME: Record<string, string> = {
   ".html": "text/html; charset=utf-8",

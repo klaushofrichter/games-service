@@ -6,6 +6,7 @@ const KEY = window.TABLE_KEY;
 // A remote player's copy of the board (phase 1c): it runs inside the cloud's invite page, which carries
 // requests and the live socket over a WebRTC channel. No table key, no join code, no simulations.
 const REMOTE = !!window.REMOTE_BOARD;
+const REMOTE_INV = new URLSearchParams(location.search).get("inv") ?? "";
 // Tell the invite page's service worker which page this frame belongs to (it forgets when restarted).
 if (REMOTE && navigator.serviceWorker) {
   const own = () => navigator.serviceWorker.controller?.postMessage({ type: "gt-own", page: new URLSearchParams(location.search).get("gtp") });
@@ -51,7 +52,7 @@ function toast(msg) {
 
 // Dialogs and overlays face the current front edge, like the rest of the board.
 function faceFront(el) {
-  if (state) el.style.transform = `rotate(${ROT[state.frontEdge]}deg)`;
+  if (state) el.style.transform = `rotate(${ROT[viewEdge()]}deg)`;
   return el;
 }
 
@@ -125,10 +126,28 @@ async function configureAi(playerId) {
   if (opts) act("POST", `/players/${playerId}/ai-options`, { options: opts });
 }
 
+// ---------- orientation ----------
+// The table's board faces `frontEdge` (turned with the rotate buttons). A remote player's copy instead
+// turns the whole surface so their own seat is at the bottom of their screen, and faces text to it.
+// Their deck (same origin) records which player they are.
+function myEdge() {
+  if (!REMOTE || !state) return null;
+  let id = null;
+  try {
+    id = localStorage.getItem(`gametable.remote.${REMOTE_INV}.player`);
+  } catch {}
+  const p = id && state.players.find((x) => x.id === id);
+  return p && p.seat !== null ? state.seatEdges[p.seat] ?? null : null;
+}
+const viewEdge = () => myEdge() ?? state.frontEdge;
+if (REMOTE) window.addEventListener("storage", (e) => e.key?.startsWith("gametable.remote.") && state && (render(), game?.inst && gameMsg && game.inst.update(gameMsg.view, [], gameInfo())));
+
 // ---------- scaling ----------
 function fit() {
-  const s = Math.min(window.innerWidth / W, window.innerHeight / H);
-  surface.style.transform = `scale(${s})`;
+  const e = myEdge();
+  const sideways = e === "east" || e === "west";
+  const s = sideways ? Math.min(window.innerWidth / H, window.innerHeight / W) : Math.min(window.innerWidth / W, window.innerHeight / H);
+  surface.style.transform = `${e ? `rotate(${-ROT[e]}deg) ` : ""}scale(${s})`;
 }
 window.addEventListener("resize", fit);
 // A board inside a frame (remote play) can start hidden at zero size; refit whenever the window changes.
@@ -182,7 +201,8 @@ function onSeatTap(seat, pl) {
 function render() {
   if (!state) return;
   renderSeats();
-  const front = state.frontEdge;
+  if (REMOTE) fit();
+  const front = viewEdge();
   center.style.transform = `rotate(${ROT[front]}deg)`;
   center.classList.toggle("sideways", front === "east" || front === "west");
 
@@ -223,8 +243,8 @@ function toolbar() {
   const sel = state.players.find((p) => p.id === selectedPlayer);
   return `<div class="toolbar">
     <span class="seg">${[2, 4, 6, 8].map((n) => `<button data-layout="${n}" class="${state.layout === n ? "on" : ""}">${n}</button>`).join("")}</span>
-    <button data-rotate="90">⟳ 90°</button>
-    <button data-rotate="180">⟳ 180°</button>
+    ${REMOTE ? "" : `<button data-rotate="90">⟳ 90°</button>
+    <button data-rotate="180">⟳ 180°</button>`}
     ${REMOTE ? "" : `<button data-add-ai>+ AI player</button>
     ${sel?.kind === "ai" ? `<button data-config="${sel.id}">Configure ${esc(sel.name)}</button>` : ""}
     ${sel ? `<button class="danger" data-remove="${sel.id}">Remove ${esc(sel.name)}</button>` : ""}`}
@@ -270,7 +290,7 @@ function renderReady() {
       <div class="ready-list">${humans.map((p) => `<span class="chip ${p.ready ? "ok" : ""}"><span class="dot" style="background:${p.ready ? "var(--jade)" : ""}"></span>${esc(p.name)}</span>`).join("")}</div>
       <div class="toolbar"><button class="primary" data-start ${all ? "" : "disabled"}>Start game</button><button data-close>Change game</button>
       ${REMOTE ? "" : (() => { const sel = state.players.find((p) => p.id === selectedPlayer); return sel?.kind === "ai" ? `<button data-config="${sel.id}">Configure ${esc(sel.name)}</button>` : state.players.some((p) => p.kind === "ai") ? `<span class="faint" style="font-size:.7em">Tap an AI seat to configure it</span>` : ""; })()}
-      <span class="spacer"></span><button data-rotate="180">⟳ 180°</button></div>
+      <span class="spacer"></span>${REMOTE ? "" : `<button data-rotate="180">⟳ 180°</button>`}</div>
     </section>${joinPanel()}`;
 }
 
@@ -289,7 +309,7 @@ function renderPause() {
   pauseLayer.hidden = !p;
   if (!p) return;
   const online = state.cloud.status === "online" || state.cloud.status === "disabled";
-  pauseLayer.innerHTML = `<div class="panel" style="transform:rotate(${ROT[state.frontEdge]}deg)">
+  pauseLayer.innerHTML = `<div class="panel" style="transform:rotate(${ROT[viewEdge()]}deg)">
     ${online ? "" : `<div class="spinner"></div>`}
     <h2>${online ? "Connection is back" : "Game paused"}</h2>
     <p>${online ? "Continue where you left off." : "The table lost its connection to the Game Table service. The game continues by itself when the connection returns."}</p>
@@ -318,8 +338,8 @@ function gameInfo() {
     players: state.players,
     seatEdges: state.seatEdges,
     seatPositions: seatPositions(state.seatEdges),
-    frontEdge: state.frontEdge,
-    rotation: ROT[state.frontEdge],
+    frontEdge: viewEdge(),
+    rotation: ROT[viewEdge()],
     settings: state.game?.settings ?? {},
     timers: gameMsg?.timers ?? {},
     now: gameMsg?.now ?? Date.now(),
@@ -399,8 +419,8 @@ function openLobbyOverlay() {
         .map((p) => `<div class="row"><span>${esc(p.name)} <span class="faint">· ${p.seat === null ? "no seat" : `seat ${p.seat + 1}`}${p.kind === "ai" ? " · AI" : ""}${p.connected ? "" : " · reconnecting"}</span></span>
           ${REMOTE ? "" : `<button class="danger" data-remove="${p.id}">Remove</button>`}</div>`)
         .join("") || `<div class="faint">Nobody yet</div>`}</div>
-      <div class="group"><div class="eyebrow">View</div><div class="row"><span>Turn the board for players on another edge</span>
-        <span><button data-rotate="90">⟳ 90°</button> <button data-rotate="180">⟳ 180°</button></span></div></div>
+      ${REMOTE ? "" : `<div class="group"><div class="eyebrow">View</div><div class="row"><span>Turn the board for players on another edge</span>
+        <span><button data-rotate="90">⟳ 90°</button> <button data-rotate="180">⟳ 180°</button></span></div></div>`}
       <div class="group">${REMOTE ? "" : `<div class="row"><span>Remote players${state.remote?.players ? ` · ${state.remote.players} joined` : ""}</span><button data-invite>Invite…</button></div>`}
         <div class="row"><span>Terms of service</span><a href="/deck/terms.html" target="_blank" style="color:var(--brass)">Open</a></div></div>
       <div class="actions" style="display:flex;justify-content:space-between;margin-top:20px">
