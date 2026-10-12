@@ -1,21 +1,19 @@
 // Board UI: lobby, seats around the edge, QR join, game surface and the lobby overlay.
 // Talks to the Table Host through the board control API (same API the tests and local AI agents use).
+import { ROT, W, H, esc, seatPositions } from "/shared/board-kit.js";
+
 const KEY = window.TABLE_KEY;
-const W = 1920, H = 1080;
 const surface = document.getElementById("surface");
 const seatsEl = document.getElementById("seats");
 const center = document.getElementById("center");
 const lobbyBtn = document.getElementById("lobby-button");
 const overlayRoot = document.getElementById("overlay-root");
+const gameLayer = document.getElementById("game-layer");
 
 let state = null;
 let games = [];
-let gameView = null;
-let lastFlipRound = 0;
+let gameMsg = null; // last game.board message
 let selectedPlayer = null;
-
-const ROT = { south: 0, west: 90, north: 180, east: -90 };
-const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
 // ---------- API ----------
 async function api(method, path, body) {
@@ -74,26 +72,6 @@ window.addEventListener("resize", fit);
 fit();
 
 // ---------- seats ----------
-function seatPositions(edges) {
-  const byEdge = {};
-  edges.forEach((e, i) => (byEdge[e] ??= []).push(i));
-  const pos = [];
-  for (const [edge, list] of Object.entries(byEdge)) {
-    list.forEach((seat, k) => {
-      const n = list.length;
-      if (edge === "south" || edge === "north") {
-        const span = 1300, x0 = (W - span) / 2;
-        let x = x0 + (span * (k + 0.5)) / n;
-        if (edge === "north") x = W - x; // numbered left to right as seen from that edge
-        pos[seat] = { x, y: edge === "south" ? H - 92 : 92, rot: ROT[edge], edge };
-      } else {
-        pos[seat] = { x: edge === "east" ? W - 92 : 92, y: H / 2, rot: ROT[edge], edge };
-      }
-    });
-  }
-  return pos;
-}
-
 function renderSeats() {
   const pos = seatPositions(state.seatEdges);
   const playing = state.phase === "active" || state.phase === "paused";
@@ -148,7 +126,11 @@ function render() {
   lobbyBtn.hidden = !playing;
   lobbyBtn.className = state.game?.lobbyButton ?? "bottom-right";
 
-  if (playing) return renderGame();
+  seatsEl.hidden = playing;
+  center.hidden = playing;
+  gameLayer.hidden = !playing;
+  if (playing) return void showGame();
+  closeGame();
   if (state.phase === "finished") return renderFinished();
   if (state.phase === "ready") return renderReady();
   renderLobby();
@@ -227,22 +209,60 @@ function renderFinished() {
     </section>${joinPanel()}`;
 }
 
-function renderGame() {
-  const v = gameView?.view;
-  let body;
-  if (v && "lastFlip" in v && Array.isArray(v.seats)) {
-    const flipNow = v.lastFlip && v.round !== lastFlipRound;
-    lastFlipRound = v.round;
-    body = `<div class="coin ${flipNow ? "flip" : ""}">${v.lastFlip ? esc(v.lastFlip) : "?"}</div>
-      <div class="scores">${v.seats.map((s) => `<div class="score"><span>${esc(s.name)} ${s.hasGuessed ? "✓" : ""}</span><span class="n">${s.score}</span></div>`).join("")}</div>`;
-  } else if (v && "holderName" in v) {
-    body = `<div class="coin">${v.passes}/${v.total}</div><div class="sub" style="text-align:center">Token is with <b>${esc(v.holderName)}</b></div>`;
-  } else {
-    body = `<pre class="raw">${esc(JSON.stringify(v, null, 2))}</pre>`;
+// ---------- game surface: the game's own board.js ----------
+// A game package may ship board.js exporting mount(root, ctx) -> { update(view, events, info), destroy() }.
+let game = null; // { key, inst, loading }
+
+function gameInfo() {
+  return {
+    players: state.players,
+    seatEdges: state.seatEdges,
+    seatPositions: seatPositions(state.seatEdges),
+    frontEdge: state.frontEdge,
+    rotation: ROT[state.frontEdge],
+    settings: state.game?.settings ?? {},
+    timers: gameMsg?.timers ?? {},
+    now: gameMsg?.now ?? Date.now(),
+    receivedAt: gameMsg?.receivedAt ?? Date.now(),
+    over: gameMsg?.over ?? false,
+  };
+}
+
+async function showGame() {
+  const key = `${state.game.id}@${state.game.version}`;
+  if (!game || game.key !== key) {
+    closeGame();
+    game = { key, inst: null };
+    const mine = game;
+    let mod;
+    try {
+      mod = await import(`/games/${state.game.id}/board.js?v=${encodeURIComponent(state.game.version)}`);
+    } catch {
+      mod = { mount: genericBoard };
+    }
+    if (game !== mine) return; // a newer game replaced this one while loading
+    mine.inst = mod.mount(gameLayer, { gameId: state.game.id, assetUrl: (p) => `/games/${state.game.id}/assets/${p}` });
   }
-  const round = v?.round ? ` · round ${v.round} of ${v.rounds}` : "";
-  center.innerHTML = `<section class="main gameview" style="grid-column:1/-1">
-    <div><div class="eyebrow">${esc(state.game.name)}${round}</div></div>${body}</section>`;
+  if (game.inst && gameMsg) game.inst.update(gameMsg.view, [], gameInfo());
+}
+
+function closeGame() {
+  if (!game) return;
+  try {
+    game.inst?.destroy?.();
+  } catch {}
+  game = null;
+  gameMsg = null;
+  gameLayer.innerHTML = "";
+}
+
+/** Fallback for games without their own board UI: show the public view as JSON. */
+function genericBoard(root) {
+  const pre = document.createElement("pre");
+  pre.className = "raw";
+  pre.style.cssText = "position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);max-width:1200px";
+  root.appendChild(pre);
+  return { update: (view) => (pre.textContent = JSON.stringify(view, null, 2)) };
 }
 
 // ---------- events ----------
@@ -362,8 +382,9 @@ function connect() {
       render();
       stateListeners.forEach((f) => f());
     } else if (m.ch === "game" && m.type === "board") {
-      gameView = m.payload;
-      if (state && (state.phase === "active" || state.phase === "paused")) renderGame();
+      gameMsg = { ...m.payload, receivedAt: Date.now() };
+      if (game?.inst && state) game.inst.update(gameMsg.view, gameMsg.events ?? [], gameInfo());
+      else if (state && (state.phase === "active" || state.phase === "paused")) showGame();
     }
   };
   ws.onclose = () => setTimeout(connect, 1000);

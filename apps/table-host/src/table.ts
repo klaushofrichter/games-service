@@ -112,7 +112,14 @@ export class Table extends EventEmitter {
       players: [...this.players.values()].map(({ sessionToken, graceTimer, aiSeed, ...info }) => info),
       phase: this.phase,
       game: this.selected
-        ? { id: this.selected.game.manifest.id, name: this.selected.game.manifest.name, settings: this.selected.settings, lobbyButton: this.selected.game.manifest.lobbyButton, edges: this.selected.game.manifest.edges }
+        ? {
+            id: this.selected.game.manifest.id,
+            name: this.selected.game.manifest.name,
+            version: this.selected.game.manifest.version,
+            settings: this.selected.settings,
+            lobbyButton: this.selected.game.manifest.lobbyButton,
+            edges: this.selected.game.manifest.edges,
+          }
         : null,
       summary: this.summary,
       joinUrl: this.currentJoin().url,
@@ -217,7 +224,7 @@ export class Table extends EventEmitter {
   }
 
   private seatInfo(p: Player): SeatInfo {
-    return { seat: p.seat!, playerId: p.id, name: p.name, kind: p.kind };
+    return { seat: p.seat!, playerId: p.id, name: p.name, kind: p.kind, edge: seatEdges(this.layout)[p.seat!] };
   }
 
   setLayout(n: number) {
@@ -380,7 +387,9 @@ export class Table extends EventEmitter {
     if (notReady.length) throw new TableError(409, `waiting for ${notReady.map((p) => p.name).join(", ")}`);
     const { game, settings } = this.selected;
     const seats = this.seated().map((p) => this.seatInfo(p));
-    const rt = new GameRuntime(game.manifest, game.def, randomInt(2 ** 31), settings, seats, realClock);
+    const aiOptions: Record<number, Record<string, unknown>> = {};
+    for (const p of this.seated()) if (p.kind === "ai") aiOptions[p.seat!] = aiDefaults(game.manifest);
+    const rt = new GameRuntime(game.manifest, game.def, randomInt(2 ** 31), settings, seats, realClock, { aiOptions });
     this.runtime = rt;
     this.gameStartedAt = Date.now();
     this.phase = "active";
@@ -495,6 +504,16 @@ export class Table extends EventEmitter {
     for (const p of this.players.values()) if (p.graceTimer) clearTimeout(p.graceTimer);
     this.runtime?.clearAllTimers();
   }
+}
+
+/** AI options with manifest defaults. The AI configuration screen (later phase) will override these per seat. */
+export function aiDefaults(m: InstalledGame["manifest"], given: Record<string, unknown> = {}): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const o of m.ai.options) {
+    const v = given[o.key];
+    out[o.key] = v !== undefined && (!o.values || o.values.includes(String(v))) ? v : o.default;
+  }
+  return out;
 }
 
 function describeCounts(c: number[]): string {

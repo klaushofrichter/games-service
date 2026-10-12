@@ -127,7 +127,7 @@ export interface LobbyState {
   frontEdge: Edge;
   players: PlayerInfo[];
   phase: Phase;
-  game: { id: string; name: string; settings: Record<string, unknown>; lobbyButton: string; edges: Edge[] } | null;
+  game: { id: string; name: string; version: string; settings: Record<string, unknown>; lobbyButton: string; edges: Edge[] } | null;
   summary: GameSummary | null;
   joinUrl: string;
   cloud: CloudStatus;

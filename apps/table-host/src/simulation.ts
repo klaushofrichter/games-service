@@ -1,9 +1,9 @@
 // Headless AI-only simulation: runs games with virtual time and packages one log zip per run.
 import { createRng, type SeatInfo } from "../../../packages/sdk/src/index.ts";
-import { allowedPlayerCounts } from "../../../packages/protocol/src/index.ts";
+import { allowedPlayerCounts, seatEdges, type SeatLayout } from "../../../packages/protocol/src/index.ts";
 import { settingsWithDefaults, type InstalledGame } from "./games.ts";
 import { GameRuntime, VirtualClock, type LogRecord } from "./runtime.ts";
-import { logId, TableError } from "./table.ts";
+import { aiDefaults, logId, TableError } from "./table.ts";
 import type { LogStore } from "./logs.ts";
 
 export interface SimulationRequest {
@@ -11,11 +11,13 @@ export interface SimulationRequest {
   games: number;
   seed: number;
   settings?: Record<string, unknown>;
+  /** AI options for every seat, or a list with one entry per seat (e.g. to compare play styles). */
+  aiOptions?: Record<string, unknown> | Record<string, unknown>[];
 }
 
 export interface SimulationResult {
   logId: string;
-  games: { summary: unknown; steps: number; reason: string }[];
+  games: { summary: unknown; steps: number; reason: string; aiOptions: Record<number, Record<string, unknown>> }[];
 }
 
 const MAX_STEPS = 100_000;
@@ -40,10 +42,17 @@ export async function runSimulation(game: InstalledGame, req: SimulationRequest,
   const results: SimulationResult["games"] = [];
 
   for (let g = 0; g < games; g++) {
-    const seats: SeatInfo[] = Array.from({ length: players }, (_, i) => ({ seat: i, playerId: `ai_${i + 1}`, name: `AI ${i + 1}`, kind: "ai" }));
+    const layout = (m.seatLayouts.find((l) => l >= players) ?? 8) as SeatLayout;
+    const edges = seatEdges(layout);
+    const seats: SeatInfo[] = Array.from({ length: players }, (_, i) => ({ seat: i, playerId: `ai_${i + 1}`, name: `AI ${i + 1}`, kind: "ai", edge: edges[i] }));
+    const aiOptions: Record<number, Record<string, unknown>> = {};
+    for (const s of seats) {
+      const given = Array.isArray(req.aiOptions) ? (req.aiOptions[s.seat] ?? {}) : (req.aiOptions ?? {});
+      aiOptions[s.seat] = aiDefaults(m, given);
+    }
     const clock = new VirtualClock();
     const gameSeed = Math.floor(master() * 2 ** 31);
-    const rt = new GameRuntime(m, game.def, gameSeed, settings, seats, clock, { simulation: true });
+    const rt = new GameRuntime(m, game.def, gameSeed, settings, seats, clock, { simulation: true, aiOptions });
     const aiRngs = seats.map((s) => createRng(gameSeed ^ (s.seat + 1) * 0x9e3779b1));
     let steps = 0;
     while (!rt.over && steps < MAX_STEPS) {
@@ -52,8 +61,8 @@ export async function runSimulation(game: InstalledGame, req: SimulationRequest,
         if (rt.over) break;
         const intent = rt.aiIntent(s.seat, aiRngs[s.seat]);
         if (intent) {
-          rt.submit(s.seat, intent, "ai");
-          acted = true;
+          // A rejected AI move counts as no move, so a confused AI cannot spin forever; time moves on instead.
+          if (rt.submit(s.seat, intent, "ai").ok) acted = true;
           steps++;
         }
       }
@@ -65,7 +74,7 @@ export async function runSimulation(game: InstalledGame, req: SimulationRequest,
     if (!rt.over) rt.finish("terminated", { text: `Simulation stopped after ${MAX_STEPS} steps.`, highlights: {} });
     const end = rt.log.at(-1) as Extract<LogRecord, { t: "end" }>;
     logsOut.push(rt.log);
-    results.push({ summary: rt.summary, steps, reason: end.reason });
+    results.push({ summary: rt.summary, steps, reason: end.reason, aiOptions });
   }
 
   const id = logId(`${m.id}-sim`);

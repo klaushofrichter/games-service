@@ -108,6 +108,10 @@ html, body { overflow: hidden; }
 .score .n { font-family: var(--display); font-size: 1.3em; color: var(--brass); }
 pre.raw { font-family: var(--mono); font-size: 0.7em; color: var(--ink-soft); background: rgba(0,0,0,0.25); padding: 16px; border-radius: 12px; overflow: auto; max-height: 420px; }
 
+/* ---------- game layer: the running game owns the whole surface ---------- */
+#game-layer { position: absolute; inset: 0; z-index: 2; }
+#game-layer[hidden], #seats[hidden], #center[hidden] { display: none; }
+
 /* ---------- lobby button and overlay ---------- */
 #lobby-button {
   position: absolute; z-index: 20; font-size: 0.8em;

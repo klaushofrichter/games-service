@@ -1,0 +1,35 @@
+.rl-root { position: absolute; inset: 0; }
+.rl-table {
+  position: absolute; left: 50%; top: 50%; width: 1580px; height: 660px; margin: -330px 0 0 -790px;
+  display: grid; grid-template-columns: 620px 1fr; gap: 40px; align-items: center;
+  transition: transform 0.6s cubic-bezier(.2,.7,.2,1);
+}
+.rl-wheelbox { position: relative; width: 600px; height: 600px; }
+.rl-wheel { position: absolute; inset: 0; }
+.rl-spin { transform-origin: 300px 300px; transition: transform 5.2s cubic-bezier(.12,.68,.18,1); }
+.rl-ball { transition: opacity .4s; }
+.rl-side { display: flex; flex-direction: column; gap: 18px; }
+.rl-status { display: flex; align-items: baseline; gap: 24px; min-height: 64px; }
+.rl-status .big { font-family: var(--display); font-size: 48px; color: var(--ink); }
+.rl-status .clock { font-family: var(--mono); font-size: 34px; color: var(--brass); margin-left: auto; }
+.rl-status .clock.hurry { color: var(--ruby); }
+.rl-layout text { font-family: var(--text); fill: var(--ink); pointer-events: none; }
+.rl-layout .num { font-family: var(--display); font-size: 28px; font-weight: 600; }
+.rl-layout .lbl { font-size: 20px; letter-spacing: .04em; }
+.rl-cell { stroke: rgba(243, 238, 226, .55); stroke-width: 2; }
+.rl-cell.red { fill: #a8322a; }
+.rl-cell.black { fill: #191a1c; }
+.rl-cell.green { fill: #1f7a4d; }
+.rl-cell.out { fill: rgba(255, 255, 255, .03); }
+.rl-cell.win { stroke: var(--brass); stroke-width: 6; animation: rl-pulse 1s ease-in-out infinite alternate; }
+@keyframes rl-pulse { from { filter: brightness(1); } to { filter: brightness(1.6); } }
+.rl-chip circle.face { stroke: rgba(0, 0, 0, .55); stroke-width: 2; }
+.rl-chip circle.ring { fill: none; stroke: rgba(255, 255, 255, .8); stroke-width: 2; stroke-dasharray: 5 5; }
+.rl-chip text { font-family: var(--text); font-size: 13px; font-weight: 700; fill: #111; }
+.rl-chip { animation: rl-drop .35s ease-out; }
+@keyframes rl-drop { from { transform: translateY(-30px); opacity: 0; } to { transform: none; opacity: 1; } }
+.rl-history { display: flex; gap: 8px; justify-content: center; margin-top: 18px; }
+.rl-history span { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: 17px; border: 2px solid rgba(255,255,255,.25); }
+.rl-history .red { background: #a8322a; } .rl-history .black { background: #191a1c; } .rl-history .green { background: #1f7a4d; }
+.rl-history span:last-child { border-color: var(--brass); }
+.rl-legend { color: var(--ink-soft); font-size: 20px; }

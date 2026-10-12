@@ -59,11 +59,13 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
     if (!rt) return;
     const board = rt.boardView();
     const views = new Map(table.views().map((v) => [v.playerId, v]));
+    // Timer deadlines plus the host's clock let clients draw countdowns without trusting their own clock.
+    const timing = { timers: rt.timerDeadlines(), now: Date.now() };
     for (const c of clients) {
-      if (c.role === "board") send(c.ws, envelope("game", "board", { view: board, events, over: rt.over }));
+      if (c.role === "board") send(c.ws, envelope("game", "board", { view: board, events, over: rt.over, ...timing }));
       if (c.role === "deck") {
         const v = views.get(c.playerId);
-        if (v) send(c.ws, envelope("game", "view", { seat: v.seat, view: v.view, events, over: rt.over }));
+        if (v) send(c.ws, envelope("game", "view", { seat: v.seat, view: v.view, events, over: rt.over, ...timing }));
       }
     }
   });
@@ -101,8 +103,7 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
     }
   };
 
-  const serveFile = async (res: ServerResponse, rel: string, transform?: (s: string) => string) => {
-    const root = opts.publicDir;
+  const serveFile = async (res: ServerResponse, rel: string, transform?: (s: string) => string, root = opts.publicDir) => {
     const file = normalize(join(root, rel));
     if (!file.startsWith(root)) return json(res, 404, { error: "not found" });
     try {
@@ -147,7 +148,12 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
     if (m === "POST" && path === "/simulation") {
       const g = table.games.get(String(body.gameId));
       if (!g) throw new TableError(404, "no such game");
-      const r = await runSimulation(g, { players: Number(body.players), games: Number(body.games ?? 1), seed: Number(body.seed ?? Date.now()), settings: body.settings as Record<string, unknown> }, logs, table.config.tableName);
+      const r = await runSimulation(
+        g,
+        { players: Number(body.players), games: Number(body.games ?? 1), seed: Number(body.seed ?? Date.now()), settings: body.settings as Record<string, unknown>, aiOptions: body.aiOptions as Record<string, unknown> },
+        logs,
+        table.config.tableName,
+      );
       table.metrics.simulations++;
       return json(res, 200, r);
     }
@@ -189,6 +195,12 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
       }
       if (path === "/deck" || path === "/deck/") return await serveFile(res, "deck/index.html");
       if (path.startsWith("/board/") || path.startsWith("/deck/") || path.startsWith("/shared/")) return await serveFile(res, path.slice(1));
+      if ((match = path.match(/^\/games\/([a-z0-9-]+)\/((?:board|deck)\.(?:js|css)|assets\/[\w./-]+)$/))) {
+        // A game's own board and deck UI and its assets; rules and manifest are not served.
+        const g = table.games.get(match[1]);
+        if (!g || match[2].includes("..")) return json(res, 404, { error: "not found" });
+        return await serveFile(res, match[2], undefined, g.dir);
+      }
       json(res, 404, { error: "not found" });
     } catch (err) {
       if (err instanceof TableError) return json(res, err.status, { error: err.message });

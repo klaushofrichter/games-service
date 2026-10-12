@@ -19,6 +19,7 @@
 }
 
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html, body { margin: 0; height: 100%; }
 body {
   background: var(--felt-deep);
@@ -71,3 +72,15 @@ button.danger { border-color: rgba(210, 87, 74, 0.6); color: #f1a197; }
   background: #2a1512; border: 1px solid var(--ruby); color: #f6d5cf;
   padding: 10px 18px; border-radius: 999px; z-index: 60; font-size: 0.95em;
 }
+
+/* ---------- board kit: seat plates for games ---------- */
+.kit-plates { position: absolute; inset: 0; pointer-events: none; z-index: 5; }
+.kit-plate {
+  position: absolute; min-width: 240px; padding: 10px 18px; border-radius: 16px; text-align: center;
+  background: rgba(8, 22, 19, 0.82); border: 2px solid var(--seat, var(--brass-deep));
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35); transition: box-shadow 0.25s, opacity 0.25s;
+}
+.kit-plate .kit-name { font-family: var(--display); font-size: 26px; color: var(--ink); white-space: nowrap; }
+.kit-plate .kit-extra { font-size: 18px; color: var(--ink-soft); margin-top: 2px; }
+.kit-plate.active { box-shadow: 0 0 0 4px var(--seat), 0 0 40px var(--seat); }
+.kit-plate.away { opacity: 0.5; border-style: dashed; }

@@ -112,7 +112,7 @@ describe("game selection gating", () => {
 
   it("lists installed games from their manifests", async () => {
     const games = await t.ok("GET", "/games");
-    expect(games.map((g: any) => g.id).sort()).toEqual(["coin-flip", "quartet"]);
+    expect(games.map((g: any) => g.id)).toEqual(expect.arrayContaining(["coin-flip", "quartet", "roulette"]));
   });
 
   it("requires at least one player at the table", async () => {

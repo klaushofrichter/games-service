@@ -1,0 +1,34 @@
+{
+  "id": "roulette",
+  "name": "Roulette",
+  "version": "1.0.0",
+  "sdk": "^0.1",
+  "description": "European single-zero roulette. Everyone bets at once from their phone, then the wheel spins. Points only, no real-world value.",
+  "players": { "min": 1, "max": 6 },
+  "turnModel": "simultaneous",
+  "seatLayouts": [2, 4, 6],
+  "edges": ["north", "south"],
+  "seatConstraints": null,
+  "dynamicPlayers": true,
+  "saveGame": false,
+  "settings": [
+    { "key": "rounds", "type": "int", "min": 1, "max": 50, "default": 10, "label": "Spins" },
+    { "key": "startPoints", "type": "int", "min": 100, "max": 100000, "default": 1000, "label": "Starting points" },
+    { "key": "minBet", "type": "int", "min": 1, "max": 1000, "default": 10, "label": "Minimum bet" },
+    { "key": "maxBet", "type": "int", "min": 10, "max": 100000, "default": 1000, "label": "Maximum bet per spot" },
+    { "key": "bettingSeconds", "type": "int", "min": 5, "max": 120, "default": 25, "label": "Seconds to bet" },
+    { "key": "resultSeconds", "type": "int", "min": 2, "max": 30, "default": 7, "label": "Seconds to show the result" }
+  ],
+  "ai": {
+    "supported": true,
+    "options": [
+      { "key": "style", "type": "enum", "values": ["conservative", "aggressive", "erratic"], "default": "conservative", "label": "Play style" }
+    ],
+    "hostConfig": []
+  },
+  "simulation": { "supported": true, "headless": true },
+  "remoteBoardControl": true,
+  "lobbyButton": "bottom-right",
+  "deck": { "minWidth": 320, "orientation": "portrait" },
+  "permissions": []
+}

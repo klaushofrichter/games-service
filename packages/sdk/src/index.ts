@@ -10,6 +10,8 @@ export interface SeatInfo {
   playerId: string;
   name: string;
   kind: "human" | "ai";
+  /** Board edge the seat is on; games use it to orient a player's area. */
+  edge?: "north" | "east" | "south" | "west";
 }
 
 export interface Intent {

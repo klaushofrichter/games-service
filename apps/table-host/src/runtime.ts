@@ -14,7 +14,7 @@ import {
 import type { GameSummary, Manifest } from "../../../packages/protocol/src/index.ts";
 
 export type LogRecord =
-  | { t: "start"; at: number; gameId: string; version: string; seed: number; settings: Record<string, unknown>; seats: SeatInfo[]; aiOptions: Record<string, unknown>; simulation: boolean }
+  | { t: "start"; at: number; gameId: string; version: string; seed: number; settings: Record<string, unknown>; seats: SeatInfo[]; aiOptions: Record<number, Record<string, unknown>>; simulation: boolean }
   | { t: "intent"; at: number; seat: number; by: "human" | "ai" | "board"; intent: Intent; accepted: boolean; reason?: string; events?: GameEvent[] }
   | { t: "timer"; at: number; id: string; events?: GameEvent[] }
   | { t: "seatJoined"; at: number; seat: SeatInfo; events?: GameEvent[] }
@@ -73,6 +73,7 @@ export class GameRuntime {
   over = false;
   private rng: () => number;
   private timers = new Map<string, unknown>();
+  private deadlines = new Map<string, number>();
   private listeners: Listener[] = [];
   private replaying = false;
 
@@ -82,7 +83,7 @@ export class GameRuntime {
   readonly settings: Record<string, unknown>;
   seats: SeatInfo[];
   readonly clock: Clock;
-  readonly opts: { simulation?: boolean; aiOptions?: Record<string, unknown>; replay?: boolean };
+  readonly opts: { simulation?: boolean; aiOptions?: Record<number, Record<string, unknown>>; replay?: boolean };
 
   constructor(
     manifest: Manifest,
@@ -91,7 +92,7 @@ export class GameRuntime {
     settings: Record<string, unknown>,
     seats: SeatInfo[],
     clock: Clock = realClock,
-    opts: { simulation?: boolean; aiOptions?: Record<string, unknown>; replay?: boolean } = {},
+    opts: { simulation?: boolean; aiOptions?: Record<number, Record<string, unknown>>; replay?: boolean } = {},
   ) {
     this.manifest = manifest;
     this.def = def;
@@ -129,15 +130,18 @@ export class GameRuntime {
     this.clearTimer(id);
     const h = this.clock.setTimeout(() => {
       this.timers.delete(id);
+      this.deadlines.delete(id);
       this.fireTimer(id);
     }, ms);
     this.timers.set(id, h);
+    this.deadlines.set(id, this.clock.now() + ms);
   }
 
   private clearTimer(id: string) {
     const h = this.timers.get(id);
     if (h !== undefined) this.clock.clearTimeout(h);
     this.timers.delete(id);
+    this.deadlines.delete(id);
   }
 
   clearAllTimers() {
@@ -221,10 +225,15 @@ export class GameRuntime {
     return this.def.boardView(this.state);
   }
 
+  /** Pending timers as absolute deadlines (clock time), for countdowns on board and decks. */
+  timerDeadlines(): Record<string, number> {
+    return Object.fromEntries(this.deadlines);
+  }
+
   aiIntent(seat: number, aiRng: () => number): Intent | null {
     if (!this.def.ai || this.over) return null;
     const ctx = { random: aiRng, randomInt: (min: number, max: number) => min + Math.floor(aiRng() * (max - min + 1)) };
-    return this.def.ai(this.view(seat), seat, ctx, this.opts.aiOptions ?? {});
+    return this.def.ai(this.view(seat), seat, ctx, this.opts.aiOptions?.[seat] ?? {});
   }
 }
 
