@@ -35,6 +35,15 @@ describe("cloud service", () => {
     expect((await fetch(`${base}/admin/api/tables`)).status).toBe(401);
   });
 
+  it("serves the admin page publicly and its data only with the token", async () => {
+    const page = await fetch(`${base}/admin`);
+    expect(page.status).toBe(200);
+    expect(page.headers.get("x-frame-options")).toBe("DENY");
+    expect(await page.text()).toContain("service admin");
+    expect((await fetch(`${base}/admin/api/settings`)).status).toBe(401);
+    expect((await admin("GET", "/admin/api/settings")).body).toEqual({ logRetentionDays: 90 });
+  });
+
   it("pairs a table, receives heartbeats and uploaded logs, and serves them by token", async () => {
     const t = await testHost({ cloudUrl: base, cloudPollMs: 30, cloudHeartbeatMs: 50 });
     try {

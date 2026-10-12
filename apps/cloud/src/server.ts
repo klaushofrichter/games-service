@@ -3,6 +3,10 @@
 // PostgreSQL replaces it before production (see architecture doc).
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { randomBytes, randomInt, timingSafeEqual } from "node:crypto";
+import { readFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
+
+const ADMIN_PAGE = fileURLToPath(new URL("../public/admin.html", import.meta.url));
 
 const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const code = (n: number) => Array.from({ length: n }, () => ALPHABET[randomInt(ALPHABET.length)]).join("");
@@ -85,6 +89,11 @@ export function startCloud(o: CloudOptions) {
     let match: RegExpMatchArray | null;
     try {
       if (p === "/health") return json(res, 200, { ok: true });
+      if (m === "GET" && (p === "/admin" || p === "/admin/")) {
+        // The page itself is public; everything it shows comes from /admin/api with the admin token.
+        res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-cache", "x-frame-options": "DENY", "referrer-policy": "no-referrer" });
+        return res.end(await readFile(ADMIN_PAGE));
+      }
 
       // ----- tables -----
       if (m === "POST" && p === "/api/tables/hello") {
@@ -168,6 +177,7 @@ export function startCloud(o: CloudOptions) {
           const sum = (k: string) => all.reduce((a, t) => a + (t.metrics[k] ?? 0), 0);
           return json(res, 200, { tables: all.length, gamesPlayed: sum("gamesPlayed"), gamesTerminated: sum("gamesTerminated"), totalGameMs: sum("totalGameMs"), simulations: sum("simulations") });
         }
+        if (m === "GET" && p === "/admin/api/settings") return json(res, 200, settings);
         if (m === "PUT" && p === "/admin/api/settings") {
           const b = await jsonBody(req);
           const d = Number(b.logRetentionDays);
