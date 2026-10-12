@@ -8,12 +8,12 @@ export function mount(root, ctx) {
   let info = null;
   root.innerHTML = `
     <div class="card" style="text-align:center"><div class="eyebrow he-head"></div>
-      <div class="he-mine" style="display:flex;gap:14px;justify-content:center;margin:14px 0 8px;--w:118px"></div>
+      <div class="he-mine" style="display:flex;gap:14px;justify-content:center;margin:14px 0 8px;--w:clamp(60px, 14dvh, 118px)"></div>
       <div class="display he-hand" style="font-size:1.2em;min-height:1.4em"></div></div>
-    <div class="card"><div style="display:flex;gap:6px;justify-content:center;--w:52px" class="he-board"></div>
+    <div class="card"><div style="display:flex;gap:6px;justify-content:center;container-type:inline-size;--w:min(52px, calc((100cqi - 24px) / 5))" class="he-board"></div>
       <div style="display:flex;justify-content:space-between;margin-top:12px"><span class="muted he-pot"></span><span class="muted he-stack"></span></div></div>
     <div class="he-status muted center" style="min-height:1.3em"></div>
-    <div class="he-actions" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+    <div class="he-actions" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;position:sticky;bottom:10px;z-index:2;padding:8px;margin:0 -8px;border-radius:16px;background:rgba(10,29,25,.88);backdrop-filter:blur(6px)">
       <button class="danger he-fold" data-a="fold">Fold</button><button class="he-call"></button><button class="primary he-raise"></button></div>
     <div class="card he-result" hidden></div>`;
   root.querySelector(".he-actions").addEventListener("click", async (e) => {

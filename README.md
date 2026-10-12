@@ -116,12 +116,13 @@ A remote player gets an invite link (`https://games.skylar.technology/i/CODE`) f
 ## Testing
 
 ```sh
-npm test                                   # rules, lobby, platform edges, cloud service, remote play, host integration (Vitest)
+npm test                                   # rules, fuzzing, lobby, concurrency, API limits, platform, cloud, remote play (Vitest)
 node scripts/soak.ts 100                   # 100 AI-only games per game and player count
 # browser end-to-end (needs Python Playwright and a running host on port 8090 with TABLE_KEY=devkey)
 python3 scripts/e2e/play.py roulette out/  # also: pachisi, holdem, coinflip, dialogs
 python3 scripts/e2e/admin.py out/          # admin portal (starts its own cloud and host)
 python3 scripts/e2e/remote.py out/         # remote play in a second browser (starts its own cloud and host)
+python3 scripts/e2e/layout.py out/         # decks at 4 phone sizes x 3 games, the board at 5 screen sizes
 ```
 
 ## Known limits

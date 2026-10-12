@@ -41,6 +41,15 @@ export async function runSimulation(game: InstalledGame, req: SimulationRequest,
   const logsOut: LogRecord[][] = [];
   const results: SimulationResult["games"] = [];
 
+  // Simulations run on the table's only thread: hand it back every few milliseconds, so the board,
+  // decks, timers and liveness pings of a real game keep running during a long simulation.
+  let slice = Date.now();
+  const breathe = async () => {
+    if (Date.now() - slice < 15) return;
+    await new Promise((r) => setImmediate(r));
+    slice = Date.now();
+  };
+
   for (let g = 0; g < games; g++) {
     const layout = (m.seatLayouts.find((l) => l >= players) ?? 8) as SeatLayout;
     const edges = seatEdges(layout);
@@ -56,6 +65,7 @@ export async function runSimulation(game: InstalledGame, req: SimulationRequest,
     const aiRngs = seats.map((s) => createRng(gameSeed ^ (s.seat + 1) * 0x9e3779b1));
     let steps = 0;
     while (!rt.over && steps < MAX_STEPS) {
+      if ((steps & 63) === 0) await breathe();
       let acted = false;
       for (const s of seats) {
         if (rt.over) break;
