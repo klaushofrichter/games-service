@@ -219,7 +219,8 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
     const url = new URL(req.url ?? "/", "http://table");
     const path = url.pathname;
     try {
-      if (path === "/health") return json(res, 200, { ok: true, protocol: PROTOCOL_VERSION });
+      // {status, version}: the version is stamped at build time (APP_VERSION) and reads "dev" outside a release build.
+      if (path === "/health") return json(res, 200, { status: "ok", ok: true, version: process.env.APP_VERSION || "dev", protocol: PROTOCOL_VERSION });
       if (path.startsWith("/api/v1/")) return await api(req, res, path.slice("/api/v1".length));
       if (path === "/") {
         res.writeHead(302, { location: boardAllowed(req) ? "/board/" : "/deck/" });

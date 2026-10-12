@@ -124,7 +124,8 @@ export function startCloud(o: CloudOptions) {
     const m = req.method ?? "GET";
     let match: RegExpMatchArray | null;
     try {
-      if (p === "/health") return json(res, 200, { ok: true });
+      // {status, version}: the deploy smoke test and the cluster's version-exporter read the version (APP_VERSION, "dev" outside a release build).
+      if (p === "/health") return json(res, 200, { status: "ok", ok: true, version: process.env.APP_VERSION || "dev" });
       if (m === "GET" && (p === "/admin" || p === "/admin/")) {
         // The page itself is public; everything it shows comes from /admin/api with the admin token.
         res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-cache", "x-frame-options": "DENY", "referrer-policy": "no-referrer" });
