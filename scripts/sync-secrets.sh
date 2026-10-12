@@ -1,0 +1,86 @@
+#!/usr/bin/env bash
+# Puts the values from this repo's local .env where the deployment needs them, without printing any value:
+#   GitHub secret  KUBE_SETUP_DEPLOY_TOKEN      <- GITHUB_KUBE_SETUP_PAT    (the deploy pushes the kube-setup manifest)
+#   k8s Secret     games-runner/runner-pat      <- GITHUB_GAMES_SERVICE_PAT (key `token`: the runner registers itself)
+#   k8s Secret     games/games-oauth            <- GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI,
+#                                                  ALLOWED_EMAILS, COOKIE_SECRET, and ADMIN_TOKEN if set
+#
+#   scripts/sync-secrets.sh --check     validate .env and list what would be set (default)
+#   scripts/sync-secrets.sh --github    set the GitHub secret (needs `gh` signed in with admin on the repo)
+#   scripts/sync-secrets.sh --cluster   create or update both Kubernetes Secrets (needs kubectl for the cluster
+#                                       and the namespaces games and games-runner, created by kube-setup)
+#   scripts/sync-secrets.sh --all       both
+# After changing games-oauth, restart the pod: kubectl -n games rollout restart deployment/games-cloud
+set -euo pipefail
+cd "$(dirname "$0")/.."
+REPO=klaushofrichter/games-service
+ENV_FILE=${ENV_FILE:-.env}
+MODE=${1:---check}
+PUBLIC_URL=https://games.skylar.technology
+
+[ -f "$ENV_FILE" ] || { echo "no $ENV_FILE here" >&2; exit 1; }
+git check-ignore -q "$ENV_FILE" || { echo "$ENV_FILE is not git-ignored; refusing to continue" >&2; exit 1; }
+
+# Parse KEY=value lines without `source` (values may contain shell characters). The whole rest of the line is the
+# value, so an inline "# comment" would become part of a token: reject that instead of shipping it.
+declare -A V
+problems=()
+while IFS= read -r line || [ -n "$line" ]; do
+  [[ "$line" =~ ^[[:space:]]*(#|$) ]] && continue
+  if [[ "$line" =~ ^([A-Za-z_][A-Za-z0-9_]*)=(.*)$ ]]; then
+    k=${BASH_REMATCH[1]} v=${BASH_REMATCH[2]}
+    [[ "$v" =~ [[:space:]]# ]] && problems+=("$k has an inline comment; put comments on their own line")
+    [[ "$v" =~ ^[\"\'] ]] && problems+=("$k is quoted; write the bare value")
+    [[ "$v" =~ [[:space:]]$ ]] && problems+=("$k has trailing whitespace")
+    V[$k]=$v
+  else
+    problems+=("unreadable line (not KEY=value): ${line%%=*}...")
+  fi
+done < "$ENV_FILE"
+
+need() { for k in "$@"; do [ -n "${V[$k]:-}" ] || problems+=("$k is missing"); done; }
+need GITHUB_KUBE_SETUP_PAT GITHUB_GAMES_SERVICE_PAT GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET GOOGLE_REDIRECT_URI ALLOWED_EMAILS COOKIE_SECRET
+[ "${V[GOOGLE_REDIRECT_URI]:-}" = "$PUBLIC_URL/auth/google/callback" ] || problems+=("GOOGLE_REDIRECT_URI must be $PUBLIC_URL/auth/google/callback")
+[[ "${V[GOOGLE_CLIENT_ID]:-}" == 40017202035-*.apps.googleusercontent.com ]] || problems+=("GOOGLE_CLIENT_ID should be a skylar-technology client (40017202035-....apps.googleusercontent.com)")
+[ "${#V[COOKIE_SECRET]}" -ge 32 ] 2>/dev/null || problems+=("COOKIE_SECRET must be at least 32 characters (openssl rand -hex 32)")
+[ -z "${V[ADMIN_TOKEN]:-}" ] || [ "${#V[ADMIN_TOKEN]}" -ge 16 ] || problems+=("ADMIN_TOKEN must be at least 16 characters, or left out")
+for k in GITHUB_KUBE_SETUP_PAT GITHUB_GAMES_SERVICE_PAT; do
+  [[ "${V[$k]:-}" == github_pat_* || "${V[$k]:-}" == ghp_* ]] || problems+=("$k does not look like a GitHub token")
+done
+
+if ((${#problems[@]})); then printf 'problem: %s\n' "${problems[@]}" >&2; exit 1; fi
+OAUTH_KEYS=(GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET GOOGLE_REDIRECT_URI ALLOWED_EMAILS COOKIE_SECRET)
+[ -n "${V[ADMIN_TOKEN]:-}" ] && OAUTH_KEYS+=(ADMIN_TOKEN)
+echo ".env ok. Keys (values not shown):"
+echo "  GitHub secret KUBE_SETUP_DEPLOY_TOKEN  <- GITHUB_KUBE_SETUP_PAT"
+echo "  games-runner/runner-pat (token)        <- GITHUB_GAMES_SERVICE_PAT"
+echo "  games/games-oauth                      <- ${OAUTH_KEYS[*]}"
+
+do_github() {
+  # Through stdin, so the token never appears in a process list.
+  printf '%s' "${V[GITHUB_KUBE_SETUP_PAT]}" | gh secret set KUBE_SETUP_DEPLOY_TOKEN --repo "$REPO"
+  echo "set GitHub secret KUBE_SETUP_DEPLOY_TOKEN on $REPO"
+}
+
+do_cluster() {
+  local tmp
+  tmp=$(mktemp -d)
+  trap 'rm -rf "$tmp"' RETURN
+  chmod 700 "$tmp"
+  for k in "${OAUTH_KEYS[@]}"; do printf '%s=%s\n' "$k" "${V[$k]}"; done > "$tmp/oauth.env"
+  printf '%s' "${V[GITHUB_GAMES_SERVICE_PAT]}" > "$tmp/token"
+  # Rendered client-side and applied, so a re-run updates instead of failing on "already exists".
+  kubectl -n games create secret generic games-oauth --from-env-file="$tmp/oauth.env" --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+  echo "applied Secret games/games-oauth (${OAUTH_KEYS[*]})"
+  kubectl -n games-runner create secret generic runner-pat --from-file=token="$tmp/token" --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+  echo "applied Secret games-runner/runner-pat (token)"
+  echo "restart to pick up changes: kubectl -n games rollout restart deployment/games-cloud"
+}
+
+case "$MODE" in
+  --check) ;;
+  --github) do_github ;;
+  --cluster) do_cluster ;;
+  --all) do_github; do_cluster ;;
+  *) echo "usage: $0 [--check|--github|--cluster|--all]" >&2; exit 2 ;;
+esac

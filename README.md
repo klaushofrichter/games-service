@@ -177,7 +177,7 @@ python3 scripts/e2e/layout.py out/         # decks at 4 phone sizes x 3 games, t
 ## Known limits
 
 - Game rules run in-process; the isolated sandbox for third-party games comes later.
-- The cloud keeps its state in memory: one replica, data lost on restart, until PostgreSQL is added.
+- The cloud keeps its state in memory: one replica, and a restart (every deploy) forgets paired tables, invites and uploaded logs. A persistent store comes next.
 - Tables authenticate to the cloud with an issued bearer token, not yet a key pair or certificate.
 - Host-side AI configuration (`ai.hostConfig`, e.g. API keys) is parsed but has no screen yet.
 - werift waits up to 5 s for STUN during connection setup when STUN is unreachable.
