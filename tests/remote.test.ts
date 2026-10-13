@@ -238,6 +238,9 @@ describe("remote play", { timeout: 60_000 }, () => {
     await t.ok("POST", "/game/select", { gameId: "pachisi" });
     expect((await peer.json("POST", "/api/v1/game/prefs", { prefs: { colors: {} } })).status).toBe(403);
     expect((await peer.json("POST", "/api/v1/display", { sound: false })).status).toBe(403);
+    // ...but a remote board follows the table's sound setting
+    await t.ok("POST", "/display", { sound: false });
+    expect((await peer.json("GET", "/api/v1/state")).body.display).toEqual({ sound: false });
   });
 
   it("limits the number of remote players", async () => {
