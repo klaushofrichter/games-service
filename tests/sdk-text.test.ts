@@ -20,7 +20,7 @@ describe("message helpers", () => {
 
   it("Coin Flip's result reads naturally", () => {
     const over = (scores: Record<number, number>) =>
-      game.isOver!({ done: true, active: [0, 1], scores, names: { 0: "Klaus", 1: "Mia (AI)" }, rounds: 3, history: [] } as any)!.text;
+      game.isOver!({ done: true, active: [0, 1], scores, names: { 0: "Klaus", 1: "Mia (AI)" }, rounds: 3, history: [], picks: {}, lastGuesses: {} } as any)!.text;
     expect(over({ 0: 1, 1: 0 })).toBe("Klaus wins with one correct guess.");
     expect(over({ 0: 2, 1: 2 })).toBe("Klaus and Mia (AI) tie with two correct guesses each.");
     expect(over({ 0: 0, 1: 0 })).toBe("Nobody guessed right.");

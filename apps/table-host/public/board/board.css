@@ -34,7 +34,6 @@ html, body { overflow: hidden; }
 .seat .name { font-family: var(--display); font-size: 1.5em; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 270px; }
 .seat .status { font-size: 0.7em; display: flex; gap: 10px; align-items: center; }
 .seat.taken { border-style: solid; border-color: var(--brass-deep); background: rgba(214, 169, 74, 0.07); }
-.seat.ai .name::before { content: "◆ "; color: var(--brass); font-size: 0.7em; vertical-align: middle; }
 .seat.away { opacity: 0.55; border-color: var(--ruby); }
 .seat.ready .status .dot { background: var(--jade); }
 .seat.selected { box-shadow: 0 0 0 4px var(--brass); }
@@ -136,6 +135,15 @@ pre.raw { font-family: var(--mono); font-size: 0.7em; color: var(--ink-soft); ba
 #lobby-button.bottom-left { left: 28px; bottom: 28px; }
 #lobby-button.top-right { right: 28px; top: 28px; }
 #lobby-button.top-left { left: 28px; top: 28px; }
+#result-button { position: absolute; z-index: 20; font-size: 0.9em; }
+#result-button.bottom-right { right: 28px; bottom: 28px; }
+#result-button.bottom-left { left: 28px; bottom: 28px; }
+#result-button.top-right { right: 28px; top: 28px; }
+#result-button.top-left { left: 28px; top: 28px; }
+.summary-table { margin: 20px 0 8px; border-collapse: collapse; font-size: 26px; }
+.summary-table th { font-size: 15px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-soft); font-weight: 500; padding: 4px 22px; }
+.summary-table td { padding: 8px 22px; text-align: center; border-top: 1px solid var(--felt-line); }
+.summary-table td:first-child, .summary-table th:first-child { text-align: left; padding-left: 0; }
 
 .overlay {
   position: fixed; inset: 0; z-index: 40; background: rgba(4, 10, 9, 0.6);
@@ -193,3 +201,6 @@ pre.raw { font-family: var(--mono); font-size: 0.7em; color: var(--ink-soft); ba
 .swatches { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
 .swatch { width: 40px; height: 40px; padding: 0; border-radius: 50%; background: var(--c); border: 3px solid transparent; }
 .overlay.settings .swatch.on { border-color: #fbf8ef; box-shadow: 0 0 0 3px var(--c); }
+.stepper { display: inline-flex; align-items: center; gap: 6px; }
+.stepper button { width: 52px; height: 48px; padding: 0; font-size: 1.1em; }
+.stepper .value, .overlay.settings .value { min-width: 64px; text-align: center; font-family: var(--mono); color: var(--ink); }

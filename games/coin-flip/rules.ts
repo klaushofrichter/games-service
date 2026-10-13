@@ -13,6 +13,10 @@ interface State {
   lastFlip: Guess | null;
   history: Guess[];
   done: boolean;
+  /** What each seat picked in the last flipped round (null: no pick in time), shown on the board (D-091). */
+  lastGuesses: Record<number, Guess | null>;
+  /** Every pick per seat, for the statistics at the end. */
+  picks: Record<number, (Guess | null)[]>;
 }
 
 function startRound(state: State, ctx: GameContext): State {
@@ -25,10 +29,21 @@ function flip(state: State, ctx: GameContext) {
   const result: Guess = ctx.random() < 0.5 ? "heads" : "tails";
   const scores = { ...state.scores };
   for (const seat of state.active) if (state.guesses[seat] === result) scores[seat] = (scores[seat] ?? 0) + 1;
-  const next: State = { ...state, scores, lastFlip: result, history: [...state.history, result], round: state.round + 1 };
+  const lastGuesses = Object.fromEntries(state.active.map((seat) => [seat, state.guesses[seat] ?? null]));
+  const picks = { ...state.picks };
+  for (const seat of state.active) picks[seat] = [...(picks[seat] ?? []), state.guesses[seat] ?? null];
+  const next: State = { ...state, scores, lastGuesses, picks, lastFlip: result, history: [...state.history, result], round: state.round + 1 };
   const events = [{ name: "coinFlipped", data: { result, round: state.round } }];
   if (next.round > next.rounds) return { state: { ...next, done: true }, events };
   return { state: startRound(next, ctx), events };
+}
+
+/** A seat's picks so far: how often heads and tails, and the heads share in whole percent (null before any pick). */
+function stats(state: State, seat: number) {
+  const p = state.picks[seat] ?? [];
+  const heads = p.filter((g) => g === "heads").length;
+  const tails = p.filter((g) => g === "tails").length;
+  return { heads, tails, headsPct: heads + tails ? Math.round((100 * heads) / (heads + tails)) : null };
 }
 
 function allGuessed(state: State) {
@@ -41,7 +56,8 @@ export default defineGame<State>({
     const state: State = {
       round: 1,
       rounds: Number(settings.rounds ?? 3),
-      roundMs: Number(settings.roundMs ?? 15000),
+      // Seconds since D-090; logs from before it carry roundMs, and replay must still read them.
+      roundMs: settings.roundSeconds !== undefined ? Number(settings.roundSeconds) * 1000 : Number(settings.roundMs ?? 15000),
       active: seats,
       guesses: {},
       scores: Object.fromEntries(seats.map((s) => [s, 0])),
@@ -49,6 +65,8 @@ export default defineGame<State>({
       lastFlip: null,
       history: [],
       done: false,
+      lastGuesses: {},
+      picks: {},
     };
     return startRound(state, ctx);
   },
@@ -100,9 +118,12 @@ export default defineGame<State>({
     return {
       round: Math.min(state.round, state.rounds),
       rounds: state.rounds,
+      roundMs: state.roundMs,
       myGuess: state.guesses[seat] ?? null,
       myScore: state.scores[seat] ?? 0,
       lastFlip: state.lastFlip,
+      myLastGuess: state.lastGuesses[seat] ?? null,
+      flipped: state.history.length,
       done: state.done,
     };
   },
@@ -111,7 +132,16 @@ export default defineGame<State>({
     return {
       round: Math.min(state.round, state.rounds),
       rounds: state.rounds,
-      seats: state.active.map((s) => ({ seat: s, name: state.names[s], score: state.scores[s] ?? 0, hasGuessed: state.guesses[s] !== undefined })),
+      roundMs: state.roundMs,
+      flipped: state.history.length, // rounds flipped so far
+      seats: state.active.map((s) => ({
+        seat: s,
+        name: state.names[s],
+        score: state.scores[s] ?? 0,
+        hasGuessed: state.guesses[s] !== undefined, // never which way, until the flip
+        lastGuess: state.lastGuesses[s] ?? null,
+        ...stats(state, s),
+      })),
       lastFlip: state.lastFlip,
       done: state.done,
     };
@@ -127,6 +157,13 @@ export default defineGame<State>({
         : winners.length === 1 ? `${winners[0]} wins with ${count(best, "correct guess", "correct guesses")}.`
         : `${list(winners)} tie with ${count(best, "correct guess", "correct guesses")} each.`,
       highlights: { winners, rounds: state.rounds, flips: state.history, scores: state.scores },
+      table: {
+        columns: ["Player", "Correct", "Heads", "Tails", "Heads %"],
+        rows: state.active.map((s) => {
+          const st = stats(state, s);
+          return [state.names[s], state.scores[s] ?? 0, st.heads, st.tails, st.headsPct === null ? "–" : `${st.headsPct}%`];
+        }),
+      },
     };
   },
 

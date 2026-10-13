@@ -571,6 +571,21 @@ export class Table extends EventEmitter {
     return this.prefs.get(id)!;
   }
 
+  /**
+   * Change the chosen game's settings before it starts (D-090), from the board's settings. Only the keys given
+   * change; everyone's Ready stays, since the game itself is the same.
+   */
+  updateSettings(patch: unknown) {
+    if (!this.selected || this.phase !== "ready") throw new TableError(409, "settings can change only before the game starts");
+    if (!patch || typeof patch !== "object" || Array.isArray(patch)) throw new TableError(400, "settings must be an object");
+    try {
+      this.selected.settings = settingsWithDefaults(this.selected.game.manifest, { ...this.selected.settings, ...(patch as Record<string, unknown>) });
+    } catch (e) {
+      throw new TableError(400, (e as Error).message);
+    }
+    this.changed();
+  }
+
   selectGame(gameId: string, settings: Record<string, unknown> = {}) {
     if (this.phase !== "idle" && this.phase !== "finished" && this.phase !== "ready")
       throw new TableError(409, "a game is running");
