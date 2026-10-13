@@ -13,7 +13,7 @@
   "saveGame": false,
   "settings": [
     { "key": "rounds", "type": "int", "min": 1, "max": 20, "default": 3, "label": "Rounds" },
-    { "key": "roundMs", "type": "int", "min": 0, "max": 60000, "default": 15000, "label": "Seconds per round (ms)" }
+    { "key": "roundMs", "type": "int", "min": 0, "max": 60000, "default": 15000, "label": "Milliseconds per round (0 = no limit)" }
   ],
   "ai": { "supported": true, "options": [], "hostConfig": [] },
   "simulation": { "supported": true, "headless": true },

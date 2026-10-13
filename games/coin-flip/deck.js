@@ -7,10 +7,7 @@ export function mount(root, ctx) {
     <div class="choices"><button data-guess="heads">Heads</button><button data-guess="tails">Tails</button></div>
     <div class="muted center cf-hint"></div>`;
   root.querySelectorAll("[data-guess]").forEach((b) =>
-    b.addEventListener("click", async () => {
-      const r = await ctx.send("guess", b.dataset.guess);
-      if (!r.ok) ctx.toast(r.reason);
-    }),
+    b.addEventListener("click", () => ctx.send("guess", b.dataset.guess)),
   );
   return {
     update(v) {

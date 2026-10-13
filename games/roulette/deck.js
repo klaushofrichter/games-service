@@ -43,22 +43,15 @@ export function mount(root, ctx) {
     }),
   );
   root.querySelectorAll("[data-type]").forEach((b) =>
-    b.addEventListener("click", async () => {
+    b.addEventListener("click", () => {
       const payload = { type: b.dataset.type, amount: chip };
       if (b.dataset.target !== undefined) payload.target = Number(b.dataset.target);
       ctx.vibrate?.(15);
-      const r = await ctx.send("placeBet", payload);
-      if (!r.ok) ctx.toast(r.reason);
+      ctx.send("placeBet", payload);
     }),
   );
-  root.querySelector(".rd-clear").addEventListener("click", async () => {
-    const r = await ctx.send("clearBets");
-    if (!r.ok) ctx.toast(r.reason);
-  });
-  root.querySelector(".rd-done").addEventListener("click", async () => {
-    const r = await ctx.send("done");
-    if (!r.ok) ctx.toast(r.reason);
-  });
+  root.querySelector(".rd-clear").addEventListener("click", () => ctx.send("clearBets"));
+  root.querySelector(".rd-done").addEventListener("click", () => ctx.send("done"));
 
   const clock = root.querySelector(".rd-clock");
   const tick = setInterval(() => {

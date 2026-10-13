@@ -1,32 +1,13 @@
 // Hold'em board UI: an oval felt with the shared cards and pot, each player's bet and face-down cards
 // toward the middle, the dealer button, and revealed hands at showdown.
-import { esc, html, remainingMs, seatColor, seatPlates } from "/shared/board-kit.js";
-import { card, injectCardStyles } from "/games/holdem/assets/cards.js";
+import { esc, html, remainingMs, seatColor, seatPlates, useStyles } from "/shared/board-kit.js";
+import { card } from "/games/holdem/assets/cards.js";
 
-const CX = 960, CY = 540;
-const STYLE = `
-.he-felt { position:absolute; left:${CX - 640}px; top:${CY - 300}px; width:1280px; height:600px; border-radius:300px;
-  background: radial-gradient(ellipse at 50% 40%, #1d6b4b, #0e3d2c 70%); box-shadow: 0 0 0 16px #3a2512, 0 0 0 20px #a57c28, 0 30px 80px rgba(0,0,0,.6); }
-.he-center { position:absolute; left:${CX}px; top:${CY}px; transform: translate(-50%,-50%); text-align:center; transition: transform .6s; }
-.he-board { display:flex; gap:16px; justify-content:center; --w: 104px; }
-.he-pot { margin-top: 22px; font-family: var(--display); font-size: 36px; color: var(--ink); }
-.he-pot b { color: var(--brass); }
-.he-street { font-size: 20px; letter-spacing: .2em; text-transform: uppercase; color: var(--brass); margin-bottom: 18px; }
-.he-msg { font-size: 26px; color: var(--ink); min-height: 34px; margin-top: 8px; }
-.he-spot { position:absolute; transform: translate(-50%,-50%); display:flex; flex-direction:column; align-items:center; gap:8px; transition: transform .5s; }
-.he-hole { display:flex; gap:6px; --w: 62px; }
-.he-hole.folded { opacity: .25; }
-.he-bet { display:flex; align-items:center; gap:8px; font: 700 22px var(--text); color: var(--ink); min-height: 30px; }
-.he-chip { width: 26px; height: 26px; border-radius: 50%; border: 3px dashed rgba(255,255,255,.7); }
-.he-dealer { position:absolute; width: 46px; height: 46px; border-radius: 50%; background: #fbf8ef; color:#1b1a17; display:grid; place-items:center;
-  font: 800 22px var(--text); box-shadow: 0 6px 14px rgba(0,0,0,.5); transform: translate(-50%,-50%); transition: left .6s, top .6s; }
-.he-act { font-size: 20px; color: var(--ink-soft); }
-.he-clock { font-family: var(--mono); font-size: 26px; color: var(--brass); }
-`;
+const CX = 960, CY = 540; // board.css positions the felt and centre around this point
 
 export function mount(root) {
-  injectCardStyles();
-  if (!document.getElementById("he-css")) document.head.appendChild(Object.assign(document.createElement("style"), { id: "he-css", textContent: STYLE }));
+  useStyles("/games/holdem/assets/cards.css");
+  useStyles("/games/holdem/board.css");
   const box = html(`<div style="position:absolute;inset:0"><div class="he-felt"></div><div class="he-spots"></div>
     <div class="he-dealer">D</div><div class="he-center"><div class="he-street"></div><div class="he-board"></div><div class="he-pot"></div><div class="he-msg"></div></div></div>`);
   root.appendChild(box);

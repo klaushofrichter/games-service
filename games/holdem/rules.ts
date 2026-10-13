@@ -19,7 +19,6 @@ export interface State {
   smallBet: number;
   turnMs: number;
   nextMs: number;
-  startPoints: number;
   seats: number[]; // seated players, in seat order (clockwise)
   names: Record<number, string>;
   stacks: Record<number, number>;
@@ -295,7 +294,6 @@ export default defineGame<State>({
       smallBet: Number(settings.smallBet ?? 10),
       turnMs: Number(settings.turnSeconds ?? 30) * 1000,
       nextMs: Number(settings.showdownSeconds ?? 8) * 1000,
-      startPoints: start,
       seats,
       names: Object.fromEntries(ctx.seats.map((x) => [x.seat, x.name])),
       stacks: Object.fromEntries(seats.map((x) => [x, start])),
@@ -344,7 +342,7 @@ export default defineGame<State>({
     s.seats = s.seats.filter((x) => x !== seat);
     if (prev.dealer === seat) {
       // The button stays where it was: the seat before the leaver now holds it, so the next hand moves on normally.
-      s.dealer = [...after].reverse()[0] ?? s.seats[0];
+      s.dealer = after.at(-1) ?? s.seats[0];
     }
     s.inHand = s.inHand.filter((x) => x !== seat);
     s.needToAct = s.needToAct.filter((x) => x !== seat);

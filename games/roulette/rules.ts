@@ -1,7 +1,7 @@
 // Roulette rules. Everyone bets at the same time during a betting window; the wheel then spins
 // (one seeded random draw), bets are settled, and after a short result display the next round starts.
-import { defineGame, type GameContext, type Intent } from "../../packages/sdk/src/index.ts";
-import { betKey, colorOf, PAYOUT, returnFor, validBet, type Bet, type BetType, type Color } from "./wheel.ts";
+import { defineGame, type GameContext } from "../../packages/sdk/src/index.ts";
+import { betKey, colorOf, returnFor, validBet, type Bet, type BetType, type Color } from "./wheel.ts";
 
 export interface SeatResult {
   staked: number;
@@ -232,15 +232,10 @@ export default defineGame<State>({
     const amount = Math.max(v.minBet, Math.min(v.maxBet, v.balance, Math.round((v.balance * pct) / v.minBet) * v.minBet));
     if (amount > v.balance) return { name: "done" };
     const outside: BetType[] = ["red", "black", "odd", "even", "low", "high"];
-    const pick = (): Intent => {
-      if (style === "conservative") return { name: "placeBet", payload: { type: outside[ctx.randomInt(0, 5)], amount } };
-      const r = ctx.random();
-      if (r < 0.35) return { name: "placeBet", payload: { type: "straight", target: ctx.randomInt(0, 36), amount } };
-      if (r < 0.7) return { name: "placeBet", payload: { type: ctx.random() < 0.5 ? "dozen" : "column", target: ctx.randomInt(1, 3), amount } };
-      return { name: "placeBet", payload: { type: outside[ctx.randomInt(0, 5)], amount } };
-    };
-    return pick();
+    if (style === "conservative") return { name: "placeBet", payload: { type: outside[ctx.randomInt(0, 5)], amount } };
+    const r = ctx.random();
+    if (r < 0.35) return { name: "placeBet", payload: { type: "straight", target: ctx.randomInt(0, 36), amount } };
+    if (r < 0.7) return { name: "placeBet", payload: { type: ctx.random() < 0.5 ? "dozen" : "column", target: ctx.randomInt(1, 3), amount } };
+    return { name: "placeBet", payload: { type: outside[ctx.randomInt(0, 5)], amount } };
   },
 });
-
-export { PAYOUT };

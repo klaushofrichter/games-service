@@ -143,6 +143,8 @@ export function chooseMove(s: State, seat: number, legal: number[], level: strin
 
 const where = (p: number) => (p === -1 ? "base" : p === FINISH ? "home" : p >= TRACK ? `home column ${p - TRACK + 1}` : `step ${p + 1}`);
 
+const publicPlayers = (s: State) => Object.values(s.players).map((p) => ({ seat: p.seat, name: p.name, side: p.side, tokens: p.tokens }));
+
 export default defineGame<State>({
   setup(ctx, settings) {
     const n = Number(settings.tokens ?? 4);
@@ -203,19 +205,15 @@ export default defineGame<State>({
     const myTurn = s.turn === seat && !s.over;
     return {
       phase: s.phase,
-      turn: s.turn,
       turnName: s.players[s.turn]?.name,
       myTurn,
       die: s.die,
       legal: myTurn && s.phase === "move" ? legalMoves(s, seat, s.die!) : [],
       tokens: me?.tokens ?? [],
       where: (me?.tokens ?? []).map(where),
-      side: me?.side,
-      finished: me ? me.tokens.filter((x) => x === FINISH).length : 0,
-      lastMove: s.lastMove,
       winner: s.winner === null ? null : s.players[s.winner]?.name ?? null,
       over: s.over,
-      players: Object.values(s.players).map((p) => ({ seat: p.seat, name: p.name, side: p.side, tokens: p.tokens })),
+      players: publicPlayers(s),
     };
   },
 
@@ -224,7 +222,7 @@ export default defineGame<State>({
       phase: s.phase,
       turn: s.turn,
       die: s.die,
-      players: Object.values(s.players).map((p) => ({ seat: p.seat, name: p.name, side: p.side, tokens: p.tokens })),
+      players: publicPlayers(s),
       lastMove: s.lastMove,
       winner: s.winner,
       over: s.over,

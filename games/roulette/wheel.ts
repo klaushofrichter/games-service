@@ -63,20 +63,3 @@ export function wins(bet: Pick<Bet, "type" | "target">, n: number): boolean {
 export const returnFor = (bet: Bet, n: number) => (wins(bet, n) ? bet.amount * (PAYOUT[bet.type] + 1) : 0);
 
 export const betKey = (b: Pick<Bet, "type" | "target">) => (b.target === undefined || b.target === null ? b.type : `${b.type}:${b.target}`);
-
-export function betLabel(b: Pick<Bet, "type" | "target">): string {
-  switch (b.type) {
-    case "straight":
-      return `Number ${b.target}`;
-    case "dozen":
-      return ["1st 12", "2nd 12", "3rd 12"][b.target! - 1];
-    case "column":
-      return `Column ${b.target}`;
-    case "low":
-      return "1–18";
-    case "high":
-      return "19–36";
-    default:
-      return b.type[0].toUpperCase() + b.type.slice(1);
-  }
-}
