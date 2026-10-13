@@ -8,7 +8,7 @@ Fails (exit 1) on any browser console error or uncaught exception.
 """
 import os, sys, time
 from playwright.sync_api import sync_playwright
-from common import BASE, api, errors, join_deck, pick_game, reset, watch
+from common import BASE, api, errors, join_deck, pick_game, reset, watch, wait
 
 GAME = sys.argv[1] if len(sys.argv) > 1 else "roulette"
 OUT = sys.argv[2] if len(sys.argv) > 2 else "e2e-out"
@@ -80,6 +80,22 @@ def pachisi(browser, board):
     time.sleep(0.4)
     api("POST", "/game/start")
     decks[0].wait_for_selector(".pc-what")
+    # Settings (D-088): Pachisi adds player colours. Klaus picks purple, then Mira picks purple too and they swap.
+    board.click("#settings-button")
+    board.wait_for_selector(".game-settings")
+    rows = board.locator(".game-settings .row")
+    rows.nth(0).locator(".swatch").nth(4).click()
+    purple = "rgb(195, 139, 232)"
+    wait_for = lambda page, sel, color: page.wait_for_function(
+        "([s, c]) => [...document.querySelectorAll(s)].some((e) => getComputedStyle(e).backgroundColor === c)", arg=[sel, color], timeout=5000)
+    wait_for(decks[0], ".pc-tokens .card > div:first-child", purple)  # Klaus's phone follows
+    klaus_before = rows.nth(0).locator(".swatch.on").get_attribute("style")
+    rows.nth(1).locator(".swatch").nth(4).click()
+    wait_for(decks[1], ".pc-tokens .card > div:first-child", purple)
+    board.wait_for_function("() => document.querySelectorAll('.game-settings .swatch.on').length === 3")
+    assert rows.nth(0).locator(".swatch.on").get_attribute("style") != klaus_before, "picking a taken colour swaps it"
+    shot(board, "settings-pachisi")
+    board.click("[data-close-overlay]")
     moves = 0
     shot_move = False
     for _ in range(160):
@@ -156,19 +172,62 @@ def holdem(browser, board):
 @scenario
 def coinflip(browser, board):
     decks = [join(browser, n) for n in ["Klaus", "Mira"]]
-    api("POST", "/game/select", {"gameId": "coin-flip", "settings": {"rounds": 2, "roundMs": 30000}})
+    api("POST", "/ai", {})
+    api("POST", "/game/select", {"gameId": "coin-flip", "settings": {"rounds": 2, "roundSeconds": 30}})
     time.sleep(0.4)
+    # D-089: the AI shows Ready on the board; the phone says what is true now and what the button switches to
+    board.wait_for_selector(".seat.ai >> text=Ready")
+    decks[0].wait_for_selector("text=You are not ready yet")
+    assert decks[0].inner_text("#ready") == "Switch to ready"
     for d in decks:
         d.click("#ready")
-    time.sleep(0.3)
+    decks[0].wait_for_selector("text=You are ready")
+    assert decks[0].inner_text("#ready") == "Switch to not ready"
+    # D-090: change the rounds from the board's settings before the start, Ready stays
+    board.click("#settings-button")
+    board.wait_for_selector(".game-rules")
+    board.locator(".game-rules [data-setting=rounds][data-delta='1']").click()
+    wait(lambda: api("GET", "/state")["game"]["settings"]["rounds"] == 3, 5, "rounds to become 3")
+    assert all(p["ready"] for p in api("GET", "/state")["players"])
+    # D-092: sound effects switch off and on again from the settings
+    board.click("[data-sound]")
+    wait(lambda: api("GET", "/state")["display"]["sound"] is False, 5, "sound off")
+    board.wait_for_selector("[data-sound] >> text=Off")
+    board.click("[data-sound]")
+    wait(lambda: api("GET", "/state")["display"]["sound"] is True, 5, "sound on")
+    board.click("[data-close-overlay]")
     api("POST", "/game/start")
-    decks[0].wait_for_selector("[data-guess=heads]")
-    decks[0].click("[data-guess=heads]")
-    decks[1].click("[data-guess=tails]")
-    time.sleep(1.2)
-    shot(board, "board")
-    shot(decks[0], "deck")
-    assert api("GET", "/game/board")["view"]["round"] == 2
+    board.click("#settings-button")  # during the game the settings are shown, not editable
+    board.wait_for_selector(".game-rules")
+    assert board.locator(".game-rules [data-setting]").count() == 0, "game settings must be read-only while playing"
+    board.click("[data-close-overlay]")
+    decks[0].wait_for_selector(".cf-clock >> text=Time to pick")  # countdown on the phone
+    board.wait_for_selector(".cf-clock >> text=seconds to pick")  # and on the board
+    for rnd in range(3):
+        decks[0].wait_for_selector("[data-guess=heads]:not([disabled])")
+        decks[0].click("[data-guess=heads]")
+        decks[1].click("[data-guess=tails]")
+        if rnd == 0:
+            board.wait_for_selector(".cf-picks >> text=Klaus · heads")  # everyone's pick shows with the flip
+            board.wait_for_selector(".cf-picks >> text=Mira · tails")
+            time.sleep(1.3)
+            shot(board, "board")
+            shot(decks[0], "deck")
+    # D-092: the board played the coin's sounds (spin and landing) for each round
+    # (the last flip's spin needs the final step's events, which used to be dropped when a step ended the game)
+    time.sleep(1.5)
+    played = board.evaluate("() => window.gameTableSounds ?? []")
+    assert played.count("coin-spin") == 3 and played.count("coin-land") >= 2, played
+    # D-091: the last screen stays, with statistics, until Show result
+    wait(lambda: api("GET", "/state")["phase"] == "finished", 10, "the game to finish")
+    board.wait_for_selector("#result-button:not([hidden])")
+    board.wait_for_selector(".cf-table >> text=Klaus")
+    board.wait_for_selector("text=All 3 rounds played")
+    shot(board, "held-final")
+    board.click("#result-button")
+    board.wait_for_selector(".summary-table >> text=Heads %")
+    decks[0].wait_for_selector(".summary-table >> text=Klaus")
+    shot(board, "result")
     return decks
 
 

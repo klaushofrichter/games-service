@@ -1,6 +1,6 @@
 // Board UI: lobby, seats around the edge, QR join, game surface and the lobby overlay.
 // Talks to the Table Host through the board control API (same API the tests and local AI agents use).
-import { ROT, W, H, esc, seatPositions, claimServiceWorkerPage, openTableSocket } from "/shared/board-kit.js";
+import { ROT, W, H, audio, esc, seatName, seatPositions, claimServiceWorkerPage, openTableSocket } from "/shared/board-kit.js";
 
 const KEY = window.TABLE_KEY;
 // A remote player's copy of the board (phase 1c): it runs inside the cloud's invite page, which carries
@@ -16,6 +16,8 @@ const overlayRoot = document.getElementById("overlay-root");
 const gameLayer = document.getElementById("game-layer");
 const pauseLayer = document.getElementById("pause-layer");
 const cornersEl = document.getElementById("corners");
+const settingsBtn = document.getElementById("settings-button");
+const resultBtn = document.getElementById("result-button");
 
 let state = null;
 let games = [];
@@ -173,10 +175,10 @@ function renderSeats() {
       ? "Open seat"
       : !pl.connected
         ? "Reconnecting…"
-        : state.phase === "ready" && pl.kind === "human"
+        : state.phase === "ready" // AI players are always ready, and show it like everyone else (D-089)
           ? `<span class="dot"></span>${pl.ready ? "Ready" : "Not ready"}`
           : pl.kind === "ai" ? `AI player${pl.aiOptions ? ` · ${esc(Object.values(pl.aiOptions).join(", "))}` : ""}` : pl.location === "remote" ? "Remote" : "";
-    el.innerHTML = `<div class="num">Seat ${seat + 1} · ${p.edge}</div>
+    el.innerHTML = `<div class="num">${esc(seatName(state.seatEdges, seat))}</div>
       <div class="name">${pl ? esc(pl.name) : "—"}</div><div class="status">${status}</div>`;
     if (!playing && !REMOTE) el.addEventListener("click", () => onSeatTap(seat, pl)); // seating stays with the table
     seatsEl.appendChild(el);
@@ -215,6 +217,141 @@ cornersEl.addEventListener("click", (e) => {
   if (b && b.dataset.face !== state.frontEdge) act("POST", "/face", { edge: b.dataset.face });
 });
 
+// Browsers keep sound off until the page is touched: wake the audio on the first touch (D-092).
+window.addEventListener("pointerdown", () => audio(), { capture: true });
+
+let lastPhase = null;
+let holdFinal = false;
+resultBtn.addEventListener("click", () => {
+  holdFinal = false;
+  render();
+});
+
+// ---------- settings (D-088) ----------
+// A gear beside the corner at the left end of the edge the board faces (as seen from that edge), turned to it.
+// During a game it moves to the other end of that edge if the game's Lobby button sits in that corner.
+// Not on a remote player's copy: settings stay with the table.
+const FRONT_CORNERS = { south: ["bl", "br"], west: ["tl", "bl"], north: ["tr", "tl"], east: ["br", "tr"] };
+const LOBBY_CORNER = { "top-left": "tl", "top-right": "tr", "bottom-left": "bl", "bottom-right": "br" };
+function placeSettings(playing) {
+  settingsBtn.hidden = REMOTE;
+  if (REMOTE) return;
+  const front = viewEdge();
+  let [corner, other] = FRONT_CORNERS[front];
+  if (playing && LOBBY_CORNER[state.game?.lobbyButton ?? "bottom-right"] === corner) corner = other;
+  settingsBtn.className = `${corner} along-${front === "south" || front === "north" ? "x" : "y"}`;
+  settingsBtn.querySelector("svg").style.transform = `rotate(${ROT[front]}deg)`;
+}
+settingsBtn.addEventListener("click", () => openSettings());
+
+/**
+ * The settings modal: the board's own settings (Fullscreen), then whatever the chosen game adds. A game adds
+ * items by exporting settings({ info, setPrefs }) from its board.js; each item is
+ *   { type: "toggle", label, value, onChange(next) }   { type: "choice", label, value, options: [{ value, label }], onChange }
+ *   { type: "swatches", label, value, options: ["#rrggbb", …], onChange }   { type: "button", label, onChange() }
+ * setPrefs(patch) stores display choices for this game on the table; board and decks get them as info.prefs.
+ */
+let settingsOverlay = null;
+function openSettings() {
+  if (settingsOverlay) return;
+  const o = (settingsOverlay = document.createElement("div"));
+  o.className = "overlay settings";
+  let mod = null; // the chosen game's board module, for its settings()
+  let modFor = null;
+  let items = [];
+  const setPrefs = (prefs) => act("POST", "/game/prefs", { prefs });
+  const loadGame = () => {
+    const g = state?.game;
+    const key = g ? `${g.id}@${g.version}` : null;
+    if (key === modFor) return;
+    modFor = key;
+    mod = null;
+    if (g) import(`/games/${g.id}/board.js?v=${encodeURIComponent(g.version)}`).then((m) => modFor === key && ((mod = m), draw())).catch(() => {});
+  };
+  const control = (it, k) => {
+    if (it.type === "toggle") return `<button data-item="${k}" class="${it.value ? "on" : ""}" role="switch" aria-checked="${!!it.value}">${it.value ? "On" : "Off"}</button>`;
+    if (it.type === "button") return `<button data-item="${k}">${esc(it.action ?? it.label)}</button>`;
+    if (it.type === "swatches")
+      return `<span class="swatches">${it.options.map((c, i) => `<button class="swatch ${c === it.value ? "on" : ""}" style="--c:${esc(c)}" data-item="${k}" data-val="${i}" aria-label="${esc(it.label)}: colour ${i + 1}"></button>`).join("")}</span>`;
+    return `<span class="seg">${it.options.map((op, i) => `<button class="${op.value === it.value ? "on" : ""}" data-item="${k}" data-val="${i}">${esc(op.label ?? op.value)}</button>`).join("")}</span>`;
+  };
+  const draw = () => {
+    if (!state) return;
+    loadGame();
+    try {
+      items = (state.game && mod?.settings?.({ info: gameInfo(), setPrefs })) || [];
+    } catch (err) {
+      console.error("game settings failed", err);
+      items = [];
+    }
+    const fs = document.fullscreenEnabled;
+    // The chosen game's own settings from its manifest (D-090): editable until it starts, then shown read-only.
+    const fields = (state.game && games.find((x) => x.id === state.game.id)?.settings) || [];
+    const editable = state.phase === "ready";
+    const cur = state.game?.settings ?? {};
+    const setting = (f) => {
+      const v = cur[f.key] ?? f.default;
+      if (!editable) return `<span class="value">${esc(f.type === "bool" ? (v ? "On" : "Off") : v)}</span>`;
+      if (f.type === "int" || f.type === "number")
+        return `<span class="stepper"><button data-setting="${esc(f.key)}" data-delta="-1" ${f.min !== undefined && v <= f.min ? "disabled" : ""} aria-label="Less">−</button>
+          <span class="value">${esc(v)}</span><button data-setting="${esc(f.key)}" data-delta="1" ${f.max !== undefined && v >= f.max ? "disabled" : ""} aria-label="More">+</button></span>`;
+      if (f.type === "bool") return `<button data-setting="${esc(f.key)}" data-toggle class="${v ? "on" : ""}" role="switch" aria-checked="${!!v}">${v ? "On" : "Off"}</button>`;
+      if (f.type === "enum") return `<span class="seg">${f.values.map((x) => `<button class="${String(v) === x ? "on" : ""}" data-setting="${esc(f.key)}" data-value="${esc(x)}">${esc(x)}</button>`).join("")}</span>`;
+      return `<span class="value">${esc(v)}</span>`;
+    };
+    const gameSettings = fields.length
+      ? `<div class="group game-rules"><div class="eyebrow">${esc(state.game.name)} · game settings</div>
+          ${fields.map((f) => `<div class="row"><span>${esc(f.label ?? f.key)}</span>${setting(f)}</div>`).join("")}
+          ${editable ? "" : `<div class="faint" style="font-size:.7em;margin-top:6px">These can be changed before the game starts.</div>`}</div>`
+      : "";
+    o.innerHTML = `<div class="panel"><h2>Settings</h2>
+      <div class="group"><div class="eyebrow">Display</div>
+        <div class="row"><span>Sound effects</span><button data-sound class="${state.display?.sound !== false ? "on" : ""}" role="switch" aria-checked="${state.display?.sound !== false}">${state.display?.sound !== false ? "On" : "Off"}</button></div>
+        <div class="row"><span>Fullscreen</span>${fs ? `<button data-fs class="${document.fullscreenElement ? "on" : ""}">${document.fullscreenElement ? "Leave fullscreen" : "Fullscreen"}</button>` : `<span class="faint">not available in this browser</span>`}</div></div>
+      ${gameSettings}
+      ${items.length ? `<div class="group game-settings"><div class="eyebrow">${esc(state.game.name)}</div>${items.map((it, k) => `<div class="row"><span>${esc(it.label)}</span>${control(it, k)}</div>`).join("")}</div>` : ""}
+      <div class="actions" style="display:flex;justify-content:flex-end;margin-top:20px"><button class="primary" data-close-overlay>Done</button></div></div>`;
+    faceFront(o.querySelector(".panel"));
+  };
+  const close = () => {
+    unsub();
+    document.removeEventListener("fullscreenchange", draw);
+    o.remove();
+    settingsOverlay = null;
+  };
+  draw();
+  const unsub = onState(draw);
+  document.addEventListener("fullscreenchange", draw);
+  o.addEventListener("click", (e) => {
+    const b = e.target.closest("button");
+    if (e.target === o || b?.dataset.closeOverlay !== undefined) return close();
+    if (!b) return;
+    if (b.dataset.fs !== undefined) {
+      (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()).catch(() => toast("Fullscreen was refused by the browser"));
+    }
+    if (b.dataset.sound !== undefined) return void act("POST", "/display", { sound: state.display?.sound === false });
+    if (b.dataset.setting) {
+      const f = ((state.game && games.find((x) => x.id === state.game.id)?.settings) || []).find((x) => x.key === b.dataset.setting);
+      if (!f) return;
+      const v = state.game.settings?.[f.key] ?? f.default;
+      let next = v;
+      if (b.dataset.delta) {
+        const step = f.step ?? (f.type === "int" ? 1 : 0.5);
+        next = Math.min(f.max ?? Infinity, Math.max(f.min ?? -Infinity, Number(v) + Number(b.dataset.delta) * step));
+      } else if (b.dataset.toggle !== undefined) next = !v;
+      else if (b.dataset.value !== undefined) next = b.dataset.value;
+      if (next !== v) act("POST", "/game/settings", { settings: { [f.key]: next } });
+      return;
+    }
+    const it = items[Number(b.dataset.item)];
+    if (!it || b.dataset.item === undefined) return;
+    if (it.type === "toggle") it.onChange?.(!it.value);
+    else if (it.type === "button") it.onChange?.();
+    else it.onChange?.(it.type === "swatches" ? it.options[Number(b.dataset.val)] : it.options[Number(b.dataset.val)].value);
+  });
+  overlayRoot.appendChild(o);
+}
+
 // ---------- center panel ----------
 function render() {
   if (!state) return;
@@ -225,15 +362,24 @@ function render() {
   center.classList.toggle("sideways", front === "east" || front === "west");
 
   const playing = state.phase === "active" || state.phase === "paused" || state.phase === "terminating";
+  // A game that ends by itself keeps its last screen until someone taps Show result (D-091); one ended from the
+  // lobby goes straight to the result. This is per screen: each board (and remote board) moves on by itself.
+  if (state.phase === "finished" && (lastPhase === "active" || lastPhase === "paused") && game) holdFinal = true;
+  if (state.phase !== "finished") holdFinal = false;
+  lastPhase = state.phase;
+  const showingGame = playing || holdFinal;
   lobbyBtn.hidden = !playing;
   lobbyBtn.className = state.game?.lobbyButton ?? "bottom-right";
+  resultBtn.hidden = !holdFinal;
+  resultBtn.className = `primary ${state.game?.lobbyButton ?? "bottom-right"}`;
 
   renderPause();
-  renderCorners(playing && state.phase !== "paused");
-  seatsEl.hidden = playing;
-  center.hidden = playing;
-  gameLayer.hidden = !playing;
-  if (playing) return void showGame();
+  renderCorners(showingGame && state.phase !== "paused");
+  placeSettings(showingGame);
+  seatsEl.hidden = showingGame;
+  center.hidden = showingGame;
+  gameLayer.hidden = !showingGame;
+  if (showingGame) return void showGame();
   closeGame();
   if (state.phase === "finished") return renderFinished();
   if (state.phase === "ready") return renderReady();
@@ -268,14 +414,14 @@ function seatButtons() {
 
 function toolbar() {
   const sel = state.players.find((p) => p.id === selectedPlayer);
+  // Left: the table's seat layout. Right: managing players (D-086).
   return `<div class="toolbar">
     ${seatButtons()}
-    ${REMOTE ? "" : `<button data-add-ai>+ AI player</button>
-    ${sel?.kind === "ai" ? `<button data-config="${sel.id}">Configure ${esc(sel.name)}</button>` : ""}
-    ${sel ? `<button class="danger" data-remove="${sel.id}">Remove ${esc(sel.name)}</button>` : ""}`}
-    <span class="spacer"></span>
-    ${REMOTE ? "" : `<button data-invite>Invite…</button><button data-sim>Simulation…</button>`}
-  </div>`;
+    ${REMOTE ? "" : `<div class="right"><button data-add-ai>+ AI player</button><button data-invite>Invite…</button><button data-sim>Simulation…</button></div>`}
+  </div>
+  ${REMOTE || !sel ? "" : `<div class="toolbar selected"><div class="right"><span class="faint">${esc(sel.name)}</span>
+    ${sel.kind === "ai" ? `<button data-config="${sel.id}">Configure</button>` : ""}
+    <button class="danger" data-remove="${sel.id}">Remove</button></div></div>`}`;
 }
 
 function renderLobby() {
@@ -338,12 +484,18 @@ function renderReady() {
   center.innerHTML = `<section class="main waiting">
       <div><div class="eyebrow">Up next · ${playersLabel(state.game.players)} · ${seated} seated</div><h1>${esc(state.game.name)}</h1>
       <div class="sub">${needs.length ? `${esc(needs.map((n, i) => (i ? n : n[0].toUpperCase() + n.slice(1))).join(" · "))}. Scan the code to join${g?.ai ? " or add an AI player" : ""}.` : "Everyone taps <b>Ready</b> on their phone."}</div></div>
-      <div class="ready-list">${humans.map((p) => `<span class="chip ${p.ready ? "ok" : ""}"><span class="dot" style="background:${p.ready ? "var(--jade)" : ""}"></span>${esc(p.name)}</span>`).join("")}</div>
-      ${REMOTE ? "" : `<div class="toolbar">${seatButtons()}${roomForAi ? `<button data-add-ai>+ AI player</button>` : ""}</div>`}
+      <div class="ready-list">${state.players.filter((p) => p.seat !== null).map((p) => `<span class="chip ${p.ready ? "ok" : ""}"><span class="dot" style="background:${p.ready ? "var(--jade)" : ""}"></span>${esc(p.name)}</span>`).join("")}</div>
+      ${REMOTE ? "" : `<div class="toolbar">${seatButtons()}${roomForAi ? `<div class="right"><button data-add-ai>+ AI player</button></div>` : ""}</div>`}
       <div class="toolbar"><button class="primary" data-start ${all ? "" : "disabled"}>Start game</button><button data-close>Change game</button>
       ${REMOTE ? "" : (() => { const sel = state.players.find((p) => p.id === selectedPlayer); return sel?.kind === "ai" ? `<button data-config="${sel.id}">Configure ${esc(sel.name)}</button>` : state.players.some((p) => p.kind === "ai") ? `<span class="faint" style="font-size:.7em">Tap an AI seat to configure it</span>` : ""; })()}
       </div>
     </section>${joinPanel()}`;
+}
+
+/** A game's statistics from its summary (D-091): the first column left-aligned, numbers centred. */
+function summaryTable(t) {
+  return `<table class="summary-table"><tr>${t.columns.map((c) => `<th>${esc(c)}</th>`).join("")}</tr>
+    ${t.rows.map((r) => `<tr>${r.map((c) => `<td>${esc(c)}</td>`).join("")}</tr>`).join("")}</table>`;
 }
 
 function renderFinished() {
@@ -351,6 +503,7 @@ function renderFinished() {
   center.innerHTML = `<section class="main">
       <div class="summary"><div class="eyebrow">${esc(state.game?.name ?? "Game")} · finished</div>
       <div class="big">${esc(s?.text ?? "Game over")}</div>
+      ${s?.table ? summaryTable(s.table) : ""}
       <div class="toolbar"><button class="primary" data-again>Play again</button><button data-close>Back to lobby</button></div></div>
     </section>${joinPanel()}`;
 }
@@ -393,6 +546,8 @@ function gameInfo() {
     frontEdge: viewEdge(),
     rotation: ROT[viewEdge()],
     settings: state.game?.settings ?? {},
+    prefs: state.game?.prefs ?? {},
+    sound: state.display?.sound !== false, // sound effects on (D-092)
     timers: gameMsg?.timers ?? {},
     now: gameMsg?.now ?? Date.now(),
     receivedAt: gameMsg?.receivedAt ?? Date.now(),
@@ -471,7 +626,7 @@ function openLobbyOverlay() {
   const draw = () => {
     o.innerHTML = `<div class="panel"><h2>Lobby</h2>
       <div class="group"><div class="eyebrow">Players</div>${state.players
-        .map((p) => `<div class="row"><span>${esc(p.name)} <span class="faint">· ${p.seat === null ? "no seat" : `seat ${p.seat + 1}`}${p.kind === "ai" ? " · AI" : ""}${p.connected ? "" : " · reconnecting"}</span></span>
+        .map((p) => `<div class="row"><span>${esc(p.name)} <span class="faint">· ${p.seat === null ? "no seat" : `${esc(seatName(state.seatEdges, p.seat))} seat`}${p.connected ? "" : " · reconnecting"}</span></span>
           ${REMOTE ? "" : `<button class="danger" data-remove="${p.id}">Remove</button>`}</div>`)
         .join("") || `<div class="faint">Nobody yet</div>`}</div>
       ${REMOTE ? "" : `<div class="group"><div class="eyebrow">View</div><div class="row"><span>Lobby and menus face</span>

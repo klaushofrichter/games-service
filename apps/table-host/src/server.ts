@@ -195,6 +195,9 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
     }
     if (m === "POST" && path === "/game/start") return (table.start(), json(res, 200, table.state()));
     if (m === "POST" && path === "/game/end") return (table.end(), json(res, 200, table.state()));
+    if (m === "POST" && path === "/display") return (table.setDisplay(body), json(res, 200, table.state()));
+    if (m === "POST" && path === "/game/settings") return (table.updateSettings(body.settings), json(res, 200, table.state()));
+    if (m === "POST" && path === "/game/prefs") return (table.setPrefs(body.prefs), json(res, 200, table.state()));
     if (m === "POST" && path === "/game/close") return (table.close(), json(res, 200, table.state()));
     if (m === "POST" && path === "/game/resume") return (table.resumeGame(), json(res, 200, table.state()));
     if (m === "POST" && path === "/game/save") return json(res, 200, { saveId: await table.saveAndExit(), state: table.state() });

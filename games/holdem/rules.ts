@@ -1,6 +1,6 @@
 // Fixed-limit Texas Hold'em. Hole cards and the deck never leave the host except to their owner;
 // the board shows shared cards, bets and the pot, and reveals hands only at showdown.
-import { defineGame, type GameContext, type GameEvent } from "../../packages/sdk/src/index.ts";
+import { count, defineGame, list, type GameContext, type GameEvent } from "../../packages/sdk/src/index.ts";
 import { bestHand, compareScores, newDeck, rankOf, shuffle, suitOf, type Card } from "../../packages/sdk/src/cards.ts";
 
 export const STREETS = ["preflop", "flop", "turn", "river"] as const;
@@ -387,7 +387,7 @@ export default defineGame<State>({
     const best = s.stacks[ranked[0]];
     const winners = ranked.filter((x) => s.stacks[x] === best).map((x) => s.names[x]);
     return {
-      text: winners.length === 1 ? `${winners[0]} wins with ${best} points after ${s.hand} hands.` : `${winners.join(" and ")} tie with ${best} points.`,
+      text: winners.length === 1 ? `${winners[0]} wins with ${count(best, "point")} after ${count(s.hand, "hand")}.` : `${list(winners)} tie with ${count(best, "point")}.`,
       highlights: { winners, hands: s.hand, stacks: Object.fromEntries(s.seats.map((k) => [s.names[k], s.stacks[k]])) },
     };
   },

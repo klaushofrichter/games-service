@@ -250,7 +250,7 @@ describe("deck socket robustness", () => {
     const b = await t.joinDeck("B");
     const c = await t.joinDeck("C"); // no seat left
     expect(t.host.table.state().players.find((p) => p.name === "C")!.seat).toBeNull();
-    await t.ok("POST", "/game/select", { gameId: "coin-flip", settings: { rounds: 1, roundMs: 0 } });
+    await t.ok("POST", "/game/select", { gameId: "coin-flip", settings: { rounds: 1, roundSeconds: 0 } });
     await a.request("lobby", "ready", { ready: true });
     await b.request("lobby", "ready", { ready: true });
     await t.ok("POST", "/game/start");

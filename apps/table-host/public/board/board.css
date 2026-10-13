@@ -34,7 +34,6 @@ html, body { overflow: hidden; }
 .seat .name { font-family: var(--display); font-size: 1.5em; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 270px; }
 .seat .status { font-size: 0.7em; display: flex; gap: 10px; align-items: center; }
 .seat.taken { border-style: solid; border-color: var(--brass-deep); background: rgba(214, 169, 74, 0.07); }
-.seat.ai .name::before { content: "◆ "; color: var(--brass); font-size: 0.7em; vertical-align: middle; }
 .seat.away { opacity: 0.55; border-color: var(--ruby); }
 .seat.ready .status .dot { background: var(--jade); }
 .seat.selected { box-shadow: 0 0 0 4px var(--brass); }
@@ -80,6 +79,10 @@ html, body { overflow: hidden; }
 
 .toolbar { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; align-items: center; }
 .toolbar .spacer { flex: 1; }
+/* Player management sits on the right; when the row is full it wraps as a group, still right-aligned. */
+.toolbar .right { margin-left: auto; display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end; align-items: center; }
+.toolbar.selected { margin-top: 10px; }
+.toolbar.selected .faint { font-size: 0.72em; }
 .toolbar button { font-size: 0.78em; }
 .seg { display: inline-flex; border: 1px solid var(--felt-line); border-radius: 999px; overflow: hidden; }
 .seg button { border: 0; border-radius: 0; padding: 0.5em 0.9em; }
@@ -132,6 +135,15 @@ pre.raw { font-family: var(--mono); font-size: 0.7em; color: var(--ink-soft); ba
 #lobby-button.bottom-left { left: 28px; bottom: 28px; }
 #lobby-button.top-right { right: 28px; top: 28px; }
 #lobby-button.top-left { left: 28px; top: 28px; }
+#result-button { position: absolute; z-index: 20; font-size: 0.9em; }
+#result-button.bottom-right { right: 28px; bottom: 28px; }
+#result-button.bottom-left { left: 28px; bottom: 28px; }
+#result-button.top-right { right: 28px; top: 28px; }
+#result-button.top-left { left: 28px; top: 28px; }
+.summary-table { margin: 20px 0 8px; border-collapse: collapse; font-size: 26px; }
+.summary-table th { font-size: 15px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-soft); font-weight: 500; padding: 4px 22px; }
+.summary-table td { padding: 8px 22px; text-align: center; border-top: 1px solid var(--felt-line); }
+.summary-table td:first-child, .summary-table th:first-child { text-align: left; padding-left: 0; }
 
 .overlay {
   position: fixed; inset: 0; z-index: 40; background: rgba(4, 10, 9, 0.6);
@@ -167,3 +179,28 @@ pre.raw { font-family: var(--mono); font-size: 0.7em; color: var(--ink-soft); ba
 #corners .tr { right: 22px; top: 22px; }
 #corners .br { right: 22px; bottom: 22px; }
 #corners .bl { left: 22px; bottom: 22px; }
+
+/* Settings button (D-088): a quiet gear beside a corner, at the left end of the edge the board faces. */
+#settings-button {
+  position: absolute; z-index: 21; width: 58px; height: 58px; padding: 0; border-radius: 50%;
+  display: grid; place-items: center; color: var(--ink-soft, #cfd8d3); opacity: .6;
+  background: rgba(10, 29, 25, 0.75); border: 1px solid var(--felt-line);
+}
+#settings-button:hover { opacity: 1; color: var(--brass); border-color: var(--brass-deep); }
+#settings-button svg { transition: transform .3s; }
+#settings-button.along-x.bl { left: 92px; bottom: 22px; }
+#settings-button.along-x.br { right: 92px; bottom: 22px; }
+#settings-button.along-x.tl { left: 92px; top: 22px; }
+#settings-button.along-x.tr { right: 92px; top: 22px; }
+#settings-button.along-y.tl { left: 22px; top: 92px; }
+#settings-button.along-y.bl { left: 22px; bottom: 92px; }
+#settings-button.along-y.tr { right: 22px; top: 92px; }
+#settings-button.along-y.br { right: 22px; bottom: 92px; }
+.overlay.settings .panel { min-width: 560px; }
+.overlay.settings .seg button.on, .overlay.settings button.on:not(.swatch) { border-color: var(--brass); color: var(--brass); }
+.swatches { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.swatch { width: 40px; height: 40px; padding: 0; border-radius: 50%; background: var(--c); border: 3px solid transparent; }
+.overlay.settings .swatch.on { border-color: #fbf8ef; box-shadow: 0 0 0 3px var(--c); }
+.stepper { display: inline-flex; align-items: center; gap: 6px; }
+.stepper button { width: 52px; height: 48px; padding: 0; font-size: 1.1em; }
+.stepper .value, .overlay.settings .value { min-width: 64px; text-align: center; font-family: var(--mono); color: var(--ink); }

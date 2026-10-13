@@ -180,19 +180,20 @@ export class GameRuntime {
     if (this.over) return;
     const summary = this.def.isOver(this.state);
     if (summary) {
-      this.finish("finished", summary);
+      // The step's own events (the last flip, the winning move) still go out with the game-over (D-092).
+      this.finish("finished", summary, events);
       return;
     }
     for (const l of this.listeners) l("changed", events);
   }
 
-  finish(reason: "finished" | "terminated" | "seatLeft", summary: GameSummary | null) {
+  finish(reason: "finished" | "terminated" | "seatLeft", summary: GameSummary | null, events: GameEvent[] = []) {
     if (this.over) return;
     this.over = true;
     this.summary = summary;
     this.clearAllTimers();
     this.record({ t: "end", at: this.clock.now(), reason, summary, stateHash: stateHash(this.state) });
-    for (const l of this.listeners) l("over", []);
+    for (const l of this.listeners) l("over", events);
   }
 
   submit(seat: number, intent: Intent, by: "human" | "ai" | "board"): { ok: true } | { ok: false; reason: string } {

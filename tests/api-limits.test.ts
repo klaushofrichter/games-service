@@ -76,7 +76,7 @@ describe("simulation API", () => {
     const t = await host();
     const few = await t.ok("POST", "/simulation", { gameId: "coin-flip", players: 1, games: -5, settings: { rounds: 1 } });
     expect(few.games).toHaveLength(1);
-    const many = await t.ok("POST", "/simulation", { gameId: "coin-flip", players: 1, games: 5000, settings: { rounds: 1, roundMs: 0 } });
+    const many = await t.ok("POST", "/simulation", { gameId: "coin-flip", players: 1, games: 5000, settings: { rounds: 1, roundSeconds: 0 } });
     expect(many.games).toHaveLength(1000);
     const odd = await t.ok("POST", "/simulation", { gameId: "pachisi", players: 2, games: 1, settings: { tokens: 1 }, aiOptions: { level: "godlike", extra: 1 } });
     expect(odd.games[0].aiOptions[0]).toEqual({ level: "average" });

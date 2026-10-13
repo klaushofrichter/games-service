@@ -57,6 +57,8 @@ const settingSchema = z.object({
   values: z.array(z.string()).optional(),
   default: z.unknown().optional(),
   label: z.string().optional(),
+  /** How far one tap on − or + moves a number in the board's settings (D-090). */
+  step: z.number().positive().optional(),
 });
 
 export const manifestSchema = z.object({
@@ -127,6 +129,8 @@ export interface PlayerInfo {
 export interface GameSummary {
   text: string;
   highlights: Record<string, unknown>;
+  /** Optional statistics the result screen shows as a table (D-091), e.g. per player: correct guesses, heads %. */
+  table?: { columns: string[]; rows: (string | number)[][] };
 }
 
 export interface LobbyState {
@@ -148,6 +152,11 @@ export interface LobbyState {
     players: number[];
     /** What the game still needs before it can start, in plain words (empty when only Ready is missing). */
     needs: string[];
+    /**
+     * Display choices made in the board's settings for this game (D-088), e.g. Pachisi's player colours.
+     * Kept per game on this table, shared with the board and every deck; never part of the game's rules or log.
+     */
+    prefs: Record<string, unknown>;
   } | null;
   /** Seat layouts that may be chosen now: the selected game's, or, with none selected, any visible game's. */
   layouts: SeatLayout[];
@@ -158,6 +167,8 @@ export interface LobbyState {
   pause: { reason: "cloud"; since: number; canSave: boolean } | null;
   /** Remote play: whether remote boards may act, and how many remote players fit. */
   remote: { boardControl: boolean; maxPlayers: number; players: number };
+  /** The table's display choices from the board's settings (D-092), followed by every board, remote ones too. */
+  display: { sound: boolean };
 }
 
 export interface CloudStatus {

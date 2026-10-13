@@ -16,7 +16,7 @@ import {
   type SeatLayout,
   type CloudStatus,
 } from "../../../packages/protocol/src/index.ts";
-import { createRng, type Intent, type SeatInfo } from "../../../packages/sdk/src/index.ts";
+import { createRng, type GameEvent, type Intent, type SeatInfo } from "../../../packages/sdk/src/index.ts";
 import { settingsWithDefaults, type InstalledGame } from "./games.ts";
 import { GameRuntime, realClock } from "./runtime.ts";
 import type { LogStore } from "./logs.ts";
@@ -65,6 +65,10 @@ export class Table extends EventEmitter {
   frontEdge: Edge = "south";
   phase: Phase = "idle";
   private selected: { game: InstalledGame; settings: Record<string, unknown> } | null = null;
+  /** Sound effects on the boards (D-092); on until someone turns them off in the board's settings. */
+  private sound = true;
+  /** Display choices per game id (D-088), set from the board's settings; in memory, so they last until a restart. */
+  private prefs = new Map<string, Record<string, unknown>>();
   runtime: GameRuntime | null = null;
   private summary: GameSummary | null = null;
   private stateRev = 0;
@@ -122,6 +126,7 @@ export class Table extends EventEmitter {
             edges: this.selected.game.manifest.edges,
             players: allowedPlayerCounts(this.selected.game.manifest),
             needs: this.needsFor(this.selected.game.manifest),
+            prefs: this.prefs.get(this.selected.game.manifest.id) ?? {},
           }
         : null,
       layouts: this.allowedLayouts(),
@@ -129,6 +134,7 @@ export class Table extends EventEmitter {
       joinUrl: this.currentJoin().url,
       cloud: this.cloud,
       pause: this.pause,
+      display: { sound: this.sound },
       remote: { boardControl: this.remoteBoardControl, maxPlayers: this.config.maxRemotePlayers, players: this.humans().filter((p) => p.location === "remote").length },
     };
   }
@@ -548,6 +554,49 @@ export class Table extends EventEmitter {
     return reasons;
   }
 
+  /**
+   * Merge display choices into the chosen game's prefs (D-088). Top-level keys are replaced; null removes one.
+   * The game's board defines what the keys mean; the table only keeps them small and plain.
+   */
+  setPrefs(patch: unknown) {
+    if (!this.selected) throw new TableError(409, "choose a game first");
+    if (!patch || typeof patch !== "object" || Array.isArray(patch)) throw new TableError(400, "prefs must be an object");
+    const id = this.selected.game.manifest.id;
+    const next: Record<string, unknown> = { ...(this.prefs.get(id) ?? {}) };
+    for (const [k, v] of Object.entries(patch)) {
+      if (!/^[A-Za-z][\w-]{0,39}$/.test(k)) throw new TableError(400, `bad prefs key "${k}"`);
+      if (v === null) delete next[k];
+      else next[k] = v;
+    }
+    if (Object.keys(next).length > 20 || JSON.stringify(next).length > 4096) throw new TableError(413, "prefs are limited to 20 keys and 4 KB");
+    this.prefs.set(id, JSON.parse(JSON.stringify(next)));
+    this.changed();
+    return this.prefs.get(id)!;
+  }
+
+  setDisplay(d: unknown) {
+    const sound = (d as { sound?: unknown } | null)?.sound;
+    if (typeof sound !== "boolean") throw new TableError(400, "sound must be true or false");
+    if (sound === this.sound) return;
+    this.sound = sound;
+    this.changed();
+  }
+
+  /**
+   * Change the chosen game's settings before it starts (D-090), from the board's settings. Only the keys given
+   * change; everyone's Ready stays, since the game itself is the same.
+   */
+  updateSettings(patch: unknown) {
+    if (!this.selected || this.phase !== "ready") throw new TableError(409, "settings can change only before the game starts");
+    if (!patch || typeof patch !== "object" || Array.isArray(patch)) throw new TableError(400, "settings must be an object");
+    try {
+      this.selected.settings = settingsWithDefaults(this.selected.game.manifest, { ...this.selected.settings, ...(patch as Record<string, unknown>) });
+    } catch (e) {
+      throw new TableError(400, (e as Error).message);
+    }
+    this.changed();
+  }
+
   selectGame(gameId: string, settings: Record<string, unknown> = {}) {
     if (this.phase !== "idle" && this.phase !== "finished" && this.phase !== "ready")
       throw new TableError(409, "a game is running");
@@ -596,7 +645,7 @@ export class Table extends EventEmitter {
     this.gameStartedAt = Date.now();
     this.phase = "active";
     rt.onChange((kind, events) => {
-      if (kind === "over") void this.onGameOver();
+      if (kind === "over") void this.onGameOver(events);
       else {
         this.emit("game", events);
         this.scheduleAi(); // timers and leaving players move games on too, not only intents
@@ -624,7 +673,7 @@ export class Table extends EventEmitter {
     this.changed();
   }
 
-  private async onGameOver() {
+  private async onGameOver(events: GameEvent[] = []) {
     const rt = this.runtime!;
     const terminated = rt.log.at(-1)?.t === "end" && (rt.log.at(-1) as { reason: string }).reason === "terminated";
     this.phase = "finished";
@@ -634,7 +683,7 @@ export class Table extends EventEmitter {
     if (terminated) this.metrics.gamesTerminated++;
     else this.metrics.gamesPlayed++;
     this.metrics.totalGameMs += ms;
-    this.emit("game", []);
+    this.emit("game", events);
     this.changed();
     const id = logId(rt.manifest.id);
     if (this.closed) return;

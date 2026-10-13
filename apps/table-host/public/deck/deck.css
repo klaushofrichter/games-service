@@ -31,3 +31,13 @@ button.big { width: 100%; padding: 16px; font-size: 1.1em; }
 .banner { padding: 10px 14px; border-radius: 12px; background: #2a1512; border: 1px solid var(--ruby); color: #f6d5cf; font-size: 0.9em; }
 .center { text-align: center; }
 pre { font-family: var(--mono); font-size: 0.75em; white-space: pre-wrap; color: var(--ink-soft); }
+
+/* Ready status (D-089): what is true now, separate from the button that changes it. */
+.ready-status { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; color: var(--ink-soft); }
+.ready-status .dot { width: 12px; height: 12px; border-radius: 50%; background: #8a8577; }
+.ready-status.ok { color: var(--jade); }
+.ready-status.ok .dot { background: var(--jade); }
+.summary-table { width: 100%; margin-top: 12px; border-collapse: collapse; font-size: .85em; }
+.summary-table th { font-weight: 500; color: var(--ink-soft); font-size: .75em; text-transform: uppercase; letter-spacing: .08em; padding: 4px 4px; }
+.summary-table td { padding: 6px 4px; text-align: center; border-top: 1px solid var(--felt-line); }
+.summary-table td:first-child, .summary-table th:first-child { text-align: left; }

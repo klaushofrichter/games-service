@@ -113,6 +113,12 @@ with sync_playwright() as p:
     watch(page, "board controls")
     page.goto(BASE + "/board/")
     page.wait_for_selector("text=Pick a game")
+    # the settings gear opens a modal with Fullscreen, and closes again (D-088)
+    page.click("#settings-button")
+    page.wait_for_selector(".overlay.settings >> text=Fullscreen")
+    page.click(".overlay.settings [data-close-overlay]")
+    if page.locator(".overlay.settings").count():
+        problems.append("board: the settings modal did not close")
     if page.locator("#corners button[data-face]").count() != 4:
         problems.append("board: expected four corner buttons in the lobby")
     page.locator("#corners button[data-face='west']").click()

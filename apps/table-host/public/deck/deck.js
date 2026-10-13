@@ -1,6 +1,6 @@
 // Deck UI: join with a name, lobby with Ready, and the game's own private deck view.
 // A game package may ship deck.js exporting mount(root, ctx) -> { update(view, events, info), destroy() }.
-import { esc, claimServiceWorkerPage, openTableSocket } from "/shared/board-kit.js";
+import { esc, claimServiceWorkerPage, openTableSocket, seatName, seatTitle } from "/shared/board-kit.js";
 
 const app = document.getElementById("app");
 const params = new URLSearchParams(location.search);
@@ -118,9 +118,9 @@ function renderTop() {
   const paused = state.phase === "paused" ? `<div class="banner">Game paused: the table lost its connection. It continues by itself when the connection is back.</div>` : "";
   top.innerHTML = `${paused}${banner ? `<div class="banner">${esc(banner)}</div>` : ""}
     <div><div class="eyebrow">${esc(state.tableName)}${inGame ? ` · ${esc(state.game?.name)}` : ""}</div><h1>${esc(p?.name ?? "")}</h1></div>
-    ${inGame ? "" : `<div class="card seatcard"><div class="badge">${p?.seat == null ? "–" : p.seat + 1}</div>
+    ${inGame ? "" : `<div class="card seatcard"><div class="badge">${p?.seat == null ? "–" : esc(seatName(state.seatEdges, p.seat).replace(/(north|south|east|west)/g, (w) => w[0]).toUpperCase())}</div>
       <div>${p?.seat == null ? `<div>No seat yet</div><div class="muted" style="font-size:.85em">You'll get one when a seat opens.</div>`
-        : `<div>Seat ${p.seat + 1}</div><div class="muted" style="font-size:.85em">${esc(state.seatEdges[p.seat])} side of the board</div>`}</div></div>`}`;
+        : `<div>${esc(seatTitle(state.seatEdges, p.seat))}</div><div class="muted" style="font-size:.85em">at the ${esc(state.seatEdges[p.seat])} edge of the board</div>`}</div></div>`}`;
 }
 
 function render() {
@@ -179,17 +179,20 @@ function renderJoin() {
 
 function renderLobby(p) {
   const players = state.players
-    .map((x) => `<div class="row"><span class="${x.id === me ? "me" : ""}">${esc(x.name)}${x.kind === "ai" ? " · AI" : ""}</span>
-      <span class="muted">${x.seat == null ? "no seat" : `seat ${x.seat + 1}`}${state.phase === "ready" && x.kind === "human" ? (x.ready ? " · ready" : "") : ""}${x.connected ? "" : " · away"}</span></div>`)
+    .map((x) => `<div class="row"><span class="${x.id === me ? "me" : ""}">${esc(x.name)}</span>
+      <span class="muted">${x.seat == null ? "no seat" : `${esc(seatName(state.seatEdges, x.seat))} seat`}${state.phase === "ready" ? (x.ready ? " · ready" : " · not ready") : ""}${x.connected ? "" : " · away"}</span></div>`)
     .join("");
   let action = `<div class="card muted">Choose a game on the board.</div>`;
   if (state.phase === "ready" && state.game) {
     action = p?.seat == null
       ? `<div class="card muted">${esc(state.game.name)} is about to start. You're not seated for this one.</div>`
       : `<div class="card"><div class="eyebrow">Up next</div><div class="display" style="font-size:1.5em;margin:4px 0 14px">${esc(state.game.name)}</div>
-         <button class="${p.ready ? "" : "primary"} big" id="ready">${p.ready ? "Not ready" : "I'm ready"}</button></div>`;
+         <div class="ready-status ${p.ready ? "ok" : ""}"><span class="dot"></span>${p.ready ? "You are ready" : "You are not ready yet"}</div>
+         <button class="${p.ready ? "" : "primary"} big" id="ready">${p.ready ? "Switch to not ready" : "Switch to ready"}</button></div>`;
   } else if (state.phase === "finished" && state.summary) {
-    action = `<div class="card"><div class="eyebrow">Result</div><div class="display" style="font-size:1.3em;margin-top:6px">${esc(state.summary.text)}</div></div>`;
+    const t = state.summary.table;
+    action = `<div class="card"><div class="eyebrow">Result</div><div class="display" style="font-size:1.3em;margin-top:6px">${esc(state.summary.text)}</div>
+      ${t ? `<table class="summary-table"><tr>${t.columns.map((c) => `<th>${esc(c)}</th>`).join("")}</tr>${t.rows.map((r) => `<tr>${r.map((c) => `<td>${esc(c)}</td>`).join("")}</tr>`).join("")}</table>` : ""}</div>`;
   }
   return `${action}<div class="card list"><div class="eyebrow" style="margin-bottom:6px">At the table</div>${players}</div>`;
 }
@@ -203,6 +206,7 @@ function info() {
     me: self(),
     players: state.players,
     settings: state.game?.settings ?? {},
+    prefs: state.game?.prefs ?? {},
     timers: gameMsg?.timers ?? {},
     now: gameMsg?.now ?? Date.now(),
     receivedAt: gameMsg?.receivedAt ?? Date.now(),
