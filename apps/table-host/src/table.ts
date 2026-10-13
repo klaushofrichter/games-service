@@ -400,12 +400,21 @@ export class Table extends EventEmitter {
     const free = this.freeSeats();
     const target = seat ?? free[0];
     if (target === undefined || !free.includes(target)) throw new TableError(409, "no free seat");
-    const n = [...this.players.values()].filter((p) => p.kind === "ai").length + 1;
-    const p: Player = { id: newId("ai"), name: `AI ${n}`, kind: "ai", location: "local", seat: target, connected: true, ready: true, sessionToken: null, aiSeed: randomInt(2 ** 31) };
+    const p: Player = { id: newId("ai"), name: this.aiName(), kind: "ai", location: "local", seat: target, connected: true, ready: true, sessionToken: null, aiSeed: randomInt(2 ** 31) };
     this.players.set(p.id, p);
     if (this.phase === "ready") this.revalidateSelection();
     this.changed();
     return p.id;
+  }
+
+  /** A random short name, marked as AI, that nobody at the table has yet ("Mia (AI)"). Remove and re-add to get another. */
+  private aiName() {
+    const taken = new Set([...this.players.values()].map((p) => p.name));
+    const free = AI_NAMES.map((n) => `${n} (AI)`).filter((n) => !taken.has(n));
+    if (free.length) return free[randomInt(free.length)];
+    let n = 1;
+    while (taken.has(`AI ${n}`)) n++;
+    return `AI ${n}`;
   }
 
   /** Set an AI player's options (play style, level). Checked against the selected game when there is one. */
@@ -714,6 +723,12 @@ export class Table extends EventEmitter {
     this.runtime?.clearAllTimers();
   }
 }
+
+/** AI player names (D-081): short, so "Name (AI)" fits a seat plate; half female, half male. */
+export const AI_NAMES = [
+  "Anna", "Bea", "Cleo", "Emma", "Ida", "Lena", "Lisa", "Mia", "Nora", "Rosa", "Sara", "Zoe",
+  "Ben", "Bob", "Finn", "Jack", "Leo", "Max", "Noah", "Otto", "Paul", "Sam", "Tom", "Theo",
+];
 
 /** AI options with manifest defaults. The AI configuration screen (later phase) will override these per seat. */
 export function aiDefaults(m: InstalledGame["manifest"], given: Record<string, unknown> = {}): Record<string, unknown> {

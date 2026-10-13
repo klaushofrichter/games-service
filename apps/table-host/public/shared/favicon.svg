@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Game Table board and deck: two fanned cards on felt (the service console uses a die). Sized for a crisp 16 px. -->
+  <rect width="64" height="64" rx="14" fill="#0f2a24"/>
+  <rect x="11" y="13" width="26" height="36" rx="5" fill="#d6a94a" transform="rotate(-14 24 31)"/>
+  <rect x="25" y="14" width="28" height="38" rx="5" fill="#f3eee2" transform="rotate(10 39 33)"/>
+  <path d="M39 44c-7-5-11-8.6-11-12.6 0-2.9 2.2-5 4.8-5 1.9 0 3.4 1 4.2 2.6.8-1.6 2.3-2.6 4.2-2.6 2.6 0 4.8 2.1 4.8 5 0 4-4 7.6-11 12.6z" fill="#d2574a" transform="rotate(10 39 33)"/>
+</svg>

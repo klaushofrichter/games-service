@@ -88,13 +88,13 @@ curl -s -H "$K" $H/state                                   # lobby state
 curl -s -H "$K" -X POST $H/join/new                       # new join code (the board's QR code changes)
 curl -s -H "$K" $H/games                                   # games, selectable + reasons
 curl -s -H "$K" -X POST $H/ai -d '{}'                      # add an AI seat
-curl -s -H "$K" -X POST $H/rotate -d '{"degrees":180}'
+curl -s -H "$K" -X POST $H/face -d '{"edge":"west"}'       # turn the lobby to a side (the board's corner buttons)
 curl -s -H "$K" -X POST $H/game/select -d '{"gameId":"coin-flip","settings":{"rounds":5}}'
 curl -s -H "$K" -X POST $H/simulation -d '{"gameId":"coin-flip","players":4,"games":100,"seed":42}'
 curl -s -H "$K" $H/logs/<id>.zip -o run.zip                # JSONL game logs
 ```
 
-Full list: `GET /state, /join, /games, /metrics, /game/board, /logs, /logs/{id}.zip` and `POST /layout, /rotate, /seats/move, /ai, /game/select, /game/start, /game/end, /game/close, /game/resume, /game/save, /simulation, /players/{id}/ai-options, /invites, /remote`, `GET /saves, /qr?text=URL`, `DELETE /players/{id}`.
+Full list: `GET /state, /join, /games, /metrics, /game/board, /logs, /logs/{id}.zip` and `POST /layout, /face, /rotate, /seats/move, /ai, /game/select, /game/start, /game/end, /game/close, /game/resume, /game/save, /simulation, /players/{id}/ai-options, /invites, /remote`, `GET /saves, /qr?text=URL`, `DELETE /players/{id}`.
 
 Decks speak JSON envelopes over `/ws`: `system.hello {joinToken, name}` or `{sessionToken}`, then `lobby.ready {ready}` and `game.intent {name, payload}`. The host answers with `lobby.state`, `game.view` (this seat only) and `system.ack | reject | error`.
 
