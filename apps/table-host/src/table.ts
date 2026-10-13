@@ -10,6 +10,7 @@ import {
   type GameAvailability,
   type GameSummary,
   type LobbyState,
+  type Manifest,
   type Phase,
   type PlayerInfo,
   type SeatLayout,
@@ -119,8 +120,11 @@ export class Table extends EventEmitter {
             settings: this.selected.settings,
             lobbyButton: this.selected.game.manifest.lobbyButton,
             edges: this.selected.game.manifest.edges,
+            players: allowedPlayerCounts(this.selected.game.manifest),
+            needs: this.needsFor(this.selected.game.manifest),
           }
         : null,
+      layouts: this.allowedLayouts(),
       summary: this.summary,
       joinUrl: this.currentJoin().url,
       cloud: this.cloud,
@@ -315,8 +319,10 @@ export class Table extends EventEmitter {
       this.scheduleAi();
       return;
     }
-    const seat = this.freeSeats()[0];
-    p.seat = seat ?? null;
+    // A chosen game that is full takes no more players: newcomers wait without a seat instead of cancelling it.
+    const m = this.phase === "ready" ? this.selected?.game.manifest : undefined;
+    const full = m !== undefined && this.seated().length >= Math.max(...allowedPlayerCounts(m));
+    p.seat = full ? null : (this.freeSeats()[0] ?? null);
     if (this.phase === "ready" && this.selected) this.revalidateSelection();
   }
 
@@ -328,14 +334,35 @@ export class Table extends EventEmitter {
     if (![2, 4, 6, 8].includes(n)) throw new TableError(400, "layout must be 2, 4, 6 or 8");
     this.assertNotPlaying("change the layout");
     const layout = n as SeatLayout;
+    const m = this.phase === "ready" ? this.selected?.game.manifest : undefined;
+    if (m && !m.seatLayouts.includes(layout)) throw new TableError(409, `${m.name} does not support ${layout} seats`);
     if (this.seated().length > layout) throw new TableError(409, `${this.seated().length} players are seated; remove some before choosing ${layout} seats`);
-    this.layout = layout;
-    // keep seats that still exist, move the others to free seats
-    const overflow = this.seated().filter((p) => p.seat! >= layout);
-    for (const p of overflow) p.seat = null;
-    for (const p of overflow) p.seat = this.freeSeats()[0] ?? null;
+    this.applyLayout(layout);
     if (this.phase === "ready") this.revalidateSelection();
     this.changed();
+  }
+
+  /** Switches the seat layout, keeping seats that still exist and moving the others (and anyone on an edge the
+   *  selected game cannot use) to free seats. */
+  private applyLayout(layout: SeatLayout) {
+    this.layout = layout;
+    const m = this.selected?.game.manifest;
+    const edges = seatEdges(layout);
+    const misplaced = this.seated().filter((p) => p.seat! >= layout || (m && !m.edges.includes(edges[p.seat!])));
+    for (const p of misplaced) p.seat = null;
+    for (const p of misplaced) p.seat = this.freeSeats()[0] ?? null;
+  }
+
+  /** Seat layouts that may be chosen now. */
+  private allowedLayouts(): SeatLayout[] {
+    if (this.selected && this.phase !== "finished") return [...this.selected.game.manifest.seatLayouts].sort((a, b) => a - b);
+    const all = new Set<SeatLayout>();
+    for (const { manifest } of this.visibleGames()) for (const l of manifest.seatLayouts) all.add(l);
+    return [...all].sort((a, b) => a - b);
+  }
+
+  private visibleGames() {
+    return [...this.games.values()].filter(({ manifest: m }) => this.config.showTestGames || !m.test);
   }
 
   rotate(degrees: number) {
@@ -362,6 +389,9 @@ export class Table extends EventEmitter {
 
   addAi(seat?: number) {
     this.assertNotPlaying("add AI players");
+    const m = this.phase === "ready" ? this.selected?.game.manifest : undefined;
+    if (m && !m.ai.supported) throw new TableError(409, `${m.name} has no AI players`);
+    if (m && this.seated().length >= Math.max(...allowedPlayerCounts(m))) throw new TableError(409, `${m.name} takes at most ${Math.max(...allowedPlayerCounts(m))} players`);
     const free = this.freeSeats();
     const target = seat ?? free[0];
     if (target === undefined || !free.includes(target)) throw new TableError(409, "no free seat");
@@ -425,8 +455,8 @@ export class Table extends EventEmitter {
   // ---------- games ----------
 
   availability(): GameAvailability[] {
-    return [...this.games.values()].filter(({ manifest: m }) => this.config.showTestGames || !m.test).map(({ manifest: m }) => {
-      const reasons = this.reasonsFor(m.id);
+    return this.visibleGames().map(({ manifest: m }) => {
+      const reasons = this.blockersFor(m);
       return {
         id: m.id,
         name: m.name,
@@ -434,6 +464,8 @@ export class Table extends EventEmitter {
         description: m.description,
         selectable: reasons.length === 0,
         reasons,
+        needs: this.needsFor(m),
+        seatLayouts: m.seatLayouts,
         ai: m.ai.supported,
         simulation: m.simulation.supported && m.ai.supported,
         players: allowedPlayerCounts(m),
@@ -443,22 +475,63 @@ export class Table extends EventEmitter {
     });
   }
 
-  private reasonsFor(gameId: string): string[] {
-    const g = this.games.get(gameId);
-    if (!g) return ["not installed"];
-    const m = g.manifest;
+  /**
+   * Why a game cannot be CHOSEN now (D-078: game first). Seats and player counts the table can still reach are not
+   * blockers: choosing the game switches to a seat layout it supports, and the missing players are listed by
+   * needsFor() until the game can start.
+   */
+  private blockersFor(m: Manifest): string[] {
     const reasons: string[] = [];
     if (this.phase === "active" || this.phase === "paused" || this.phase === "terminating") reasons.push("a game is running");
     if (this.config.requireCloud && !this.cloudOnline) reasons.push("the table is offline");
     const seated = this.seated();
-    const counts = allowedPlayerCounts(m);
-    if (!counts.includes(seated.length)) reasons.push(`needs ${describeCounts(counts)} players (${seated.length} seated)`);
+    const max = Math.max(...allowedPlayerCounts(m));
+    if (seated.length > max) reasons.push(`takes at most ${max} players (${seated.length} seated)`);
     if (!m.ai.supported && seated.some((p) => p.kind === "ai")) reasons.push("has no AI players; remove the AI seats");
-    if (!seated.some((p) => p.kind === "human" && p.location === "local")) reasons.push("needs at least one player at the table");
+    if (seated.length <= max && this.layoutFor(m) === null) reasons.push(`has no seat layout for ${seated.length} players`);
+    if (!m.edges.includes(this.frontEdge)) reasons.push(`cannot be shown facing ${this.frontEdge}; rotate the board`);
+    return reasons;
+  }
+
+  /** What a game still needs before it can start (other than everyone tapping Ready), in plain words. */
+  private needsFor(m: Manifest): string[] {
+    const seated = this.seated();
+    const needs: string[] = [];
+    const counts = allowedPlayerCounts(m);
+    if (!counts.includes(seated.length)) {
+      const next = counts.find((c) => c > seated.length);
+      if (next !== undefined) {
+        const more = next - seated.length;
+        needs.push(counts.length === 1 ? `needs exactly ${counts[0]} players, ${more} more` : `needs ${more} more player${more === 1 ? "" : "s"}`);
+      }
+    }
+    if (!seated.some((p) => p.kind === "human" && p.location === "local")) needs.push("needs at least one player at the table");
+    return needs;
+  }
+
+  /**
+   * The seat layout a game would use: the current one if the game supports it and everyone fits; otherwise the
+   * smallest supported layout with room for the game's maximum player count, or, failing that, the largest one that
+   * still seats everyone already seated. Only seats on edges the game uses count.
+   */
+  private layoutFor(m: Manifest): SeatLayout | null {
+    const room = (l: SeatLayout) => seatEdges(l).filter((e) => m.edges.includes(e)).length;
+    const seated = this.seated().length;
+    if (m.seatLayouts.includes(this.layout) && room(this.layout) >= seated) return this.layout;
+    const usable = [...m.seatLayouts].sort((a, b) => a - b).filter((l) => room(l) >= seated);
+    const max = Math.max(...allowedPlayerCounts(m));
+    return usable.find((l) => room(l) >= max) ?? usable.at(-1) ?? null;
+  }
+
+  /** Everything that keeps the selected game from starting: blockers, needs, and seats that do not fit it. */
+  private reasonsFor(gameId: string): string[] {
+    const g = this.games.get(gameId);
+    if (!g) return ["not installed"];
+    const m = g.manifest;
+    const reasons = [...this.blockersFor(m), ...this.needsFor(m)];
     if (!m.seatLayouts.includes(this.layout)) reasons.push(`does not support ${this.layout} seats`);
     const edges = seatEdges(this.layout);
-    if (seated.some((p) => !m.edges.includes(edges[p.seat!]))) reasons.push("has no seats on the east or west edge");
-    if (!m.edges.includes(this.frontEdge)) reasons.push(`cannot be shown facing ${this.frontEdge}`);
+    if (this.seated().some((p) => !m.edges.includes(edges[p.seat!]))) reasons.push("has no seats on the east or west edge");
     return reasons;
   }
 
@@ -467,7 +540,7 @@ export class Table extends EventEmitter {
       throw new TableError(409, "a game is running");
     const g = this.games.get(gameId);
     if (!g) throw new TableError(404, "no such game");
-    const reasons = this.reasonsFor(gameId);
+    const reasons = this.blockersFor(g.manifest);
     if (reasons.length) throw new TableError(409, `${g.manifest.name} ${reasons.join("; ")}`);
     let merged: Record<string, unknown>;
     try {
@@ -475,17 +548,22 @@ export class Table extends EventEmitter {
     } catch (e) {
       throw new TableError(400, (e as Error).message);
     }
+    const layout = this.layoutFor(g.manifest)!;
     this.selected = { game: g, settings: merged };
+    // The table follows the game: a layout it supports, and nobody on an edge it does not use.
+    this.applyLayout(layout);
     this.summary = null;
     for (const p of this.players.values()) p.ready = p.kind === "ai";
     this.phase = "ready";
     this.changed();
   }
 
-  /** In 'ready', seat changes may break the selected game's constraints; then go back to idle. */
+  /** In 'ready', the selection stays while the game can still be reached; it is dropped only on a blocker
+   *  (e.g. too many players). Missing players are not a reason: they show as needs until the game can start. */
   private revalidateSelection() {
     if (!this.selected) return;
-    if (this.reasonsFor(this.selected.game.manifest.id).length === 0) return;
+    const m = this.selected.game.manifest;
+    if (this.blockersFor(m).length === 0 && m.seatLayouts.includes(this.layout)) return;
     this.phase = "idle";
     this.selected = null;
   }
@@ -641,12 +719,6 @@ export function aiDefaults(m: InstalledGame["manifest"], given: Record<string, u
     out[o.key] = v !== undefined && (!o.values || o.values.includes(String(v))) ? v : o.default;
   }
   return out;
-}
-
-function describeCounts(c: number[]): string {
-  if (c.length === 1) return `exactly ${c[0]}`;
-  const contiguous = c.every((n, i) => i === 0 || n === c[i - 1] + 1);
-  return contiguous ? `${c[0]}–${c.at(-1)}` : c.join(", ");
 }
 
 export function logId(gameId: string) {

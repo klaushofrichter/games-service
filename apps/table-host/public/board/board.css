@@ -66,6 +66,7 @@ html, body { overflow: hidden; }
 .tile .title { font-family: var(--display); font-size: 1.35em; color: var(--ink); }
 .tile .desc { font-size: 0.72em; color: var(--ink-soft); line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .tile .why { font-size: 0.68em; color: #e8a596; margin-top: auto; }
+.tile .hint { font-size: 0.68em; color: var(--jade); margin-top: auto; }
 .tile.selectable:hover { border-color: var(--brass); }
 .tile:disabled { opacity: 0.55; }
 

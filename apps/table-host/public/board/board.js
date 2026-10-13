@@ -236,10 +236,16 @@ function joinPanel() {
   </aside>`;
 }
 
+/** Seat layout buttons: only the layouts that may be chosen now (the chosen game's, or any visible game's). */
+function seatButtons() {
+  const layouts = state.layouts?.length ? state.layouts : [2, 4, 6, 8];
+  return `<span class="seg" title="Seats around the table">${layouts.map((n) => `<button data-layout="${n}" class="${state.layout === n ? "on" : ""}">${n}</button>`).join("")}</span>`;
+}
+
 function toolbar() {
   const sel = state.players.find((p) => p.id === selectedPlayer);
   return `<div class="toolbar">
-    <span class="seg">${[2, 4, 6, 8].map((n) => `<button data-layout="${n}" class="${state.layout === n ? "on" : ""}">${n}</button>`).join("")}</span>
+    ${seatButtons()}
     ${REMOTE ? "" : `<button data-rotate="90">⟳ 90°</button>
     <button data-rotate="180">⟳ 180°</button>`}
     ${REMOTE ? "" : `<button data-add-ai>+ AI player</button>
@@ -260,10 +266,16 @@ function renderLobby() {
         .map((g) => `<button class="tile ${g.selectable ? "selectable" : ""}" data-game="${g.id}" ${g.selectable ? "" : "disabled"}>
           <span class="title">${esc(g.name)}</span><span class="desc">${esc(g.description ?? "")}</span>
           <span class="faint" style="font-size:.66em">${playersLabel(g.players)}${g.ai ? " · AI" : ""}</span>
-          ${g.selectable ? "" : `<span class="why">${esc(g.reasons[0])}</span>`}</button>`)
+          ${g.selectable ? `<span class="hint">${esc(tileHint(g))}</span>` : `<span class="why">${esc(g.reasons[0])}</span>`}</button>`)
         .join("")}</div>
       ${toolbar()}
     </section>${joinPanel()}`;
+}
+
+/** What a choosable game still needs, or that it can start right away. */
+function tileHint(g) {
+  const n = g.needs ?? [];
+  return n.length ? n[0][0].toUpperCase() + n[0].slice(1) : "Ready to play";
 }
 
 function remoteNote() {
@@ -280,11 +292,16 @@ function playersLabel(p) {
 
 function renderReady() {
   const humans = state.players.filter((p) => p.kind === "human" && p.seat !== null);
-  const all = humans.length > 0 && humans.every((p) => p.ready && p.connected);
+  const needs = state.game.needs ?? [];
+  const all = needs.length === 0 && humans.length > 0 && humans.every((p) => p.ready && p.connected);
+  const seated = state.players.filter((p) => p.seat !== null).length;
+  const g = games.find((x) => x.id === state.game.id);
+  const roomForAi = g?.ai && seated < Math.max(...state.game.players);
   center.innerHTML = `<section class="main waiting">
-      <div><div class="eyebrow">Up next</div><h1>${esc(state.game.name)}</h1>
-      <div class="sub">Everyone taps <b>Ready</b> on their phone.</div></div>
+      <div><div class="eyebrow">Up next · ${playersLabel(state.game.players)} · ${seated} seated</div><h1>${esc(state.game.name)}</h1>
+      <div class="sub">${needs.length ? `${esc(needs.map((n, i) => (i ? n : n[0].toUpperCase() + n.slice(1))).join(" · "))}. Scan the code to join${g?.ai ? " or add an AI player" : ""}.` : "Everyone taps <b>Ready</b> on their phone."}</div></div>
       <div class="ready-list">${humans.map((p) => `<span class="chip ${p.ready ? "ok" : ""}"><span class="dot" style="background:${p.ready ? "var(--jade)" : ""}"></span>${esc(p.name)}</span>`).join("")}</div>
+      ${REMOTE ? "" : `<div class="toolbar">${seatButtons()}${roomForAi ? `<button data-add-ai>+ AI player</button>` : ""}</div>`}
       <div class="toolbar"><button class="primary" data-start ${all ? "" : "disabled"}>Start game</button><button data-close>Change game</button>
       ${REMOTE ? "" : (() => { const sel = state.players.find((p) => p.id === selectedPlayer); return sel?.kind === "ai" ? `<button data-config="${sel.id}">Configure ${esc(sel.name)}</button>` : state.players.some((p) => p.kind === "ai") ? `<span class="faint" style="font-size:.7em">Tap an AI seat to configure it</span>` : ""; })()}
       <span class="spacer"></span>${REMOTE ? "" : `<button data-rotate="180">⟳ 180°</button>`}</div>

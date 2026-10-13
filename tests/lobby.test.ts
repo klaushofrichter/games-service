@@ -139,30 +139,85 @@ describe("game selection gating", () => {
     expect(games.map((g: any) => g.id)).toEqual(expect.arrayContaining(["coin-flip", "quartet", "roulette"]));
   });
 
-  it("requires at least one player at the table", async () => {
+  it("a game can be chosen before anyone joins; what it still needs is listed, and start waits for it", async () => {
+    const g = await avail("roulette");
+    expect(g.selectable).toBe(true);
+    expect(g.needs).toEqual(["needs 1 more player", "needs at least one player at the table"]);
     await t.ok("POST", "/ai", {});
-    const g = await avail("coin-flip");
-    expect(g.selectable).toBe(false);
-    expect(g.reasons.join()).toMatch(/at least one player at the table/);
+    const s = await t.ok("POST", "/game/select", { gameId: "roulette" });
+    expect(s.phase).toBe("ready");
+    expect(s.game.needs).toEqual(["needs at least one player at the table"]);
+    expect((await t.api("POST", "/game/start")).body.error).toMatch(/at least one player at the table/);
   });
 
-  it("only allows a 4-player game without AI when exactly four humans are seated", async () => {
+  it("an exact-count game without AI: chosen with 3 players, blocked by an AI seat, startable at exactly 4", async () => {
     for (const n of ["A", "B", "C"]) await t.joinDeck(n);
-    expect((await avail("quartet")).reasons.join()).toMatch(/exactly 4/);
+    expect((await avail("quartet")).selectable).toBe(true);
+    expect((await avail("quartet")).needs).toEqual(["needs exactly 4 players, 1 more"]);
     await t.ok("POST", "/ai", {});
     const withAi = await avail("quartet");
+    expect(withAi.selectable).toBe(false);
     expect(withAi.reasons.join()).toMatch(/no AI players/);
     const s = await t.ok("GET", "/state");
     await t.ok("DELETE", `/players/${s.players.find((p: any) => p.kind === "ai").id}`);
+    await t.ok("POST", "/game/select", { gameId: "quartet" });
+    expect((await t.ok("GET", "/state")).game.needs).toEqual(["needs exactly 4 players, 1 more"]);
     await t.joinDeck("D");
-    expect((await avail("quartet")).selectable).toBe(true);
-    expect((await t.api("POST", "/game/select", { gameId: "quartet" })).status).toBe(200);
+    expect((await t.ok("GET", "/state")).game.needs).toEqual([]);
   });
 
-  it("explains why selection was refused", async () => {
+  it("explains why choosing was refused: more players seated than the game takes", async () => {
+    await t.ok("POST", "/layout", { seats: 6 });
+    for (const n of ["A", "B", "C", "D", "E"]) await t.joinDeck(n);
+    expect((await avail("quartet")).selectable).toBe(false);
     const r = await t.api("POST", "/game/select", { gameId: "quartet" });
     expect(r.status).toBe(409);
-    expect(r.body.error).toMatch(/Quartet needs exactly 4 players/);
+    expect(r.body.error).toMatch(/Quartet takes at most 4 players \(5 seated\)/);
+  });
+
+  it("choosing a game switches the table to a seat layout the game supports, with room for its players", async () => {
+    await t.ok("POST", "/layout", { seats: 8 });
+    expect((await avail("pachisi")).selectable).toBe(true);
+    const s = await t.ok("POST", "/game/select", { gameId: "pachisi" });
+    expect(s.layout).toBe(4); // Pachisi: 2, 4 or 6 seats, at most 4 players
+    expect(s.layouts).toEqual([2, 4, 6]);
+    // a layout the game supports is kept
+    await t.ok("POST", "/game/close");
+    await t.ok("POST", "/layout", { seats: 6 });
+    expect((await t.ok("POST", "/game/select", { gameId: "pachisi" })).layout).toBe(6);
+  });
+
+  it("players on an edge the chosen game does not use are moved to one it does", async () => {
+    await t.ok("POST", "/layout", { seats: 8 });
+    const a = await t.joinDeck("A");
+    let s = await t.ok("GET", "/state");
+    const east = s.seatEdges.indexOf("east");
+    await t.ok("POST", "/seats/move", { playerId: a.playerId, seat: east });
+    s = await t.ok("POST", "/game/select", { gameId: "quartet" }); // north and south only
+    const edges = s.seatEdges as string[];
+    expect(["north", "south"]).toContain(edges[s.players.find((p: any) => p.id === a.playerId).seat]);
+  });
+
+  it("with no game chosen the seat buttons offer every layout some visible game supports; with one, only its layouts", async () => {
+    expect((await t.ok("GET", "/state")).layouts).toEqual([2, 4, 6, 8]); // the test games include 8
+    await t.joinDeck("A");
+    await t.ok("POST", "/game/select", { gameId: "roulette" });
+    expect((await t.ok("GET", "/state")).layouts).toEqual([2, 4, 6]);
+    const r = await t.api("POST", "/layout", { seats: 8 });
+    expect(r.status).toBe(409);
+    expect(r.body.error).toMatch(/Roulette does not support 8 seats/);
+  });
+
+  it("a chosen game that is full seats no more newcomers, and refuses more AI players", async () => {
+    await t.ok("POST", "/layout", { seats: 6 });
+    for (const n of ["A", "B", "C"]) await t.joinDeck(n);
+    await t.ok("POST", "/game/select", { gameId: "pachisi" }); // at most 4
+    await t.ok("POST", "/ai", {});
+    expect((await t.api("POST", "/ai", {})).body.error).toMatch(/Pachisi takes at most 4 players/);
+    const late = await t.joinDeck("Late");
+    const s = await t.ok("GET", "/state");
+    expect(s.phase).toBe("ready"); // the choice stands
+    expect(s.players.find((p: any) => p.id === late.playerId).seat).toBeNull();
   });
 
   it("validates settings against the manifest", async () => {
@@ -362,13 +417,14 @@ describe("AI-only simulation", () => {
 });
 
 describe("regressions from review", () => {
-  it("re-checks the selected game when the layout changes, and again at start", async () => {
+  it("keeps the selected game's layout rules, and checks again at start", async () => {
     for (const n of ["A", "B"]) await t.joinDeck(n);
     await t.ok("POST", "/game/select", { gameId: "roulette" });
-    const s = await t.ok("POST", "/layout", { seats: 8 }); // roulette does not support 8 seats
-    expect(s.phase).toBe("idle");
-    expect(s.game).toBeNull();
-    expect((await t.api("POST", "/game/start")).status).toBe(409);
+    expect((await t.api("POST", "/layout", { seats: 8 })).status).toBe(409); // roulette does not support 8 seats
+    const s = await t.ok("GET", "/state");
+    expect(s.phase).toBe("ready");
+    expect(s.game.id).toBe("roulette");
+    expect((await t.api("POST", "/game/start")).status).toBe(409); // nobody tapped Ready
   });
 });
 

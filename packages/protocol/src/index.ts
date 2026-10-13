@@ -133,7 +133,20 @@ export interface LobbyState {
   frontEdge: Edge;
   players: PlayerInfo[];
   phase: Phase;
-  game: { id: string; name: string; version: string; settings: Record<string, unknown>; lobbyButton: string; edges: Edge[] } | null;
+  game: {
+    id: string;
+    name: string;
+    version: string;
+    settings: Record<string, unknown>;
+    lobbyButton: string;
+    edges: Edge[];
+    /** Player counts the game accepts. */
+    players: number[];
+    /** What the game still needs before it can start, in plain words (empty when only Ready is missing). */
+    needs: string[];
+  } | null;
+  /** Seat layouts that may be chosen now: the selected game's, or, with none selected, any visible game's. */
+  layouts: SeatLayout[];
   summary: GameSummary | null;
   joinUrl: string;
   cloud: CloudStatus;
@@ -153,8 +166,13 @@ export interface GameAvailability {
   name: string;
   version: string;
   description?: string;
+  /** The game can be chosen now (the table then adapts its seats to it). */
   selectable: boolean;
+  /** Why it cannot be chosen now. */
   reasons: string[];
+  /** What it would still need before it could start, in plain words (e.g. "needs 2 more players"). */
+  needs: string[];
+  seatLayouts: SeatLayout[];
   ai: boolean;
   simulation: boolean;
   players: number[];
