@@ -24,7 +24,13 @@ const host = await startHost({
 console.log(`[table-host] ${host.table.config.tableName} on port ${host.port}`);
 console.log(`[table-host] board:  http://localhost:${host.port}/board/`);
 console.log(`[table-host] join:   ${host.table.currentJoin().url}`);
-console.log(`[table-host] games:  ${[...host.table.games.keys()].join(", ") || "(none)"}`);
+{
+  // Test games (coin-flip, quartet) exist for the automated tests; the board shows them only with SHOW_TEST_GAMES=1.
+  const all = [...host.table.games.values()].map((g) => g.manifest);
+  const shown = all.filter((m) => !m.test || env.SHOW_TEST_GAMES === "1").map((m) => m.id);
+  const hidden = all.filter((m) => m.test && env.SHOW_TEST_GAMES !== "1").map((m) => m.id);
+  console.log(`[table-host] games:  ${shown.join(", ") || "(none)"}${hidden.length ? `   (test games hidden: ${hidden.join(", ")}; SHOW_TEST_GAMES=1 shows them)` : ""}`);
+}
 if (!env.CLOUD_URL) console.log("[table-host] CLOUD_URL not set: running without the cloud service (development mode)");
 host.table.on("state", (s) => {
   if (s.cloud.status === "pending") console.log(`[table-host] waiting for admin approval, pairing code ${s.cloud.pairingCode}`);
