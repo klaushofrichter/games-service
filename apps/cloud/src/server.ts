@@ -12,6 +12,19 @@ import { createAdminAuth, esc, HTML_HEADERS, randomToken, same, sendPage, type G
 const ADMIN_PAGE = fileURLToPath(new URL("../public/admin.html", import.meta.url));
 const REMOTE_PAGE = fileURLToPath(new URL("../public/remote.html", import.meta.url));
 const REMOTE_SW = fileURLToPath(new URL("../public/remote-sw.js", import.meta.url));
+const FAVICON = fileURLToPath(new URL("../public/favicon.svg", import.meta.url));
+export const REPO_URL = "https://github.com/klaushofrichter/games-service";
+
+/** The running version (APP_VERSION, stamped at build time; "dev" otherwise), as shown in the top bar and on "/". */
+const appVersion = () => process.env.APP_VERSION || "dev";
+/**
+ * The version as a label: bare, never "v"-prefixed (kube-setup convention: tags carry the v, displayed values don't).
+ * A release version links to its GitHub release; "main" links to the main branch's history; anything else is plain.
+ */
+export function versionLabel(v = appVersion()): string {
+  const href = /^\d{4}\.\d{2}\.\d{2}\.\d+$/.test(v) ? `${REPO_URL}/releases/tag/v${v}` : v === "main" ? `${REPO_URL}/commits/main` : "";
+  return href ? `<a class="version" href="${href}" target="_blank" rel="noopener noreferrer">${esc(v)}</a>` : `<span class="version">${esc(v)}</span>`;
+}
 
 export interface IceServer {
   urls: string | string[];
@@ -195,11 +208,16 @@ export function startCloud(o: CloudOptions) {
     const url = parseUrl(req);
     if (!url) return json(res, 400, { error: "bad request target" });
     const p = url.pathname;
-    const m = req.method ?? "GET";
+    // HEAD is answered like GET (Node drops the body): uptime monitors on this cluster can only send HEAD.
+    const m = req.method === "HEAD" ? "GET" : (req.method ?? "GET");
     let match: RegExpMatchArray | null;
     try {
       // {status, version}: the deploy smoke test and the cluster's version-exporter read the version (APP_VERSION, "dev" outside a release build).
-      if (p === "/health") return json(res, 200, { status: "ok", version: process.env.APP_VERSION || "dev" });
+      if (p === "/health") return json(res, 200, { status: "ok", version: appVersion() });
+      if (m === "GET" && p === "/favicon.svg") {
+        res.writeHead(200, { "content-type": "image/svg+xml", "cache-control": "public, max-age=86400" });
+        return res.end(await readFile(FAVICON));
+      }
       if (await auth.handle(req, res, p)) return;
       if (m === "GET" && p === "/") {
         // Public landing page; also where logout lands (200, with a Sign in link, never a bounce to Google).
@@ -210,7 +228,8 @@ export function startCloud(o: CloudOptions) {
           : auth.enabled
             ? `<p><a class="btn" href="/auth/google/login">Administrators: sign in with Google</a></p>`
             : `<p><a class="btn" href="/admin">Admin portal</a></p>`;
-        return sendPage(res, 200, "Game Table", `<p class="muted">The service behind Game Table: it pairs tables, relays invites for remote players and keeps game logs.</p>${note}${action}`);
+        // The version label is part of the public page (and checked by the deploy's smoke test).
+        return sendPage(res, 200, "Game Table", `<p class="muted">The service behind Game Table: it pairs tables, relays invites for remote players and keeps game logs.</p>${note}${action}<p class="faint">${versionLabel()}</p>`);
       }
       if (m === "GET" && (p === "/admin" || p === "/admin/")) {
         // With Google sign-in configured the portal is for signed-in admins only; anonymous visitors go to the public
@@ -220,7 +239,7 @@ export function startCloud(o: CloudOptions) {
           return res.end();
         }
         res.writeHead(200, HTML_HEADERS);
-        return res.end(await readFile(ADMIN_PAGE));
+        return res.end((await readFile(ADMIN_PAGE, "utf8")).replace("{{version}}", versionLabel()).replaceAll("{{repo}}", REPO_URL));
       }
 
       // ----- tables -----

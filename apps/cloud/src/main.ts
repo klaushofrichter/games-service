@@ -1,5 +1,6 @@
 // Cloud service entry point. Configuration comes from environment variables; in the cluster they come from the
 // games-oauth Secret (see scripts/sync-secrets.sh) and the Deployment's env.
+import { isIP } from "node:net";
 import { startCloud } from "./server.ts";
 import type { GoogleAuthOptions } from "./auth.ts";
 
@@ -43,6 +44,20 @@ if (env.MAX_REPLICAS !== "1") {
   console.warn(`[cloud] WARNING: MAX_REPLICAS is ${env.MAX_REPLICAS ?? "unset"}; this service must run as exactly one replica until its state moves to a shared store`);
 }
 
+/** "1" = loopback and the k3s pod/service networks; otherwise a comma-separated list of literal CIDRs. */
+function parseTrustProxy(v: string | undefined): boolean | string[] {
+  if (!v) return false;
+  if (v === "1") return true;
+  const list = v.split(",").map((c) => c.trim()).filter(Boolean);
+  for (const c of list) {
+    const [ip, bits, extra] = c.split("/");
+    const max = isIP(ip) === 4 ? 32 : isIP(ip) === 6 ? 128 : 0;
+    // A word like "loopback" is not a CIDR here: say so instead of crashing on it later.
+    if (!max || extra !== undefined || !/^\d+$/.test(bits ?? "") || Number(bits) > max) fail(`TRUST_PROXY: "${c}" is not a CIDR like 10.42.0.0/16 (or set TRUST_PROXY=1)`);
+  }
+  return list;
+}
+
 const cloud = await startCloud({
   port: Number(env.PORT ?? 8081),
   adminToken,
@@ -52,7 +67,7 @@ const cloud = await startCloud({
   // e.g. [{"urls":"stun:stun.l.google.com:19302"},{"urls":"turn:turn.example:3478","username":"u","credential":"p"}]
   iceServers: env.ICE_SERVERS ? JSON.parse(env.ICE_SERVERS) : undefined,
   // "1": trust X-Forwarded-For from loopback and the k3s pod/service networks; or a comma-separated CIDR list.
-  trustProxy: env.TRUST_PROXY === "1" ? true : env.TRUST_PROXY ? env.TRUST_PROXY.split(",").map((c) => c.trim()) : false,
+  trustProxy: parseTrustProxy(env.TRUST_PROXY),
 });
 console.log(`[cloud] ${env.APP_VERSION || "dev"} listening on ${cloud.port}; admin sign-in: ${google ? `Google (${google.allowedEmails.length} allowed)` : "ADMIN_TOKEN only (development)"}`);
 for (const sig of ["SIGINT", "SIGTERM"] as const) process.on(sig, async () => (await cloud.close(), process.exit(0)));
