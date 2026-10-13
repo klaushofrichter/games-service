@@ -108,4 +108,29 @@ describe("cloud service", () => {
       await t.close();
     }
   });
+
+  it("reconnects a disconnected table without pairing again (D-085)", async () => {
+    const t = await testHost({ cloudUrl: base, cloudPollMs: 30, cloudHeartbeatMs: 50, requireCloud: true });
+    try {
+      const pending = await until(() => (t.host.table.cloud.status === "pending" ? t.host.table.cloud : null));
+      const { body } = await admin("POST", `/admin/api/tables/pair/${pending.pairingCode}`);
+      await until(() => t.host.table.cloud.status === "online");
+      // only a disconnected table can be reconnected
+      expect((await admin("POST", `/admin/api/tables/${body.tableId}/reconnect`)).status).toBe(409);
+      expect((await admin("POST", `/admin/api/tables/no-such-table/reconnect`)).status).toBe(404);
+      await admin("POST", `/admin/api/tables/${body.tableId}/revoke`);
+      await until(() => t.host.table.cloud.status === "revoked");
+      const r = await admin("POST", `/admin/api/tables/${body.tableId}/reconnect`);
+      expect(r.status).toBe(200);
+      expect(r.body.status).toBe("approved");
+      await until(() => t.host.table.cloud.status === "online");
+      expect((await t.ok("GET", "/games")).find((g: any) => g.id === "coin-flip").selectable).toBe(true);
+      // the same table, no second entry and no pairing code
+      const tables = (await admin("GET", "/admin/api/tables")).body.filter((x: any) => x.tableId === body.tableId);
+      expect(tables).toHaveLength(1);
+      expect(tables[0].status).toBe("approved");
+    } finally {
+      await t.close();
+    }
+  });
 });

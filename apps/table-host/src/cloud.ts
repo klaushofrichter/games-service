@@ -129,7 +129,7 @@ export class CloudLink {
         }
         if (b.status === "revoked") {
           this.table.setCloud({ status: "revoked" });
-          return this.schedule((this.o.pollMs ?? 5000) * 6);
+          return this.schedule((this.o.pollMs ?? 5000) * 2); // an admin may reconnect it
         }
         if (b.tableToken) {
           this.identity.tableToken = b.tableToken;
