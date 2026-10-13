@@ -31,7 +31,11 @@ async function inviteClient(page) {
 
 async function route(e, url) {
   let page = url.searchParams.get("gtp");
-  if (page && e.resultingClientId) owners.set(e.resultingClientId, page);
+  if (page && e.resultingClientId) {
+    // Each (re)load of a frame is a new client: forget the ones that are gone, or the map only grows.
+    for (const id of owners.keys()) if (!(await self.clients.get(id))) owners.delete(id);
+    owners.set(e.resultingClientId, page);
+  }
   if (!page) page = owners.get(e.clientId);
   const top = await inviteClient(page);
   if (!top) return new Response("Open the invite link again to reconnect.", { status: 503, headers: { "content-type": "text/plain" } });

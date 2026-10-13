@@ -1,18 +1,13 @@
 // Board UI: lobby, seats around the edge, QR join, game surface and the lobby overlay.
 // Talks to the Table Host through the board control API (same API the tests and local AI agents use).
-import { ROT, W, H, esc, seatPositions } from "/shared/board-kit.js";
+import { ROT, W, H, esc, seatPositions, claimServiceWorkerPage, openTableSocket } from "/shared/board-kit.js";
 
 const KEY = window.TABLE_KEY;
 // A remote player's copy of the board (phase 1c): it runs inside the cloud's invite page, which carries
 // requests and the live socket over a WebRTC channel. No table key, no join code, no simulations.
 const REMOTE = !!window.REMOTE_BOARD;
 const REMOTE_INV = new URLSearchParams(location.search).get("inv") ?? "";
-// Tell the invite page's service worker which page this frame belongs to (it forgets when restarted).
-if (REMOTE && navigator.serviceWorker) {
-  const own = () => navigator.serviceWorker.controller?.postMessage({ type: "gt-own", page: new URLSearchParams(location.search).get("gtp") });
-  own();
-  setInterval(own, 10000);
-}
+if (REMOTE) claimServiceWorkerPage();
 const surface = document.getElementById("surface");
 const seatsEl = document.getElementById("seats");
 const center = document.getElementById("center");
@@ -543,17 +538,15 @@ async function refreshGames() {
 }
 
 function connect() {
-  const ws =
-    REMOTE && window.parent !== window && window.parent.gameTableSocket
-      ? window.parent.gameTableSocket()
-      : new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`);
+  const ws = openTableSocket(REMOTE);
   ws.onopen = () => ws.send(JSON.stringify({ v: 1, ch: "system", type: "hello", payload: REMOTE ? { role: "board" } : { role: "board", key: KEY } }));
   ws.onmessage = async (ev) => {
     const m = JSON.parse(ev.data);
     if (m.ch === "lobby" && m.type === "state") {
       state = m.payload;
       if (selectedPlayer && !state.players.some((p) => p.id === selectedPlayer)) selectedPlayer = null;
-      await refreshGames();
+      // The games list serves only the lobby and its dialogs: skip it while a game runs.
+      if (state.phase !== "active" && state.phase !== "paused" && state.phase !== "terminating") await refreshGames();
       render();
       stateListeners.forEach((f) => f());
     } else if (m.ch === "game" && m.type === "board") {

@@ -1,5 +1,6 @@
 # Table Host on the table PC. Host networking, so phones on the venue WiFi reach it directly
-# and the kiosk browser on the same machine reaches the board over loopback.
+# and the kiosk browser on the same machine reaches the board over loopback. The health check comes
+# from the image (deploy/table-host.Dockerfile).
 services:
   table-host:
     image: ghcr.io/klaushofrichter/games-table-host:${VERSION:-latest}
@@ -10,7 +11,3 @@ services:
       DATA_DIR: /data
     volumes:
       - /var/lib/gametable:/data
-    healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:'+(process.env.PORT||8080)+'/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
-      interval: 30s
-      timeout: 3s

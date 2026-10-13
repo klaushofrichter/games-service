@@ -1,9 +1,9 @@
 // Hold'em deck UI: your two cards (only here), the shared cards, and fold / check / call / raise.
-import { esc, remainingMs } from "/shared/board-kit.js";
-import { card, injectCardStyles } from "/games/holdem/assets/cards.js";
+import { esc, remainingMs, useStyles } from "/shared/board-kit.js";
+import { card } from "/games/holdem/assets/cards.js";
 
 export function mount(root, ctx) {
-  injectCardStyles();
+  useStyles("/games/holdem/assets/cards.css");
   let view = null;
   let info = null;
   root.innerHTML = `
@@ -16,12 +16,11 @@ export function mount(root, ctx) {
     <div class="he-actions" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;position:sticky;bottom:10px;z-index:2;padding:8px;margin:0 -8px;border-radius:16px;background:rgba(10,29,25,.88);backdrop-filter:blur(6px)">
       <button class="danger he-fold" data-a="fold">Fold</button><button class="he-call"></button><button class="primary he-raise"></button></div>
     <div class="card he-result" hidden></div>`;
-  root.querySelector(".he-actions").addEventListener("click", async (e) => {
+  root.querySelector(".he-actions").addEventListener("click", (e) => {
     const b = e.target.closest("button[data-a]");
     if (!b || b.disabled) return;
     ctx.vibrate?.(20);
-    const r = await ctx.send(b.dataset.a);
-    if (!r.ok) ctx.toast(r.reason);
+    ctx.send(b.dataset.a);
   });
   const tick = setInterval(() => {
     const ms = view?.myTurn ? remainingMs(info, "turn") : null;

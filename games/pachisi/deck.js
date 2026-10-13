@@ -18,16 +18,14 @@ export function mount(root, ctx) {
       <div class="muted pc-clock" style="font-size:.85em;margin-top:4px"></div></div></div>
     <button class="primary big pc-roll">Roll the die</button>
     <div class="pc-tokens" style="display:flex;flex-direction:column;gap:10px"></div>`;
-  root.querySelector(".pc-roll").addEventListener("click", async () => {
+  root.querySelector(".pc-roll").addEventListener("click", () => {
     ctx.vibrate?.(30);
-    const r = await ctx.send("roll");
-    if (!r.ok) ctx.toast(r.reason);
+    ctx.send("roll");
   });
-  root.querySelector(".pc-tokens").addEventListener("click", async (e) => {
+  root.querySelector(".pc-tokens").addEventListener("click", (e) => {
     const b = e.target.closest("button[data-token]");
     if (!b) return;
-    const r = await ctx.send("move", { token: Number(b.dataset.token) });
-    if (!r.ok) ctx.toast(r.reason);
+    ctx.send("move", { token: Number(b.dataset.token) });
   });
   const tick = setInterval(() => {
     const ms = view?.myTurn ? remainingMs(info, "turn") : null;

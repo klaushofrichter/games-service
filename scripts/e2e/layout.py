@@ -4,38 +4,23 @@
   - the board at common screen sizes: the 16:9 surface fits the window, nothing scrolls
   python3 scripts/e2e/layout.py out/
 """
-import json, os, sys, time, urllib.request
+import os, sys, time
 from playwright.sync_api import sync_playwright
+from common import BASE, api, errors, join_deck, reset, wait, watch
 
-BASE, KEY = "http://127.0.0.1:8090", "devkey"
 OUT = sys.argv[1] if len(sys.argv) > 1 else "e2e-out"
 os.makedirs(OUT, exist_ok=True)
-problems, errors = [], []
+problems = []
 
 PHONES = {"small-android": (360, 640), "iphone-se": (320, 568), "iphone-14": (390, 844), "landscape": (844, 390)}
 SCREENS = {"hd": (1280, 720), "laptop": (1366, 768), "fullhd": (1920, 1080), "4k": (3840, 2160), "4:3": (1024, 768)}
-GAMES = {"roulette": {"rounds": 1, "bettingSeconds": 60}, "pachisi": {"turnSeconds": 60, "tokens": 2}, "holdem": {}}
-
-
-def api(method, path, body=None):
-    req = urllib.request.Request(BASE + "/api/v1" + path, method=method, data=json.dumps(body).encode() if body is not None else None,
-                                 headers={"x-table-key": KEY, "content-type": "application/json"})
-    with urllib.request.urlopen(req) as r:
-        return json.loads(r.read() or b"{}")
-
-
-def reset():
-    st = api("GET", "/state")
-    if st["phase"] in ("active", "paused"):
-        api("POST", "/game/end", {})
-    if st["phase"] in ("ready", "finished", "active", "paused"):
-        try:
-            api("POST", "/game/close", {})
-        except Exception:
-            pass
-    for p in api("GET", "/state")["players"]:
-        api("DELETE", f"/players/{p['id']}")
-    api("POST", "/layout", {"seats": 4})
+# per game: settings, the deck element that shows the game has started, and whether turns are simultaneous
+# (no "your turn" on the deck, so the action-button check does not apply)
+GAMES = {
+    "roulette": {"settings": {"rounds": 1, "bettingSeconds": 60}, "deck": ".rd-balance", "simultaneous": True},
+    "pachisi": {"settings": {"turnSeconds": 60, "tokens": 2}, "deck": ".pc-what"},
+    "holdem": {"settings": {}, "deck": ".he-mine .hc"},
+}
 
 
 CHECK = """() => {
@@ -67,48 +52,44 @@ def check(page, where):
         problems.append(f"{where}: {p}")
 
 
-def watch(page, name):
-    page.on("console", lambda m: m.type == "error" and errors.append(f"{name}: {m.text}"))
-    page.on("pageerror", lambda e: errors.append(f"{name}: {e}"))
-
-
 with sync_playwright() as p:
     b = p.chromium.launch()
     # ----- decks -----
     for phone, (w, h) in PHONES.items():
-        for game, settings in GAMES.items():
+        for game, g in GAMES.items():
             reset()
+            api("POST", "/layout", {"seats": 4})
             ctx = b.new_context(viewport={"width": w, "height": h}, device_scale_factor=2, has_touch=True)
             d = ctx.new_page()
             watch(d, f"{phone}/{game}")
-            d.goto(api("GET", "/join")["url"])
-            check(d, f"deck {phone} join form")
-            d.fill("input[name=name]", "Alexandra-Maximiliane")  # a long name
-            d.click("button[type=submit]")
-            d.wait_for_selector(".seatcard")
+            join_deck(d, api("GET", "/join")["url"], "Alexandra-Maximiliane",  # a long name
+                      on_form=lambda page: check(page, f"deck {phone} join form"))
             api("POST", "/ai", {})
-            api("POST", "/game/select", {"gameId": game, "settings": settings})
+            api("POST", "/game/select", {"gameId": game, "settings": g["settings"]})
             time.sleep(0.3)
             check(d, f"deck {phone} lobby ({game} selected)")
             d.click("#ready")
-            time.sleep(0.2)
+            wait(lambda: all(p["ready"] for p in api("GET", "/state")["players"] if p["kind"] == "human"), 5, "the deck to be ready")
             api("POST", "/game/start", {})
-            time.sleep(1.2)
+            d.wait_for_selector(g["deck"])
+            d.wait_for_timeout(200)
             check(d, f"deck {phone} in {game}")
             # on your turn, something to press must be on screen without scrolling
-            for _ in range(30):
+            if not g.get("simultaneous"):
+                for _ in range(30):
+                    if d.evaluate("() => /your turn/i.test(document.body.innerText)"):
+                        break
+                    time.sleep(0.2)
                 if d.evaluate("() => /your turn/i.test(document.body.innerText)"):
-                    break
-                time.sleep(0.2)
-            if d.evaluate("() => /your turn/i.test(document.body.innerText)"):
-                d.wait_for_timeout(300)
-                if not d.evaluate("""() => [...document.querySelectorAll('#body button:not([disabled])')].some((b) => {
-                      const r = b.getBoundingClientRect(); return r.height > 0 && r.top >= 0 && r.bottom <= innerHeight; })"""):
-                    problems.append(f"deck {phone} in {game}: on your turn no action button is visible without scrolling")
+                    d.wait_for_timeout(300)
+                    if not d.evaluate("""() => [...document.querySelectorAll('#body button:not([disabled])')].some((b) => {
+                          const r = b.getBoundingClientRect(); return r.height > 0 && r.top >= 0 && r.bottom <= innerHeight; })"""):
+                        problems.append(f"deck {phone} in {game}: on your turn no action button is visible without scrolling")
             if phone == "iphone-se":
                 d.screenshot(path=os.path.join(OUT, f"layout-{phone}-{game}.png"))
             ctx.close()
     reset()
+    api("POST", "/layout", {"seats": 4})
     # ----- board -----
     for name, (w, h) in SCREENS.items():
         page = b.new_page(viewport={"width": w, "height": h})

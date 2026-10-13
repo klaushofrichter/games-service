@@ -48,7 +48,7 @@ curl -X POST -H "Authorization: Bearer $ADMIN_TOKEN" http://localhost:8081/admin
 | `games/holdem` | Fixed-limit Texas Hold'em, 2–6 players, private hole cards, side pots, two AI styles |
 | `games/coin-flip` | Stub game: 1–8 players, simultaneous, AI, dynamic players, timers |
 | `games/quartet` | Stub game: exactly 4 humans, no AI, sequential turns, ends if a player leaves |
-| `scripts/e2e/` | Browser end-to-end checks (Playwright): `run-all.sh` runs them all, `play.py` per game, `layout.py`, `admin.py` for the portal and sign-in, `remote.py` for remote play |
+| `scripts/e2e/` | Browser end-to-end checks (Playwright): `run-all.sh` runs them all, `play.py` per game, `layout.py`, `admin.py` for the portal and sign-in, `remote.py` for remote play; shared helpers in `common.py` |
 | `scripts/sync-secrets.sh` | Puts the values from your local `.env` into GitHub and the cluster, without printing them |
 | `scripts/release-notes.sh`, `release.sh` | The release step of the deploy |
 | `scripts/soak.ts` | AI-only soak run over every game and player count |
@@ -71,6 +71,7 @@ curl -X POST -H "Authorization: Bearer $ADMIN_TOKEN" http://localhost:8081/admin
 | `AI_DELAY_MS` | 800 | Pause before an AI player acts |
 | `MAX_REMOTE_PLAYERS` | 4 | Remote seat limit (phase 1c) |
 | `ALLOW_REMOTE_BOARD` | 0 | Serve the board to non-loopback clients (development only) |
+| `SHOW_TEST_GAMES` | 0 | `1` lists the stub games (`coin-flip`, `quartet`) in the game menu; the tests and `run-all.sh` turn it on |
 | `DATA_DIR`, `GAMES_DIR` | `./data`, `./games` | Logs and table identity; installed games |
 
 ## Board control API
@@ -142,7 +143,7 @@ In the cluster these come from the `games-oauth` Secret (created by `scripts/syn
 | `ADMIN_TOKEN` | Optional bearer token for scripts (`Authorization: Bearer …`); in local development it is the portal sign-in |
 | `TRUST_PROXY` | `1` = trust `X-Forwarded-For` from loopback and the k3s pod/service networks, or a CIDR list |
 | `LOG_RETENTION_DAYS`, `ICE_SERVERS` | Log retention (default 90); STUN/TURN for remote play |
-| `APP_VERSION` | Stamped into the image by the deploy (`YYYY.MM.DD.N`); `/health` reports it, `dev` otherwise |
+| `APP_VERSION` | Stamped into the image by the deploy (`YYYY.MM.DD.N`); `/health` (`{status, version}`, on the Table Host also `protocol`) reports it, `dev` otherwise |
 
 ## Branches, CI and deployment
 
@@ -163,7 +164,7 @@ feature branch → PR → main → (PR) → production → deploy
 ## Testing
 
 ```sh
-npm test                                   # rules, fuzzing, lobby, concurrency, API limits, platform, cloud, sign-in, remote play (Vitest)
+npm test                                   # rules, fuzzing, lobby, concurrency, API limits, platform, pause, cloud, sign-in, remote play (Vitest)
 npm run typecheck                          # tsconfig.check.json: apps, packages, games, tests, scripts
 node scripts/soak.ts 100                   # 100 AI-only games per game and player count
 scripts/e2e/run-all.sh out/                # every browser check, as CI runs them (pip install -r scripts/e2e/requirements.txt)

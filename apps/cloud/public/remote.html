@@ -88,6 +88,12 @@
     return out.buffer;
   }
 
+  /** Answers a service-worker request with a 503 (the table is not reachable over the channel). */
+  function unavailable(port, error) {
+    const body = new TextEncoder().encode(JSON.stringify({ error })).buffer;
+    port.postMessage({ status: 503, type: "application/json", body }, [body]);
+  }
+
   let lastFrame = Date.now();
   function onFrame(raw) {
     lastFrame = Date.now();
@@ -118,8 +124,7 @@
     requests.set(id, { port: e.ports[0], parts: [] });
     if (!sendFrame({ k: "req", id, method: m.method, path: m.path, body: m.body })) {
       requests.delete(id);
-      const body = new TextEncoder().encode('{"error":"not connected to the table"}').buffer;
-      e.ports[0].postMessage({ status: 503, type: "application/json", body }, [body]);
+      unavailable(e.ports[0], "not connected to the table");
     }
   });
 
@@ -144,11 +149,9 @@
     if (!("serviceWorker" in navigator)) throw new Error("This browser can't open the table. Try a current Chrome, Edge, Firefox or Safari.");
     const reg = await navigator.serviceWorker.register("/remote-sw.js", { scope: "/" });
     await navigator.serviceWorker.ready;
-    const w = reg.active || navigator.serviceWorker.controller;
     const register = () => (navigator.serviceWorker.controller || reg.active)?.postMessage({ type: "gt-register", page: PAGE });
     register();
     setInterval(register, 10000); // also keeps the worker's page map warm after a restart
-    return w;
   }
 
   function gathered(peer) {
@@ -235,8 +238,7 @@
   function teardown() {
     for (const s of [...sockets.values()]) s._closed(1006);
     for (const [id, r] of requests) {
-      const body = new TextEncoder().encode('{"error":"connection to the table lost"}').buffer;
-      r.port.postMessage({ status: 503, type: "application/json", body }, [body]);
+      unavailable(r.port, "connection to the table lost");
       requests.delete(id);
     }
     if (dc) { dc.onclose = dc.onmessage = dc.onopen = null; try { dc.close(); } catch {} }
@@ -252,7 +254,6 @@
     $("board").src = `/board/${q(`&inv=${encodeURIComponent(CODE)}`)}`;
     $("deck").src = `/deck/${q(`&inv=${encodeURIComponent(CODE)}&name=${encodeURIComponent(name)}`)}`;
     playing = true;
-    show("play");
   }
 
   // The table pings every few seconds; silence means the connection is gone even if nobody said so.
@@ -266,12 +267,12 @@
     $("play").classList.toggle("deck-min", w.classList.contains("min"));
     $("deck-min").textContent = w.classList.contains("min") ? "Show" : "Hide";
   });
-  $("terms").addEventListener("click", (e) => { e.preventDefault(); alertTerms(); });
-  function alertTerms() {
+  $("terms").addEventListener("click", (e) => {
+    e.preventDefault();
     $("join-err").hidden = false;
     $("join-err").style.color = "var(--soft)";
     $("join-err").textContent = "Play fair, be kind, no real money. The full terms open from your deck once you're connected.";
-  }
+  });
 
   $("join").addEventListener("submit", async (e) => {
     e.preventDefault();

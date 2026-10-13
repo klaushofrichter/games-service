@@ -1,7 +1,7 @@
 // Cloud service and the table's cloud link: pairing, heartbeat metrics, log upload and download, invites.
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { startCloud } from "../apps/cloud/src/server.ts";
-import { sleep, testHost } from "./helpers.ts";
+import { pairTable, testHost, until } from "./helpers.ts";
 
 const ADMIN = "admin-token-for-tests-123";
 let cloud: Awaited<ReturnType<typeof startCloud>>;
@@ -11,16 +11,6 @@ const admin = async (method: string, path: string, body?: unknown) => {
   const r = await fetch(`${base}${path}`, { method, headers: { authorization: `Bearer ${ADMIN}`, "content-type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
   return { status: r.status, body: r.headers.get("content-type")?.includes("json") ? await r.json() : Buffer.from(await r.arrayBuffer()) };
 };
-
-async function until<T>(fn: () => T | Promise<T>, ms = 3000): Promise<NonNullable<T>> {
-  const end = Date.now() + ms;
-  for (;;) {
-    const v = await fn();
-    if (v) return v as NonNullable<T>;
-    if (Date.now() > end) throw new Error("condition not met in time");
-    await sleep(25);
-  }
-}
 
 beforeEach(async () => {
   cloud = await startCloud({ port: 0, host: "127.0.0.1", adminToken: ADMIN, publicUrl: "https://games.skylar.technology" });
@@ -90,9 +80,7 @@ describe("cloud service", () => {
   it("issues short invite codes and resolves them", async () => {
     const t = await testHost({ cloudUrl: base, cloudPollMs: 30, cloudHeartbeatMs: 50 });
     try {
-      const pending = await until(() => (t.host.table.cloud.status === "pending" ? t.host.table.cloud : null));
-      await admin("POST", `/admin/api/tables/pair/${pending.pairingCode}`);
-      await until(() => t.host.table.cloud.status === "online");
+      await pairTable(t, base, ADMIN);
       const token = JSON.parse((await import("node:fs")).readFileSync(`${(t.host.logs.dir as string).replace(/\/logs$/, "")}/table.json`, "utf8")).tableToken;
       const inv = await (await fetch(`${base}/api/tables/invites`, { method: "POST", headers: { authorization: `Bearer ${token}` }, body: "{}" })).json();
       expect(inv.token).toMatch(/^[A-HJ-NP-Z2-9]{8}$/);

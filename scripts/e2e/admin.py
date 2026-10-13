@@ -7,10 +7,10 @@ development mode (no Google, ADMIN_TOKEN only). Starts its own cloud services an
 Google itself is not contacted: the test signs a session cookie with the service's COOKIE_SECRET, exactly as the
 callback does after Google confirms an allowed account (the callback is covered by tests/auth.test.ts).
 """
-import base64, hashlib, hmac, json, os, subprocess, sys, tempfile, time, urllib.request
+import base64, hashlib, hmac, json, os, sys, time
 from playwright.sync_api import sync_playwright
+from common import api, errors, start_cloud, start_table, wait, watch
 
-REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 OUT = sys.argv[1] if len(sys.argv) > 1 else "e2e-out"
 os.makedirs(OUT, exist_ok=True)
 CLOUD = "http://127.0.0.1:8093"
@@ -28,44 +28,23 @@ def session_cookie(email, secret=SECRET):
     return payload + "." + b64u(hmac.new(secret.encode(), payload.encode(), hashlib.sha256).digest())
 
 
-def wait_http(url):
-    for _ in range(60):
-        try:
-            urllib.request.urlopen(url, timeout=1)
-            return
-        except Exception:
-            time.sleep(0.25)
-    raise RuntimeError(f"{url} did not come up")
-
-
 google_env = dict(GOOGLE_CLIENT_ID="40017202035-e2e.apps.googleusercontent.com", GOOGLE_CLIENT_SECRET="e2e",
                   GOOGLE_REDIRECT_URI=CLOUD + "/auth/google/callback", ALLOWED_EMAILS=ADMIN_EMAIL, COOKIE_SECRET=SECRET)
-cloud = subprocess.Popen(["node", "apps/cloud/src/main.ts"], cwd=REPO, env=dict(os.environ, PORT="8093", PUBLIC_URL=CLOUD, **google_env))
-wait_http(CLOUD + "/health")
-data = tempfile.mkdtemp(prefix="admin-e2e-")
-host = subprocess.Popen(["node", "apps/table-host/src/main.ts"], cwd=REPO,
-                        env=dict(os.environ, PORT="8094", TABLE_KEY="k", TABLE_NAME="Living room", CLOUD_URL=CLOUD, DATA_DIR=data))
-wait_http("http://127.0.0.1:8094/health")
-time.sleep(1.5)
+cloud = start_cloud(8093, PUBLIC_URL=CLOUD, **google_env)
+host = start_table(8094, TABLE_KEY="k", TABLE_NAME="Living room", CLOUD_URL=CLOUD)
 
 
 def state():
-    req = urllib.request.Request("http://127.0.0.1:8094/api/v1/state", headers={"x-table-key": "k"})
-    return json.loads(urllib.request.urlopen(req).read())
-
-
-def watch(page):
-    page.on("console", lambda m: m.type == "error" and errors.append(m.text))
-    page.on("pageerror", lambda e: errors.append(str(e)))
+    return api("GET", "/state", base="http://127.0.0.1:8094", key="k")
 
 
 try:
-    code = state()["cloud"]["pairingCode"]
+    code = wait(lambda: state()["cloud"].get("pairingCode"), 15, "the pairing code")
     with sync_playwright() as p:
         b = p.chromium.launch()
         ctx = b.new_context(viewport={"width": 1280, "height": 900})
         page = ctx.new_page()
-        watch(page)
+        watch(page, "admin")
 
         # Anonymous: /admin goes to the public page, which offers Google sign-in.
         page.goto(CLOUD + "/admin")
@@ -82,11 +61,7 @@ try:
         page.fill("#pair-code", code.lower())
         page.click("#pair-form button")
         page.wait_for_selector("#pair-msg.ok")
-        for _ in range(40):
-            if state()["cloud"]["status"] == "online":
-                break
-            time.sleep(0.5)
-        assert state()["cloud"]["status"] == "online", state()["cloud"]
+        wait(lambda: state()["cloud"]["status"] == "online", 20, "the table to come online")
         page.wait_for_timeout(1000)
         page.reload()
         page.wait_for_selector(".pill.approved")
@@ -122,14 +97,12 @@ finally:
 
 # Development mode: no Google, the portal asks for ADMIN_TOKEN.
 DEV = "http://127.0.0.1:8097"
-dev = subprocess.Popen(["node", "apps/cloud/src/main.ts"], cwd=REPO, env=dict(os.environ, PORT="8097", PUBLIC_URL=DEV, ADMIN_TOKEN="admin-token-for-e2e-0001"))
+dev = start_cloud(8097, PUBLIC_URL=DEV, ADMIN_TOKEN="admin-token-for-e2e-0001")
 try:
-    wait_http(DEV + "/health")
     with sync_playwright() as p:
         b = p.chromium.launch()
         page = b.new_page()
-        page.on("console", lambda m: m.type == "error" and "status of 401" not in m.text and errors.append(m.text))
-        page.on("pageerror", lambda e: errors.append(str(e)))
+        watch(page, "dev admin", ignore=("status of 401",))
         page.goto(DEV + "/admin")
         page.fill("#token", "wrong-token")
         page.click("#signin-form button")

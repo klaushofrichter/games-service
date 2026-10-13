@@ -96,4 +96,20 @@ export function useStyles(href) {
   document.head.appendChild(l);
 }
 
-export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+/**
+ * Remote play: tell the invite page's service worker which page this frame belongs to (it forgets when
+ * restarted). Used by the board and deck pages.
+ */
+export function claimServiceWorkerPage() {
+  if (!navigator.serviceWorker) return;
+  const own = () => navigator.serviceWorker.controller?.postMessage({ type: "gt-own", page: new URLSearchParams(location.search).get("gtp") });
+  own();
+  setInterval(own, 10000);
+}
+
+/** The table's live socket; a remote page uses the one its invite page carries over the WebRTC channel. */
+export function openTableSocket(remote) {
+  return remote && window.parent !== window && window.parent.gameTableSocket
+    ? window.parent.gameTableSocket()
+    : new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`);
+}

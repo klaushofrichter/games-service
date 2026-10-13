@@ -2,20 +2,21 @@
 import { startHost } from "./host.ts";
 
 const env = process.env;
-const num = (v: string | undefined, d: number) => (v ? Number(v) : d);
+// Unset values fall back to the defaults in host.ts.
+const num = (v: string | undefined) => (v ? Number(v) : undefined);
 
 const host = await startHost({
-  port: num(env.PORT, 8080),
-  tableName: env.TABLE_NAME ?? "Game Table",
+  port: num(env.PORT),
+  tableName: env.TABLE_NAME,
   tableKey: env.TABLE_KEY,
   publicUrl: env.PUBLIC_URL,
   gamesDir: env.GAMES_DIR,
   dataDir: env.DATA_DIR,
-  graceMs: num(env.GRACE_MS, 60_000),
-  aiDelayMs: num(env.AI_DELAY_MS, 800),
+  graceMs: num(env.GRACE_MS),
+  aiDelayMs: num(env.AI_DELAY_MS),
   requireCloud: env.REQUIRE_CLOUD === "1",
   allowRemoteBoard: env.ALLOW_REMOTE_BOARD === "1",
-  maxRemotePlayers: num(env.MAX_REMOTE_PLAYERS, 4),
+  maxRemotePlayers: num(env.MAX_REMOTE_PLAYERS),
   cloudUrl: env.CLOUD_URL,
   showTestGames: env.SHOW_TEST_GAMES === "1",
 });

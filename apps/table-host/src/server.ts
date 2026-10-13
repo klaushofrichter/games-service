@@ -6,6 +6,7 @@ import { timingSafeEqual } from "node:crypto";
 import { WebSocketServer, type WebSocket } from "ws";
 import QRCode from "qrcode";
 import { envelope, PROTOCOL_VERSION, type Envelope } from "../../../packages/protocol/src/index.ts";
+import type { GameEvent } from "../../../packages/sdk/src/index.ts";
 import { Table, TableError } from "./table.ts";
 import { runSimulation } from "./simulation.ts";
 import type { LogStore } from "./logs.ts";
@@ -63,32 +64,35 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
 
   // ---------- broadcasting ----------
 
-  const send = (ws: WebSocket, e: Envelope) => {
-    if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(e));
+  const sendText = (ws: WebSocket, text: string) => {
+    if (ws.readyState === ws.OPEN) ws.send(text);
   };
+  const send = (ws: WebSocket, e: Envelope) => sendText(ws, JSON.stringify(e));
 
   // Remote clients never see the local join code (it would let them join as if they sat at the table).
-  const forClient = (c: Client, state: ReturnType<Table["state"]>) => (c.remote ? { ...state, joinUrl: "" } : state);
+  const forClient = (remote: boolean | undefined, state: ReturnType<Table["state"]>) => (remote ? { ...state, joinUrl: "" } : state);
 
   table.on("state", (state) => {
-    for (const c of clients) if (c.role !== "pending") send(c.ws, envelope("lobby", "state", forClient(c, state), { stateRev: state.stateRev }));
+    for (const c of clients) if (c.role !== "pending") send(c.ws, envelope("lobby", "state", forClient(c.remote, state), { stateRev: state.stateRev }));
   });
 
-  table.on("game", (events) => {
+  /** The running game to these clients: the public board view to boards, each player's own view to their deck. */
+  const sendGame = (targets: Iterable<Client>, events: GameEvent[]) => {
     const rt = table.runtime;
     if (!rt) return;
-    const board = rt.boardView();
     const views = new Map(table.views().map((v) => [v.playerId, v]));
     // Timer deadlines plus the host's clock let clients draw countdowns without trusting their own clock.
     const timing = { timers: rt.timerDeadlines(), now: Date.now() };
-    for (const c of clients) {
-      if (c.role === "board") send(c.ws, envelope("game", "board", { view: board, events, over: rt.over, ...timing }));
+    const board = JSON.stringify(envelope("game", "board", { view: rt.boardView(), events, over: rt.over, ...timing }));
+    for (const c of targets) {
+      if (c.role === "board") sendText(c.ws, board);
       if (c.role === "deck") {
         const v = views.get(c.playerId);
         if (v) send(c.ws, envelope("game", "view", { seat: v.seat, view: v.view, events, over: rt.over, ...timing }));
       }
     }
-  });
+  };
+  table.on("game", (events: GameEvent[]) => sendGame(clients, events));
 
   table.on("removed", (playerId: string, reason: string) => {
     for (const c of clients) {
@@ -104,6 +108,12 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
   const json = (res: ServerResponse, status: number, body: unknown) => {
     res.writeHead(status, { "content-type": "application/json", "cache-control": "no-store" });
     res.end(JSON.stringify(body));
+  };
+
+  const qrSvg = async (res: ServerResponse, text: string) => {
+    const svg = await QRCode.toString(text, { type: "svg", margin: 1, color: { dark: "#111111", light: "#ffffff" } });
+    res.writeHead(200, { "content-type": "image/svg+xml", "cache-control": "no-store" });
+    res.end(svg);
   };
 
   const readBody = async (req: IncomingMessage): Promise<Record<string, unknown>> => {
@@ -150,7 +160,7 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
     const body = m === "GET" || m === "DELETE" ? {} : await readBody(req);
     let match: RegExpMatchArray | null;
 
-    if (m === "GET" && path === "/state") return json(res, 200, remote ? { ...table.state(), joinUrl: "" } : table.state());
+    if (m === "GET" && path === "/state") return json(res, 200, forClient(!!remote, table.state()));
     if (m === "POST" && path === "/remote") return (table.setRemoteBoardControl(!!body.boardControl), json(res, 200, table.state()));
     if (m === "POST" && path === "/invites") {
       if (!opts.createInvite) throw new TableError(409, "remote play needs the Game Table service (CLOUD_URL)");
@@ -160,8 +170,7 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
     if (m === "GET" && path === "/qr") {
       const text = new URL(req.url ?? "/", "http://t").searchParams.get("text") ?? "";
       if (!/^https?:\/\/[\w.:/-]+$/.test(text) || text.length > 200) throw new TableError(400, "text must be a URL");
-      res.writeHead(200, { "content-type": "image/svg+xml", "cache-control": "no-store" });
-      return res.end(await QRCode.toString(text, { type: "svg", margin: 1, color: { dark: "#111111", light: "#ffffff" } }));
+      return await qrSvg(res, text);
     }
     if (m === "GET" && path === "/join") return json(res, 200, table.currentJoin());
     if (m === "POST" && path === "/join/new") return json(res, 200, table.newJoinCode());
@@ -226,7 +235,7 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
     const path = url.pathname;
     try {
       // {status, version}: the version is stamped at build time (APP_VERSION) and reads "dev" outside a release build.
-      if (path === "/health") return json(res, 200, { status: "ok", ok: true, version: process.env.APP_VERSION || "dev", protocol: PROTOCOL_VERSION });
+      if (path === "/health") return json(res, 200, { status: "ok", version: process.env.APP_VERSION || "dev", protocol: PROTOCOL_VERSION });
       if (path.startsWith("/api/v1/")) return await api(req, res, path.slice("/api/v1".length));
       if (path === "/") {
         res.writeHead(302, { location: boardAllowed(req) ? "/board/" : "/deck/" });
@@ -239,9 +248,7 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
       }
       if (path === "/qr.svg") {
         if (!boardAllowed(req) || remoteOf(req)) return json(res, 403, { error: "board only" });
-        const svg = await QRCode.toString(table.currentJoin().url, { type: "svg", margin: 1, color: { dark: "#111111", light: "#ffffff" } });
-        res.writeHead(200, { "content-type": "image/svg+xml", "cache-control": "no-store" });
-        return res.end(svg);
+        return await qrSvg(res, table.currentJoin().url);
       }
       if (path === "/board" || path === "/board/" || path === "/board/index.html") {
         // Remote players get the same board, without the key: their channel is their authorisation.
@@ -306,8 +313,8 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
             c.playerId = playerId;
             reply("welcome", { role: "deck", playerId, sessionToken }, msg.seq);
           }
-          send(ws, envelope("lobby", "state", forClient(c, table.state())));
-          if (table.runtime && (table.phase === "active" || table.phase === "paused")) table.emit("game", []);
+          send(ws, envelope("lobby", "state", forClient(remote, table.state())));
+          if (table.phase === "active" || table.phase === "paused") sendGame([client], []);
           return;
         }
         if (c.role !== "deck" && c.role !== "board") throw new TableError(401, "say hello first");

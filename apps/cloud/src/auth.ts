@@ -15,8 +15,6 @@ export interface GoogleAuthOptions {
   allowedEmails: string[];
   /** Signs the session cookie. Replacing it (and restarting) ends every session: the kill switch. */
   cookieSecret: string;
-  /** Session lifetime in seconds (default 7 days). */
-  sessionSeconds?: number;
   /** Tests only: replaces the code exchange with Google. */
   exchangeCode?: (code: string) => Promise<{ email: string; emailVerified: boolean }>;
 }
@@ -30,6 +28,22 @@ export interface AdminAuth {
 }
 
 const STATE_COOKIE = "games_oauth_state";
+/** Admin session lifetime. */
+const SESSION_SECONDS = 7 * 86400;
+
+/** Constant-time string comparison (length is not secret). */
+export const same = (a: string, b: string) => a.length === b.length && timingSafeEqual(Buffer.from(a), Buffer.from(b));
+/** A random token: 24 bytes, base64url. */
+export const randomToken = () => randomBytes(24).toString("base64url");
+
+/** Headers for every HTML page we serve: never cached, never framed, no referrer. */
+export const HTML_HEADERS = { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-frame-options": "DENY", "referrer-policy": "no-referrer" } as const;
+
+/** Answers with a small public page (see publicPage). */
+export function sendPage(res: ServerResponse, status: number, title: string, body: string, extraHeaders: Record<string, string | string[]> = {}) {
+  res.writeHead(status, { ...HTML_HEADERS, ...extraHeaders });
+  res.end(publicPage(title, body));
+}
 
 export function cookies(req: IncomingMessage): Map<string, string> {
   const out = new Map<string, string>();
@@ -92,11 +106,6 @@ export function createAdminAuth(o: GoogleAuthOptions | null, publicUrl: string):
       return { email: String(p?.email ?? ""), emailVerified: p?.email_verified === true };
     });
 
-  const page = (res: ServerResponse, status: number, title: string, body: string, headers: Record<string, string | string[]> = {}) => {
-    res.writeHead(status, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-frame-options": "DENY", "referrer-policy": "no-referrer", ...headers });
-    res.end(publicPage(title, body));
-  };
-
   return {
     enabled: !!o,
     session(req) {
@@ -113,11 +122,11 @@ export function createAdminAuth(o: GoogleAuthOptions | null, publicUrl: string):
         return true;
       }
       if (!o) {
-        page(res, 503, "Sign-in is not configured", `<p>Google sign-in is not configured on this service.</p><p><a href="/">Back</a></p>`);
+        sendPage(res, 503, "Sign-in is not configured", `<p>Google sign-in is not configured on this service.</p><p><a href="/">Back</a></p>`);
         return true;
       }
       if (path === "/auth/google/login") {
-        const state = randomBytes(24).toString("base64url");
+        const state = randomToken();
         const auth = new URL("https://accounts.google.com/o/oauth2/v2/auth");
         auth.search = new URLSearchParams({ client_id: o.clientId, redirect_uri: o.redirectUri, response_type: "code", scope: "openid email", state, prompt: "select_account" }).toString();
         res.writeHead(302, { location: auth.toString(), "cache-control": "no-store", "set-cookie": set(STATE_COOKIE, state, "/auth/google", 600) });
@@ -130,29 +139,28 @@ export function createAdminAuth(o: GoogleAuthOptions | null, publicUrl: string):
         const expected = cookies(req).get(STATE_COOKIE) ?? "";
         const clearState = clear(STATE_COOKIE, "/auth/google");
         const again = `<p><a class="btn" href="/auth/google/login">Sign in with Google</a></p>`;
-        if (!state || !expected || state.length !== expected.length || !timingSafeEqual(Buffer.from(state), Buffer.from(expected))) {
-          page(res, 400, "Sign-in expired", `<p>That sign-in attempt expired or did not start here. Please try again.</p>${again}`, { "set-cookie": clearState });
+        if (!state || !expected || !same(state, expected)) {
+          sendPage(res, 400, "Sign-in expired", `<p>That sign-in attempt expired or did not start here. Please try again.</p>${again}`, { "set-cookie": clearState });
           return true;
         }
         const code = url.searchParams.get("code");
         if (!code) {
-          page(res, 400, "Sign-in cancelled", `<p>Google did not complete the sign-in.</p>${again}`, { "set-cookie": clearState });
+          sendPage(res, 400, "Sign-in cancelled", `<p>Google did not complete the sign-in.</p>${again}`, { "set-cookie": clearState });
           return true;
         }
         let who: { email: string; emailVerified: boolean };
         try {
           who = await exchange(code);
         } catch {
-          page(res, 502, "Sign-in failed", `<p>Google could not confirm the sign-in. Please try again.</p>${again}`, { "set-cookie": clearState });
+          sendPage(res, 502, "Sign-in failed", `<p>Google could not confirm the sign-in. Please try again.</p>${again}`, { "set-cookie": clearState });
           return true;
         }
         if (!who.emailVerified || !allowed(who.email)) {
           // Anyone with a Google account can reach this point: the allow-list is the actual gate.
-          page(res, 403, "Not an administrator", `<p>${esc(who.email || "This account")} is not allowed to administer this service.</p><p><a class="btn" href="/auth/google/login">Use another account</a></p>`, { "set-cookie": clearState });
+          sendPage(res, 403, "Not an administrator", `<p>${esc(who.email || "This account")} is not allowed to administer this service.</p><p><a class="btn" href="/auth/google/login">Use another account</a></p>`, { "set-cookie": clearState });
           return true;
         }
-        const seconds = o.sessionSeconds ?? 7 * 86400;
-        res.writeHead(302, { location: "/admin", "cache-control": "no-store", "set-cookie": [clearState, set(SESSION_COOKIE, signSession(o.cookieSecret, who.email.toLowerCase(), Date.now() + seconds * 1000), "/", seconds)] });
+        res.writeHead(302, { location: "/admin", "cache-control": "no-store", "set-cookie": [clearState, set(SESSION_COOKIE, signSession(o.cookieSecret, who.email.toLowerCase(), Date.now() + SESSION_SECONDS * 1000), "/", SESSION_SECONDS)] });
         res.end();
         return true;
       }

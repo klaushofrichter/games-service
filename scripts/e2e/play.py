@@ -6,28 +6,13 @@ then:
   python3 scripts/e2e/play.py roulette out/
 Fails (exit 1) on any browser console error or uncaught exception.
 """
-import json, os, sys, time, urllib.request
+import os, sys, time
 from playwright.sync_api import sync_playwright
+from common import BASE, api, errors, join_deck, reset, watch
 
-BASE = os.environ.get("BASE", "http://127.0.0.1:8090")
-KEY = os.environ.get("TABLE_KEY", "devkey")
 GAME = sys.argv[1] if len(sys.argv) > 1 else "roulette"
 OUT = sys.argv[2] if len(sys.argv) > 2 else "e2e-out"
 os.makedirs(OUT, exist_ok=True)
-errors = []
-
-
-def api(method, path, body=None):
-    req = urllib.request.Request(BASE + "/api/v1" + path, method=method,
-                                 headers={"x-table-key": KEY, "content-type": "application/json"},
-                                 data=json.dumps(body).encode() if body is not None else None)
-    with urllib.request.urlopen(req) as r:
-        return json.loads(r.read())
-
-
-def watch(page, name):
-    page.on("console", lambda m: m.type == "error" and errors.append(f"{name}: {m.text}"))
-    page.on("pageerror", lambda e: errors.append(f"{name}: {e}"))
 
 
 def shot(page, name):
@@ -38,24 +23,7 @@ def join(browser, name):
     ctx = browser.new_context(viewport={"width": 390, "height": 844}, device_scale_factor=2, has_touch=True)
     d = ctx.new_page()
     watch(d, name)
-    d.goto(api("GET", "/join")["url"])
-    d.fill("input[name=name]", name)
-    d.click("button[type=submit]")
-    d.wait_for_selector(".seatcard")
-    return d
-
-
-def reset():
-    s = api("GET", "/state")
-    if s["phase"] in ("active", "paused"):
-        api("POST", "/game/end")
-        time.sleep(0.3)
-    if api("GET", "/state")["phase"] != "idle":
-        api("POST", "/game/close")
-    for p in api("GET", "/state")["players"]:
-        api("DELETE", f"/players/{p['id']}")
-    if api("GET", "/state")["frontEdge"] != "south":
-        api("POST", "/rotate", {"degrees": 180})
+    return join_deck(d, api("GET", "/join")["url"], name)
 
 
 SCENARIOS = {}

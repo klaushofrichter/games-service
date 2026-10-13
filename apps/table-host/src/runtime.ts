@@ -77,7 +77,6 @@ export class GameRuntime {
   /** While paused: remaining time of each timer, re-armed on resume. */
   private paused: Map<string, number> | null = null;
   private listeners: Listener[] = [];
-  private replaying = false;
 
   readonly manifest: Manifest;
   readonly def: GameDefinition<any>;
@@ -104,7 +103,6 @@ export class GameRuntime {
     this.clock = clock;
     this.opts = opts;
     this.rng = createRng(seed);
-    this.replaying = !!opts.replay;
     this.record({ t: "start", at: clock.now(), gameId: manifest.id, version: manifest.version, seed, settings, seats, aiOptions: opts.aiOptions ?? {}, simulation: !!opts.simulation });
     this.state = def.setup(this.ctx(), settings);
   }
@@ -128,7 +126,7 @@ export class GameRuntime {
   }
 
   private setTimer(id: string, ms: number) {
-    if (this.replaying) return; // timer firings come from the log during replay
+    if (this.opts.replay) return; // timer firings come from the log during replay
     if (this.paused) {
       this.paused.set(id, ms); // set while paused (e.g. a player left): armed on resume
       return;
@@ -158,10 +156,6 @@ export class GameRuntime {
     const left = this.paused;
     this.paused = null;
     for (const [id, ms] of left) this.setTimer(id, ms);
-  }
-
-  get isPaused() {
-    return this.paused !== null;
   }
 
   private clearTimer(id: string) {

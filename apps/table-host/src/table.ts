@@ -15,7 +15,7 @@ import {
   type SeatLayout,
   type CloudStatus,
 } from "../../../packages/protocol/src/index.ts";
-import { createRng, type GameEvent, type Intent, type SeatInfo } from "../../../packages/sdk/src/index.ts";
+import { createRng, type Intent, type SeatInfo } from "../../../packages/sdk/src/index.ts";
 import { settingsWithDefaults, type InstalledGame } from "./games.ts";
 import { GameRuntime, realClock } from "./runtime.ts";
 import type { LogStore } from "./logs.ts";
@@ -70,10 +70,8 @@ export class Table extends EventEmitter {
   private joinToken = "";
   private joinTokenExpires = 0;
   private gameStartedAt = 0;
-  cloudOnline = true;
   cloud: CloudStatus = { status: "disabled" };
   readonly metrics = { gamesPlayed: 0, gamesTerminated: 0, totalGameMs: 0, simulations: 0 };
-  lastLogId: string | null = null;
 
   readonly config: TableConfig;
   readonly games: Map<string, InstalledGame>;
@@ -135,11 +133,15 @@ export class Table extends EventEmitter {
     return this.players.get(id);
   }
 
+  /** Online, or running without the cloud at all. */
+  get cloudOnline() {
+    return this.cloud.status === "online" || this.cloud.status === "disabled";
+  }
+
   setCloud(c: CloudStatus) {
     if (c.status === this.cloud.status && c.pairingCode === this.cloud.pairingCode) return;
     const wasOnline = this.cloud.status === "online";
     this.cloud = c;
-    this.cloudOnline = c.status === "online";
     // D-015: losing the service pauses a running game; it resumes by itself when the link returns.
     if (wasOnline && !this.cloudOnline && this.phase === "active") this.pauseGame("cloud");
     else if (this.cloudOnline && this.phase === "paused" && this.pause?.reason === "cloud") this.resumeGame();
@@ -161,7 +163,7 @@ export class Table extends EventEmitter {
   /** Resume a paused game (automatic when the cloud returns, or from the board once it is back). */
   resumeGame() {
     if (this.phase !== "paused" || !this.runtime) throw new TableError(409, "the game is not paused");
-    if (this.cloud.status !== "disabled" && !this.cloudOnline) throw new TableError(409, "still offline; the game resumes by itself when the connection returns");
+    if (!this.cloudOnline) throw new TableError(409, "still offline; the game resumes by itself when the connection returns");
     this.runtime.resume();
     this.phase = "active";
     this.pause = null;
@@ -465,21 +467,14 @@ export class Table extends EventEmitter {
       throw new TableError(409, "a game is running");
     const g = this.games.get(gameId);
     if (!g) throw new TableError(404, "no such game");
-    const prevPhase = this.phase;
-    this.phase = "idle"; // so a re-selection in 'ready' is judged on the seats alone
     const reasons = this.reasonsFor(gameId);
-    if (reasons.length) {
-      this.phase = prevPhase;
-      throw new TableError(409, `${g.manifest.name} ${reasons.join("; ")}`);
-    }
+    if (reasons.length) throw new TableError(409, `${g.manifest.name} ${reasons.join("; ")}`);
     let merged: Record<string, unknown>;
     try {
       merged = settingsWithDefaults(g.manifest, settings);
     } catch (e) {
-      this.phase = prevPhase;
       throw new TableError(400, (e as Error).message);
     }
-    this.phase = "loading";
     this.selected = { game: g, settings: merged };
     this.summary = null;
     for (const p of this.players.values()) p.ready = p.kind === "ai";
@@ -490,18 +485,14 @@ export class Table extends EventEmitter {
   /** In 'ready', seat changes may break the selected game's constraints; then go back to idle. */
   private revalidateSelection() {
     if (!this.selected) return;
-    const id = this.selected.game.manifest.id;
+    if (this.reasonsFor(this.selected.game.manifest.id).length === 0) return;
     this.phase = "idle";
-    const ok = this.reasonsFor(id).length === 0;
-    this.phase = ok ? "ready" : "idle";
-    if (!ok) this.selected = null;
+    this.selected = null;
   }
 
   start() {
     if (this.phase !== "ready" || !this.selected) throw new TableError(409, "select a game first");
-    this.phase = "idle"; // judge the seats as they are now, as selection did
     const reasons = this.reasonsFor(this.selected.game.manifest.id);
-    this.phase = "ready";
     if (reasons.length) throw new TableError(409, `${this.selected.game.manifest.name} ${reasons.join("; ")}`);
     const notReady = this.seated().filter((p) => p.kind === "human" && (!p.ready || !p.connected));
     if (notReady.length) throw new TableError(409, `waiting for ${notReady.map((p) => p.name).join(", ")}`);
@@ -569,7 +560,6 @@ export class Table extends EventEmitter {
     } finally {
       this.pendingSaves.delete(saving);
     }
-    this.lastLogId = id;
     this.emit("logSaved", id);
   }
 
@@ -663,5 +653,3 @@ export function logId(gameId: string) {
   const d = new Date().toISOString().replace(/[-:T]/g, "").slice(0, 14);
   return `${d}-${gameId}-${randomBytes(2).toString("hex")}`;
 }
-
-export type { GameEvent };
