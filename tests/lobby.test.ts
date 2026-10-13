@@ -542,3 +542,31 @@ describe("AI configuration", () => {
     expect((await t.api("POST", `/players/${ai2}/ai-options`, { options: { style: "erratic" } })).status).toBe(409); // not while playing
   });
 });
+
+describe("game display prefs (D-088)", () => {
+  it("keeps display choices per game, shared in the state, merged key by key", async () => {
+    expect((await t.api("POST", "/game/prefs", { prefs: { a: 1 } })).status).toBe(409); // no game chosen
+    await t.ok("POST", "/game/select", { gameId: "pachisi" });
+    let s = await t.ok("GET", "/state");
+    expect(s.game.prefs).toEqual({});
+    s = await t.ok("POST", "/game/prefs", { prefs: { colors: { p1: "#c38be8" }, log: false } });
+    expect(s.game.prefs).toEqual({ colors: { p1: "#c38be8" }, log: false });
+    s = await t.ok("POST", "/game/prefs", { prefs: { log: null, size: "large" } }); // null removes a key
+    expect(s.game.prefs).toEqual({ colors: { p1: "#c38be8" }, size: "large" });
+    // another game has its own; coming back to Pachisi brings its choices back
+    await t.ok("POST", "/game/close");
+    await t.ok("POST", "/game/select", { gameId: "roulette" });
+    expect((await t.ok("GET", "/state")).game.prefs).toEqual({});
+    await t.ok("POST", "/game/close");
+    expect((await t.ok("POST", "/game/select", { gameId: "pachisi" })).game.prefs.size).toBe("large");
+  });
+
+  it("refuses prefs that are not a small plain object", async () => {
+    await t.ok("POST", "/game/select", { gameId: "pachisi" });
+    expect((await t.api("POST", "/game/prefs", { prefs: [1, 2] })).status).toBe(400);
+    expect((await t.api("POST", "/game/prefs", { prefs: "x" })).status).toBe(400);
+    expect((await t.api("POST", "/game/prefs", { prefs: { "bad key!": 1 } })).status).toBe(400);
+    expect((await t.api("POST", "/game/prefs", { prefs: { big: "x".repeat(5000) } })).status).toBe(413);
+    expect((await t.ok("GET", "/state")).game.prefs).toEqual({}); // nothing half-applied
+  });
+});

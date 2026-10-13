@@ -69,6 +69,7 @@ try:
         remote.wait_for_timeout(500)
         remote.screenshot(path=os.path.join(OUT, "remote-north-seat.png"))
         assert rboard.locator("#corners button[data-face]").count() == 0, "remote boards don't turn the table"
+        assert not rboard.locator("#settings-button").is_visible(), "settings stay with the table (D-088)"
 
         # remote board control: change the layout from the remote board, then the table switches control off
         rboard.locator("button[data-layout='6']").click()

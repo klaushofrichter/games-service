@@ -16,6 +16,7 @@ const overlayRoot = document.getElementById("overlay-root");
 const gameLayer = document.getElementById("game-layer");
 const pauseLayer = document.getElementById("pause-layer");
 const cornersEl = document.getElementById("corners");
+const settingsBtn = document.getElementById("settings-button");
 
 let state = null;
 let games = [];
@@ -215,6 +216,96 @@ cornersEl.addEventListener("click", (e) => {
   if (b && b.dataset.face !== state.frontEdge) act("POST", "/face", { edge: b.dataset.face });
 });
 
+// ---------- settings (D-088) ----------
+// A gear beside the corner at the left end of the edge the board faces (as seen from that edge), turned to it.
+// During a game it moves to the other end of that edge if the game's Lobby button sits in that corner.
+// Not on a remote player's copy: settings stay with the table.
+const FRONT_CORNERS = { south: ["bl", "br"], west: ["tl", "bl"], north: ["tr", "tl"], east: ["br", "tr"] };
+const LOBBY_CORNER = { "top-left": "tl", "top-right": "tr", "bottom-left": "bl", "bottom-right": "br" };
+function placeSettings(playing) {
+  settingsBtn.hidden = REMOTE;
+  if (REMOTE) return;
+  const front = viewEdge();
+  let [corner, other] = FRONT_CORNERS[front];
+  if (playing && LOBBY_CORNER[state.game?.lobbyButton ?? "bottom-right"] === corner) corner = other;
+  settingsBtn.className = `${corner} along-${front === "south" || front === "north" ? "x" : "y"}`;
+  settingsBtn.querySelector("svg").style.transform = `rotate(${ROT[front]}deg)`;
+}
+settingsBtn.addEventListener("click", () => openSettings());
+
+/**
+ * The settings modal: the board's own settings (Fullscreen), then whatever the chosen game adds. A game adds
+ * items by exporting settings({ info, setPrefs }) from its board.js; each item is
+ *   { type: "toggle", label, value, onChange(next) }   { type: "choice", label, value, options: [{ value, label }], onChange }
+ *   { type: "swatches", label, value, options: ["#rrggbb", …], onChange }   { type: "button", label, onChange() }
+ * setPrefs(patch) stores display choices for this game on the table; board and decks get them as info.prefs.
+ */
+let settingsOverlay = null;
+function openSettings() {
+  if (settingsOverlay) return;
+  const o = (settingsOverlay = document.createElement("div"));
+  o.className = "overlay settings";
+  let mod = null; // the chosen game's board module, for its settings()
+  let modFor = null;
+  let items = [];
+  const setPrefs = (prefs) => act("POST", "/game/prefs", { prefs });
+  const loadGame = () => {
+    const g = state?.game;
+    const key = g ? `${g.id}@${g.version}` : null;
+    if (key === modFor) return;
+    modFor = key;
+    mod = null;
+    if (g) import(`/games/${g.id}/board.js?v=${encodeURIComponent(g.version)}`).then((m) => modFor === key && ((mod = m), draw())).catch(() => {});
+  };
+  const control = (it, k) => {
+    if (it.type === "toggle") return `<button data-item="${k}" class="${it.value ? "on" : ""}" role="switch" aria-checked="${!!it.value}">${it.value ? "On" : "Off"}</button>`;
+    if (it.type === "button") return `<button data-item="${k}">${esc(it.action ?? it.label)}</button>`;
+    if (it.type === "swatches")
+      return `<span class="swatches">${it.options.map((c, i) => `<button class="swatch ${c === it.value ? "on" : ""}" style="--c:${esc(c)}" data-item="${k}" data-val="${i}" aria-label="${esc(it.label)}: colour ${i + 1}"></button>`).join("")}</span>`;
+    return `<span class="seg">${it.options.map((op, i) => `<button class="${op.value === it.value ? "on" : ""}" data-item="${k}" data-val="${i}">${esc(op.label ?? op.value)}</button>`).join("")}</span>`;
+  };
+  const draw = () => {
+    if (!state) return;
+    loadGame();
+    try {
+      items = (state.game && mod?.settings?.({ info: gameInfo(), setPrefs })) || [];
+    } catch (err) {
+      console.error("game settings failed", err);
+      items = [];
+    }
+    const fs = document.fullscreenEnabled;
+    o.innerHTML = `<div class="panel"><h2>Settings</h2>
+      <div class="group"><div class="eyebrow">Display</div>
+        <div class="row"><span>Fullscreen</span>${fs ? `<button data-fs class="${document.fullscreenElement ? "on" : ""}">${document.fullscreenElement ? "Leave fullscreen" : "Fullscreen"}</button>` : `<span class="faint">not available in this browser</span>`}</div></div>
+      ${items.length ? `<div class="group game-settings"><div class="eyebrow">${esc(state.game.name)}</div>${items.map((it, k) => `<div class="row"><span>${esc(it.label)}</span>${control(it, k)}</div>`).join("")}</div>` : ""}
+      <div class="actions" style="display:flex;justify-content:flex-end;margin-top:20px"><button class="primary" data-close-overlay>Done</button></div></div>`;
+    faceFront(o.querySelector(".panel"));
+  };
+  const close = () => {
+    unsub();
+    document.removeEventListener("fullscreenchange", draw);
+    o.remove();
+    settingsOverlay = null;
+  };
+  draw();
+  const unsub = onState(draw);
+  document.addEventListener("fullscreenchange", draw);
+  o.addEventListener("click", (e) => {
+    const b = e.target.closest("button");
+    if (e.target === o || b?.dataset.closeOverlay !== undefined) return close();
+    if (!b) return;
+    if (b.dataset.fs !== undefined) {
+      (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()).catch(() => toast("Fullscreen was refused by the browser"));
+    }
+    const it = items[Number(b.dataset.item)];
+    if (!it || b.dataset.item === undefined) return;
+    if (it.type === "toggle") it.onChange?.(!it.value);
+    else if (it.type === "button") it.onChange?.();
+    else it.onChange?.(it.type === "swatches" ? it.options[Number(b.dataset.val)] : it.options[Number(b.dataset.val)].value);
+  });
+  overlayRoot.appendChild(o);
+}
+
 // ---------- center panel ----------
 function render() {
   if (!state) return;
@@ -230,6 +321,7 @@ function render() {
 
   renderPause();
   renderCorners(playing && state.phase !== "paused");
+  placeSettings(playing);
   seatsEl.hidden = playing;
   center.hidden = playing;
   gameLayer.hidden = !playing;
@@ -393,6 +485,7 @@ function gameInfo() {
     frontEdge: viewEdge(),
     rotation: ROT[viewEdge()],
     settings: state.game?.settings ?? {},
+    prefs: state.game?.prefs ?? {},
     timers: gameMsg?.timers ?? {},
     now: gameMsg?.now ?? Date.now(),
     receivedAt: gameMsg?.receivedAt ?? Date.now(),

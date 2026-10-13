@@ -80,6 +80,22 @@ def pachisi(browser, board):
     time.sleep(0.4)
     api("POST", "/game/start")
     decks[0].wait_for_selector(".pc-what")
+    # Settings (D-088): Pachisi adds player colours. Klaus picks purple, then Mira picks purple too and they swap.
+    board.click("#settings-button")
+    board.wait_for_selector(".game-settings")
+    rows = board.locator(".game-settings .row")
+    rows.nth(0).locator(".swatch").nth(4).click()
+    purple = "rgb(195, 139, 232)"
+    wait_for = lambda page, sel, color: page.wait_for_function(
+        "([s, c]) => [...document.querySelectorAll(s)].some((e) => getComputedStyle(e).backgroundColor === c)", arg=[sel, color], timeout=5000)
+    wait_for(decks[0], ".pc-tokens .card > div:first-child", purple)  # Klaus's phone follows
+    klaus_before = rows.nth(0).locator(".swatch.on").get_attribute("style")
+    rows.nth(1).locator(".swatch").nth(4).click()
+    wait_for(decks[1], ".pc-tokens .card > div:first-child", purple)
+    board.wait_for_function("() => document.querySelectorAll('.game-settings .swatch.on').length === 3")
+    assert rows.nth(0).locator(".swatch.on").get_attribute("style") != klaus_before, "picking a taken colour swaps it"
+    shot(board, "settings-pachisi")
+    board.click("[data-close-overlay]")
     moves = 0
     shot_move = False
     for _ in range(160):

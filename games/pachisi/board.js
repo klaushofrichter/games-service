@@ -1,5 +1,5 @@
 // Pachisi board UI: the cross-shaped race track, tokens that glide between cells, and a big die.
-import { esc, html, remainingMs, seatColor, seatPlates, useStyles } from "/shared/board-kit.js";
+import { SEAT_COLORS, esc, html, playerColor, remainingMs, seatPlates, useStyles } from "/shared/board-kit.js";
 
 const CELL = 70; // grid cell size in px; the board is 11 × 11 cells
 const FINISH = 44;
@@ -31,6 +31,27 @@ function tokenXY(side, p, i) {
 
 const canMove = (p, die) => (p === -1 ? die === 6 : p !== FINISH && p + die <= FINISH);
 
+/**
+ * What Pachisi adds to the board's settings (D-088): each player's colour. Picking a colour another player has
+ * swaps the two, so colours stay distinct. The board and the decks draw with playerColor(), which reads these.
+ */
+export function settings({ info, setPrefs }) {
+  const seated = info.players.filter((p) => p.seat !== null).sort((a, b) => a.seat - b.seat);
+  const current = Object.fromEntries(seated.map((p) => [p.id, playerColor(info, p.seat)]));
+  return seated.map((p) => ({
+    type: "swatches",
+    label: p.name,
+    value: current[p.id],
+    options: SEAT_COLORS,
+    onChange(color) {
+      const next = { ...current, [p.id]: color };
+      const other = seated.find((q) => q.id !== p.id && current[q.id] === color);
+      if (other) next[other.id] = current[p.id];
+      return setPrefs({ colors: next });
+    },
+  }));
+}
+
 export function mount(root) {
   useStyles("/games/pachisi/board.css");
   const box = html(`<div class="pc-root"><div class="pc-wrap">
@@ -52,7 +73,7 @@ export function mount(root) {
   }, 250);
 
   function build(players) {
-    const key = players.map((p) => `${p.seat}:${p.side}:${p.tokens.length}`).join("|");
+    const key = players.map((p) => `${p.seat}:${p.side}:${p.tokens.length}:${playerColor(info, p.seat)}`).join("|");
     if (key === built) return;
     built = key;
     board.innerHTML = "";
@@ -61,23 +82,23 @@ export function mount(root) {
     for (let side = 0; side < 4; side++) {
       const p = owner[side];
       const [qx, qy] = QUAD[side];
-      const base = html(`<div class="pc-base ${p ? "" : "empty"}" style="left:${qx * CELL}px;top:${qy * CELL}px;--c:${p ? seatColor(p.seat) : "#333"}">${p ? `<div class="pc-label">${esc(p.name)}</div>` : ""}</div>`);
+      const base = html(`<div class="pc-base ${p ? "" : "empty"}" style="left:${qx * CELL}px;top:${qy * CELL}px;--c:${p ? playerColor(info, p.seat) : "#333"}">${p ? `<div class="pc-label">${esc(p.name)}</div>` : ""}</div>`);
       board.appendChild(base);
       for (let j = 0; j < 4; j++) {
         const [x, y] = homeXY(side, j);
-        board.appendChild(html(`<div class="pc-cell home" style="left:${x * CELL}px;top:${y * CELL}px;--c:${p ? seatColor(p.seat) : "#777"}"></div>`));
+        board.appendChild(html(`<div class="pc-cell home" style="left:${x * CELL}px;top:${y * CELL}px;--c:${p ? playerColor(info, p.seat) : "#777"}"></div>`));
       }
     }
     for (let idx = 0; idx < 40; idx++) {
       const [x, y] = trackXY(idx);
       const side = [6, 16, 26, 36].indexOf(idx);
       const p = side >= 0 ? owner[side] : null;
-      board.appendChild(html(`<div class="pc-cell ${p ? "start" : ""} ${side >= 0 ? "safe" : ""}" style="left:${x * CELL}px;top:${y * CELL}px;--c:${p ? seatColor(p.seat) : ""}"></div>`));
+      board.appendChild(html(`<div class="pc-cell ${p ? "start" : ""} ${side >= 0 ? "safe" : ""}" style="left:${x * CELL}px;top:${y * CELL}px;--c:${p ? playerColor(info, p.seat) : ""}"></div>`));
     }
     board.appendChild(html(`<div class="pc-center"></div>`));
     for (const p of players) {
       p.tokens.forEach((_, i) => {
-        const t = html(`<div class="pc-token" style="--c:${seatColor(p.seat)}">${i + 1}</div>`);
+        const t = html(`<div class="pc-token" style="--c:${playerColor(info, p.seat)}">${i + 1}</div>`);
         board.appendChild(t);
         tokens.set(`${p.seat}:${i}`, t);
       });
@@ -142,7 +163,7 @@ export function mount(root) {
         turnEl.innerHTML = v.winner === null ? "Game over" : `${esc(name(v.winner))} wins!`;
         box.querySelector(".pc-hint").textContent = "";
       } else {
-        turnEl.innerHTML = `<span style="color:${seatColor(v.turn)}">${esc(name(v.turn))}</span>`;
+        turnEl.innerHTML = `<span style="color:${playerColor(i, v.turn)}">${esc(name(v.turn))}</span>`;
         box.querySelector(".pc-hint").textContent = v.phase === "roll" ? "Roll the die on your phone" : `Rolled ${v.die} · choose a token`;
       }
       seatPlates(root, i, (seat) => {
