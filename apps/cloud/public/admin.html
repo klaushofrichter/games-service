@@ -44,6 +44,10 @@
   .muted { color:var(--soft); } .faint { color:var(--faint); }
   .msg { margin-top:10px; min-height:20px; font-size:14px; }
   .msg.err { color:#f1a197; } .msg.ok { color:var(--jade); }
+  .copyline { display:flex; align-items:center; gap:8px; }
+  .copyline .mono { word-break:break-all; }
+  button.copy { flex:none; display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; padding:0; border-radius:8px; color:var(--soft); }
+  button.copy:hover, button.copy.done { color:var(--brass); }
   #signin { max-width:440px; margin:12vh auto; }
   .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:22px; }
   @media (max-width: 800px) { .grid2 { grid-template-columns:1fr; } th:nth-child(4), td:nth-child(4) { display:none; } }
@@ -195,12 +199,29 @@ document.addEventListener("click", async (e) => {
   }
 });
 
+const COPY_ICON = `<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M5 15V6a2 2 0 0 1 2-2h8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`;
+const DONE_ICON = `<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
+/** Copy the download link; if the clipboard is refused, select the text so Cmd/Ctrl-C works. */
+$("#dl-msg").addEventListener("click", async (e) => {
+  const b = e.target.closest("#dl-copy");
+  if (!b) return;
+  const text = $("#dl-url").textContent;
+  try {
+    await navigator.clipboard.writeText(text);
+    b.innerHTML = DONE_ICON; b.classList.add("done"); b.title = "Copied";
+    setTimeout(() => { b.innerHTML = COPY_ICON; b.classList.remove("done"); b.title = "Copy link"; }, 1600);
+  } catch {
+    getSelection().selectAllChildren($("#dl-url"));
+  }
+});
+
 $("#dl-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   try {
     const r = await api("POST", "/admin/api/download-tokens", { gameId: $("#dl-game").value.trim() || undefined, expiresInHours: Number($("#dl-hours").value) });
     $("#dl-msg").className = "msg ok";
-    $("#dl-msg").innerHTML = `<div class="mono" style="word-break:break-all">${esc(r.url)}</div><div class="faint">Valid until ${esc(new Date(r.expiresAt).toLocaleString())}. Copy it now; it is not shown again.</div>`;
+    $("#dl-msg").innerHTML = `<div class="copyline"><span class="mono" id="dl-url">${esc(r.url)}</span><button type="button" class="copy" id="dl-copy" title="Copy link" aria-label="Copy link">${COPY_ICON}</button></div><div class="faint">Valid until ${esc(new Date(r.expiresAt).toLocaleString())}. Copy it now; it is not shown again.</div>`;
   } catch (err) { msg("#dl-msg", err.message); }
 });
 
