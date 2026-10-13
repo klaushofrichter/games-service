@@ -602,3 +602,14 @@ describe("sound effects setting (D-092)", () => {
     expect((await t.ok("POST", "/display", { sound: true })).display.sound).toBe(true);
   });
 });
+
+describe("sound stays a board setting (D-092)", () => {
+  it("a game's prefs cannot change it, and it is the same whichever game is chosen", async () => {
+    await t.ok("POST", "/game/select", { gameId: "coin-flip" });
+    const s = await t.ok("POST", "/game/prefs", { prefs: { sound: false, display: { sound: false } } });
+    expect(s.display.sound).toBe(true); // a game's own value, not the board's
+    await t.ok("POST", "/display", { sound: false });
+    await t.ok("POST", "/game/close");
+    expect((await t.ok("POST", "/game/select", { gameId: "pachisi" })).display.sound).toBe(false);
+  });
+});

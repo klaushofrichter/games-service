@@ -117,11 +117,13 @@ function renderTop() {
   const inGame = gameMsg && (state.phase === "active" || state.phase === "paused");
   const paused = state.phase === "paused" ? `<div class="banner">Game paused: the table lost its connection. It continues by itself when the connection is back.</div>` : "";
   top.innerHTML = `${paused}${banner ? `<div class="banner">${esc(banner)}</div>` : ""}
-    <div><div class="eyebrow">${esc(state.tableName)}${inGame ? ` · ${esc(state.game?.name)}` : ""}</div><h1>${esc(p?.name ?? "")}</h1></div>
-    ${inGame ? "" : `<div class="card seatcard"><div class="badge">${p?.seat == null ? "–" : esc(seatName(state.seatEdges, p.seat).replace(/(north|south|east|west)/g, (w) => w[0]).toUpperCase())}</div>
-      <div>${p?.seat == null ? `<div>No seat yet</div><div class="muted" style="font-size:.85em">You'll get one when a seat opens.</div>`
-        : `<div>${esc(seatTitle(state.seatEdges, p.seat))}</div><div class="muted" style="font-size:.85em">at the ${esc(state.seatEdges[p.seat])} edge of the board</div>`}</div></div>`}`;
+    <div class="who"><div><div class="eyebrow">${esc(state.tableName)}${inGame ? ` · ${esc(state.game?.name)}` : ""}</div><h1>${esc(p?.name ?? "")}</h1></div>
+      ${p?.seat == null ? "" : `<div class="badge" title="${esc(seatTitle(state.seatEdges, p.seat))}" aria-label="${esc(seatTitle(state.seatEdges, p.seat))}">${esc(seatBadge(state.seatEdges, p.seat))}</div>`}</div>
+    ${inGame || p?.seat != null ? "" : `<div class="card muted">No seat yet. You'll get one when a seat opens.</div>`}`;
 }
+
+/** The seat as compass initials for the badge beside the name (D-093): "NE", "S". */
+const seatBadge = (edges, seat) => seatName(edges, seat).replace(/(north|south|east|west)/g, (w) => w[0]).toUpperCase();
 
 function render() {
   if (removed) {

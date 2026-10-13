@@ -10,8 +10,9 @@ footer a { color: var(--ink-faint); }
 
 h1 { font-family: var(--display); font-weight: 600; font-size: 1.9em; margin: 4px 0 0; line-height: 1.1; }
 .card { background: rgba(255, 255, 255, 0.04); border: 1px solid var(--felt-line); border-radius: var(--radius); padding: 16px 18px; }
-.seatcard { display: flex; align-items: center; gap: 14px; }
-.seatcard .badge { width: 54px; height: 54px; border-radius: 14px; display: grid; place-items: center; background: var(--brass); color: #1b1407; font-family: var(--display); font-size: 1.6em; font-weight: 700; flex: none; }
+/* Name on the left, the seat's compass badge on the right (D-093); the list below says where everyone sits. */
+.who { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.who .badge { width: 54px; height: 54px; border-radius: 14px; display: grid; place-items: center; background: var(--brass); color: #1b1407; font-family: var(--display); font-size: 1.6em; font-weight: 700; flex: none; }
 .list { display: flex; flex-direction: column; }
 .list .row { display: flex; justify-content: space-between; padding: 9px 0; border-bottom: 1px solid var(--felt-line); font-size: 0.95em; }
 .list .row:last-child { border-bottom: 0; }
