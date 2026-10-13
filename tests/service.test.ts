@@ -156,6 +156,22 @@ describe("logs", () => {
     expect((await call("PUT", "/api/tables/logs/run-1?gameId=roulette", zip, { authorization: `Bearer ${a.token}`, "content-type": "application/zip" })).status).toBe(201);
   });
 
+  it("caps the total size of stored logs, dropping the oldest first", async () => {
+    await cloud.close();
+    await start({ maxLogBytes: 10 });
+    const t = await pairedTable();
+    const put = async (id: string, data: string) => {
+      expect((await call("PUT", `/api/tables/logs/${id}?gameId=roulette`, new TextEncoder().encode(data), { authorization: `Bearer ${t.token}`, "content-type": "application/zip" })).status).toBe(201);
+      await sleep(5); // distinct upload times
+    };
+    await put("old", "1234");
+    await put("mid", "5678");
+    await put("new", "9abc"); // 12 bytes would exceed 10: "old" goes
+    expect((await admin("GET", "/admin/api/logs")).body.map((l: any) => l.id)).toEqual(["mid", "new"]);
+    await put("mid", "56789"); // replacing a log counts only its new size: 4 + 5 fits
+    expect((await admin("GET", "/admin/api/logs")).body.map((l: any) => l.id).sort()).toEqual(["mid", "new"]);
+  });
+
   it("download tokens expire, and nonsense lifetimes fall back to a day", async () => {
     const short = (await admin("POST", "/admin/api/download-tokens", { expiresInHours: 0.0001 })).body; // 360 ms
     const path = new URL(short.url).pathname;

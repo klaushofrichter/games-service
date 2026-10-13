@@ -1,13 +1,13 @@
-// Cloud service skeleton (games.skylar.technology): table enrollment, heartbeat and metrics,
-// log upload with admin and token downloads, invite tokens. In-memory store for phase 1a;
-// PostgreSQL replaces it before production (see architecture doc).
+// Cloud service (games.skylar.technology): table enrollment, heartbeat and metrics, log upload with admin and token
+// downloads, invites and remote-play signaling. State is in memory, so the service runs as exactly one replica
+// (D-036, D-071); a persistent store is the next step.
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { randomBytes, randomInt, timingSafeEqual } from "node:crypto";
+import { createHash, randomInt } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { BlockList, isIPv4, isIPv6 } from "node:net";
 import { WebSocketServer, type WebSocket } from "ws";
-import { createAdminAuth, esc, publicPage, type GoogleAuthOptions } from "./auth.ts";
+import { createAdminAuth, esc, HTML_HEADERS, randomToken, same, sendPage, type GoogleAuthOptions } from "./auth.ts";
 
 const ADMIN_PAGE = fileURLToPath(new URL("../public/admin.html", import.meta.url));
 const REMOTE_PAGE = fileURLToPath(new URL("../public/remote.html", import.meta.url));
@@ -21,9 +21,10 @@ export interface IceServer {
 
 const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const code = (n: number) => Array.from({ length: n }, () => ALPHABET[randomInt(ALPHABET.length)]).join("");
-const secret = () => randomBytes(24).toString("base64url");
 const MAX_PENDING = 500;
 const PENDING_TTL_MS = 10 * 60_000;
+/** Total bytes of stored logs; the oldest are dropped to make room for a new upload. */
+const MAX_LOG_BYTES = 256 * 1024 * 1024;
 
 export interface CloudOptions {
   port: number;
@@ -42,6 +43,8 @@ export interface CloudOptions {
    * service networks).
    */
   trustProxy?: boolean | string[];
+  /** Cap on the total size of stored logs (default 256 MB). */
+  maxLogBytes?: number;
 }
 
 interface TableRecord {
@@ -68,15 +71,18 @@ interface LogRecordMeta {
 
 export function startCloud(o: CloudOptions) {
   const tables = new Map<string, TableRecord>();
+  const tokenIndex = new Map<string, string>(); // sha256(table token) hex -> tableId
+  const tokenKey = (token: string) => createHash("sha256").update(token).digest("hex");
   const logs = new Map<string, { meta: LogRecordMeta; data: Buffer }>();
   const invites = new Map<string, { tableId: string; expiresAt: number; used: boolean }>();
   const downloadTokens = new Map<string, { gameId: string | null; expiresAt: number }>();
   const settings = { logRetentionDays: o.logRetentionDays ?? 90 };
+  const maxLogBytes = o.maxLogBytes ?? MAX_LOG_BYTES;
   const lookups = new Map<string, { n: number; reset: number }>(); // invite lookup rate limit per IP
   const iceServers = o.iceServers ?? [{ urls: "stun:stun.l.google.com:19302" }];
   // Remote play signaling (D-020): tables hold a socket here; remote browsers get a session per invite.
   const tableSockets = new Map<string, WebSocket>();
-  const remoteSessions = new Map<string, { tableId: string; invite: string; expiresAt: number; ws: WebSocket | null }>();
+  const remoteSessions = new Map<string, { tableId: string; expiresAt: number; ws: WebSocket | null }>();
   /** The client's address; behind the ingress, the last X-Forwarded-For entry (the one the ingress added). */
   const proxies = new BlockList();
   if (o.trustProxy) {
@@ -109,7 +115,6 @@ export function startCloud(o: CloudOptions) {
     res.end(JSON.stringify(body));
   };
   const bearer = (req: IncomingMessage) => (req.headers.authorization ?? "").replace(/^Bearer\s+/i, "");
-  const same = (a: string, b: string) => a.length === b.length && timingSafeEqual(Buffer.from(a), Buffer.from(b));
   const tokenAdmin = (req: IncomingMessage) => !!o.adminToken && same(bearer(req), o.adminToken);
   /**
    * The signed-in admin (Google session) or a script holding ADMIN_TOKEN. A cookie-authenticated change must also come
@@ -130,7 +135,9 @@ export function startCloud(o: CloudOptions) {
   };
   const tableFor = (req: IncomingMessage) => {
     const t = bearer(req);
-    return [...tables.values()].find((x) => x.status === "approved" && x.tableToken && same(x.tableToken, t));
+    const id = tokenIndex.get(tokenKey(t));
+    const x = id ? tables.get(id) : undefined;
+    return x && x.status === "approved" && x.tableToken && same(x.tableToken, t) ? x : undefined;
   };
   const body = async (req: IncomingMessage, limit = 64 * 1024): Promise<Buffer> => {
     const chunks: Buffer[] = [];
@@ -153,7 +160,24 @@ export function startCloud(o: CloudOptions) {
     for (const [t, d] of downloadTokens) if (d.expiresAt < Date.now()) downloadTokens.delete(t);
     for (const [id, r] of remoteSessions) if (r.expiresAt < Date.now()) (r.ws?.close(4002, "expired"), remoteSessions.delete(id));
     for (const [ip, l] of lookups) if (l.reset < Date.now()) lookups.delete(ip);
+    prunePending();
+  };
+  const prunePending = () => {
     for (const [id, t] of tables) if (t.status === "pending" && (t.lastHello ?? t.createdAt) < Date.now() - PENDING_TTL_MS) tables.delete(id);
+  };
+  const pendingCount = () => {
+    let n = 0;
+    for (const t of tables.values()) if (t.status === "pending") n++;
+    return n;
+  };
+  const zip = (res: ServerResponse, data: Buffer) => {
+    res.writeHead(200, { "content-type": "application/zip" });
+    res.end(data);
+  };
+  /** A lifetime from now: the stored and the reported expiry are the same instant. */
+  const expiry = (ms: number) => {
+    const at = Date.now() + ms;
+    return { at, iso: new Date(at).toISOString() };
   };
   const pruneTimer = setInterval(prune, 600_000);
   pruneTimer.unref();
@@ -175,7 +199,7 @@ export function startCloud(o: CloudOptions) {
     let match: RegExpMatchArray | null;
     try {
       // {status, version}: the deploy smoke test and the cluster's version-exporter read the version (APP_VERSION, "dev" outside a release build).
-      if (p === "/health") return json(res, 200, { status: "ok", ok: true, version: process.env.APP_VERSION || "dev" });
+      if (p === "/health") return json(res, 200, { status: "ok", version: process.env.APP_VERSION || "dev" });
       if (await auth.handle(req, res, p)) return;
       if (m === "GET" && p === "/") {
         // Public landing page; also where logout lands (200, with a Sign in link, never a bounce to Google).
@@ -186,8 +210,7 @@ export function startCloud(o: CloudOptions) {
           : auth.enabled
             ? `<p><a class="btn" href="/auth/google/login">Administrators: sign in with Google</a></p>`
             : `<p><a class="btn" href="/admin">Admin portal</a></p>`;
-        res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-frame-options": "DENY", "referrer-policy": "no-referrer" });
-        return res.end(publicPage("Game Table", `<p class="muted">The service behind Game Table: it pairs tables, relays invites for remote players and keeps game logs.</p>${note}${action}`));
+        return sendPage(res, 200, "Game Table", `<p class="muted">The service behind Game Table: it pairs tables, relays invites for remote players and keeps game logs.</p>${note}${action}`);
       }
       if (m === "GET" && (p === "/admin" || p === "/admin/")) {
         // With Google sign-in configured the portal is for signed-in admins only; anonymous visitors go to the public
@@ -196,7 +219,7 @@ export function startCloud(o: CloudOptions) {
           res.writeHead(302, { location: "/", "cache-control": "no-store" });
           return res.end();
         }
-        res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-frame-options": "DENY", "referrer-policy": "no-referrer" });
+        res.writeHead(200, HTML_HEADERS);
         return res.end(await readFile(ADMIN_PAGE));
       }
 
@@ -210,12 +233,9 @@ export function startCloud(o: CloudOptions) {
         if (!/^[A-Za-z0-9_-]{8,64}$/.test(tableId)) return json(res, 400, { error: "tableId required" });
         let t = tables.get(tableId);
         if (!t) {
-          let pending = 0;
-          for (const x of tables.values()) if (x.status === "pending") pending++;
-          if (pending >= MAX_PENDING) {
-            prune();
-            pending = [...tables.values()].filter((x) => x.status === "pending").length;
-            if (pending >= MAX_PENDING) return json(res, 503, { error: "too many tables waiting for approval; try again later" });
+          if (pendingCount() >= MAX_PENDING) {
+            prunePending();
+            if (pendingCount() >= MAX_PENDING) return json(res, 503, { error: "too many tables waiting for approval; try again later" });
           }
           t = { tableId, name: String(b.name ?? "Game Table").slice(0, 60), status: "pending", pairingCode: code(6), tableToken: null, lastSeen: null, metrics: {}, createdAt: Date.now() };
           tables.set(tableId, t);
@@ -226,7 +246,10 @@ export function startCloud(o: CloudOptions) {
           return json(res, 202, { status: "pending", pairingCode: t.pairingCode });
         }
         // Approved: the token is handed out once, on the first hello after approval.
-        if (!t.tableToken) t.tableToken = secret();
+        if (!t.tableToken) {
+          t.tableToken = randomToken();
+          tokenIndex.set(tokenKey(t.tableToken), t.tableId);
+        }
         else if (!same(bearer(req), t.tableToken)) return json(res, 200, { status: "approved", tokenIssued: true });
         return json(res, 200, { status: "approved", tableToken: t.tableToken, config: settings });
       }
@@ -245,6 +268,15 @@ export function startCloud(o: CloudOptions) {
         if (existing && existing.meta.tableId !== t.tableId) return json(res, 409, { error: "a log with this id belongs to another table" });
         const data = await body(req, 50 * 1024 * 1024);
         const gameId = String(url.searchParams.get("gameId") ?? "");
+        // Bounded in total too: the oldest logs make room for the new one.
+        logs.delete(match[1]);
+        let total = 0;
+        for (const l of logs.values()) total += l.data.length;
+        for (const l of [...logs.values()].sort((a, b) => a.meta.uploadedAt - b.meta.uploadedAt)) {
+          if (total + data.length <= maxLogBytes) break;
+          logs.delete(l.meta.id);
+          total -= l.data.length;
+        }
         logs.set(match[1], { meta: { id: match[1], tableId: t.tableId, gameId, simulation: url.searchParams.get("simulation") === "1", bytes: data.length, uploadedAt: Date.now() }, data });
         return json(res, 201, { ok: true });
       }
@@ -252,22 +284,17 @@ export function startCloud(o: CloudOptions) {
         const t = tableFor(req);
         if (!t) return json(res, 401, { error: "unknown or revoked table" });
         const b = await jsonBody(req);
-        const ttl = lifetime(b.ttlMinutes, 120, 24 * 60) * 60_000;
+        const exp = expiry(lifetime(b.ttlMinutes, 120, 24 * 60) * 60_000);
         let token = code(8);
         while (invites.has(token)) token = code(8);
-        invites.set(token, { tableId: t.tableId, expiresAt: Date.now() + ttl, used: false });
-        return json(res, 201, { token, url: `${o.publicUrl}/i/${token}`, expiresAt: new Date(Date.now() + ttl).toISOString() });
+        invites.set(token, { tableId: t.tableId, expiresAt: exp.at, used: false });
+        return json(res, 201, { token, url: `${o.publicUrl}/i/${token}`, expiresAt: exp.iso });
       }
       if (m === "GET" && (match = p.match(/^\/i\/([A-Za-z0-9]{1,12})$/))) {
         if (limited(clientIp(req))) return json(res, 429, { error: "too many attempts; wait a minute" });
         const inv = invites.get(match[1].toUpperCase());
         // A used invite still serves the page: the player who claimed it reconnects with their session.
-        if (!inv || inv.expiresAt < Date.now()) {
-          res.writeHead(404, { "content-type": "text/html; charset=utf-8" });
-          return res.end(`<!doctype html><meta name=viewport content="width=device-width,initial-scale=1"><title>Game Table</title>
-            <body style="font-family:system-ui;background:#0f2a24;color:#f3eee2;display:grid;place-items:center;min-height:100vh;margin:0">
-            <div style="max-width:420px;padding:24px;text-align:center"><h1>Invite not found</h1><p>This invite has expired or the code is wrong. Ask for a new one.</p></div></body>`);
-        }
+        if (!inv || inv.expiresAt < Date.now()) return sendPage(res, 404, "Invite not found", `<p>This invite has expired or the code is wrong. Ask for a new one.</p>`);
         res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "referrer-policy": "no-referrer" });
         return res.end(await readFile(REMOTE_PAGE));
       }
@@ -280,7 +307,7 @@ export function startCloud(o: CloudOptions) {
       // ----- admin -----
       if (p.startsWith("/admin/api/")) {
         const who = admin(req);
-        if (!who) return json(res, 401, { error: "sign in required", signIn: auth.enabled ? "/auth/google/login" : null, tokenSignIn: !auth.enabled });
+        if (!who) return json(res, 401, { error: "sign in required", signIn: auth.enabled ? "/auth/google/login" : null });
         if (m === "GET" && p === "/admin/api/me") return json(res, 200, who);
         if (m === "GET" && p === "/admin/api/tables") {
           return json(res, 200, [...tables.values()].map(({ tableToken, ...t }) => ({ ...t, online: !!t.lastSeen && Date.now() - t.lastSeen < 60_000 })));
@@ -295,6 +322,7 @@ export function startCloud(o: CloudOptions) {
           const t = tables.get(match[1]);
           if (!t) return json(res, 404, { error: "no such table" });
           t.status = "revoked";
+          if (t.tableToken) tokenIndex.delete(tokenKey(t.tableToken));
           t.tableToken = null;
           tableSockets.get(t.tableId)?.close(4001, "revoked");
           return json(res, 200, { tableId: t.tableId, status: t.status });
@@ -317,15 +345,14 @@ export function startCloud(o: CloudOptions) {
         if (m === "GET" && (match = p.match(/^\/admin\/api\/logs\/([\w-]+)\.zip$/))) {
           const l = logs.get(match[1]);
           if (!l) return json(res, 404, { error: "no such log" });
-          res.writeHead(200, { "content-type": "application/zip" });
-          return res.end(l.data);
+          return zip(res, l.data);
         }
         if (m === "POST" && p === "/admin/api/download-tokens") {
           const b = await jsonBody(req);
-          const token = secret();
-          const hours = lifetime(b.expiresInHours, 24, 24 * 90);
-          downloadTokens.set(token, { gameId: b.gameId ? String(b.gameId) : null, expiresAt: Date.now() + hours * 3600_000 });
-          return json(res, 201, { token, url: `${o.publicUrl}/dl/${token}`, expiresAt: new Date(Date.now() + hours * 3600_000).toISOString() });
+          const token = randomToken();
+          const exp = expiry(lifetime(b.expiresInHours, 24, 24 * 90) * 3600_000);
+          downloadTokens.set(token, { gameId: b.gameId ? String(b.gameId) : null, expiresAt: exp.at });
+          return json(res, 201, { token, url: `${o.publicUrl}/dl/${token}`, expiresAt: exp.iso });
         }
       }
 
@@ -337,8 +364,7 @@ export function startCloud(o: CloudOptions) {
         if (!match[2]) return json(res, 200, visible.map((l) => l.meta));
         const l = visible.find((x) => x.meta.id === match![2]);
         if (!l) return json(res, 404, { error: "no such log for this token" });
-        res.writeHead(200, { "content-type": "application/zip" });
-        return res.end(l.data);
+        return zip(res, l.data);
       }
 
       json(res, 404, { error: "not found" });
@@ -376,8 +402,8 @@ export function startCloud(o: CloudOptions) {
         if (!inv || inv.used || inv.expiresAt < Date.now()) return reject(404);
         // Claimed now, not when the table answers: a second tab or a forwarded link can't open another session.
         inv.used = true;
-        id = secret();
-        session = { tableId: inv.tableId, invite: code, expiresAt: inv.expiresAt + 12 * 3600_000, ws: null };
+        id = randomToken();
+        session = { tableId: inv.tableId, expiresAt: inv.expiresAt + 12 * 3600_000, ws: null };
         remoteSessions.set(id, session);
       }
       const s = session;
