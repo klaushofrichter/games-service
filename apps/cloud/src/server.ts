@@ -346,6 +346,14 @@ export function startCloud(o: CloudOptions) {
           tableSockets.get(t.tableId)?.close(4001, "revoked");
           return json(res, 200, { tableId: t.tableId, status: t.status });
         }
+        if (m === "POST" && (match = p.match(/^\/admin\/api\/tables\/([\w-]+)\/reconnect$/))) {
+          // Undo a disconnect: the same table, approved again. It picks up a new token at its next hello (D-085).
+          const t = tables.get(match[1]);
+          if (!t) return json(res, 404, { error: "no such table" });
+          if (t.status !== "revoked") return json(res, 409, { error: `the table is ${t.status}, not disconnected` });
+          t.status = "approved";
+          return json(res, 200, { tableId: t.tableId, status: t.status });
+        }
         if (m === "GET" && p === "/admin/api/metrics") {
           const all = [...tables.values()];
           const sum = (k: string) => all.reduce((a, t) => a + (t.metrics[k] ?? 0), 0);

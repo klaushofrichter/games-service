@@ -162,7 +162,8 @@ async function refresh() {
       <td><span class="dot ${t.online ? "on" : ""}"></span>${t.online ? "online" : `last seen ${ago(t.lastSeen)}`}</td>
       <td>${t.metrics.gamesPlayed ?? 0}</td>
       <td style="text-align:right">${t.status === "pending" ? `<button class="primary" data-pair="${esc(t.pairingCode)}">Approve</button>` : ""}
-        ${t.status !== "revoked" ? `<button class="danger" data-revoke="${esc(t.tableId)}" data-name="${esc(t.name)}">Disconnect</button>` : ""}</td></tr>`).join("")
+        ${t.status !== "revoked" ? `<button class="danger" data-revoke="${esc(t.tableId)}" data-name="${esc(t.name)}">Disconnect</button>`
+          : `<button class="primary" data-reconnect="${esc(t.tableId)}">Reconnect</button>`}</td></tr>`).join("")
       || `<tr><td colspan="5" class="faint">No tables yet. Start a table with CLOUD_URL pointing here; its board shows a pairing code.</td></tr>`;
     $("#logs").innerHTML = logs.sort((a, b) => b.uploadedAt - a.uploadedAt).map((l) => `<tr>
       <td class="mono">${esc(l.id)}</td><td>${esc(l.gameId)}${l.simulation ? ` <span class="pill">sim</span>` : ""}</td><td>${size(l.bytes)}</td>
@@ -187,7 +188,10 @@ $("#pair-form").addEventListener("submit", (e) => { e.preventDefault(); pair($("
 document.addEventListener("click", async (e) => {
   const b = e.target.closest("button"); if (!b) return;
   if (b.dataset.pair) pair(b.dataset.pair);
-  if (b.dataset.revoke && confirm(`Disconnect "${b.dataset.name}"? The table stops and has to be paired again.`)) {
+  if (b.dataset.reconnect) {
+    try { await api("POST", `/admin/api/tables/${encodeURIComponent(b.dataset.reconnect)}/reconnect`); refresh(); } catch (err) { msg("#pair-msg", err.message); }
+  }
+  if (b.dataset.revoke && confirm(`Disconnect "${b.dataset.name}"? It stops using the service until you reconnect it here.`)) {
     try { await api("POST", `/admin/api/tables/${encodeURIComponent(b.dataset.revoke)}/revoke`); refresh(); } catch (err) { msg("#pair-msg", err.message); }
   }
   if (b.dataset.log) {
