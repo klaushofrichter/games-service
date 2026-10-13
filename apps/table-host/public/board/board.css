@@ -80,6 +80,10 @@ html, body { overflow: hidden; }
 
 .toolbar { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; align-items: center; }
 .toolbar .spacer { flex: 1; }
+/* Player management sits on the right; when the row is full it wraps as a group, still right-aligned. */
+.toolbar .right { margin-left: auto; display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end; align-items: center; }
+.toolbar.selected { margin-top: 10px; }
+.toolbar.selected .faint { font-size: 0.72em; }
 .toolbar button { font-size: 0.78em; }
 .seg { display: inline-flex; border: 1px solid var(--felt-line); border-radius: 999px; overflow: hidden; }
 .seg button { border: 0; border-radius: 0; padding: 0.5em 0.9em; }

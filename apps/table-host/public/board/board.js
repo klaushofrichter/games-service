@@ -1,6 +1,6 @@
 // Board UI: lobby, seats around the edge, QR join, game surface and the lobby overlay.
 // Talks to the Table Host through the board control API (same API the tests and local AI agents use).
-import { ROT, W, H, esc, seatPositions, claimServiceWorkerPage, openTableSocket } from "/shared/board-kit.js";
+import { ROT, W, H, esc, seatName, seatPositions, claimServiceWorkerPage, openTableSocket } from "/shared/board-kit.js";
 
 const KEY = window.TABLE_KEY;
 // A remote player's copy of the board (phase 1c): it runs inside the cloud's invite page, which carries
@@ -176,7 +176,7 @@ function renderSeats() {
         : state.phase === "ready" && pl.kind === "human"
           ? `<span class="dot"></span>${pl.ready ? "Ready" : "Not ready"}`
           : pl.kind === "ai" ? `AI player${pl.aiOptions ? ` · ${esc(Object.values(pl.aiOptions).join(", "))}` : ""}` : pl.location === "remote" ? "Remote" : "";
-    el.innerHTML = `<div class="num">Seat ${seat + 1} · ${p.edge}</div>
+    el.innerHTML = `<div class="num">${esc(seatName(state.seatEdges, seat))}</div>
       <div class="name">${pl ? esc(pl.name) : "—"}</div><div class="status">${status}</div>`;
     if (!playing && !REMOTE) el.addEventListener("click", () => onSeatTap(seat, pl)); // seating stays with the table
     seatsEl.appendChild(el);
@@ -268,14 +268,14 @@ function seatButtons() {
 
 function toolbar() {
   const sel = state.players.find((p) => p.id === selectedPlayer);
+  // Left: the table's seat layout. Right: managing players (D-086).
   return `<div class="toolbar">
     ${seatButtons()}
-    ${REMOTE ? "" : `<button data-add-ai>+ AI player</button>
-    ${sel?.kind === "ai" ? `<button data-config="${sel.id}">Configure ${esc(sel.name)}</button>` : ""}
-    ${sel ? `<button class="danger" data-remove="${sel.id}">Remove ${esc(sel.name)}</button>` : ""}`}
-    <span class="spacer"></span>
-    ${REMOTE ? "" : `<button data-invite>Invite…</button><button data-sim>Simulation…</button>`}
-  </div>`;
+    ${REMOTE ? "" : `<div class="right"><button data-add-ai>+ AI player</button><button data-invite>Invite…</button><button data-sim>Simulation…</button></div>`}
+  </div>
+  ${REMOTE || !sel ? "" : `<div class="toolbar selected"><div class="right"><span class="faint">${esc(sel.name)}</span>
+    ${sel.kind === "ai" ? `<button data-config="${sel.id}">Configure</button>` : ""}
+    <button class="danger" data-remove="${sel.id}">Remove</button></div></div>`}`;
 }
 
 function renderLobby() {
@@ -339,7 +339,7 @@ function renderReady() {
       <div><div class="eyebrow">Up next · ${playersLabel(state.game.players)} · ${seated} seated</div><h1>${esc(state.game.name)}</h1>
       <div class="sub">${needs.length ? `${esc(needs.map((n, i) => (i ? n : n[0].toUpperCase() + n.slice(1))).join(" · "))}. Scan the code to join${g?.ai ? " or add an AI player" : ""}.` : "Everyone taps <b>Ready</b> on their phone."}</div></div>
       <div class="ready-list">${humans.map((p) => `<span class="chip ${p.ready ? "ok" : ""}"><span class="dot" style="background:${p.ready ? "var(--jade)" : ""}"></span>${esc(p.name)}</span>`).join("")}</div>
-      ${REMOTE ? "" : `<div class="toolbar">${seatButtons()}${roomForAi ? `<button data-add-ai>+ AI player</button>` : ""}</div>`}
+      ${REMOTE ? "" : `<div class="toolbar">${seatButtons()}${roomForAi ? `<div class="right"><button data-add-ai>+ AI player</button></div>` : ""}</div>`}
       <div class="toolbar"><button class="primary" data-start ${all ? "" : "disabled"}>Start game</button><button data-close>Change game</button>
       ${REMOTE ? "" : (() => { const sel = state.players.find((p) => p.id === selectedPlayer); return sel?.kind === "ai" ? `<button data-config="${sel.id}">Configure ${esc(sel.name)}</button>` : state.players.some((p) => p.kind === "ai") ? `<span class="faint" style="font-size:.7em">Tap an AI seat to configure it</span>` : ""; })()}
       </div>
@@ -471,7 +471,7 @@ function openLobbyOverlay() {
   const draw = () => {
     o.innerHTML = `<div class="panel"><h2>Lobby</h2>
       <div class="group"><div class="eyebrow">Players</div>${state.players
-        .map((p) => `<div class="row"><span>${esc(p.name)} <span class="faint">· ${p.seat === null ? "no seat" : `seat ${p.seat + 1}`}${p.kind === "ai" ? " · AI" : ""}${p.connected ? "" : " · reconnecting"}</span></span>
+        .map((p) => `<div class="row"><span>${esc(p.name)} <span class="faint">· ${p.seat === null ? "no seat" : `${esc(seatName(state.seatEdges, p.seat))} seat`}${p.connected ? "" : " · reconnecting"}</span></span>
           ${REMOTE ? "" : `<button class="danger" data-remove="${p.id}">Remove</button>`}</div>`)
         .join("") || `<div class="faint">Nobody yet</div>`}</div>
       ${REMOTE ? "" : `<div class="group"><div class="eyebrow">View</div><div class="row"><span>Lobby and menus face</span>

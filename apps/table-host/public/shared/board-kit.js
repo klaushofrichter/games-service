@@ -36,6 +36,33 @@ export function seatPositions(edges) {
   return pos;
 }
 
+/**
+ * A seat's compass name (D-087): "south", "southwest", "northeast"… Seat numbers are not shown to players.
+ * One seat on an edge is that edge; two are its west and east halves (north and south) or north and south
+ * halves (east and west); three add the plain edge in the middle. Unique for every layout.
+ */
+export function seatName(edges, seat) {
+  const edge = edges?.[seat];
+  if (!edge) return "";
+  const mine = edges.map((e, i) => (e === edge ? i : -1)).filter((i) => i >= 0);
+  if (mine.length < 2) return edge;
+  // Order along the edge from the west (or north) end, using the positions seatPositions gives.
+  const pos = seatPositions(edges);
+  const along = (i) => (edge === "south" || edge === "north" ? pos[i].x : pos[i].y);
+  const order = [...mine].sort((a, b) => along(a) - along(b));
+  const ends = edge === "south" || edge === "north" ? ["west", "east"] : ["north", "south"];
+  const k = order.indexOf(seat);
+  const part = k === 0 ? ends[0] : k === order.length - 1 ? ends[1] : "";
+  if (!part) return edge;
+  return edge === "south" || edge === "north" ? `${edge}${part}` : `${part}${edge}`;
+}
+
+/** The same, capitalised, for a heading: "Southwest seat". */
+export const seatTitle = (edges, seat) => {
+  const n = seatName(edges, seat);
+  return n ? `${n[0].toUpperCase()}${n.slice(1)} seat` : "";
+};
+
 /** Create an element from an HTML string. */
 export function html(markup) {
   const t = document.createElement("template");

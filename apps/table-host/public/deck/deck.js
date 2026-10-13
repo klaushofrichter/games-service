@@ -1,6 +1,6 @@
 // Deck UI: join with a name, lobby with Ready, and the game's own private deck view.
 // A game package may ship deck.js exporting mount(root, ctx) -> { update(view, events, info), destroy() }.
-import { esc, claimServiceWorkerPage, openTableSocket } from "/shared/board-kit.js";
+import { esc, claimServiceWorkerPage, openTableSocket, seatName, seatTitle } from "/shared/board-kit.js";
 
 const app = document.getElementById("app");
 const params = new URLSearchParams(location.search);
@@ -118,9 +118,9 @@ function renderTop() {
   const paused = state.phase === "paused" ? `<div class="banner">Game paused: the table lost its connection. It continues by itself when the connection is back.</div>` : "";
   top.innerHTML = `${paused}${banner ? `<div class="banner">${esc(banner)}</div>` : ""}
     <div><div class="eyebrow">${esc(state.tableName)}${inGame ? ` · ${esc(state.game?.name)}` : ""}</div><h1>${esc(p?.name ?? "")}</h1></div>
-    ${inGame ? "" : `<div class="card seatcard"><div class="badge">${p?.seat == null ? "–" : p.seat + 1}</div>
+    ${inGame ? "" : `<div class="card seatcard"><div class="badge">${p?.seat == null ? "–" : esc(seatName(state.seatEdges, p.seat).replace(/(north|south|east|west)/g, (w) => w[0]).toUpperCase())}</div>
       <div>${p?.seat == null ? `<div>No seat yet</div><div class="muted" style="font-size:.85em">You'll get one when a seat opens.</div>`
-        : `<div>Seat ${p.seat + 1}</div><div class="muted" style="font-size:.85em">${esc(state.seatEdges[p.seat])} side of the board</div>`}</div></div>`}`;
+        : `<div>${esc(seatTitle(state.seatEdges, p.seat))}</div><div class="muted" style="font-size:.85em">at the ${esc(state.seatEdges[p.seat])} edge of the board</div>`}</div></div>`}`;
 }
 
 function render() {
@@ -179,8 +179,8 @@ function renderJoin() {
 
 function renderLobby(p) {
   const players = state.players
-    .map((x) => `<div class="row"><span class="${x.id === me ? "me" : ""}">${esc(x.name)}${x.kind === "ai" ? " · AI" : ""}</span>
-      <span class="muted">${x.seat == null ? "no seat" : `seat ${x.seat + 1}`}${state.phase === "ready" && x.kind === "human" ? (x.ready ? " · ready" : "") : ""}${x.connected ? "" : " · away"}</span></div>`)
+    .map((x) => `<div class="row"><span class="${x.id === me ? "me" : ""}">${esc(x.name)}</span>
+      <span class="muted">${x.seat == null ? "no seat" : `${esc(seatName(state.seatEdges, x.seat))} seat`}${state.phase === "ready" && x.kind === "human" ? (x.ready ? " · ready" : "") : ""}${x.connected ? "" : " · away"}</span></div>`)
     .join("");
   let action = `<div class="card muted">Choose a game on the board.</div>`;
   if (state.phase === "ready" && state.game) {

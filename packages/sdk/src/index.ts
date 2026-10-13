@@ -70,6 +70,21 @@ export function createRng(seed: number): () => number {
   };
 }
 
+const WORDS = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"];
+
+/**
+ * A count for messages: small numbers in words, the noun matching the number.
+ * count(1, "correct guess", "correct guesses") → "one correct guess"; count(12, "hand") → "12 hands".
+ */
+export function count(n: number, singular: string, plural = `${singular}s`): string {
+  return `${Number.isInteger(n) && n >= 0 && n < WORDS.length ? WORDS[n] : n} ${n === 1 ? singular : plural}`;
+}
+
+/** Names for messages: "Ann", "Ann and Bob", "Ann, Bob and Cleo". */
+export function list(names: string[]): string {
+  return names.length < 2 ? (names[0] ?? "") : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
+}
+
 export function isReject<S>(r: StepResult<S>): r is { reject: string } {
   return "reject" in r;
 }
