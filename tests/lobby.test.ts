@@ -212,7 +212,8 @@ describe("ready flow and play", () => {
     expect(done.summary?.highlights).toHaveProperty("flips");
     await until(async () => (await t.ok("GET", "/metrics")).gamesPlayed === 1);
 
-    // the log replays to the same final state
+    // the log replays to the same final state (it is written to disk just after the game ends)
+    await until(async () => (await t.ok("GET", "/logs")).length === 1);
     const logs = await t.ok("GET", "/logs");
     expect(logs).toHaveLength(1);
     const zip = (await t.api("GET", `/logs/${logs[0].id}.zip`)).body as Buffer;
