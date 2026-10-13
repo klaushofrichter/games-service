@@ -244,7 +244,7 @@ function cloudNotice() {
   const c = state.cloud;
   if (c.status === "pending") return `<div class="cloud">Waiting for an admin to approve this table · pairing code <b>${esc(c.pairingCode)}</b></div>`;
   if (c.status === "offline") return `<div class="cloud">The table is offline · new games start when the connection returns</div>`;
-  if (c.status === "revoked") return `<div class="cloud">This table was disconnected by an admin</div>`;
+  if (c.status === "revoked") return `<div class="cloud">This table was disconnected by an admin. It reconnects by itself once an admin presses Reconnect in the console.</div>`;
   return "";
 }
 
