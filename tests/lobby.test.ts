@@ -592,3 +592,13 @@ describe("changing game settings before the start (D-090)", () => {
     expect((await t.api("POST", "/game/settings", { settings: { rounds: 2 } })).status).toBe(409);
   });
 });
+
+describe("sound effects setting (D-092)", () => {
+  it("is on by default, switches with POST /display, and refuses anything but true or false", async () => {
+    expect((await t.ok("GET", "/state")).display).toEqual({ sound: true });
+    expect((await t.ok("POST", "/display", { sound: false })).display.sound).toBe(false);
+    expect((await t.api("POST", "/display", { sound: "no" })).status).toBe(400);
+    expect((await t.api("POST", "/display", {})).status).toBe(400);
+    expect((await t.ok("POST", "/display", { sound: true })).display.sound).toBe(true);
+  });
+});

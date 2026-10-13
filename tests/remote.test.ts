@@ -237,6 +237,7 @@ describe("remote play", { timeout: 60_000 }, () => {
     // settings stay with the table (D-088): a remote board can't change a game's display choices, even with control on
     await t.ok("POST", "/game/select", { gameId: "pachisi" });
     expect((await peer.json("POST", "/api/v1/game/prefs", { prefs: { colors: {} } })).status).toBe(403);
+    expect((await peer.json("POST", "/api/v1/display", { sound: false })).status).toBe(403);
   });
 
   it("limits the number of remote players", async () => {

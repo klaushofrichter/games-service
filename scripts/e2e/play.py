@@ -189,6 +189,12 @@ def coinflip(browser, board):
     board.locator(".game-rules [data-setting=rounds][data-delta='1']").click()
     wait(lambda: api("GET", "/state")["game"]["settings"]["rounds"] == 3, 5, "rounds to become 3")
     assert all(p["ready"] for p in api("GET", "/state")["players"])
+    # D-092: sound effects switch off and on again from the settings
+    board.click("[data-sound]")
+    wait(lambda: api("GET", "/state")["display"]["sound"] is False, 5, "sound off")
+    board.wait_for_selector("[data-sound] >> text=Off")
+    board.click("[data-sound]")
+    wait(lambda: api("GET", "/state")["display"]["sound"] is True, 5, "sound on")
     board.click("[data-close-overlay]")
     api("POST", "/game/start")
     board.click("#settings-button")  # during the game the settings are shown, not editable
@@ -207,6 +213,11 @@ def coinflip(browser, board):
             time.sleep(1.3)
             shot(board, "board")
             shot(decks[0], "deck")
+    # D-092: the board played the coin's sounds (spin and landing) for each round
+    # (the last flip's spin needs the final step's events, which used to be dropped when a step ended the game)
+    time.sleep(1.5)
+    played = board.evaluate("() => window.gameTableSounds ?? []")
+    assert played.count("coin-spin") == 3 and played.count("coin-land") >= 2, played
     # D-091: the last screen stays, with statistics, until Show result
     wait(lambda: api("GET", "/state")["phase"] == "finished", 10, "the game to finish")
     board.wait_for_selector("#result-button:not([hidden])")
