@@ -1,4 +1,4 @@
-import { defineGame, type GameContext } from "../../packages/sdk/src/index.ts";
+import { count, defineGame, list, type GameContext } from "../../packages/sdk/src/index.ts";
 
 type Guess = "heads" | "tails";
 
@@ -122,7 +122,10 @@ export default defineGame<State>({
     const best = Math.max(...state.active.map((s) => state.scores[s] ?? 0), 0);
     const winners = state.active.filter((s) => (state.scores[s] ?? 0) === best).map((s) => state.names[s]);
     return {
-      text: winners.length === 1 ? `${winners[0]} wins with ${best} correct guesses.` : `Tie between ${winners.join(", ")} with ${best} each.`,
+      text:
+        best === 0 ? "Nobody guessed right."
+        : winners.length === 1 ? `${winners[0]} wins with ${count(best, "correct guess", "correct guesses")}.`
+        : `${list(winners)} tie with ${count(best, "correct guess", "correct guesses")} each.`,
       highlights: { winners, rounds: state.rounds, flips: state.history, scores: state.scores },
     };
   },

@@ -1,6 +1,6 @@
 // Roulette rules. Everyone bets at the same time during a betting window; the wheel then spins
 // (one seeded random draw), bets are settled, and after a short result display the next round starts.
-import { defineGame, type GameContext } from "../../packages/sdk/src/index.ts";
+import { count, defineGame, list, type GameContext } from "../../packages/sdk/src/index.ts";
 import { betKey, colorOf, returnFor, validBet, type Bet, type BetType, type Color } from "./wheel.ts";
 
 export interface SeatResult {
@@ -211,7 +211,7 @@ export default defineGame<State>({
     const winners = ranked.filter((x) => s.balances[x] === best).map((x) => s.names[x]);
     const net = Object.fromEntries(s.active.map((x) => [s.names[x], s.balances[x] - s.startPoints]));
     return {
-      text: winners.length === 1 ? `${winners[0]} wins with ${best} points.` : `${winners.join(" and ")} tie with ${best} points.`,
+      text: winners.length === 1 ? `${winners[0]} wins with ${count(best, "point")}.` : `${list(winners)} tie with ${count(best, "point")}.`,
       highlights: {
         winners,
         balances: Object.fromEntries(s.active.map((x) => [s.names[x], s.balances[x]])),
