@@ -11,6 +11,16 @@ export const ROT = { south: 0, west: 90, north: 180, east: -90 };
 export const SEAT_COLORS = ["#e8b04a", "#5fb7e8", "#e8735f", "#7fd18b", "#c38be8", "#e8e15f", "#5fe0c8", "#e88fbf"];
 export const seatColor = (seat) => SEAT_COLORS[seat % SEAT_COLORS.length];
 
+/**
+ * A player's colour (D-088): the one chosen in the board's settings for this game (`info.prefs.colors`,
+ * keyed by player id), else the seat's colour. Boards and decks both use this, so they always agree.
+ */
+export function playerColor(info, seat) {
+  const id = info?.players?.find((p) => p.seat === seat)?.id;
+  const c = id && info?.prefs?.colors?.[id];
+  return typeof c === "string" && /^#[0-9a-f]{6}$/i.test(c) ? c : seatColor(seat);
+}
+
 export const esc = (s) =>
   String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
@@ -105,7 +115,7 @@ export function seatPlates(layer, info, extra = () => "", opts = {}) {
     .map((p) => {
       const at = pos[p.seat];
       const active = opts.active === p.seat;
-      return `<div class="kit-plate ${active ? "active" : ""} ${p.connected ? "" : "away"}" style="left:${at.x}px;top:${at.y}px;transform:translate(-50%,-50%) rotate(${at.rot}deg);--seat:${seatColor(p.seat)}">
+      return `<div class="kit-plate ${active ? "active" : ""} ${p.connected ? "" : "away"}" style="left:${at.x}px;top:${at.y}px;transform:translate(-50%,-50%) rotate(${at.rot}deg);--seat:${playerColor(info, p.seat)}">
         <div class="kit-name">${p.kind === "ai" ? "◆ " : ""}${esc(p.name)}</div>
         <div class="kit-extra">${p.connected ? extra(p.seat, p) : "Reconnecting…"}</div></div>`;
     })

@@ -65,6 +65,8 @@ export class Table extends EventEmitter {
   frontEdge: Edge = "south";
   phase: Phase = "idle";
   private selected: { game: InstalledGame; settings: Record<string, unknown> } | null = null;
+  /** Display choices per game id (D-088), set from the board's settings; in memory, so they last until a restart. */
+  private prefs = new Map<string, Record<string, unknown>>();
   runtime: GameRuntime | null = null;
   private summary: GameSummary | null = null;
   private stateRev = 0;
@@ -122,6 +124,7 @@ export class Table extends EventEmitter {
             edges: this.selected.game.manifest.edges,
             players: allowedPlayerCounts(this.selected.game.manifest),
             needs: this.needsFor(this.selected.game.manifest),
+            prefs: this.prefs.get(this.selected.game.manifest.id) ?? {},
           }
         : null,
       layouts: this.allowedLayouts(),
@@ -546,6 +549,26 @@ export class Table extends EventEmitter {
     const edges = seatEdges(this.layout);
     if (this.seated().some((p) => !m.edges.includes(edges[p.seat!]))) reasons.push("has no seats on the east or west edge");
     return reasons;
+  }
+
+  /**
+   * Merge display choices into the chosen game's prefs (D-088). Top-level keys are replaced; null removes one.
+   * The game's board defines what the keys mean; the table only keeps them small and plain.
+   */
+  setPrefs(patch: unknown) {
+    if (!this.selected) throw new TableError(409, "choose a game first");
+    if (!patch || typeof patch !== "object" || Array.isArray(patch)) throw new TableError(400, "prefs must be an object");
+    const id = this.selected.game.manifest.id;
+    const next: Record<string, unknown> = { ...(this.prefs.get(id) ?? {}) };
+    for (const [k, v] of Object.entries(patch)) {
+      if (!/^[A-Za-z][\w-]{0,39}$/.test(k)) throw new TableError(400, `bad prefs key "${k}"`);
+      if (v === null) delete next[k];
+      else next[k] = v;
+    }
+    if (Object.keys(next).length > 20 || JSON.stringify(next).length > 4096) throw new TableError(413, "prefs are limited to 20 keys and 4 KB");
+    this.prefs.set(id, JSON.parse(JSON.stringify(next)));
+    this.changed();
+    return this.prefs.get(id)!;
   }
 
   selectGame(gameId: string, settings: Record<string, unknown> = {}) {

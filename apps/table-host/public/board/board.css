@@ -171,3 +171,25 @@ pre.raw { font-family: var(--mono); font-size: 0.7em; color: var(--ink-soft); ba
 #corners .tr { right: 22px; top: 22px; }
 #corners .br { right: 22px; bottom: 22px; }
 #corners .bl { left: 22px; bottom: 22px; }
+
+/* Settings button (D-088): a quiet gear beside a corner, at the left end of the edge the board faces. */
+#settings-button {
+  position: absolute; z-index: 21; width: 58px; height: 58px; padding: 0; border-radius: 50%;
+  display: grid; place-items: center; color: var(--ink-soft, #cfd8d3); opacity: .6;
+  background: rgba(10, 29, 25, 0.75); border: 1px solid var(--felt-line);
+}
+#settings-button:hover { opacity: 1; color: var(--brass); border-color: var(--brass-deep); }
+#settings-button svg { transition: transform .3s; }
+#settings-button.along-x.bl { left: 92px; bottom: 22px; }
+#settings-button.along-x.br { right: 92px; bottom: 22px; }
+#settings-button.along-x.tl { left: 92px; top: 22px; }
+#settings-button.along-x.tr { right: 92px; top: 22px; }
+#settings-button.along-y.tl { left: 22px; top: 92px; }
+#settings-button.along-y.bl { left: 22px; bottom: 92px; }
+#settings-button.along-y.tr { right: 22px; top: 92px; }
+#settings-button.along-y.br { right: 22px; bottom: 92px; }
+.overlay.settings .panel { min-width: 560px; }
+.overlay.settings .seg button.on, .overlay.settings button.on:not(.swatch) { border-color: var(--brass); color: var(--brass); }
+.swatches { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.swatch { width: 40px; height: 40px; padding: 0; border-radius: 50%; background: var(--c); border: 3px solid transparent; }
+.overlay.settings .swatch.on { border-color: #fbf8ef; box-shadow: 0 0 0 3px var(--c); }

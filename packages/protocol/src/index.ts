@@ -148,6 +148,11 @@ export interface LobbyState {
     players: number[];
     /** What the game still needs before it can start, in plain words (empty when only Ready is missing). */
     needs: string[];
+    /**
+     * Display choices made in the board's settings for this game (D-088), e.g. Pachisi's player colours.
+     * Kept per game on this table, shared with the board and every deck; never part of the game's rules or log.
+     */
+    prefs: Record<string, unknown>;
   } | null;
   /** Seat layouts that may be chosen now: the selected game's, or, with none selected, any visible game's. */
   layouts: SeatLayout[];

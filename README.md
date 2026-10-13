@@ -94,7 +94,7 @@ curl -s -H "$K" -X POST $H/simulation -d '{"gameId":"coin-flip","players":4,"gam
 curl -s -H "$K" $H/logs/<id>.zip -o run.zip                # JSONL game logs
 ```
 
-Full list: `GET /state, /join, /games, /metrics, /game/board, /logs, /logs/{id}.zip` and `POST /layout, /face, /rotate, /seats/move, /ai, /game/select, /game/start, /game/end, /game/close, /game/resume, /game/save, /simulation, /players/{id}/ai-options, /invites, /remote`, `GET /saves, /qr?text=URL`, `DELETE /players/{id}`.
+Full list: `GET /state, /join, /games, /metrics, /game/board, /logs, /logs/{id}.zip` and `POST /layout, /face, /rotate, /seats/move, /ai, /game/select, /game/prefs, /game/start, /game/end, /game/close, /game/resume, /game/save, /simulation, /players/{id}/ai-options, /invites, /remote`, `GET /saves, /qr?text=URL`, `DELETE /players/{id}`.
 
 Decks speak JSON envelopes over `/ws`: `system.hello {joinToken, name}` or `{sessionToken}`, then `lobby.ready {ready}` and `game.intent {name, payload}`. The host answers with `lobby.state`, `game.view` (this seat only) and `system.ack | reject | error`.
 
@@ -115,6 +115,8 @@ export default defineGame<State>({
 ```
 
 The UI modules export `mount(root, ctx)` returning `{ update(view, events, info), destroy() }`. `info` carries the players, seat positions, the front edge and rotation, settings, and host timer deadlines for countdowns; the deck's `ctx.send(name, payload)` submits an intent and resolves with `{ ok, reason }`. `/shared/board-kit.js` has helpers for seat plates, rotation and countdowns, and `packages/sdk/src/cards.ts` has a deck, seeded shuffle and poker hand evaluation.
+
+**Board settings.** The board's gear button opens a settings modal: Fullscreen for every game, then anything the chosen game adds. A game adds items by exporting `settings({ info, setPrefs })` from its `board.js`, which returns a list of `{ type: "toggle" | "choice" | "swatches" | "button", label, value, options, onChange }`. `setPrefs(patch)` stores display choices for that game on the table (`POST /game/prefs`, at most 20 keys and 4 KB, `null` removes a key). Board and decks get them as `info.prefs`, and they last until the host restarts. They are display choices only: not part of the rules, the log or replay. Pachisi uses this for player colours, and `playerColor(info, seat)` in the board kit applies them. Remote boards have no settings.
 
 Rules must be deterministic: all randomness through `ctx.random()`. The host logs the seed and every input (intents, timer firings, seat changes), so `replay()` rebuilds any game exactly; the tests check this for live games and simulations.
 

@@ -1,5 +1,5 @@
 // Pachisi deck UI: roll the die, then pick which token to move.
-import { esc, remainingMs, seatColor } from "/shared/board-kit.js";
+import { esc, playerColor, remainingMs } from "/shared/board-kit.js";
 
 const FINISH = 44;
 const PIPS = { 1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] };
@@ -38,7 +38,7 @@ export function mount(root, ctx) {
       view = v;
       info = i;
       if (v.myTurn && !wasMyTurn) ctx.vibrate?.(80);
-      const color = seatColor(i.seat ?? 0);
+      const color = playerColor(i, i.seat ?? 0);
       root.querySelector(".pc-die").innerHTML = dieFace(v.die);
       root.querySelector(".pc-who").innerHTML = v.over ? "Game over" : v.myTurn ? `<span style="color:${color}">Your turn</span>` : `${esc(v.turnName)}'s turn`;
       root.querySelector(".pc-what").textContent = v.over

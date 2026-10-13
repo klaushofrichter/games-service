@@ -203,6 +203,7 @@ function info() {
     me: self(),
     players: state.players,
     settings: state.game?.settings ?? {},
+    prefs: state.game?.prefs ?? {},
     timers: gameMsg?.timers ?? {},
     now: gameMsg?.now ?? Date.now(),
     receivedAt: gameMsg?.receivedAt ?? Date.now(),
