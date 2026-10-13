@@ -119,6 +119,15 @@ with sync_playwright() as p:
     wait(lambda: api("GET", "/state")["frontEdge"] == "west", 5, "the table to face west")
     page.wait_for_timeout(400)
     page.screenshot(path=os.path.join(OUT, "board-facing-west.png"))
+    for seats in (4, 6, 8):
+        api("POST", "/layout", {"seats": seats})
+        page.wait_for_timeout(300)
+        gap = page.evaluate("""() => { const c = document.getElementById('center').getBoundingClientRect();
+          return Math.min(...[...document.querySelectorAll('.seat')].map((e) => { const s = e.getBoundingClientRect();
+            return Math.max(s.top - c.bottom, c.top - s.bottom, s.left - c.right, c.left - s.right); })); }""")
+        if gap < 20:  # screen px at 1280 x 720
+            problems.append(f"board facing west, {seats} seats: centre panel only {gap:.0f}px from a seat plate")
+    api("POST", "/layout", {"seats": 4})
     first = page.locator(".games .tile").first.get_attribute("data-game")
     if page.locator(".games .tile.selectable").count() == 0:
         problems.append("board facing west: no game can be chosen")
