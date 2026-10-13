@@ -232,6 +232,55 @@ def coinflip(browser, board):
 
 
 @scenario
+def endings(browser, board):
+    """D-089..D-093: the phone's name line, sound off, a game ended from the lobby, a full table."""
+    api("POST", "/layout", {"seats": 2})
+    decks = [join(browser, n) for n in ["Klaus", "Mira"]]
+    # the phone: name on the left, the seat's compass badge on the right, no separate seat card
+    assert decks[0].inner_text(".who .badge") == "S" and decks[1].inner_text(".who .badge") == "N"
+    assert decks[0].locator(".seatcard").count() == 0
+    extra = join(browser, "Paul")  # the 2-seat table is full
+    extra.wait_for_selector("text=No seat yet")
+    assert extra.locator(".who .badge").count() == 0
+    extra.close()
+    # sound off: a whole game plays without a single sound effect
+    api("POST", "/display", {"sound": False})
+    board.click("#settings-button")  # also wakes audio, as a touch would
+    board.wait_for_selector("[data-sound] >> text=Off")
+    board.click("[data-close-overlay]")
+    board.evaluate("() => (window.gameTableSounds = [])")
+    api("POST", "/game/select", {"gameId": "coin-flip", "settings": {"rounds": 1, "roundSeconds": 0}})
+    for d in decks:
+        d.click("#ready")
+    wait(lambda: all(p["ready"] for p in api("GET", "/state")["players"] if p["seat"] is not None), 5, "everyone ready")
+    api("POST", "/game/start")
+    for d, g in zip(decks, ["heads", "tails"]):
+        d.wait_for_selector(f"[data-guess={g}]:not([disabled])")
+        d.click(f"[data-guess={g}]")
+    board.wait_for_selector("#result-button:not([hidden])")  # held, as a game that ended by itself
+    time.sleep(1.4)
+    assert board.evaluate("() => window.gameTableSounds") == [], "no sounds with sound off"
+    board.click("#result-button")
+    # a game ended from the lobby goes straight to the result, no held screen
+    board.click("[data-again]")
+    wait(lambda: api("GET", "/state")["phase"] == "ready", 5, "ready again")
+    for d in decks:
+        d.click("#ready")
+    wait(lambda: all(p["ready"] for p in api("GET", "/state")["players"] if p["seat"] is not None), 5, "everyone ready")
+    api("POST", "/game/start")
+    board.wait_for_selector("#lobby-button:not([hidden])")
+    board.click("#lobby-button")
+    board.click("[data-end]")
+    board.click(".dialog [data-x=yes]")
+    wait(lambda: api("GET", "/state")["phase"] == "finished", 5, "the game to end")
+    board.wait_for_selector("text=finished")
+    assert board.locator("#result-button").is_hidden(), "ended from the lobby: no held screen"
+    shot(board, "ended-from-lobby")
+    api("POST", "/display", {"sound": True})
+    return decks
+
+
+@scenario
 def dialogs(browser, board):
     api("POST", "/layout", {"seats": 4})
     decks = [join(browser, "Klaus")]

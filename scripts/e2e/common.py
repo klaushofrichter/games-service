@@ -72,13 +72,13 @@ def start_table(port, **env):
 
 
 def join_deck(page, url, name, on_form=None):
-    """Open a join URL on a phone page, join by name and wait for the seat card. on_form(page) runs on the join form."""
+    """Open a join URL on a phone page, join by name and wait for the lobby (name line). on_form(page) runs on the join form."""
     page.goto(url)
     if on_form:
         on_form(page)
     page.fill("input[name=name]", name)
     page.click("button[type=submit]")
-    page.wait_for_selector(".seatcard")
+    page.wait_for_selector(".who h1")
     return page
 
 
