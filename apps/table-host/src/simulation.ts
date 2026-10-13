@@ -50,15 +50,17 @@ export async function runSimulation(game: InstalledGame, req: SimulationRequest,
     slice = Date.now();
   };
 
+  // The same seats and AI options for every game of the run.
+  const layout = (m.seatLayouts.find((l) => l >= players) ?? 8) as SeatLayout;
+  const edges = seatEdges(layout);
+  const seats: SeatInfo[] = Array.from({ length: players }, (_, i) => ({ seat: i, playerId: `ai_${i + 1}`, name: `AI ${i + 1}`, kind: "ai", edge: edges[i] }));
+  const aiOptions: Record<number, Record<string, unknown>> = {};
+  for (const s of seats) {
+    const given = Array.isArray(req.aiOptions) ? (req.aiOptions[s.seat] ?? {}) : (req.aiOptions ?? {});
+    aiOptions[s.seat] = aiDefaults(m, given);
+  }
+
   for (let g = 0; g < games; g++) {
-    const layout = (m.seatLayouts.find((l) => l >= players) ?? 8) as SeatLayout;
-    const edges = seatEdges(layout);
-    const seats: SeatInfo[] = Array.from({ length: players }, (_, i) => ({ seat: i, playerId: `ai_${i + 1}`, name: `AI ${i + 1}`, kind: "ai", edge: edges[i] }));
-    const aiOptions: Record<number, Record<string, unknown>> = {};
-    for (const s of seats) {
-      const given = Array.isArray(req.aiOptions) ? (req.aiOptions[s.seat] ?? {}) : (req.aiOptions ?? {});
-      aiOptions[s.seat] = aiDefaults(m, given);
-    }
     const clock = new VirtualClock();
     const gameSeed = Math.floor(master() * 2 ** 31);
     const rt = new GameRuntime(m, game.def, gameSeed, settings, seats, clock, { simulation: true, aiOptions });

@@ -49,7 +49,6 @@ function fakeResponse(done: (status: number, type: string, body: Buffer) => void
       type = headers["content-type"] ?? type;
       return this;
     },
-    setHeader() {},
     end(data?: string | Buffer) {
       done(status, type, data === undefined ? Buffer.alloc(0) : Buffer.isBuffer(data) ? data : Buffer.from(data));
     },
@@ -114,7 +113,7 @@ class Session {
   startLiveness() {
     this.lastSeen = Date.now();
     this.pingTimer = setInterval(() => {
-      if (Date.now() - this.lastSeen > this.gw.timeoutMs) return this.gw.dropSession(this.id, this);
+      if (Date.now() - this.lastSeen > this.gw.timeoutMs) return this.gw.drop(this.id, this);
       this.send({ k: "ping" });
     }, this.gw.pingMs);
     this.pingTimer.unref?.();
@@ -223,11 +222,7 @@ export class RemoteGateway {
     }
   }
 
-  dropSession(id: string, s: Session) {
-    this.drop(id, s);
-  }
-
-  private drop(id: string, s: Session) {
+  drop(id: string, s: Session) {
     if (this.sessions.get(id) !== s) return;
     this.sessions.delete(id);
     s.close();

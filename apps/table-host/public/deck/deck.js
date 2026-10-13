@@ -1,6 +1,6 @@
 // Deck UI: join with a name, lobby with Ready, and the game's own private deck view.
 // A game package may ship deck.js exporting mount(root, ctx) -> { update(view, events, info), destroy() }.
-import { esc } from "/shared/board-kit.js";
+import { esc, claimServiceWorkerPage, openTableSocket } from "/shared/board-kit.js";
 
 const app = document.getElementById("app");
 const params = new URLSearchParams(location.search);
@@ -9,17 +9,8 @@ const joinToken = params.get("t");
 // over a WebRTC channel to the table; their name comes from that page, and no join code is needed.
 const REMOTE = params.get("remote") === "1";
 const remoteName = params.get("name") ?? "";
-// Tell the invite page's service worker which page this frame belongs to (it forgets when restarted).
-if (REMOTE && navigator.serviceWorker) {
-  const own = () => navigator.serviceWorker.controller?.postMessage({ type: "gt-own", page: new URLSearchParams(location.search).get("gtp") });
-  own();
-  setInterval(own, 10000);
-}
+if (REMOTE) claimServiceWorkerPage();
 const SESSION_KEY = REMOTE ? `gametable.remote.${params.get("inv") ?? ""}` : `gametable.session.${location.host}`;
-const openSocket = () =>
-  REMOTE && window.parent !== window && window.parent.gameTableSocket
-    ? window.parent.gameTableSocket()
-    : new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`);
 
 let ws = null;
 let me = null; // playerId
@@ -59,7 +50,7 @@ function toast(msg) {
 }
 
 function connect(hello) {
-  ws = openSocket();
+  ws = openTableSocket(REMOTE);
   ws.onopen = () => send("system", "hello", hello);
   ws.onmessage = (ev) => {
     const m = JSON.parse(ev.data);
@@ -75,7 +66,7 @@ function connect(hello) {
         if (m.payload.sessionToken) storage.set(m.payload.sessionToken);
         retry = 0;
         banner = "";
-        if (joinToken) history.replaceState(null, "", "/deck/"); // the join code is single-use
+        if (joinToken) history.replaceState(null, "", "/deck/"); // keep the join code out of the address bar and history
       } else if (m.type === "removed") {
         removed = true;
         storage.clear();
@@ -236,7 +227,12 @@ async function showGame() {
     mine.inst = mod.mount(body, {
       gameId: state.game.id,
       seat: gameMsg.seat,
-      send: (name, payload) => send("game", "intent", { name, payload }),
+      // A rejected intent shows its reason here, so games need not toast it themselves.
+      send: (name, payload) =>
+        send("game", "intent", { name, payload }).then((r) => {
+          if (!r.ok) toast(r.reason);
+          return r;
+        }),
       toast,
       vibrate: (ms = 40) => navigator.vibrate?.(ms),
       assetUrl: (p) => `/games/${state.game.id}/assets/${p}`,
