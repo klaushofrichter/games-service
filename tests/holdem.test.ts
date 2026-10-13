@@ -177,9 +177,9 @@ describe("betting rules", () => {
 });
 
 describe("AI simulation", () => {
-  it("never creates or loses points, finishes, and replays exactly, for 2 to 6 players", async () => {
+  it("never creates or loses points, finishes, and replays exactly, for 2 to 8 players", async () => {
     const logs = new LogStore(await mkdtemp(join(tmpdir(), "holdem-")));
-    for (const n of [2, 3, 6]) {
+    for (const n of [2, 3, 6, 8]) {
       const r = await runSimulation({ ...game, dir: "" }, { players: n, games: 8, seed: n * 7, settings: { hands: 30, startPoints: 300, turnSeconds: 0 }, aiOptions: n === 3 ? [{ style: "tight" }, { style: "loose" }, { style: "tight" }] : { style: "loose" } }, logs, "t");
       expect(r.games.every((g) => g.reason === "finished")).toBe(true);
       const { games } = await LogStore.unzip((await logs.read(r.logId))!);

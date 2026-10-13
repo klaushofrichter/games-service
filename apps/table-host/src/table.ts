@@ -367,10 +367,15 @@ export class Table extends EventEmitter {
 
   rotate(degrees: number) {
     if (degrees !== 90 && degrees !== 180) throw new TableError(400, "degrees must be 90 or 180");
-    const next = rotateEdge(this.frontEdge, degrees);
-    const m = this.selected?.game.manifest;
-    if (m && !m.edges.includes(next)) throw new TableError(409, `${m.name} cannot be shown facing ${next}`);
-    this.frontEdge = next;
+    this.face(rotateEdge(this.frontEdge, degrees));
+  }
+
+  /** Turns the lobby (and dialogs) to face one edge of the table. Games draw the same whichever way it faces, so
+   *  this never blocks a game (D-079). */
+  face(edge: string) {
+    if (!["north", "east", "south", "west"].includes(edge)) throw new TableError(400, "edge must be north, east, south or west");
+    if (this.frontEdge === edge) return;
+    this.frontEdge = edge as Edge;
     this.changed();
   }
 
@@ -489,7 +494,6 @@ export class Table extends EventEmitter {
     if (seated.length > max) reasons.push(`takes at most ${max} players (${seated.length} seated)`);
     if (!m.ai.supported && seated.some((p) => p.kind === "ai")) reasons.push("has no AI players; remove the AI seats");
     if (seated.length <= max && this.layoutFor(m) === null) reasons.push(`has no seat layout for ${seated.length} players`);
-    if (!m.edges.includes(this.frontEdge)) reasons.push(`cannot be shown facing ${this.frontEdge}; rotate the board`);
     return reasons;
   }
 

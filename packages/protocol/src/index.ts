@@ -34,7 +34,8 @@ export function seatEdges(layout: SeatLayout): Edge[] {
     case 4:
       return ["south", "south", "north", "north"];
     case 6:
-      return ["south", "south", "south", "north", "north", "north"];
+      // Two on each long side and one at each end (D-079): the usual six-seat table.
+      return ["south", "south", "north", "north", "east", "west"];
     case 8:
       return ["south", "south", "south", "north", "north", "north", "east", "west"];
   }
@@ -71,6 +72,8 @@ export const manifestSchema = z.object({
   ]),
   turnModel: z.enum(["sequential", "simultaneous"]),
   seatLayouts: z.array(z.union([z.literal(2), z.literal(4), z.literal(6), z.literal(8)])).nonempty(),
+  /** Edges of the table the game can seat players on. Not about which way the board faces: games draw the same
+   *  either way, and the lobby faces whichever edge the table is turned to (D-079). */
   edges: z.array(z.enum(["north", "east", "south", "west"])).refine(
     (e) => e.includes("north") && e.includes("south"),
     "every game must support north and south",

@@ -112,16 +112,19 @@ describe("seats and orientation", () => {
     expect((await t.api("POST", "/rotate", { degrees: 45 })).status).toBe(400);
   });
 
-  it("refuses 90° rotation for a game that only supports north and south", async () => {
+  it("facing east or west blocks no game: games draw the same whichever way the lobby faces (D-079)", async () => {
     for (const n of ["A", "B", "C", "D"]) await t.joinDeck(n);
-    await t.ok("POST", "/game/select", { gameId: "quartet" });
-    const r = await t.api("POST", "/rotate", { degrees: 90 });
-    expect(r.status).toBe(409);
-    expect((await t.ok("POST", "/rotate", { degrees: 180 })).frontEdge).toBe("north");
+    expect((await t.ok("POST", "/face", { edge: "east" })).frontEdge).toBe("east");
+    expect((await t.ok("GET", "/games")).find((g: any) => g.id === "quartet").selectable).toBe(true);
+    await t.ok("POST", "/game/select", { gameId: "quartet" }); // a north/south-only game, chosen while facing east
+    expect((await t.ok("POST", "/face", { edge: "west" })).frontEdge).toBe("west");
+    expect((await t.ok("POST", "/rotate", { degrees: 90 })).frontEdge).toBe("north"); // the old API still works
+    expect((await t.api("POST", "/face", { edge: "up" })).status).toBe(400);
   });
 
   it("names the edge of every seat for each layout", async () => {
     expect((await t.ok("POST", "/layout", { seats: 8 })).seatEdges).toEqual(["south", "south", "south", "north", "north", "north", "east", "west"]);
+    expect((await t.ok("POST", "/layout", { seats: 6 })).seatEdges).toEqual(["south", "south", "north", "north", "east", "west"]);
     expect((await t.ok("POST", "/layout", { seats: 2 })).seatEdges).toEqual(["south", "north"]);
   });
 
