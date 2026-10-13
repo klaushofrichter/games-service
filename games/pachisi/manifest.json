@@ -7,7 +7,7 @@
   "players": { "min": 2, "max": 4 },
   "turnModel": "sequential",
   "seatLayouts": [2, 4, 6],
-  "edges": ["north", "south"],
+  "edges": ["north", "south", "east", "west"],
   "seatConstraints": null,
   "dynamicPlayers": false,
   "saveGame": true,

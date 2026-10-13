@@ -3,6 +3,10 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Deck, sleep, testHost, until } from "./helpers.ts";
 import { LogStore } from "../apps/table-host/src/logs.ts";
 import { replay } from "../apps/table-host/src/runtime.ts";
+import { cp, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+
+const GAMES = join(import.meta.dirname, "../games");
 
 let t: Awaited<ReturnType<typeof testHost>>;
 beforeEach(async () => {
@@ -263,14 +267,26 @@ describe("game selection gating", () => {
   });
 
   it("players on an edge the chosen game does not use are moved to one it does", async () => {
-    await t.ok("POST", "/layout", { seats: 8 });
-    const a = await t.joinDeck("A");
-    let s = await t.ok("GET", "/state");
-    const east = s.seatEdges.indexOf("east");
-    await t.ok("POST", "/seats/move", { playerId: a.playerId, seat: east });
-    s = await t.ok("POST", "/game/select", { gameId: "quartet" }); // north and south only
-    const edges = s.seatEdges as string[];
-    expect(["north", "south"]).toContain(edges[s.players.find((p: any) => p.id === a.playerId).seat]);
+    // No shipped game limits its edges any more (D-084), so test with a copy of Quartet that seats only north and
+    // south. The copy sits beside games/ because a game's rules import the SDK by relative path.
+    const dir = await mkdtemp(join(GAMES, "../.test-games-"));
+    try {
+      await cp(join(GAMES, "quartet"), join(dir, "quartet"), { recursive: true });
+      const mf = join(dir, "quartet", "manifest.json");
+      await writeFile(mf, JSON.stringify({ ...JSON.parse(await readFile(mf, "utf8")), edges: ["north", "south"] }));
+      await t.close();
+      t = await testHost({ gamesDir: dir, showTestGames: true });
+      await t.ok("POST", "/layout", { seats: 8 });
+      const a = await t.joinDeck("A");
+      let s = await t.ok("GET", "/state");
+      const east = s.seatEdges.indexOf("east");
+      await t.ok("POST", "/seats/move", { playerId: a.playerId, seat: east });
+      s = await t.ok("POST", "/game/select", { gameId: "quartet" });
+      const edges = s.seatEdges as string[];
+      expect(["north", "south"]).toContain(edges[s.players.find((p: any) => p.id === a.playerId).seat]);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 
   it("with no game chosen the seat buttons offer every layout some visible game supports; with one, only its layouts", async () => {

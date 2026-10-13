@@ -74,6 +74,12 @@ try:
         page.fill("#dl-game", "roulette")
         page.click("#dl-form button")
         page.wait_for_selector("#dl-msg .mono")
+        # the copy button puts exactly the shown link on the clipboard
+        ctx.grant_permissions(["clipboard-read", "clipboard-write"], origin=CLOUD)
+        page.click("#dl-copy")
+        page.wait_for_selector("#dl-copy.done")
+        link = page.inner_text("#dl-url")
+        assert "/dl/" in link and page.evaluate("() => navigator.clipboard.readText()") == link, "copy button"
         page.fill("#ret-days", "30")
         page.click("#ret-form button")
         page.wait_for_selector("#ret-msg.ok")
