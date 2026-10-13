@@ -29,8 +29,20 @@ jobs:
         with:
           fetch-depth: 0 # the release notes list the commits since the previous tag
 
-      - name: Configure in-cluster kubectl
+      - name: Install kubectl and configure in-cluster access
         run: |
+          set -euo pipefail
+          # The runner image has no kubectl (steps-service's deploy does the same): fetch the current stable release
+          # for this runner's architecture, unless an earlier run on the same pod already did.
+          if ! command -v kubectl >/dev/null 2>&1; then
+            case "$(uname -m)" in x86_64) ARCH=amd64 ;; aarch64|arm64) ARCH=arm64 ;; *) echo "::error::unsupported arch $(uname -m)"; exit 1 ;; esac
+            K8S=$(curl -fsSL https://dl.k8s.io/release/stable.txt)
+            curl -fsSLo /tmp/kubectl "https://dl.k8s.io/release/${K8S}/bin/linux/${ARCH}/kubectl"
+            curl -fsSLo /tmp/kubectl.sha256 "https://dl.k8s.io/release/${K8S}/bin/linux/${ARCH}/kubectl.sha256"
+            echo "$(cat /tmp/kubectl.sha256)  /tmp/kubectl" | sha256sum --check --status || { echo "::error::kubectl checksum mismatch"; exit 1; }
+            sudo install -m 0755 /tmp/kubectl /usr/local/bin/kubectl
+          fi
+          kubectl version --client
           # Plain kubectl does not detect in-cluster credentials by itself; no kubeconfig is ever stored in GitHub.
           SA_DIR=/var/run/secrets/kubernetes.io/serviceaccount
           kubectl config set-cluster in-cluster --server=https://kubernetes.default.svc --certificate-authority="${SA_DIR}/ca.crt"
