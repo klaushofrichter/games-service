@@ -1,0 +1,2 @@
+# Accepted CodeQL findings: ruleId<TAB>path<TAB>reason. Changing this file needs a PR (see .github/scripts/codeql-gate.sh).
+js/clear-text-storage-of-sensitive-data	apps/cloud/src/auth.ts	The admin session and the OAuth state are cookies by design (the cluster's OAuth pattern): HttpOnly, Secure, SameSite=Lax, __Host- prefixed. The session value is an HMAC-signed email and expiry, not a credential to protect from its own holder; the state is single-use and short-lived. Accepted 2026-10-13 (D-075).

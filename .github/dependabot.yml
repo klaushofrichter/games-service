@@ -1,0 +1,69 @@
+version: 2
+
+# Version updates only. The security half (alerts + security updates) is a repository setting, not config:
+# kube-setup docs/repository-baseline.md, requirements 1 and 2.
+updates:
+  # Application dependencies.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: America/Chicago
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+    commit-message:
+      prefix: deps
+      prefix-development: deps-dev
+    groups:
+      # One PR per group, not per package: checks take minutes each.
+      production-dependencies:
+        dependency-type: production
+        update-types: [minor, patch]
+      development-dependencies:
+        dependency-type: development
+        update-types: [minor, patch]
+    # Majors stay ungrouped and arrive one at a time.
+
+  # The browser e2e checks' Python dependency (Playwright).
+  - package-ecosystem: pip
+    directory: /scripts/e2e
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: America/Chicago
+    labels:
+      - dependencies
+    commit-message:
+      prefix: deps-dev
+
+  # Workflow actions — the ecosystem most repos forget.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: America/Chicago
+    labels: [dependencies, ci]
+    commit-message:
+      prefix: ci
+    groups:
+      actions:
+        patterns: ["*"]
+
+  # Container base images (both Dockerfiles live in deploy/).
+  - package-ecosystem: docker
+    directory: /deploy
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: America/Chicago
+    labels:
+      - dependencies
+    commit-message:
+      prefix: docker

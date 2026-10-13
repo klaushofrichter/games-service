@@ -1,0 +1,165 @@
+# Push to production (a merged main -> production PR): version, build, deploy, verify, release.
+# Runs on this repo's own in-cluster runner (namespace games-runner), which may patch only deployment/games-cloud.
+# Pattern and reasons: kube-setup docs/cluster-deployment-requirements.md and docs/self-hosted-runner-cicd-pattern.md.
+name: Deploy production
+on:
+  push:
+    branches: [production]
+
+permissions:
+  contents: write # the release and its tag
+  packages: write
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  NAMESPACE: games
+  DEPLOYMENT: games-cloud
+  MANIFEST: manifests/games/games-cloud-deployment.yaml
+  BASE: https://games.skylar.technology
+  REGISTRY: ghcr.io/${{ github.repository_owner }}
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, k3s]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # the release notes list the commits since the previous tag
+
+      - name: Configure in-cluster kubectl
+        run: |
+          # Plain kubectl does not detect in-cluster credentials by itself; no kubeconfig is ever stored in GitHub.
+          SA_DIR=/var/run/secrets/kubernetes.io/serviceaccount
+          kubectl config set-cluster in-cluster --server=https://kubernetes.default.svc --certificate-authority="${SA_DIR}/ca.crt"
+          kubectl config set-credentials deploy-sa --token="$(cat "${SA_DIR}/token")"
+          kubectl config set-context in-cluster --cluster=in-cluster --user=deploy-sa --namespace="$NAMESPACE"
+          kubectl config use-context in-cluster
+
+      - name: Generate the version
+        id: ver
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          DATE=$(TZ=America/Chicago date +%Y.%m.%d)
+          # Its own assignment on purpose: a `gh` failure must fail the step. Folded into the `|| true` below, an
+          # errored list would read as "no releases today" and silently reuse a shipped version.
+          RELEASES=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 200 --json tagName -q '.[].tagName')
+          TODAY=$(printf '%s\n' "$RELEASES" | grep -c "^v${DATE}\." || true)
+          VERSION="${DATE}.$((TODAY + 1))"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Deploying $VERSION"
+
+      - name: Build both images and push the SHA tags
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          # Only :<sha> before the deploy is verified (the cluster pins it). :v<version> and :latest (which table PCs
+          # pull, deploy/table-pc/update.sh) follow after the smoke test, so a failed deploy publishes neither, and a
+          # retry that reuses the version number cannot overwrite a tag someone already pulled.
+          for img in cloud table-host; do
+            docker build -f "deploy/$img.Dockerfile" --build-arg "APP_VERSION=$VERSION" -t "$REGISTRY/games-$img:$GITHUB_SHA" .
+            docker push "$REGISTRY/games-$img:$GITHUB_SHA"
+          done
+
+      - name: Update the kube-setup manifest and apply it
+        env:
+          KUBE_SETUP_DEPLOY_TOKEN: ${{ secrets.KUBE_SETUP_DEPLOY_TOKEN }}
+        run: |
+          set -euo pipefail
+          IMAGE="$REGISTRY/games-cloud:$GITHUB_SHA"
+          rm -rf /tmp/kube-setup
+          # The clone URL carries the token into .git/config: remove the checkout however this step ends.
+          trap 'rm -rf /tmp/kube-setup' EXIT
+          git clone --depth 1 "https://x-access-token:${KUBE_SETUP_DEPLOY_TOKEN}@github.com/klaushofrichter/kube-setup.git" /tmp/kube-setup
+          cd /tmp/kube-setup
+          sed -i -E "s#image: ${REGISTRY}/games-cloud:[^[:space:]]+#image: ${IMAGE}#" "$MANIFEST"
+          # A silently no-op sed would commit an unchanged manifest and report success while git and the cluster drift.
+          grep -q "image: ${IMAGE}$" "$MANIFEST" || { echo "::error::manifest image line did not update to ${GITHUB_SHA}"; exit 1; }
+          git config user.name "games-service deploy"
+          git config user.email "deploy@games.skylar.technology"
+          git add "$MANIFEST"
+          if git diff --cached --quiet; then
+            echo "Manifest already at ${GITHUB_SHA}"
+          else
+            git commit -q -m "Deploy games-cloud ${GITHUB_SHA}"
+            # Push before apply, always: a change applied but not pushed is reverted by the next deploy.
+            for i in 1 2 3; do git push -q origin HEAD:main && break; git pull -q --rebase origin main; done
+            git fetch -q origin main && git diff --quiet HEAD origin/main || { echo "::error::could not push the manifest"; exit 1; }
+          fi
+          kubectl apply -f "$MANIFEST"
+
+      - name: Wait for the rollout
+        run: |
+          set -euo pipefail
+          # `kubectl rollout status` needs list+watch, which a Role scoped to one Deployment cannot grant: poll instead.
+          for i in $(seq 1 60); do
+            # `|| true`: an API blip is retried by the loop instead of ending the step without a message.
+            read -r gen observed updated available replicas <<<"$(kubectl get deployment "$DEPLOYMENT" -o jsonpath='{.metadata.generation} {.status.observedGeneration} {.status.updatedReplicas} {.status.availableReplicas} {.spec.replicas}' || true)" || true
+            if [ "$gen" = "$observed" ] && [ "${updated:-0}" = "$replicas" ] && [ "${available:-0}" = "$replicas" ]; then
+              echo "Rolled out (generation $gen)"; exit 0
+            fi
+            sleep 5
+          done
+          echo "::error::the rollout did not finish in 5 minutes"; kubectl get deployment "$DEPLOYMENT" -o wide; exit 1
+
+      - name: Smoke-test the public endpoints
+        id: smoke
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          set -euo pipefail
+          # Poll until the SERVED version is the one this run stamped: right after a rollout the old pod can still answer.
+          served=""
+          for i in $(seq 1 20); do
+            code=$(curl -s -o /tmp/health.json -w '%{http_code}' "$BASE/health" || true)
+            served=$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' /tmp/health.json 2>/dev/null | head -1 || true)
+            [ "$code" = "200" ] && [ "$served" = "$VERSION" ] && break
+            sleep 6
+          done
+          [ "$served" = "$VERSION" ] || { echo "::error::$BASE/health serves '$served', expected $VERSION"; exit 1; }
+          # Public landing page.
+          page=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/" || true)
+          [ "$page" = "200" ] || { echo "::error::GET / returned $page"; exit 1; }
+          # Auth-enforcement check, do not "fix" it to 200: anonymous /admin must redirect to the public sign-in page.
+          # A 200 here would mean the admin portal had gone world-readable.
+          admin=$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' "$BASE/admin" || true)
+          [ "$admin" = "302 $BASE/" ] || { echo "::error::GET /admin returned '$admin', expected '302 $BASE/'"; exit 1; }
+          api=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/admin/api/tables" || true)
+          [ "$api" = "401" ] || { echo "::error::GET /admin/api/tables returned $api without a session"; exit 1; }
+          {
+            echo "served_version=$served"
+            echo "page_code=$page"
+            echo "admin=$admin"
+            echo "checked_at=$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Publish the verified build as v<version> and latest
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          set -euo pipefail
+          for img in cloud table-host; do
+            for t in "v$VERSION" latest; do
+              docker tag "$REGISTRY/games-$img:$GITHUB_SHA" "$REGISTRY/games-$img:$t"
+              docker push "$REGISTRY/games-$img:$t"
+            done
+          done
+          docker system prune -af --filter "until=168h" || true
+
+      - name: Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.ver.outputs.tag }}
+          SERVED: ${{ steps.smoke.outputs.served_version }}
+          PAGE_CODE: ${{ steps.smoke.outputs.page_code }}
+          ADMIN: ${{ steps.smoke.outputs.admin }}
+          CHECKED_AT: ${{ steps.smoke.outputs.checked_at }}
+        run: scripts/release-notes.sh > /tmp/notes.md && scripts/release.sh /tmp/notes.md

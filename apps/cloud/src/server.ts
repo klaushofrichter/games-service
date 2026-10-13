@@ -5,7 +5,9 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { randomBytes, randomInt, timingSafeEqual } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
+import { BlockList, isIPv4, isIPv6 } from "node:net";
 import { WebSocketServer, type WebSocket } from "ws";
+import { createAdminAuth, esc, publicPage, type GoogleAuthOptions } from "./auth.ts";
 
 const ADMIN_PAGE = fileURLToPath(new URL("../public/admin.html", import.meta.url));
 const REMOTE_PAGE = fileURLToPath(new URL("../public/remote.html", import.meta.url));
@@ -20,17 +22,26 @@ export interface IceServer {
 const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const code = (n: number) => Array.from({ length: n }, () => ALPHABET[randomInt(ALPHABET.length)]).join("");
 const secret = () => randomBytes(24).toString("base64url");
+const MAX_PENDING = 500;
+const PENDING_TTL_MS = 10 * 60_000;
 
 export interface CloudOptions {
   port: number;
   host?: string;
-  adminToken: string;
+  /** Optional bearer token for scripts and pipelines (ADMIN_TOKEN). People sign in with Google. */
+  adminToken?: string;
+  /** Google sign-in for the admin portal; null only for local development (the portal then asks for ADMIN_TOKEN). */
+  google?: GoogleAuthOptions | null;
   publicUrl: string; // https://games.skylar.technology
   logRetentionDays?: number;
   /** STUN/TURN servers handed to both ends of a remote connection. */
   iceServers?: IceServer[];
-  /** Behind a reverse proxy (the Kubernetes ingress): take the client address from X-Forwarded-For. */
-  trustProxy?: boolean;
+  /**
+   * Behind a reverse proxy (the cluster's Traefik): take the client address from X-Forwarded-For, but only when the
+   * direct peer is one of these networks. A CIDR list, never a hop count (default: loopback and the k3s pod and
+   * service networks).
+   */
+  trustProxy?: boolean | string[];
 }
 
 interface TableRecord {
@@ -40,6 +51,8 @@ interface TableRecord {
   pairingCode: string;
   tableToken: string | null;
   lastSeen: number | null;
+  /** Last hello while pending: waiting tables poll every 5 s; one gone quiet for 10 minutes is dropped. */
+  lastHello?: number;
   metrics: Record<string, number>;
   createdAt: number;
 }
@@ -65,8 +78,22 @@ export function startCloud(o: CloudOptions) {
   const tableSockets = new Map<string, WebSocket>();
   const remoteSessions = new Map<string, { tableId: string; invite: string; expiresAt: number; ws: WebSocket | null }>();
   /** The client's address; behind the ingress, the last X-Forwarded-For entry (the one the ingress added). */
+  const proxies = new BlockList();
+  if (o.trustProxy) {
+    for (const c of o.trustProxy === true ? ["127.0.0.0/8", "::1/128", "10.42.0.0/16", "10.43.0.0/16"] : o.trustProxy) {
+      const [net, bits] = c.split("/");
+      proxies.addSubnet(net, Number(bits), isIPv6(net) ? "ipv6" : "ipv4");
+    }
+  }
+  const fromProxy = (addr: string | undefined) => {
+    if (!o.trustProxy || !addr) return false;
+    const a = addr.replace(/^::ffff:/, "");
+    return isIPv4(a) ? proxies.check(a, "ipv4") : isIPv6(a) && proxies.check(a, "ipv6");
+  };
+  const auth = createAdminAuth(o.google ?? null, o.publicUrl);
+  const ownOrigin = new URL(o.publicUrl).origin;
   const clientIp = (req: IncomingMessage) => {
-    const xff = o.trustProxy ? String(req.headers["x-forwarded-for"] ?? "").split(",").map((x) => x.trim()).filter(Boolean).pop() : "";
+    const xff = fromProxy(req.socket.remoteAddress) ? String(req.headers["x-forwarded-for"] ?? "").split(",").map((x) => x.trim()).filter(Boolean).pop() : "";
     return xff || req.socket.remoteAddress || "?";
   };
   const limited = (ip: string, max = 20) => {
@@ -83,7 +110,19 @@ export function startCloud(o: CloudOptions) {
   };
   const bearer = (req: IncomingMessage) => (req.headers.authorization ?? "").replace(/^Bearer\s+/i, "");
   const same = (a: string, b: string) => a.length === b.length && timingSafeEqual(Buffer.from(a), Buffer.from(b));
-  const isAdmin = (req: IncomingMessage) => same(bearer(req), o.adminToken);
+  const tokenAdmin = (req: IncomingMessage) => !!o.adminToken && same(bearer(req), o.adminToken);
+  /**
+   * The signed-in admin (Google session) or a script holding ADMIN_TOKEN. A cookie-authenticated change must also come
+   * from our own origin: SameSite=Lax already keeps cross-site POSTs cookieless, this is the second layer.
+   */
+  const admin = (req: IncomingMessage): { via: "google"; email: string } | { via: "token" } | null => {
+    if (tokenAdmin(req)) return { via: "token" };
+    const email = auth.session(req);
+    if (!email) return null;
+    const m = req.method ?? "GET";
+    if (m !== "GET" && m !== "HEAD" && req.headers.origin !== ownOrigin) return null;
+    return { via: "google", email };
+  };
   /** A lifetime from a request: positive and finite, else the default; never above the cap. */
   const lifetime = (v: unknown, fallback: number, cap: number) => {
     const n = Number(v);
@@ -114,35 +153,78 @@ export function startCloud(o: CloudOptions) {
     for (const [t, d] of downloadTokens) if (d.expiresAt < Date.now()) downloadTokens.delete(t);
     for (const [id, r] of remoteSessions) if (r.expiresAt < Date.now()) (r.ws?.close(4002, "expired"), remoteSessions.delete(id));
     for (const [ip, l] of lookups) if (l.reset < Date.now()) lookups.delete(ip);
+    for (const [id, t] of tables) if (t.status === "pending" && (t.lastHello ?? t.createdAt) < Date.now() - PENDING_TTL_MS) tables.delete(id);
   };
   const pruneTimer = setInterval(prune, 600_000);
   pruneTimer.unref();
 
+  /** A request target URL can't parse (e.g. "//[") must answer 400, not throw: an unhandled rejection exits Node. */
+  const parseUrl = (req: IncomingMessage) => {
+    try {
+      return new URL(req.url ?? "/", "http://cloud");
+    } catch {
+      return null;
+    }
+  };
+
   const server = createServer(async (req, res) => {
-    const url = new URL(req.url ?? "/", "http://cloud");
+    const url = parseUrl(req);
+    if (!url) return json(res, 400, { error: "bad request target" });
     const p = url.pathname;
     const m = req.method ?? "GET";
     let match: RegExpMatchArray | null;
     try {
-      if (p === "/health") return json(res, 200, { ok: true });
+      // {status, version}: the deploy smoke test and the cluster's version-exporter read the version (APP_VERSION, "dev" outside a release build).
+      if (p === "/health") return json(res, 200, { status: "ok", ok: true, version: process.env.APP_VERSION || "dev" });
+      if (await auth.handle(req, res, p)) return;
+      if (m === "GET" && p === "/") {
+        // Public landing page; also where logout lands (200, with a Sign in link, never a bounce to Google).
+        const signedIn = auth.session(req);
+        const note = url.searchParams.has("signed-out") ? `<p class="muted">You are signed out.</p>` : "";
+        const action = signedIn
+          ? `<p class="muted">Signed in as ${esc(signedIn)}.</p><p><a class="btn" href="/admin">Open the admin portal</a></p>`
+          : auth.enabled
+            ? `<p><a class="btn" href="/auth/google/login">Administrators: sign in with Google</a></p>`
+            : `<p><a class="btn" href="/admin">Admin portal</a></p>`;
+        res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-frame-options": "DENY", "referrer-policy": "no-referrer" });
+        return res.end(publicPage("Game Table", `<p class="muted">The service behind Game Table: it pairs tables, relays invites for remote players and keeps game logs.</p>${note}${action}`));
+      }
       if (m === "GET" && (p === "/admin" || p === "/admin/")) {
-        // The page itself is public; everything it shows comes from /admin/api with the admin token.
-        res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-cache", "x-frame-options": "DENY", "referrer-policy": "no-referrer" });
+        // With Google sign-in configured the portal is for signed-in admins only; anonymous visitors go to the public
+        // page with its Sign in link (the deploy smoke test asserts this 302 as an auth-enforcement check).
+        if (auth.enabled && !auth.session(req)) {
+          res.writeHead(302, { location: "/", "cache-control": "no-store" });
+          return res.end();
+        }
+        res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-frame-options": "DENY", "referrer-policy": "no-referrer" });
         return res.end(await readFile(ADMIN_PAGE));
       }
 
       // ----- tables -----
       if (m === "POST" && p === "/api/tables/hello") {
+        // Unauthenticated, so bounded: per address (a waiting table polls 12 times a minute; several may share a
+        // home's address) and in total, or a flood of invented table ids would fill the pod's memory.
+        if (limited(`hello:${clientIp(req)}`, 60)) return json(res, 429, { error: "too many requests; wait a minute" });
         const b = await jsonBody(req);
         const tableId = String(b.tableId ?? "");
         if (!/^[A-Za-z0-9_-]{8,64}$/.test(tableId)) return json(res, 400, { error: "tableId required" });
         let t = tables.get(tableId);
         if (!t) {
+          let pending = 0;
+          for (const x of tables.values()) if (x.status === "pending") pending++;
+          if (pending >= MAX_PENDING) {
+            prune();
+            pending = [...tables.values()].filter((x) => x.status === "pending").length;
+            if (pending >= MAX_PENDING) return json(res, 503, { error: "too many tables waiting for approval; try again later" });
+          }
           t = { tableId, name: String(b.name ?? "Game Table").slice(0, 60), status: "pending", pairingCode: code(6), tableToken: null, lastSeen: null, metrics: {}, createdAt: Date.now() };
           tables.set(tableId, t);
         }
         if (t.status === "revoked") return json(res, 403, { status: "revoked" });
-        if (t.status === "pending") return json(res, 202, { status: "pending", pairingCode: t.pairingCode });
+        if (t.status === "pending") {
+          t.lastHello = Date.now();
+          return json(res, 202, { status: "pending", pairingCode: t.pairingCode });
+        }
         // Approved: the token is handed out once, on the first hello after approval.
         if (!t.tableToken) t.tableToken = secret();
         else if (!same(bearer(req), t.tableToken)) return json(res, 200, { status: "approved", tokenIssued: true });
@@ -197,7 +279,9 @@ export function startCloud(o: CloudOptions) {
 
       // ----- admin -----
       if (p.startsWith("/admin/api/")) {
-        if (!isAdmin(req)) return json(res, 401, { error: "admin token required" });
+        const who = admin(req);
+        if (!who) return json(res, 401, { error: "sign in required", signIn: auth.enabled ? "/auth/google/login" : null, tokenSignIn: !auth.enabled });
+        if (m === "GET" && p === "/admin/api/me") return json(res, 200, who);
         if (m === "GET" && p === "/admin/api/tables") {
           return json(res, 200, [...tables.values()].map(({ tableToken, ...t }) => ({ ...t, online: !!t.lastSeen && Date.now() - t.lastSeen < 60_000 })));
         }
@@ -270,11 +354,12 @@ export function startCloud(o: CloudOptions) {
   const sendJson = (ws: WebSocket | null | undefined, v: unknown) => ws && ws.readyState === ws.OPEN && ws.send(JSON.stringify(v));
 
   server.on("upgrade", (req, socket, head) => {
-    const url = new URL(req.url ?? "/", "http://cloud");
     const reject = (code: number) => {
       socket.write(`HTTP/1.1 ${code} No\r\n\r\n`);
       socket.destroy();
     };
+    const url = parseUrl(req);
+    if (!url) return reject(400);
     if (url.pathname === "/api/tables/ws") {
       const t = tableFor(req as IncomingMessage);
       if (!t) return reject(401);
