@@ -231,3 +231,66 @@ describe("hardening (review findings)", () => {
     expect(codes.slice(60)).toContain(429);
   });
 });
+
+describe("console top bar, favicon and version label", () => {
+  const withVersion = async (v: string | undefined, fn: () => Promise<void>) => {
+    const before = process.env.APP_VERSION;
+    if (v === undefined) delete process.env.APP_VERSION;
+    else process.env.APP_VERSION = v;
+    try {
+      await fn();
+    } finally {
+      if (before === undefined) delete process.env.APP_VERSION;
+      else process.env.APP_VERSION = before;
+    }
+  };
+
+  it("serves the favicon, and every page links it", async () => {
+    await start();
+    const icon = await get("/favicon.svg");
+    expect(icon.status).toBe(200);
+    expect(icon.headers.get("content-type")).toBe("image/svg+xml");
+    expect(await icon.text()).toMatch(/^<svg /);
+    const { session } = await signIn("admin@example.com");
+    for (const html of [await (await get("/")).text(), await (await get("/admin", { cookie: `__Host-games_admin=${session}` })).text()]) {
+      expect(html).toContain('<link rel="icon" type="image/svg+xml" href="/favicon.svg">');
+    }
+  });
+
+  it("the console's top bar shows the icon, 'Game Table Console' linked to the repository, and the version", async () => {
+    await withVersion("2026.10.13.2", async () => {
+      await start();
+      const { session } = await signIn("admin@example.com");
+      const html = await (await get("/admin", { cookie: `__Host-games_admin=${session}` })).text();
+      const header = html.slice(html.indexOf("<header>"), html.indexOf("</header>"));
+      expect(header).toContain('<a class="brand" href="https://github.com/klaushofrichter/games-service"');
+      expect(header).toContain('<img src="/favicon.svg" alt=""><h1>Game Table Console</h1></a>');
+      // bare version, exactly once, linked to its release (the tag carries the v)
+      expect(header).toContain('<a class="version" href="https://github.com/klaushofrichter/games-service/releases/tag/v2026.10.13.2"');
+      expect(header.match(/2026\.10\.13\.2</g)).toHaveLength(1);
+      expect(header).not.toContain(">v2026");
+      expect(html).not.toMatch(/\{\{(version|repo)\}\}/);
+    });
+  });
+
+  it("labels main and dev builds without a release link, and shows the version on the public page", async () => {
+    await withVersion("main", async () => {
+      await start();
+      expect(await (await get("/")).text()).toContain('href="https://github.com/klaushofrichter/games-service/commits/main"');
+      await cloud!.close();
+    });
+    await withVersion(undefined, async () => {
+      await start();
+      expect(await (await get("/")).text()).toContain('<span class="version">dev</span>');
+    });
+  });
+
+  it("answers HEAD like GET, as the uptime monitor only sends HEAD", async () => {
+    await start();
+    for (const path of ["/", "/health", "/favicon.svg"]) {
+      const r = await fetch(base + path, { method: "HEAD" });
+      expect(r.status, path).toBe(200);
+      expect(await r.text(), path).toBe("");
+    }
+  });
+});

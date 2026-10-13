@@ -56,6 +56,12 @@ try:
         ctx.add_cookies([{"name": "games_admin", "value": session_cookie(ADMIN_EMAIL), "url": CLOUD, "httpOnly": True, "sameSite": "Lax"}])
         page.goto(CLOUD + "/admin")
         page.wait_for_selector(f"#who:has-text('{ADMIN_EMAIL}')")
+        # Top bar: the icon (actually loaded), "Game Table Console" linked to the repository, and the version.
+        assert page.get_attribute("header a.brand", "href") == "https://github.com/klaushofrichter/games-service"
+        assert page.inner_text("header a.brand h1") == "Game Table Console"
+        assert page.eval_on_selector("header a.brand img", "i => i.complete && i.naturalWidth > 0"), "favicon did not load"
+        assert page.inner_text("header .version") == "dev", page.inner_text("header .version")
+        assert page.eval_on_selector("link[rel=icon]", "l => l.href").endswith("/favicon.svg")
         page.wait_for_selector(f"text={code}")
         page.screenshot(path=os.path.join(OUT, "admin-pending.png"))
         page.fill("#pair-code", code.lower())

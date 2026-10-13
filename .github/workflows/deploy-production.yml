@@ -125,9 +125,10 @@ jobs:
             sleep 6
           done
           [ "$served" = "$VERSION" ] || { echo "::error::$BASE/health serves '$served', expected $VERSION"; exit 1; }
-          # Public landing page.
-          page=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/" || true)
+          # Public landing page, with the version label of this build.
+          page=$(curl -s -o /tmp/landing.html -w '%{http_code}' "$BASE/" || true)
           [ "$page" = "200" ] || { echo "::error::GET / returned $page"; exit 1; }
+          grep -qF ">$VERSION<" /tmp/landing.html || { echo "::error::GET / does not show the version label $VERSION"; exit 1; }
           # Auth-enforcement check, do not "fix" it to 200: anonymous /admin must redirect to the public sign-in page.
           # A 200 here would mean the admin portal had gone world-readable.
           admin=$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' "$BASE/admin" || true)

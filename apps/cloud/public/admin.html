@@ -3,7 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Game Table · Admin</title>
+<title>Game Table Console</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <style>
   :root { --bg:#0a1d19; --panel:#0f2a24; --line:#1f4a40; --ink:#f3eee2; --soft:#b9b3a3; --faint:#7d8a83; --brass:#d6a94a; --ruby:#d2574a; --jade:#5fbf8f;
     --display:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif; --text:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif; --mono:ui-monospace,SFMono-Regular,Menlo,monospace; }
@@ -11,6 +12,11 @@
   body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.45 var(--text); }
   header { display:flex; align-items:center; gap:16px; padding:18px 28px; border-bottom:1px solid var(--line); }
   header h1 { font-family:var(--display); font-size:24px; margin:0; font-weight:600; }
+  header .brand { display:flex; align-items:center; gap:12px; color:inherit; text-decoration:none; }
+  header .brand:hover h1 { color:var(--brass); }
+  header .brand img { width:30px; height:30px; display:block; }
+  header .version { color:var(--faint); font:13px var(--mono); text-decoration:none; }
+  header a.version:hover { color:var(--brass); text-decoration:underline; }
   header .eyebrow { margin-left:auto; }
   main { max-width:1180px; margin:0 auto; padding:24px 28px 60px; display:grid; gap:22px; }
   section { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:20px 22px; }
@@ -45,7 +51,8 @@
 </style>
 </head>
 <body>
-<header><h1>Game Table</h1><span class="faint">service admin</span><span class="eyebrow" id="who"></span><button id="signout" hidden>Sign out</button></header>
+<!-- The repository link and version placeholders below are filled in by the server (apps/cloud/src/server.ts). -->
+<header><a class="brand" href="{{repo}}" target="_blank" rel="noopener noreferrer" title="Source on GitHub"><img src="/favicon.svg" alt=""><h1>Game Table Console</h1></a>{{version}}<span class="eyebrow" id="who"></span><button id="signout" hidden>Sign out</button></header>
 
 <!-- Only used in local development, where Google sign-in is not configured. In the cluster /admin is for signed-in admins. -->
 <section id="signin" hidden>

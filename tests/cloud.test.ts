@@ -29,7 +29,7 @@ describe("cloud service", () => {
     const page = await fetch(`${base}/admin`);
     expect(page.status).toBe(200);
     expect(page.headers.get("x-frame-options")).toBe("DENY");
-    expect(await page.text()).toContain("service admin");
+    expect(await page.text()).toContain("Game Table Console");
     expect((await fetch(`${base}/admin/api/settings`)).status).toBe(401);
     expect((await admin("GET", "/admin/api/settings")).body).toEqual({ logRetentionDays: 90 });
   });
