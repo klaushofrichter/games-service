@@ -35,7 +35,7 @@ describe("board geometry", () => {
 
   it("gives players the side of the board they sit at", () => {
     expect(assignSides(seats(2))).toEqual({ 0: 2, 1: 0 });
-    expect(assignSides(seats(4))).toEqual({ 0: 2, 1: 1, 2: 0, 3: 3 });
+    expect(assignSides(seats(4))).toEqual({ 0: 2, 1: 3, 2: 0, 3: 1 }); // one per edge: south bottom, west left, north top, east right
     expect(assignSides(seats(3, "human", 6))).toEqual({ 0: 2, 1: 1, 2: 0 }); // two on the south edge, one north
     expect(assignSides(seats(3, "human", 8))).toEqual({ 0: 2, 1: 1, 2: 3 }); // three on the south edge
   });

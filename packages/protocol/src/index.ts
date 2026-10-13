@@ -32,7 +32,8 @@ export function seatEdges(layout: SeatLayout): Edge[] {
     case 2:
       return ["south", "north"];
     case 4:
-      return ["south", "south", "north", "north"];
+      // One on each side, clockwise from south (D-084).
+      return ["south", "west", "north", "east"];
     case 6:
       // Two on each long side and one at each end (D-079): the usual six-seat table.
       return ["south", "south", "north", "north", "east", "west"];
