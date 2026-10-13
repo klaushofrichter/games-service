@@ -35,7 +35,13 @@ export function cookies(req: IncomingMessage): Map<string, string> {
   const out = new Map<string, string>();
   for (const part of String(req.headers.cookie ?? "").split(";")) {
     const i = part.indexOf("=");
-    if (i > 0) out.set(part.slice(0, i).trim(), decodeURIComponent(part.slice(i + 1).trim()));
+    if (i <= 0) continue;
+    // Cookies for the whole skylar.technology domain reach us too; one badly encoded value must not break the page.
+    try {
+      out.set(part.slice(0, i).trim(), decodeURIComponent(part.slice(i + 1).trim()));
+    } catch {
+      /* skip it */
+    }
   }
   return out;
 }

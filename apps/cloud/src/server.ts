@@ -22,6 +22,8 @@ export interface IceServer {
 const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const code = (n: number) => Array.from({ length: n }, () => ALPHABET[randomInt(ALPHABET.length)]).join("");
 const secret = () => randomBytes(24).toString("base64url");
+const MAX_PENDING = 500;
+const PENDING_TTL_MS = 10 * 60_000;
 
 export interface CloudOptions {
   port: number;
@@ -49,6 +51,8 @@ interface TableRecord {
   pairingCode: string;
   tableToken: string | null;
   lastSeen: number | null;
+  /** Last hello while pending: waiting tables poll every 5 s; one gone quiet for 10 minutes is dropped. */
+  lastHello?: number;
   metrics: Record<string, number>;
   createdAt: number;
 }
@@ -149,12 +153,23 @@ export function startCloud(o: CloudOptions) {
     for (const [t, d] of downloadTokens) if (d.expiresAt < Date.now()) downloadTokens.delete(t);
     for (const [id, r] of remoteSessions) if (r.expiresAt < Date.now()) (r.ws?.close(4002, "expired"), remoteSessions.delete(id));
     for (const [ip, l] of lookups) if (l.reset < Date.now()) lookups.delete(ip);
+    for (const [id, t] of tables) if (t.status === "pending" && (t.lastHello ?? t.createdAt) < Date.now() - PENDING_TTL_MS) tables.delete(id);
   };
   const pruneTimer = setInterval(prune, 600_000);
   pruneTimer.unref();
 
+  /** A request target URL can't parse (e.g. "//[") must answer 400, not throw: an unhandled rejection exits Node. */
+  const parseUrl = (req: IncomingMessage) => {
+    try {
+      return new URL(req.url ?? "/", "http://cloud");
+    } catch {
+      return null;
+    }
+  };
+
   const server = createServer(async (req, res) => {
-    const url = new URL(req.url ?? "/", "http://cloud");
+    const url = parseUrl(req);
+    if (!url) return json(res, 400, { error: "bad request target" });
     const p = url.pathname;
     const m = req.method ?? "GET";
     let match: RegExpMatchArray | null;
@@ -187,16 +202,29 @@ export function startCloud(o: CloudOptions) {
 
       // ----- tables -----
       if (m === "POST" && p === "/api/tables/hello") {
+        // Unauthenticated, so bounded: per address (a waiting table polls 12 times a minute; several may share a
+        // home's address) and in total, or a flood of invented table ids would fill the pod's memory.
+        if (limited(`hello:${clientIp(req)}`, 60)) return json(res, 429, { error: "too many requests; wait a minute" });
         const b = await jsonBody(req);
         const tableId = String(b.tableId ?? "");
         if (!/^[A-Za-z0-9_-]{8,64}$/.test(tableId)) return json(res, 400, { error: "tableId required" });
         let t = tables.get(tableId);
         if (!t) {
+          let pending = 0;
+          for (const x of tables.values()) if (x.status === "pending") pending++;
+          if (pending >= MAX_PENDING) {
+            prune();
+            pending = [...tables.values()].filter((x) => x.status === "pending").length;
+            if (pending >= MAX_PENDING) return json(res, 503, { error: "too many tables waiting for approval; try again later" });
+          }
           t = { tableId, name: String(b.name ?? "Game Table").slice(0, 60), status: "pending", pairingCode: code(6), tableToken: null, lastSeen: null, metrics: {}, createdAt: Date.now() };
           tables.set(tableId, t);
         }
         if (t.status === "revoked") return json(res, 403, { status: "revoked" });
-        if (t.status === "pending") return json(res, 202, { status: "pending", pairingCode: t.pairingCode });
+        if (t.status === "pending") {
+          t.lastHello = Date.now();
+          return json(res, 202, { status: "pending", pairingCode: t.pairingCode });
+        }
         // Approved: the token is handed out once, on the first hello after approval.
         if (!t.tableToken) t.tableToken = secret();
         else if (!same(bearer(req), t.tableToken)) return json(res, 200, { status: "approved", tokenIssued: true });
@@ -326,11 +354,12 @@ export function startCloud(o: CloudOptions) {
   const sendJson = (ws: WebSocket | null | undefined, v: unknown) => ws && ws.readyState === ws.OPEN && ws.send(JSON.stringify(v));
 
   server.on("upgrade", (req, socket, head) => {
-    const url = new URL(req.url ?? "/", "http://cloud");
     const reject = (code: number) => {
       socket.write(`HTTP/1.1 ${code} No\r\n\r\n`);
       socket.destroy();
     };
+    const url = parseUrl(req);
+    if (!url) return reject(400);
     if (url.pathname === "/api/tables/ws") {
       const t = tableFor(req as IncomingMessage);
       if (!t) return reject(401);

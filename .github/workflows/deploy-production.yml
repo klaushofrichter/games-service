@@ -54,20 +54,20 @@ jobs:
           echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
           echo "Deploying $VERSION"
 
-      - name: Build and push both images
+      - name: Build both images and push the SHA tags
         env:
           VERSION: ${{ steps.ver.outputs.version }}
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
-          # The cluster pins :<sha>; people look for :v<version>; table PCs pull :latest (deploy/table-pc/update.sh).
+          # Only :<sha> before the deploy is verified (the cluster pins it). :v<version> and :latest (which table PCs
+          # pull, deploy/table-pc/update.sh) follow after the smoke test, so a failed deploy publishes neither, and a
+          # retry that reuses the version number cannot overwrite a tag someone already pulled.
           for img in cloud table-host; do
-            docker build -f "deploy/$img.Dockerfile" --build-arg "APP_VERSION=$VERSION" \
-              -t "$REGISTRY/games-$img:$GITHUB_SHA" -t "$REGISTRY/games-$img:v$VERSION" -t "$REGISTRY/games-$img:latest" .
-            for t in "$GITHUB_SHA" "v$VERSION" latest; do docker push "$REGISTRY/games-$img:$t"; done
+            docker build -f "deploy/$img.Dockerfile" --build-arg "APP_VERSION=$VERSION" -t "$REGISTRY/games-$img:$GITHUB_SHA" .
+            docker push "$REGISTRY/games-$img:$GITHUB_SHA"
           done
-          docker system prune -af --filter "until=168h" || true
 
       - name: Update the kube-setup manifest and apply it
         env:
@@ -76,6 +76,8 @@ jobs:
           set -euo pipefail
           IMAGE="$REGISTRY/games-cloud:$GITHUB_SHA"
           rm -rf /tmp/kube-setup
+          # The clone URL carries the token into .git/config: remove the checkout however this step ends.
+          trap 'rm -rf /tmp/kube-setup' EXIT
           git clone --depth 1 "https://x-access-token:${KUBE_SETUP_DEPLOY_TOKEN}@github.com/klaushofrichter/kube-setup.git" /tmp/kube-setup
           cd /tmp/kube-setup
           sed -i -E "s#image: ${REGISTRY}/games-cloud:[^[:space:]]+#image: ${IMAGE}#" "$MANIFEST"
@@ -99,7 +101,8 @@ jobs:
           set -euo pipefail
           # `kubectl rollout status` needs list+watch, which a Role scoped to one Deployment cannot grant: poll instead.
           for i in $(seq 1 60); do
-            read -r gen observed updated available replicas <<<"$(kubectl get deployment "$DEPLOYMENT" -o jsonpath='{.metadata.generation} {.status.observedGeneration} {.status.updatedReplicas} {.status.availableReplicas} {.spec.replicas}')"
+            # `|| true`: an API blip is retried by the loop instead of ending the step without a message.
+            read -r gen observed updated available replicas <<<"$(kubectl get deployment "$DEPLOYMENT" -o jsonpath='{.metadata.generation} {.status.observedGeneration} {.status.updatedReplicas} {.status.availableReplicas} {.spec.replicas}' || true)" || true
             if [ "$gen" = "$observed" ] && [ "${updated:-0}" = "$replicas" ] && [ "${available:-0}" = "$replicas" ]; then
               echo "Rolled out (generation $gen)"; exit 0
             fi
@@ -123,13 +126,13 @@ jobs:
           done
           [ "$served" = "$VERSION" ] || { echo "::error::$BASE/health serves '$served', expected $VERSION"; exit 1; }
           # Public landing page.
-          page=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/")
+          page=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/" || true)
           [ "$page" = "200" ] || { echo "::error::GET / returned $page"; exit 1; }
           # Auth-enforcement check, do not "fix" it to 200: anonymous /admin must redirect to the public sign-in page.
           # A 200 here would mean the admin portal had gone world-readable.
-          admin=$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' "$BASE/admin")
+          admin=$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' "$BASE/admin" || true)
           [ "$admin" = "302 $BASE/" ] || { echo "::error::GET /admin returned '$admin', expected '302 $BASE/'"; exit 1; }
-          api=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/admin/api/tables")
+          api=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/admin/api/tables" || true)
           [ "$api" = "401" ] || { echo "::error::GET /admin/api/tables returned $api without a session"; exit 1; }
           {
             echo "served_version=$served"
@@ -137,6 +140,19 @@ jobs:
             echo "admin=$admin"
             echo "checked_at=$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
           } >> "$GITHUB_OUTPUT"
+
+      - name: Publish the verified build as v<version> and latest
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          set -euo pipefail
+          for img in cloud table-host; do
+            for t in "v$VERSION" latest; do
+              docker tag "$REGISTRY/games-$img:$GITHUB_SHA" "$REGISTRY/games-$img:$t"
+              docker push "$REGISTRY/games-$img:$t"
+            done
+          done
+          docker system prune -af --filter "until=168h" || true
 
       - name: Release
         env:

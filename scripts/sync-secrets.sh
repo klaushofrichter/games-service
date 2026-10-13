@@ -25,7 +25,9 @@ git check-ignore -q "$ENV_FILE" || { echo "$ENV_FILE is not git-ignored; refusin
 # value, so an inline "# comment" would become part of a token: reject that instead of shipping it.
 declare -A V
 problems=()
+n=0
 while IFS= read -r line || [ -n "$line" ]; do
+  n=$((n + 1))
   [[ "$line" =~ ^[[:space:]]*(#|$) ]] && continue
   if [[ "$line" =~ ^([A-Za-z_][A-Za-z0-9_]*)=(.*)$ ]]; then
     k=${BASH_REMATCH[1]} v=${BASH_REMATCH[2]}
@@ -34,7 +36,8 @@ while IFS= read -r line || [ -n "$line" ]; do
     [[ "$v" =~ [[:space:]]$ ]] && problems+=("$k has trailing whitespace")
     V[$k]=$v
   else
-    problems+=("unreadable line (not KEY=value): ${line%%=*}...")
+    # Only the line number: the line itself might be a bare token.
+    problems+=("line $n is not KEY=value")
   fi
 done < "$ENV_FILE"
 

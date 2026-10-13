@@ -37,6 +37,12 @@ if (present.length) {
   fail("Local development needs ADMIN_TOKEN (at least 16 characters) when Google sign-in is not configured");
 }
 
+// State lives in this one process (D-036): a second replica would not see the first one's tables. The replica count is
+// in kube-setup's manifest, far from this code, so the manifest passes it in and we warn loudly when it is wrong.
+if (env.MAX_REPLICAS !== "1") {
+  console.warn(`[cloud] WARNING: MAX_REPLICAS is ${env.MAX_REPLICAS ?? "unset"}; this service must run as exactly one replica until its state moves to a shared store`);
+}
+
 const cloud = await startCloud({
   port: Number(env.PORT ?? 8081),
   adminToken,

@@ -17,6 +17,17 @@ if [ -f "$ACCEPTED" ]; then
   accepted_keys="$(awk -F'\t' '!/^[[:space:]]*#/ && NF>=3 {print $1"\t"$2}' "$ACCEPTED")"
 fi
 
+# jq writes to a file first: inside `< <(...)` a jq error escapes set -e and the gate would read nothing and pass.
+results=$(mktemp)
+trap 'rm -f "$results"' EXIT
+jq -r '.runs[] | (.results // error("a run without results: is this CodeQL SARIF?"))[] | [
+    .ruleId,
+    (.locations[0].physicalLocation.artifactLocation.uri // "?"),
+    (.locations[0].physicalLocation.region.startLine // 0 | tostring),
+    ((.suppressions // []) | length > 0 | tostring),
+    ((.message.text // "(no message)") | gsub("[\t\n]"; " "))
+  ] | @tsv' "${files[@]}" > "$results"
+
 failed=0 noted=0
 while IFS=$'\t' read -r rule path line suppressed msg; do
   [ -z "$rule" ] && continue
@@ -27,13 +38,7 @@ while IFS=$'\t' read -r rule path line suppressed msg; do
     echo "::error file=$path,line=$line::CodeQL $rule: $msg"
     failed=$((failed + 1))
   fi
-done < <(jq -r '.runs[].results[] | [
-    .ruleId,
-    (.locations[0].physicalLocation.artifactLocation.uri // "?"),
-    (.locations[0].physicalLocation.region.startLine // 0 | tostring),
-    ((.suppressions // []) | length > 0 | tostring),
-    (.message.text | gsub("[\t\n]"; " "))
-  ] | @tsv' "${files[@]}")
+done < "$results"
 
 echo "CodeQL: $failed finding(s) failing the gate, $noted accepted"
 [ "$failed" -eq 0 ]

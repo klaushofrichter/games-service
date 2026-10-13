@@ -194,3 +194,40 @@ describe("admin sign-in", () => {
     expect(await burst((i) => `203.0.113.${i}`)).toBeGreaterThan(0); // spoofed headers are ignored
   });
 });
+
+describe("hardening (review findings)", () => {
+  const raw = (port: number, request: string) =>
+    new Promise<string>((resolve) => {
+      import("node:net").then(({ connect }) => {
+        const s = connect(port, "127.0.0.1", () => s.write(request));
+        let out = "";
+        s.on("data", (d) => (out += d));
+        s.on("close", () => resolve(out));
+        s.on("error", () => resolve(out));
+        setTimeout(() => s.destroy(), 1000);
+      });
+    });
+
+  it("a request target that is not a URL gets 400 and the service keeps running", async () => {
+    await start();
+    expect(await raw(cloud!.port, "GET //[ HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n")).toMatch(/^HTTP\/1\.1 400/);
+    expect(await raw(cloud!.port, "GET //[ HTTP/1.1\r\nHost: x\r\nConnection: Upgrade\r\nUpgrade: websocket\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n\r\n")).toMatch(/^HTTP\/1\.1 400/);
+    expect((await get("/health")).status).toBe(200);
+  });
+
+  it("a badly encoded cookie from another service is ignored, not a 500", async () => {
+    await start();
+    const { session } = await signIn("admin@example.com");
+    expect((await get("/", { cookie: "other=50%" })).status).toBe(200);
+    expect((await get("/admin/api/me", { cookie: `other=50%; __Host-games_admin=${session}` })).status).toBe(200);
+  });
+
+  it("unauthenticated table hellos are rate limited per address", async () => {
+    await start();
+    const hello = (i: number) => fetch(`${base}/api/tables/hello`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ tableId: `flood-table-${i}` }) });
+    const codes: number[] = [];
+    for (let i = 0; i < 65; i++) codes.push((await hello(i)).status);
+    expect(codes.slice(0, 60).every((c) => c === 202)).toBe(true);
+    expect(codes.slice(60)).toContain(429);
+  });
+});

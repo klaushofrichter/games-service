@@ -73,6 +73,8 @@ spec:
             # X-Forwarded-For only from loopback and the pod/service networks (10.42/16, 10.43/16): a CIDR list, not hops.
             - { name: TRUST_PROXY, value: "1" }
             - { name: LOG_RETENTION_DAYS, value: "90" }
+            # Must match `replicas`; the service warns at startup otherwise (its state is in one process).
+            - { name: MAX_REPLICAS, value: "1" }
           # GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI, ALLOWED_EMAILS, COOKIE_SECRET (+ optional ADMIN_TOKEN)
           envFrom: [{ secretRef: { name: games-oauth } }]
           readinessProbe: { httpGet: { path: /health, port: http }, periodSeconds: 10 }

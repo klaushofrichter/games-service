@@ -216,7 +216,13 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
   };
 
   const handler = async (req: IncomingMessage, res: ServerResponse) => {
-    const url = new URL(req.url ?? "/", "http://table");
+    let url: URL;
+    try {
+      url = new URL(req.url ?? "/", "http://table");
+    } catch {
+      // A request target URL can't parse must answer 400, not throw: an unhandled rejection exits Node.
+      return json(res, 400, { error: "bad request target" });
+    }
     const path = url.pathname;
     try {
       // {status, version}: the version is stamped at build time (APP_VERSION) and reads "dev" outside a release build.
