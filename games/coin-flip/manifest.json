@@ -1,7 +1,7 @@
 {
   "id": "coin-flip",
   "name": "Coin Flip",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "sdk": "^0.1",
   "description": "Everyone guesses heads or tails, then the coin flips. A stub game for platform tests.",
   "players": {
@@ -34,12 +34,13 @@
       "label": "Rounds"
     },
     {
-      "key": "roundMs",
+      "key": "roundSeconds",
       "type": "int",
       "min": 0,
-      "max": 60000,
-      "default": 15000,
-      "label": "Milliseconds per round (0 = no limit)"
+      "max": 120,
+      "step": 5,
+      "default": 15,
+      "label": "Seconds to guess (0 = no limit)"
     }
   ],
   "ai": {

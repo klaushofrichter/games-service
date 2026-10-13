@@ -63,7 +63,7 @@ describe("concurrency", () => {
   it("starts one game when start is pressed twice at once", async () => {
     const t = await host();
     const a = await t.joinDeck("A");
-    await t.ok("POST", "/game/select", { gameId: "coin-flip", settings: { rounds: 2, roundMs: 0 } });
+    await t.ok("POST", "/game/select", { gameId: "coin-flip", settings: { rounds: 2, roundSeconds: 0 } });
     await a.request("lobby", "ready", { ready: true });
     const [r1, r2] = await Promise.all([t.api("POST", "/game/start"), t.api("POST", "/game/start")]);
     expect([r1.status, r2.status].sort()).toEqual([200, 409]);

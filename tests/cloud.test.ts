@@ -46,7 +46,7 @@ describe("cloud service", () => {
 
       // play a game; its log is uploaded
       const a = await t.joinDeck("A");
-      await t.ok("POST", "/game/select", { gameId: "coin-flip", settings: { rounds: 1, roundMs: 0 } });
+      await t.ok("POST", "/game/select", { gameId: "coin-flip", settings: { rounds: 1, roundSeconds: 0 } });
       await a.request("lobby", "ready", { ready: true });
       await t.ok("POST", "/game/start");
       await a.request("game", "intent", { name: "guess", payload: "heads" });

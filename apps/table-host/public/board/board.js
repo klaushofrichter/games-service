@@ -17,6 +17,7 @@ const gameLayer = document.getElementById("game-layer");
 const pauseLayer = document.getElementById("pause-layer");
 const cornersEl = document.getElementById("corners");
 const settingsBtn = document.getElementById("settings-button");
+const resultBtn = document.getElementById("result-button");
 
 let state = null;
 let games = [];
@@ -174,7 +175,7 @@ function renderSeats() {
       ? "Open seat"
       : !pl.connected
         ? "Reconnecting…"
-        : state.phase === "ready" && pl.kind === "human"
+        : state.phase === "ready" // AI players are always ready, and show it like everyone else (D-089)
           ? `<span class="dot"></span>${pl.ready ? "Ready" : "Not ready"}`
           : pl.kind === "ai" ? `AI player${pl.aiOptions ? ` · ${esc(Object.values(pl.aiOptions).join(", "))}` : ""}` : pl.location === "remote" ? "Remote" : "";
     el.innerHTML = `<div class="num">${esc(seatName(state.seatEdges, seat))}</div>
@@ -214,6 +215,13 @@ function renderCorners(hide) {
 cornersEl.addEventListener("click", (e) => {
   const b = e.target.closest("button[data-face]");
   if (b && b.dataset.face !== state.frontEdge) act("POST", "/face", { edge: b.dataset.face });
+});
+
+let lastPhase = null;
+let holdFinal = false;
+resultBtn.addEventListener("click", () => {
+  holdFinal = false;
+  render();
 });
 
 // ---------- settings (D-088) ----------
@@ -274,9 +282,29 @@ function openSettings() {
       items = [];
     }
     const fs = document.fullscreenEnabled;
+    // The chosen game's own settings from its manifest (D-090): editable until it starts, then shown read-only.
+    const fields = (state.game && games.find((x) => x.id === state.game.id)?.settings) || [];
+    const editable = state.phase === "ready";
+    const cur = state.game?.settings ?? {};
+    const setting = (f) => {
+      const v = cur[f.key] ?? f.default;
+      if (!editable) return `<span class="value">${esc(f.type === "bool" ? (v ? "On" : "Off") : v)}</span>`;
+      if (f.type === "int" || f.type === "number")
+        return `<span class="stepper"><button data-setting="${esc(f.key)}" data-delta="-1" ${f.min !== undefined && v <= f.min ? "disabled" : ""} aria-label="Less">−</button>
+          <span class="value">${esc(v)}</span><button data-setting="${esc(f.key)}" data-delta="1" ${f.max !== undefined && v >= f.max ? "disabled" : ""} aria-label="More">+</button></span>`;
+      if (f.type === "bool") return `<button data-setting="${esc(f.key)}" data-toggle class="${v ? "on" : ""}" role="switch" aria-checked="${!!v}">${v ? "On" : "Off"}</button>`;
+      if (f.type === "enum") return `<span class="seg">${f.values.map((x) => `<button class="${String(v) === x ? "on" : ""}" data-setting="${esc(f.key)}" data-value="${esc(x)}">${esc(x)}</button>`).join("")}</span>`;
+      return `<span class="value">${esc(v)}</span>`;
+    };
+    const gameSettings = fields.length
+      ? `<div class="group game-rules"><div class="eyebrow">${esc(state.game.name)} · game settings</div>
+          ${fields.map((f) => `<div class="row"><span>${esc(f.label ?? f.key)}</span>${setting(f)}</div>`).join("")}
+          ${editable ? "" : `<div class="faint" style="font-size:.7em;margin-top:6px">These can be changed before the game starts.</div>`}</div>`
+      : "";
     o.innerHTML = `<div class="panel"><h2>Settings</h2>
       <div class="group"><div class="eyebrow">Display</div>
         <div class="row"><span>Fullscreen</span>${fs ? `<button data-fs class="${document.fullscreenElement ? "on" : ""}">${document.fullscreenElement ? "Leave fullscreen" : "Fullscreen"}</button>` : `<span class="faint">not available in this browser</span>`}</div></div>
+      ${gameSettings}
       ${items.length ? `<div class="group game-settings"><div class="eyebrow">${esc(state.game.name)}</div>${items.map((it, k) => `<div class="row"><span>${esc(it.label)}</span>${control(it, k)}</div>`).join("")}</div>` : ""}
       <div class="actions" style="display:flex;justify-content:flex-end;margin-top:20px"><button class="primary" data-close-overlay>Done</button></div></div>`;
     faceFront(o.querySelector(".panel"));
@@ -297,6 +325,19 @@ function openSettings() {
     if (b.dataset.fs !== undefined) {
       (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()).catch(() => toast("Fullscreen was refused by the browser"));
     }
+    if (b.dataset.setting) {
+      const f = ((state.game && games.find((x) => x.id === state.game.id)?.settings) || []).find((x) => x.key === b.dataset.setting);
+      if (!f) return;
+      const v = state.game.settings?.[f.key] ?? f.default;
+      let next = v;
+      if (b.dataset.delta) {
+        const step = f.step ?? (f.type === "int" ? 1 : 0.5);
+        next = Math.min(f.max ?? Infinity, Math.max(f.min ?? -Infinity, Number(v) + Number(b.dataset.delta) * step));
+      } else if (b.dataset.toggle !== undefined) next = !v;
+      else if (b.dataset.value !== undefined) next = b.dataset.value;
+      if (next !== v) act("POST", "/game/settings", { settings: { [f.key]: next } });
+      return;
+    }
     const it = items[Number(b.dataset.item)];
     if (!it || b.dataset.item === undefined) return;
     if (it.type === "toggle") it.onChange?.(!it.value);
@@ -316,16 +357,24 @@ function render() {
   center.classList.toggle("sideways", front === "east" || front === "west");
 
   const playing = state.phase === "active" || state.phase === "paused" || state.phase === "terminating";
+  // A game that ends by itself keeps its last screen until someone taps Show result (D-091); one ended from the
+  // lobby goes straight to the result. This is per screen: each board (and remote board) moves on by itself.
+  if (state.phase === "finished" && (lastPhase === "active" || lastPhase === "paused") && game) holdFinal = true;
+  if (state.phase !== "finished") holdFinal = false;
+  lastPhase = state.phase;
+  const showingGame = playing || holdFinal;
   lobbyBtn.hidden = !playing;
   lobbyBtn.className = state.game?.lobbyButton ?? "bottom-right";
+  resultBtn.hidden = !holdFinal;
+  resultBtn.className = `primary ${state.game?.lobbyButton ?? "bottom-right"}`;
 
   renderPause();
-  renderCorners(playing && state.phase !== "paused");
-  placeSettings(playing);
-  seatsEl.hidden = playing;
-  center.hidden = playing;
-  gameLayer.hidden = !playing;
-  if (playing) return void showGame();
+  renderCorners(showingGame && state.phase !== "paused");
+  placeSettings(showingGame);
+  seatsEl.hidden = showingGame;
+  center.hidden = showingGame;
+  gameLayer.hidden = !showingGame;
+  if (showingGame) return void showGame();
   closeGame();
   if (state.phase === "finished") return renderFinished();
   if (state.phase === "ready") return renderReady();
@@ -430,7 +479,7 @@ function renderReady() {
   center.innerHTML = `<section class="main waiting">
       <div><div class="eyebrow">Up next · ${playersLabel(state.game.players)} · ${seated} seated</div><h1>${esc(state.game.name)}</h1>
       <div class="sub">${needs.length ? `${esc(needs.map((n, i) => (i ? n : n[0].toUpperCase() + n.slice(1))).join(" · "))}. Scan the code to join${g?.ai ? " or add an AI player" : ""}.` : "Everyone taps <b>Ready</b> on their phone."}</div></div>
-      <div class="ready-list">${humans.map((p) => `<span class="chip ${p.ready ? "ok" : ""}"><span class="dot" style="background:${p.ready ? "var(--jade)" : ""}"></span>${esc(p.name)}</span>`).join("")}</div>
+      <div class="ready-list">${state.players.filter((p) => p.seat !== null).map((p) => `<span class="chip ${p.ready ? "ok" : ""}"><span class="dot" style="background:${p.ready ? "var(--jade)" : ""}"></span>${esc(p.name)}</span>`).join("")}</div>
       ${REMOTE ? "" : `<div class="toolbar">${seatButtons()}${roomForAi ? `<div class="right"><button data-add-ai>+ AI player</button></div>` : ""}</div>`}
       <div class="toolbar"><button class="primary" data-start ${all ? "" : "disabled"}>Start game</button><button data-close>Change game</button>
       ${REMOTE ? "" : (() => { const sel = state.players.find((p) => p.id === selectedPlayer); return sel?.kind === "ai" ? `<button data-config="${sel.id}">Configure ${esc(sel.name)}</button>` : state.players.some((p) => p.kind === "ai") ? `<span class="faint" style="font-size:.7em">Tap an AI seat to configure it</span>` : ""; })()}
@@ -438,11 +487,18 @@ function renderReady() {
     </section>${joinPanel()}`;
 }
 
+/** A game's statistics from its summary (D-091): the first column left-aligned, numbers centred. */
+function summaryTable(t) {
+  return `<table class="summary-table"><tr>${t.columns.map((c) => `<th>${esc(c)}</th>`).join("")}</tr>
+    ${t.rows.map((r) => `<tr>${r.map((c) => `<td>${esc(c)}</td>`).join("")}</tr>`).join("")}</table>`;
+}
+
 function renderFinished() {
   const s = state.summary;
   center.innerHTML = `<section class="main">
       <div class="summary"><div class="eyebrow">${esc(state.game?.name ?? "Game")} · finished</div>
       <div class="big">${esc(s?.text ?? "Game over")}</div>
+      ${s?.table ? summaryTable(s.table) : ""}
       <div class="toolbar"><button class="primary" data-again>Play again</button><button data-close>Back to lobby</button></div></div>
     </section>${joinPanel()}`;
 }

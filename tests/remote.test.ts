@@ -206,7 +206,7 @@ describe("remote play", { timeout: 60_000 }, () => {
       expect(r.body.error).toMatch(/only players at the table/);
     }
     expect(t.host.table.state().players.map((p) => p.name).sort()).toEqual(["Ana", "Rita"]);
-    expect((await peer.json("POST", "/api/v1/game/select", { gameId: "coin-flip", settings: { rounds: 1, roundMs: 0 } })).status).toBe(200);
+    expect((await peer.json("POST", "/api/v1/game/select", { gameId: "coin-flip", settings: { rounds: 1, roundSeconds: 0 } })).status).toBe(200);
     await a.request("lobby", "ready", { ready: true });
     deck.send("lobby", "ready", { ready: true }, 2);
     await until(() => t.host.table.state().players.every((p) => p.ready));

@@ -116,7 +116,7 @@ export function seatPlates(layer, info, extra = () => "", opts = {}) {
       const at = pos[p.seat];
       const active = opts.active === p.seat;
       return `<div class="kit-plate ${active ? "active" : ""} ${p.connected ? "" : "away"}" style="left:${at.x}px;top:${at.y}px;transform:translate(-50%,-50%) rotate(${at.rot}deg);--seat:${playerColor(info, p.seat)}">
-        <div class="kit-name">${p.kind === "ai" ? "◆ " : ""}${esc(p.name)}</div>
+        <div class="kit-name">${esc(p.name)}</div>
         <div class="kit-extra">${p.connected ? extra(p.seat, p) : "Reconnecting…"}</div></div>`;
     })
     .join("");

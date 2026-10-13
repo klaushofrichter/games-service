@@ -315,7 +315,7 @@ describe("game selection gating", () => {
     await t.joinDeck("A");
     expect((await t.api("POST", "/game/select", { gameId: "coin-flip", settings: { rounds: 99 } })).status).toBe(400);
     const s = await t.ok("POST", "/game/select", { gameId: "coin-flip", settings: { rounds: 2 } });
-    expect(s.game.settings).toMatchObject({ rounds: 2, roundMs: 15000 });
+    expect(s.game.settings).toMatchObject({ rounds: 2, roundSeconds: 15 });
   });
 });
 
@@ -323,7 +323,7 @@ describe("ready flow and play", () => {
   it("starts only when every human is ready", async () => {
     const a = await t.joinDeck("A");
     const b = await t.joinDeck("B");
-    await t.ok("POST", "/game/select", { gameId: "coin-flip", settings: { rounds: 1, roundMs: 0 } });
+    await t.ok("POST", "/game/select", { gameId: "coin-flip", settings: { rounds: 1, roundSeconds: 0 } });
     expect((await a.request("lobby", "ready", { ready: true })).type).toBe("ack");
     const r = await t.api("POST", "/game/start");
     expect(r.status).toBe(409);
@@ -335,7 +335,7 @@ describe("ready flow and play", () => {
   it("plays coin flip: intents reach the game, views stay private, summary and log at the end", async () => {
     const a = await t.joinDeck("A");
     const b = await t.joinDeck("B");
-    await t.ok("POST", "/game/select", { gameId: "coin-flip", settings: { rounds: 2, roundMs: 0 } });
+    await t.ok("POST", "/game/select", { gameId: "coin-flip", settings: { rounds: 2, roundSeconds: 0 } });
     await a.request("lobby", "ready", { ready: true });
     await b.request("lobby", "ready", { ready: true });
     await t.ok("POST", "/game/start");
@@ -374,7 +374,7 @@ describe("ready flow and play", () => {
   it("lets an AI seat play by itself", async () => {
     const a = await t.joinDeck("A");
     await t.ok("POST", "/ai", {});
-    await t.ok("POST", "/game/select", { gameId: "coin-flip", settings: { rounds: 1, roundMs: 0 } });
+    await t.ok("POST", "/game/select", { gameId: "coin-flip", settings: { rounds: 1, roundSeconds: 0 } });
     await a.request("lobby", "ready", { ready: true });
     await t.ok("POST", "/game/start");
     // the AI seat guesses on its own
@@ -385,7 +385,7 @@ describe("ready flow and play", () => {
 
   it("refuses seat and layout changes while a game is running", async () => {
     const a = await t.joinDeck("A");
-    await t.ok("POST", "/game/select", { gameId: "coin-flip", settings: { roundMs: 0 } });
+    await t.ok("POST", "/game/select", { gameId: "coin-flip", settings: { roundSeconds: 0 } });
     await a.request("lobby", "ready", { ready: true });
     await t.ok("POST", "/game/start");
     expect((await t.api("POST", "/seats/move", { playerId: a.playerId, seat: 2 })).status).toBe(409);
@@ -395,7 +395,7 @@ describe("ready flow and play", () => {
 
   it("seats a newcomer into a running game that allows dynamic players", async () => {
     const a = await t.joinDeck("A");
-    await t.ok("POST", "/game/select", { gameId: "coin-flip", settings: { rounds: 3, roundMs: 0 } });
+    await t.ok("POST", "/game/select", { gameId: "coin-flip", settings: { rounds: 3, roundSeconds: 0 } });
     await a.request("lobby", "ready", { ready: true });
     await t.ok("POST", "/game/start");
     const b = await t.joinDeck("B");
@@ -468,7 +468,7 @@ describe("disconnects and eviction", () => {
   it("removes a disconnected player from a running dynamic game after the grace period", async () => {
     const a = await t.joinDeck("A");
     const b = await t.joinDeck("B");
-    await t.ok("POST", "/game/select", { gameId: "coin-flip", settings: { rounds: 2, roundMs: 0 } });
+    await t.ok("POST", "/game/select", { gameId: "coin-flip", settings: { rounds: 2, roundSeconds: 0 } });
     await a.request("lobby", "ready", { ready: true });
     await b.request("lobby", "ready", { ready: true });
     await t.ok("POST", "/game/start");
@@ -568,5 +568,27 @@ describe("game display prefs (D-088)", () => {
     expect((await t.api("POST", "/game/prefs", { prefs: { "bad key!": 1 } })).status).toBe(400);
     expect((await t.api("POST", "/game/prefs", { prefs: { big: "x".repeat(5000) } })).status).toBe(413);
     expect((await t.ok("GET", "/state")).game.prefs).toEqual({}); // nothing half-applied
+  });
+});
+
+describe("changing game settings before the start (D-090)", () => {
+  it("changes only the keys given, keeps everyone's Ready, and is closed once the game runs", async () => {
+    const a = await t.joinDeck("A");
+    await t.ok("POST", "/ai", {});
+    await t.ok("POST", "/game/select", { gameId: "coin-flip", settings: { rounds: 3, roundSeconds: 0 } });
+    a.send("lobby", "ready", { ready: true });
+    await until(async () => (await t.ok("GET", "/state")).players.every((p: any) => p.ready));
+    let s = await t.ok("POST", "/game/settings", { settings: { rounds: 7 } });
+    expect(s.game.settings).toEqual({ rounds: 7, roundSeconds: 0 });
+    expect(s.players.every((p: any) => p.ready)).toBe(true);
+    expect((await t.api("POST", "/game/settings", { settings: { rounds: 99 } })).status).toBe(400); // max 20
+    expect((await t.api("POST", "/game/settings", { settings: [1] })).status).toBe(400);
+    expect((await t.ok("GET", "/state")).game.settings.rounds).toBe(7);
+    await t.ok("POST", "/game/start");
+    expect((await t.api("POST", "/game/settings", { settings: { rounds: 2 } })).status).toBe(409);
+  });
+
+  it("is refused with no game chosen", async () => {
+    expect((await t.api("POST", "/game/settings", { settings: { rounds: 2 } })).status).toBe(409);
   });
 });

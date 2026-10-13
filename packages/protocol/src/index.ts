@@ -57,6 +57,8 @@ const settingSchema = z.object({
   values: z.array(z.string()).optional(),
   default: z.unknown().optional(),
   label: z.string().optional(),
+  /** How far one tap on − or + moves a number in the board's settings (D-090). */
+  step: z.number().positive().optional(),
 });
 
 export const manifestSchema = z.object({
@@ -127,6 +129,8 @@ export interface PlayerInfo {
 export interface GameSummary {
   text: string;
   highlights: Record<string, unknown>;
+  /** Optional statistics the result screen shows as a table (D-091), e.g. per player: correct guesses, heads %. */
+  table?: { columns: string[]; rows: (string | number)[][] };
 }
 
 export interface LobbyState {
