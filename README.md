@@ -33,6 +33,10 @@ With Docker: `docker compose -f deploy/docker-compose.yml up --build` starts a c
 curl -X POST -H "Authorization: Bearer $ADMIN_TOKEN" http://localhost:8081/admin/api/tables/pair/<CODE>
 ```
 
+## A table on a Mac (development)
+
+`scripts/mac-table.sh` runs a Table Host on a Mac against the live service at `games.skylar.technology` (Node 26 needed). It opens the board in the browser, puts the Mac's WiFi address in the QR code, and keeps the table's identity and API key in `~/.gametable-mac`, so a restart is the same table. The first time, the board shows a pairing code: approve it in the console at `https://games.skylar.technology/admin`. Allow `node` to accept incoming connections when macOS asks, or phones cannot join. `CLOUD_URL= scripts/mac-table.sh` runs it without the service.
+
 ## Layout
 
 | Path | What it is |
