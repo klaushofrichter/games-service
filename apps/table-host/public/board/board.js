@@ -1,6 +1,6 @@
 // Board UI: lobby, seats around the edge, QR join, game surface and the lobby overlay.
 // Talks to the Table Host through the board control API (same API the tests and local AI agents use).
-import { ROT, W, H, esc, seatName, seatPositions, claimServiceWorkerPage, openTableSocket } from "/shared/board-kit.js";
+import { ROT, W, H, audio, esc, seatName, seatPositions, claimServiceWorkerPage, openTableSocket } from "/shared/board-kit.js";
 
 const KEY = window.TABLE_KEY;
 // A remote player's copy of the board (phase 1c): it runs inside the cloud's invite page, which carries
@@ -217,6 +217,9 @@ cornersEl.addEventListener("click", (e) => {
   if (b && b.dataset.face !== state.frontEdge) act("POST", "/face", { edge: b.dataset.face });
 });
 
+// Browsers keep sound off until the page is touched: wake the audio on the first touch (D-092).
+window.addEventListener("pointerdown", () => audio(), { capture: true });
+
 let lastPhase = null;
 let holdFinal = false;
 resultBtn.addEventListener("click", () => {
@@ -303,6 +306,7 @@ function openSettings() {
       : "";
     o.innerHTML = `<div class="panel"><h2>Settings</h2>
       <div class="group"><div class="eyebrow">Display</div>
+        <div class="row"><span>Sound effects</span><button data-sound class="${state.display?.sound !== false ? "on" : ""}" role="switch" aria-checked="${state.display?.sound !== false}">${state.display?.sound !== false ? "On" : "Off"}</button></div>
         <div class="row"><span>Fullscreen</span>${fs ? `<button data-fs class="${document.fullscreenElement ? "on" : ""}">${document.fullscreenElement ? "Leave fullscreen" : "Fullscreen"}</button>` : `<span class="faint">not available in this browser</span>`}</div></div>
       ${gameSettings}
       ${items.length ? `<div class="group game-settings"><div class="eyebrow">${esc(state.game.name)}</div>${items.map((it, k) => `<div class="row"><span>${esc(it.label)}</span>${control(it, k)}</div>`).join("")}</div>` : ""}
@@ -325,6 +329,7 @@ function openSettings() {
     if (b.dataset.fs !== undefined) {
       (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()).catch(() => toast("Fullscreen was refused by the browser"));
     }
+    if (b.dataset.sound !== undefined) return void act("POST", "/display", { sound: state.display?.sound === false });
     if (b.dataset.setting) {
       const f = ((state.game && games.find((x) => x.id === state.game.id)?.settings) || []).find((x) => x.key === b.dataset.setting);
       if (!f) return;
@@ -542,6 +547,7 @@ function gameInfo() {
     rotation: ROT[viewEdge()],
     settings: state.game?.settings ?? {},
     prefs: state.game?.prefs ?? {},
+    sound: state.display?.sound !== false, // sound effects on (D-092)
     timers: gameMsg?.timers ?? {},
     now: gameMsg?.now ?? Date.now(),
     receivedAt: gameMsg?.receivedAt ?? Date.now(),

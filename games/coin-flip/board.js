@@ -1,8 +1,26 @@
 // Coin Flip board UI (D-091): which round, the coin, everyone's pick once the coin is in the air, a countdown
 // while people choose, and per-player statistics when all rounds are played. Plates at each seat show scores.
-import { esc, html, playerColor, remainingMs, seatPlates } from "/shared/board-kit.js";
+import { esc, html, ping, playerColor, playSound, remainingMs, seatPlates } from "/shared/board-kit.js";
 
 const SPIN_MS = 1100;
+
+// Sound effects (D-092), synthesised: no audio files to ship.
+/** The coin in the air: a flick, then a ringing whirr whose rings slow down as it spins. */
+function spinSound(ctx, t, out) {
+  ping(ctx, out, t, { freq: 1700, decay: 0.06, gain: 0.35 });
+  let at = t + 0.06;
+  for (let k = 0; at < t + SPIN_MS / 1000 - 0.05; k++) {
+    ping(ctx, out, at, { freq: k % 2 ? 3300 : 3550, partials: [1, 1.5], decay: 0.09, gain: 0.12 * (1 - k / 30) });
+    at += 0.045 + k * 0.006;
+  }
+}
+/** The coin lands: a clink and two smaller bounces, then it settles. */
+function landSound(ctx, t, out) {
+  ping(ctx, out, t, { freq: 2450, decay: 0.45, gain: 0.45 });
+  ping(ctx, out, t + 0.13, { freq: 2500, decay: 0.25, gain: 0.22 });
+  ping(ctx, out, t + 0.21, { freq: 2550, decay: 0.15, gain: 0.1 });
+  for (let k = 0; k < 4; k++) ping(ctx, out, t + 0.26 + k * 0.035, { freq: 2600, partials: [1], decay: 0.05, gain: 0.05 });
+}
 
 export function mount(root) {
   const center = html(`<div class="cf-center" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);text-align:center;transition:transform .5s;width:900px">
@@ -73,8 +91,13 @@ export function mount(root) {
       if (events.some((e) => e.name === "coinFlipped")) {
         spinning = true;
         clearTimeout(spinTimer);
+        playSound(info, "coin-spin", spinSound);
         center.querySelector(".cf-coin").animate([{ transform: "rotateY(0)" }, { transform: "rotateY(1800deg)" }], { duration: SPIN_MS, easing: "cubic-bezier(.2,.7,.2,1)" });
-        spinTimer = setTimeout(() => ((spinning = false), view && draw()), SPIN_MS);
+        spinTimer = setTimeout(() => {
+          spinning = false;
+          playSound(info, "coin-land", landSound);
+          if (view) draw();
+        }, SPIN_MS);
       }
       draw();
     },
@@ -84,3 +107,5 @@ export function mount(root) {
     },
   };
 }
+
+export { spinSound, landSound }; // for listening to them outside a game

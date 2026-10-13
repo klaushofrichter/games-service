@@ -167,6 +167,8 @@ export interface LobbyState {
   pause: { reason: "cloud"; since: number; canSave: boolean } | null;
   /** Remote play: whether remote boards may act, and how many remote players fit. */
   remote: { boardControl: boolean; maxPlayers: number; players: number };
+  /** The table's display choices from the board's settings (D-092), followed by every board, remote ones too. */
+  display: { sound: boolean };
 }
 
 export interface CloudStatus {

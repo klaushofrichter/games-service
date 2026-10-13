@@ -11,6 +11,53 @@ export const ROT = { south: 0, west: 90, north: 180, east: -90 };
 export const SEAT_COLORS = ["#e8b04a", "#5fb7e8", "#e8735f", "#7fd18b", "#c38be8", "#e8e15f", "#5fe0c8", "#e88fbf"];
 export const seatColor = (seat) => SEAT_COLORS[seat % SEAT_COLORS.length];
 
+// ---------- sound effects (D-092) ----------
+// One shared AudioContext for the page. Browsers start it suspended until the page has been touched; the board
+// resumes it on the first touch (the table PC's kiosk browser allows sound from the start).
+let actx = null;
+export function audio() {
+  try {
+    actx ??= new (window.AudioContext || window.webkitAudioContext)();
+    if (actx.state === "suspended") actx.resume().catch(() => {});
+    return actx;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Play a game's sound effect if the table has sound on (`info.sound`). `make(ctx, t0)` schedules the Web Audio
+ * nodes for it, starting at time t0; output goes through one gain node so effects share a sensible volume.
+ */
+export function playSound(info, name, make) {
+  if (info?.sound === false) return;
+  const ctx = audio();
+  if (!ctx || ctx.state !== "running") return;
+  const out = ctx.createGain();
+  out.gain.value = 0.5;
+  out.connect(ctx.destination);
+  try {
+    make(ctx, ctx.currentTime + 0.01, out);
+    (window.gameTableSounds ??= []).push(name); // what played, for the browser tests
+    if (window.gameTableSounds.length > 50) window.gameTableSounds.shift();
+  } catch {}
+}
+
+/** A short struck-metal tone (a few decaying partials): the building block for coin, bell and chip sounds. */
+export function ping(ctx, out, t, { freq = 2600, partials = [1, 1.58, 2.27], decay = 0.25, gain = 0.3 } = {}) {
+  for (const [k, ratio] of partials.entries()) {
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.type = "sine";
+    o.frequency.value = freq * ratio;
+    g.gain.setValueAtTime(gain / (k + 1), t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + decay / (1 + k * 0.4));
+    o.connect(g).connect(out);
+    o.start(t);
+    o.stop(t + decay + 0.05);
+  }
+}
+
 /**
  * A player's colour (D-088): the one chosen in the board's settings for this game (`info.prefs.colors`,
  * keyed by player id), else the seat's colour. Boards and decks both use this, so they always agree.
