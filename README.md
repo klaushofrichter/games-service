@@ -33,6 +33,10 @@ With Docker: `docker compose -f deploy/docker-compose.yml up --build` starts a c
 curl -X POST -H "Authorization: Bearer $ADMIN_TOKEN" http://localhost:8081/admin/api/tables/pair/<CODE>
 ```
 
+## A table on a Mac (development)
+
+`scripts/mac-table.sh` runs a Table Host on a Mac against the live service at `games.skylar.technology` (Node 26 needed). It opens the board in the browser, puts the Mac's WiFi address in the QR code, and keeps the table's identity and API key in `~/.gametable-mac`, so a restart is the same table. The first time, the board shows a pairing code: approve it in the console at `https://games.skylar.technology/admin`. Allow `node` to accept incoming connections when macOS asks, or phones cannot join. `CLOUD_URL= scripts/mac-table.sh` runs it without the service.
+
 ## Layout
 
 | Path | What it is |
@@ -84,13 +88,13 @@ curl -s -H "$K" $H/state                                   # lobby state
 curl -s -H "$K" -X POST $H/join/new                       # new join code (the board's QR code changes)
 curl -s -H "$K" $H/games                                   # games, selectable + reasons
 curl -s -H "$K" -X POST $H/ai -d '{}'                      # add an AI seat
-curl -s -H "$K" -X POST $H/rotate -d '{"degrees":180}'
+curl -s -H "$K" -X POST $H/face -d '{"edge":"west"}'       # turn the lobby to a side (the board's corner buttons)
 curl -s -H "$K" -X POST $H/game/select -d '{"gameId":"coin-flip","settings":{"rounds":5}}'
 curl -s -H "$K" -X POST $H/simulation -d '{"gameId":"coin-flip","players":4,"games":100,"seed":42}'
 curl -s -H "$K" $H/logs/<id>.zip -o run.zip                # JSONL game logs
 ```
 
-Full list: `GET /state, /join, /games, /metrics, /game/board, /logs, /logs/{id}.zip` and `POST /layout, /rotate, /seats/move, /ai, /game/select, /game/start, /game/end, /game/close, /game/resume, /game/save, /simulation, /players/{id}/ai-options, /invites, /remote`, `GET /saves, /qr?text=URL`, `DELETE /players/{id}`.
+Full list: `GET /state, /join, /games, /metrics, /game/board, /logs, /logs/{id}.zip` and `POST /layout, /face, /rotate, /seats/move, /ai, /game/select, /game/start, /game/end, /game/close, /game/resume, /game/save, /simulation, /players/{id}/ai-options, /invites, /remote`, `GET /saves, /qr?text=URL`, `DELETE /players/{id}`.
 
 Decks speak JSON envelopes over `/ws`: `system.hello {joinToken, name}` or `{sessionToken}`, then `lobby.ready {ready}` and `game.intent {name, payload}`. The host answers with `lobby.state`, `game.view` (this seat only) and `system.ack | reject | error`.
 

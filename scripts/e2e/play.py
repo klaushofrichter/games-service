@@ -8,7 +8,7 @@ Fails (exit 1) on any browser console error or uncaught exception.
 """
 import os, sys, time
 from playwright.sync_api import sync_playwright
-from common import BASE, api, errors, join_deck, reset, watch
+from common import BASE, api, errors, join_deck, pick_game, reset, watch
 
 GAME = sys.argv[1] if len(sys.argv) > 1 else "roulette"
 OUT = sys.argv[2] if len(sys.argv) > 2 else "e2e-out"
@@ -178,7 +178,7 @@ def dialogs(browser, board):
     decks = [join(browser, "Klaus")]
     ai = api("POST", "/ai", {})["playerId"]
     time.sleep(0.5)
-    board.click("button.tile[data-game=roulette]")
+    pick_game(board, "roulette")
     board.wait_for_selector(".dialog.form")
     board.fill(".dialog [name=rounds]", "4")
     shot(board, "settings-dialog")

@@ -15,6 +15,7 @@ const lobbyBtn = document.getElementById("lobby-button");
 const overlayRoot = document.getElementById("overlay-root");
 const gameLayer = document.getElementById("game-layer");
 const pauseLayer = document.getElementById("pause-layer");
+const cornersEl = document.getElementById("corners");
 
 let state = null;
 let games = [];
@@ -192,6 +193,28 @@ function onSeatTap(seat, pl) {
   render();
 }
 
+// ---------- corner buttons: which edge the lobby faces ----------
+// Unobtrusive buttons in the board's corners turn the lobby and its menus toward one edge (D-080). Not during play
+// (a game's own lobby button lives in a corner), and not on a remote player's copy: turning stays with the table.
+const EDGE_ORDER = ["north", "east", "south", "west"];
+const CORNERS = [
+  { edge: "north", pos: "tl", arrow: 0 },
+  { edge: "east", pos: "tr", arrow: 90 },
+  { edge: "south", pos: "br", arrow: 180 },
+  { edge: "west", pos: "bl", arrow: 270 },
+];
+function renderCorners(hide) {
+  cornersEl.hidden = REMOTE || hide;
+  if (cornersEl.hidden) return;
+  cornersEl.innerHTML = CORNERS.map(({ edge, pos, arrow }) =>
+    `<button class="corner ${pos} ${state.frontEdge === edge ? "on" : ""}" data-face="${edge}" title="Face ${edge}" aria-label="Turn the lobby to face ${edge}">
+      <svg viewBox="0 0 24 24" width="22" height="22" style="transform:rotate(${arrow}deg)"><path d="M6 15l6-6 6 6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>`).join("");
+}
+cornersEl.addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-face]");
+  if (b && b.dataset.face !== state.frontEdge) act("POST", "/face", { edge: b.dataset.face });
+});
+
 // ---------- center panel ----------
 function render() {
   if (!state) return;
@@ -206,6 +229,7 @@ function render() {
   lobbyBtn.className = state.game?.lobbyButton ?? "bottom-right";
 
   renderPause();
+  renderCorners(playing && state.phase !== "paused");
   seatsEl.hidden = playing;
   center.hidden = playing;
   gameLayer.hidden = !playing;
@@ -236,12 +260,16 @@ function joinPanel() {
   </aside>`;
 }
 
+/** Seat layout buttons: only the layouts that may be chosen now (the chosen game's, or any visible game's). */
+function seatButtons() {
+  const layouts = state.layouts?.length ? state.layouts : [2, 4, 6, 8];
+  return `<span class="seg" title="Seats around the table">${layouts.map((n) => `<button data-layout="${n}" class="${state.layout === n ? "on" : ""}">${n}</button>`).join("")}</span>`;
+}
+
 function toolbar() {
   const sel = state.players.find((p) => p.id === selectedPlayer);
   return `<div class="toolbar">
-    <span class="seg">${[2, 4, 6, 8].map((n) => `<button data-layout="${n}" class="${state.layout === n ? "on" : ""}">${n}</button>`).join("")}</span>
-    ${REMOTE ? "" : `<button data-rotate="90">⟳ 90°</button>
-    <button data-rotate="180">⟳ 180°</button>`}
+    ${seatButtons()}
     ${REMOTE ? "" : `<button data-add-ai>+ AI player</button>
     ${sel?.kind === "ai" ? `<button data-config="${sel.id}">Configure ${esc(sel.name)}</button>` : ""}
     ${sel ? `<button class="danger" data-remove="${sel.id}">Remove ${esc(sel.name)}</button>` : ""}`}
@@ -256,14 +284,36 @@ function renderLobby() {
       <div class="eyebrow">${esc(state.tableName)}</div>
       ${cloudNotice()}<h1>Pick a game</h1>
       <div class="sub">${humans ? `${humans} at the table${REMOTE ? "" : " · tap a seat, then another to move a player"}` : REMOTE ? "Waiting for players" : "Scan the code to take a seat"}${remoteNote()}</div>
-      <div class="games">${games
-        .map((g) => `<button class="tile ${g.selectable ? "selectable" : ""}" data-game="${g.id}" ${g.selectable ? "" : "disabled"}>
-          <span class="title">${esc(g.name)}</span><span class="desc">${esc(g.description ?? "")}</span>
-          <span class="faint" style="font-size:.66em">${playersLabel(g.players)}${g.ai ? " · AI" : ""}</span>
-          ${g.selectable ? "" : `<span class="why">${esc(g.reasons[0])}</span>`}</button>`)
-        .join("")}</div>
+      ${gameTiles()}
       ${toolbar()}
     </section>${joinPanel()}`;
+}
+
+// The lobby shows the games a page at a time (three tiles fit beside the join panel), with arrows and dots.
+const PAGE_SIZE = 3;
+let gamePage = 0;
+function gameTiles() {
+  const pages = Math.max(1, Math.ceil(games.length / PAGE_SIZE));
+  gamePage = Math.min(gamePage, pages - 1);
+  const tiles = games
+    .slice(gamePage * PAGE_SIZE, (gamePage + 1) * PAGE_SIZE)
+    .map((g) => `<button class="tile ${g.selectable ? "selectable" : ""}" data-game="${g.id}" ${g.selectable ? "" : "disabled"}>
+          <span class="title">${esc(g.name)}</span><span class="desc">${esc(g.description ?? "")}</span>
+          <span class="faint" style="font-size:.66em">${playersLabel(g.players)}${g.ai ? " · AI" : ""}</span>
+          ${g.selectable ? `<span class="hint">${esc(tileHint(g))}</span>` : `<span class="why">${esc(g.reasons[0])}</span>`}</button>`)
+    .join("");
+  const pager = pages < 2 ? "" : `<div class="pager">
+      <button data-page="-1" ${gamePage === 0 ? "disabled" : ""} aria-label="Previous games">‹</button>
+      ${Array.from({ length: pages }, (_, i) => `<button class="dot ${i === gamePage ? "on" : ""}" data-page-to="${i}" aria-label="Games page ${i + 1}"></button>`).join("")}
+      <button data-page="1" ${gamePage === pages - 1 ? "disabled" : ""} aria-label="More games">›</button>
+      <span class="faint">${games.length} games</span></div>`;
+  return `<div class="games">${tiles}</div>${pager}`;
+}
+
+/** What a choosable game still needs, or that it can start right away. */
+function tileHint(g) {
+  const n = g.needs ?? [];
+  return n.length ? n[0][0].toUpperCase() + n[0].slice(1) : "Ready to play";
 }
 
 function remoteNote() {
@@ -280,14 +330,19 @@ function playersLabel(p) {
 
 function renderReady() {
   const humans = state.players.filter((p) => p.kind === "human" && p.seat !== null);
-  const all = humans.length > 0 && humans.every((p) => p.ready && p.connected);
+  const needs = state.game.needs ?? [];
+  const all = needs.length === 0 && humans.length > 0 && humans.every((p) => p.ready && p.connected);
+  const seated = state.players.filter((p) => p.seat !== null).length;
+  const g = games.find((x) => x.id === state.game.id);
+  const roomForAi = g?.ai && seated < Math.max(...state.game.players);
   center.innerHTML = `<section class="main waiting">
-      <div><div class="eyebrow">Up next</div><h1>${esc(state.game.name)}</h1>
-      <div class="sub">Everyone taps <b>Ready</b> on their phone.</div></div>
+      <div><div class="eyebrow">Up next · ${playersLabel(state.game.players)} · ${seated} seated</div><h1>${esc(state.game.name)}</h1>
+      <div class="sub">${needs.length ? `${esc(needs.map((n, i) => (i ? n : n[0].toUpperCase() + n.slice(1))).join(" · "))}. Scan the code to join${g?.ai ? " or add an AI player" : ""}.` : "Everyone taps <b>Ready</b> on their phone."}</div></div>
       <div class="ready-list">${humans.map((p) => `<span class="chip ${p.ready ? "ok" : ""}"><span class="dot" style="background:${p.ready ? "var(--jade)" : ""}"></span>${esc(p.name)}</span>`).join("")}</div>
+      ${REMOTE ? "" : `<div class="toolbar">${seatButtons()}${roomForAi ? `<button data-add-ai>+ AI player</button>` : ""}</div>`}
       <div class="toolbar"><button class="primary" data-start ${all ? "" : "disabled"}>Start game</button><button data-close>Change game</button>
       ${REMOTE ? "" : (() => { const sel = state.players.find((p) => p.id === selectedPlayer); return sel?.kind === "ai" ? `<button data-config="${sel.id}">Configure ${esc(sel.name)}</button>` : state.players.some((p) => p.kind === "ai") ? `<span class="faint" style="font-size:.7em">Tap an AI seat to configure it</span>` : ""; })()}
-      <span class="spacer"></span>${REMOTE ? "" : `<button data-rotate="180">⟳ 180°</button>`}</div>
+      </div>
     </section>${joinPanel()}`;
 }
 
@@ -388,6 +443,8 @@ center.addEventListener("click", async (e) => {
   if (!b) return;
   const d = b.dataset;
   if (d.game) chooseGame(d.game);
+  else if (d.page) ((gamePage = Math.max(0, gamePage + Number(d.page))), render());
+  else if (d.pageTo) ((gamePage = Number(d.pageTo)), render());
   else if (d.config) configureAi(d.config);
   else if (d.layout) act("POST", "/layout", { seats: Number(d.layout) });
   else if (d.rotate) act("POST", "/rotate", { degrees: Number(d.rotate) });
@@ -417,8 +474,8 @@ function openLobbyOverlay() {
         .map((p) => `<div class="row"><span>${esc(p.name)} <span class="faint">· ${p.seat === null ? "no seat" : `seat ${p.seat + 1}`}${p.kind === "ai" ? " · AI" : ""}${p.connected ? "" : " · reconnecting"}</span></span>
           ${REMOTE ? "" : `<button class="danger" data-remove="${p.id}">Remove</button>`}</div>`)
         .join("") || `<div class="faint">Nobody yet</div>`}</div>
-      ${REMOTE ? "" : `<div class="group"><div class="eyebrow">View</div><div class="row"><span>Turn the board for players on another edge</span>
-        <span><button data-rotate="90">⟳ 90°</button> <button data-rotate="180">⟳ 180°</button></span></div></div>`}
+      ${REMOTE ? "" : `<div class="group"><div class="eyebrow">View</div><div class="row"><span>Lobby and menus face</span>
+        <span class="seg">${EDGE_ORDER.map((e) => `<button data-face="${e}" class="${state.frontEdge === e ? "on" : ""}">${e[0].toUpperCase() + e.slice(1)}</button>`).join("")}</span></div></div>`}
       <div class="group">${REMOTE ? "" : `<div class="row"><span>Remote players${state.remote?.players ? ` · ${state.remote.players} joined` : ""}</span><button data-invite>Invite…</button></div>`}
         <div class="row"><span>Terms of service</span><a href="/deck/terms.html" target="_blank" style="color:var(--brass)">Open</a></div></div>
       <div class="actions" style="display:flex;justify-content:space-between;margin-top:20px">
@@ -431,7 +488,7 @@ function openLobbyOverlay() {
     const b = e.target.closest("button");
     if (e.target === o || b?.dataset.closeOverlay !== undefined) return (unsub(), o.remove());
     if (!b) return;
-    if (b.dataset.rotate) act("POST", "/rotate", { degrees: Number(b.dataset.rotate) });
+    if (b.dataset.face) act("POST", "/face", { edge: b.dataset.face });
     if (b.dataset.invite !== undefined) openInvite();
     if (b.dataset.remove) {
       const p = state.players.find((x) => x.id === b.dataset.remove);

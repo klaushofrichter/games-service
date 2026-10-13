@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Game Table</title>
+  <link rel="icon" type="image/svg+xml" href="/shared/favicon.svg">
   <link rel="stylesheet" href="/shared/theme.css">
   <link rel="stylesheet" href="/board/board.css">
   <script>window.TABLE_KEY = "__TABLE_KEY__";</script>
@@ -16,6 +17,8 @@
       <div id="center"></div>
       <div id="game-layer" hidden></div>
       <div id="pause-layer" hidden></div>
+      <!-- Corner buttons turn the lobby toward an edge: upper-left north, upper-right east, lower-right south, lower-left west. -->
+      <div id="corners" hidden></div>
       <button id="lobby-button" hidden aria-label="Open lobby">☰ Lobby</button>
     </div>
   </div>

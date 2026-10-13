@@ -49,15 +49,23 @@ html, body { overflow: hidden; }
   transition: transform 0.5s cubic-bezier(.2,.7,.2,1);
   display: grid; grid-template-columns: 1fr 330px; gap: 36px;
 }
-#center.sideways { width: 760px; height: 760px; margin: -380px 0 0 -380px; grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
-#center.sideways .join { flex-direction: row; align-items: center; }
-#center.sideways .join img { width: 160px; height: 160px; }
+#center.sideways { width: 620px; height: 900px; margin: -450px 0 0 -310px; grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+/* Sideways the join card is short and wide: QR code on the left, the text stacked beside it. */
+#center.sideways .join { display: grid; grid-template-columns: auto 1fr; column-gap: 22px; row-gap: 8px; align-items: center; justify-items: start; }
+#center.sideways .join img { width: 160px; height: 160px; grid-column: 1; grid-row: 1 / span 4; }
+#center.sideways .join > :not(img) { grid-column: 2; }
+#center.sideways .join .url, #center.sideways .join .code, #center.sideways .join .faint { text-align: left !important; }
 
 .main { display: flex; flex-direction: column; min-height: 0; }
 .main h1 { font-family: var(--display); font-weight: 600; font-size: 2.6em; margin: 4px 0 2px; }
 .main .sub { color: var(--ink-soft); margin-bottom: 18px; }
 
-.games { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); grid-auto-rows: min-content; gap: 14px; overflow: auto; padding: 4px; max-height: 430px; }
+.games { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-auto-rows: min-content; gap: 14px; padding: 4px; }
+.pager { display: flex; align-items: center; gap: 10px; font-size: .7em; margin-top: -4px; }
+.pager button { min-width: 0; padding: .2em .7em; font-size: 1.4em; line-height: 1; }
+.pager button[disabled] { opacity: .25; }
+.pager .dot { width: 12px; height: 12px; padding: 0; border-radius: 50%; font-size: 0; background: rgba(255,255,255,.18); border: 0; }
+.pager .dot.on { background: var(--brass); }
 .tile {
   text-align: left; border-radius: var(--radius); padding: 14px 18px; min-height: 120px;
   background: linear-gradient(160deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02));
@@ -66,6 +74,7 @@ html, body { overflow: hidden; }
 .tile .title { font-family: var(--display); font-size: 1.35em; color: var(--ink); }
 .tile .desc { font-size: 0.72em; color: var(--ink-soft); line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .tile .why { font-size: 0.68em; color: #e8a596; margin-top: auto; }
+.tile .hint { font-size: 0.68em; color: var(--jade); margin-top: auto; }
 .tile.selectable:hover { border-color: var(--brass); }
 .tile:disabled { opacity: 0.55; }
 
@@ -147,3 +156,14 @@ pre.raw { font-family: var(--mono); font-size: 0.7em; color: var(--ink-soft); ba
 .invite-body .code { font-family: var(--mono); font-size: 1.6em; letter-spacing: 0.18em; color: var(--brass); margin-top: 8px; }
 .invite-control { display: flex; align-items: center; gap: 14px; padding-top: 14px; border-top: 1px solid var(--felt-line); cursor: pointer; }
 .invite-control input { width: 26px; height: 26px; accent-color: var(--brass); flex: none; }
+
+/* Corner buttons (D-080): turn the lobby toward an edge. Quiet until touched. */
+#corners .corner { position: absolute; width: 58px; height: 58px; border-radius: 50%; display: grid; place-items: center; padding: 0;
+  background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.10); color: var(--ink-soft); opacity: .55; z-index: 5;
+  transition: opacity .2s, border-color .2s, color .2s; }
+#corners .corner:hover, #corners .corner:active { opacity: 1; border-color: var(--brass); color: var(--brass); }
+#corners .corner.on { opacity: .9; border-color: var(--brass); color: var(--brass); }
+#corners .tl { left: 22px; top: 22px; }
+#corners .tr { right: 22px; top: 22px; }
+#corners .br { right: 22px; bottom: 22px; }
+#corners .bl { left: 22px; bottom: 22px; }

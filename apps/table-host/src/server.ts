@@ -178,6 +178,7 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
     if (m === "GET" && path === "/metrics") return json(res, 200, table.metrics);
     if (m === "POST" && path === "/layout") return (table.setLayout(Number(body.seats)), json(res, 200, table.state()));
     if (m === "POST" && path === "/rotate") return (table.rotate(Number(body.degrees)), json(res, 200, table.state()));
+    if (m === "POST" && path === "/face") return (table.face(String(body.edge)), json(res, 200, table.state()));
     if (m === "POST" && path === "/seats/move") return (table.moveSeat(String(body.playerId), Number(body.seat)), json(res, 200, table.state()));
     if (m === "POST" && path === "/ai") {
       const id = table.addAi(body.seat === undefined ? undefined : Number(body.seat));

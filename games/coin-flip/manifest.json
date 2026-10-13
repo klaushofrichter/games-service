@@ -4,21 +4,54 @@
   "version": "0.1.0",
   "sdk": "^0.1",
   "description": "Everyone guesses heads or tails, then the coin flips. A stub game for platform tests.",
-  "players": { "min": 1, "max": 8 },
+  "players": {
+    "min": 1,
+    "max": 8
+  },
   "turnModel": "simultaneous",
-  "seatLayouts": [2, 4, 6, 8],
-  "edges": ["north", "south", "east", "west"],
+  "seatLayouts": [
+    2,
+    4,
+    6,
+    8
+  ],
+  "edges": [
+    "north",
+    "south",
+    "east",
+    "west"
+  ],
   "seatConstraints": null,
   "dynamicPlayers": true,
   "saveGame": false,
   "settings": [
-    { "key": "rounds", "type": "int", "min": 1, "max": 20, "default": 3, "label": "Rounds" },
-    { "key": "roundMs", "type": "int", "min": 0, "max": 60000, "default": 15000, "label": "Milliseconds per round (0 = no limit)" }
+    {
+      "key": "rounds",
+      "type": "int",
+      "min": 1,
+      "max": 20,
+      "default": 3,
+      "label": "Rounds"
+    },
+    {
+      "key": "roundMs",
+      "type": "int",
+      "min": 0,
+      "max": 60000,
+      "default": 15000,
+      "label": "Milliseconds per round (0 = no limit)"
+    }
   ],
-  "ai": { "supported": true, "options": [], "hostConfig": [] },
-  "simulation": { "supported": true, "headless": true },
+  "ai": {
+    "supported": true,
+    "options": [],
+    "hostConfig": []
+  },
+  "simulation": {
+    "supported": true,
+    "headless": true
+  },
   "remoteBoardControl": true,
   "lobbyButton": "bottom-right",
-  "permissions": [],
-  "test": true
+  "permissions": []
 }
