@@ -39,9 +39,8 @@ function mutate(payload: unknown, rnd: () => number, pick: <T>(xs: T[]) => T): u
   return out;
 }
 
-/** Game-specific invariants that must hold after any accepted move. */
-function checkInvariants(id: string, state: any, where: string) {
-  const isNum = (x: unknown) => typeof x === "number" && Number.isFinite(x);
+/** Invariants for any game's state after an accepted move: every number is finite, no chip count is negative. */
+function checkInvariants(state: any, where: string) {
   const walk = (v: unknown, path: string) => {
     if (typeof v === "number") expect(Number.isFinite(v), `${where}: ${path} is ${v}`).toBe(true);
     else if (v && typeof v === "object") for (const [k, x] of Object.entries(v)) walk(x, `${path}.${k}`);
@@ -49,7 +48,6 @@ function checkInvariants(id: string, state: any, where: string) {
   walk(state, "state"); // no NaN or Infinity anywhere, e.g. from a "100" or 1e15 amount
   const chips = JSON.stringify(state).match(/"(chips|stack|balance|bank)":-\d/);
   expect(chips, `${where}: negative ${chips?.[1]}`).toBeNull();
-  void isNum;
 }
 
 describe("rules fuzzing", () => {
@@ -78,7 +76,7 @@ describe("rules fuzzing", () => {
             stats.tried++;
             if (r?.ok) stats.accepted++;
             if (r && !r.ok) expect(stateHash(rt.state), `${g.id} seed ${seed}: rejected ${JSON.stringify(intent)} changed the state`).toBe(before);
-            if (r?.ok) checkInvariants(g.id, rt.state, `${g.id} seed ${seed} after ${JSON.stringify(intent)}`);
+            if (r?.ok) checkInvariants(rt.state, `${g.id} seed ${seed} after ${JSON.stringify(intent)}`);
             // 2. views stay buildable for everyone
             for (let s = 0; s < n; s++) expect(() => JSON.stringify(rt.view(s))).not.toThrow();
             expect(() => JSON.stringify(game.def.boardView(rt.state))).not.toThrow();
@@ -93,7 +91,7 @@ describe("rules fuzzing", () => {
             if (!moved && !rt.over && !clock.advance()) break;
           }
           expect(rt.over, `${g.id} seed ${seed} did not finish`).toBe(true);
-          checkInvariants(g.id, rt.state, `${g.id} seed ${seed} at the end`);
+          checkInvariants(rt.state, `${g.id} seed ${seed} at the end`);
           expect(expectReplay(game, rt), `${g.id} seed ${seed} replay`).toBe(true);
         }
         expect(stats.tried).toBeGreaterThan(30);

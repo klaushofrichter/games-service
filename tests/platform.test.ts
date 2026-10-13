@@ -9,7 +9,7 @@ import WebSocket from "ws";
 import { allowedPlayerCounts, manifestSchema, rotateEdge, seatEdges } from "../packages/protocol/src/index.ts";
 import { loadGames, settingsWithDefaults } from "../apps/table-host/src/games.ts";
 import { LogStore } from "../apps/table-host/src/logs.ts";
-import { Deck, sleep, testHost } from "./helpers.ts";
+import { Deck, pairTable, sleep, testHost, until } from "./helpers.ts";
 
 const cleanup: (() => unknown)[] = [];
 afterEach(async () => {
@@ -231,8 +231,7 @@ describe("deck socket robustness", () => {
     const s = await rawSocket(t.base);
     s.ws.send(JSON.stringify({ v: 1, ch: "system", type: "hello", seq: 1, payload: { joinToken: "WRONG123", name: "X" } }));
     await s.until((m) => m.seq === 1 && m.type === "error");
-    for (let i = 0; i < 50 && s.closed() === null; i++) await sleep(20);
-    expect(s.closed()).toBe(4003);
+    expect(await until(() => s.closed())).toBe(4003);
     expect(t.host.table.state().players).toHaveLength(0);
   });
 
@@ -340,17 +339,13 @@ describe("log retention", () => {
     const t = await host({ cloudUrl, cloudPollMs: 30, cloudHeartbeatMs: 50 });
     const admin = (m: string, p: string, b?: unknown) =>
       fetch(cloudUrl + p, { method: m, headers: { authorization: `Bearer ${ADMIN}`, "content-type": "application/json" }, body: b ? JSON.stringify(b) : undefined });
-    for (let i = 0; i < 100 && !t.host.table.cloud.pairingCode; i++) await sleep(20);
-    await admin("POST", `/admin/api/tables/pair/${t.host.table.cloud.pairingCode}`);
-    for (let i = 0; i < 100 && t.host.table.cloud.status !== "online"; i++) await sleep(20);
+    await pairTable(t, cloudUrl, ADMIN);
 
     await t.host.logs.save(meta("ten-days"), [[]]);
     await age(join(t.host.logs.dir, "ten-days.zip"), 10);
     expect((await t.host.logs.list()).map((l) => l.id)).toContain("ten-days");
     expect((await admin("PUT", "/admin/api/settings", { logRetentionDays: 7 })).status).toBe(200);
-    for (let i = 0; i < 100 && t.host.logs.retentionDays !== 7; i++) await sleep(20);
-    expect(t.host.logs.retentionDays).toBe(7);
-    for (let i = 0; i < 100 && (await t.host.logs.list()).some((l) => l.id === "ten-days"); i++) await sleep(20);
-    expect((await t.host.logs.list()).map((l) => l.id)).not.toContain("ten-days");
+    await until(() => t.host.logs.retentionDays === 7);
+    await until(async () => !(await t.host.logs.list()).some((l) => l.id === "ten-days"));
   });
 });

@@ -130,3 +130,23 @@ export class Deck {
 }
 
 export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** Poll until fn returns something truthy and return it; throw if that takes longer than ms. */
+export async function until<T>(fn: () => T | Promise<T>, ms = 5000): Promise<NonNullable<T>> {
+  const end = Date.now() + ms;
+  for (;;) {
+    const v = await fn();
+    if (v) return v as NonNullable<T>;
+    if (Date.now() > end) throw new Error("condition not met in time");
+    await sleep(25);
+  }
+}
+
+/** Pair a table started with `cloudUrl` through the cloud admin API and wait until it is online. Returns the pair answer. */
+export async function pairTable(t: Awaited<ReturnType<typeof testHost>>, cloudUrl: string, adminToken: string) {
+  const code = await until(() => t.host.table.cloud.pairingCode);
+  const r = await fetch(`${cloudUrl}/admin/api/tables/pair/${code}`, { method: "POST", headers: { authorization: `Bearer ${adminToken}` } });
+  if (r.status !== 200) throw new Error(`pairing ${code} -> ${r.status}`);
+  await until(() => t.host.table.cloud.status === "online");
+  return (await r.json()) as { tableId: string };
+}

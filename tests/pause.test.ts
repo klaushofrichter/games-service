@@ -1,7 +1,7 @@
 // D-015: a lost cloud connection pauses a running game; it resumes when the link returns, or can be
 // saved (games that allow it) or ended.
 import { afterEach, describe, expect, it } from "vitest";
-import { sleep, testHost } from "./helpers.ts";
+import { pairTable, sleep, testHost } from "./helpers.ts";
 import { startCloud } from "../apps/cloud/src/server.ts";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -101,9 +101,7 @@ describe("pause on a lost service connection", () => {
     const cloud = await startCloud({ port: 0, host: "127.0.0.1", adminToken: ADMIN, publicUrl: "https://example.test" });
     const base = `http://127.0.0.1:${cloud.port}`;
     t = await testHost({ cloudUrl: base, cloudPollMs: 30, cloudHeartbeatMs: 60 });
-    for (let i = 0; i < 100 && t.host.table.cloud.status !== "pending"; i++) await sleep(20);
-    await fetch(`${base}/admin/api/tables/pair/${t.host.table.cloud.pairingCode}`, { method: "POST", headers: { authorization: `Bearer ${ADMIN}` } });
-    for (let i = 0; i < 100 && t.host.table.cloud.status !== "online"; i++) await sleep(20);
+    await pairTable(t, base, ADMIN);
     const a = await startRoulette(t);
     await cloud.close();
     const s = await a.waitState((x) => x.phase === "paused");

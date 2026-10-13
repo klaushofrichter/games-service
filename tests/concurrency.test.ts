@@ -1,10 +1,10 @@
 // Many things at once: phones scanning the same code, parallel seat moves, double starts, a flood of
 // simultaneous bets, and a game whose rules crash. The table must stay consistent through all of it.
 import { afterEach, describe, expect, it } from "vitest";
-import { mkdtemp, mkdir, writeFile, cp } from "node:fs/promises";
+import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { Deck, sleep, testHost } from "./helpers.ts";
+import { Deck, testHost, until } from "./helpers.ts";
 
 const cleanup: (() => unknown)[] = [];
 afterEach(async () => {
@@ -95,16 +95,11 @@ describe("concurrency", () => {
       expect(s.balances[i] + mine).toBe(start[i]);
     }
     // and each deck's own view agrees
-    await sleep(100);
-    for (let i = 0; i < 6; i++) {
-      const v = [...decks[i].messages].reverse().find((m) => m.type === "view")!.payload.view;
-      expect(v.balance).toBe(s.balances[i]);
-    }
+    for (let i = 0; i < 6; i++) await decks[i].waitView((v) => v.view.balance === s.balances[i]);
   });
 
   it("survives a game whose rules crash: the move is refused, the table and the game go on", async () => {
     const dir = await mkdtemp(join(tmpdir(), "games-"));
-    await cp(join(import.meta.dirname, "..", "games", "coin-flip"), join(dir, "coin-flip"), { recursive: true });
     await mkdir(join(dir, "crashy"));
     await writeFile(
       join(dir, "crashy", "manifest.json"),
@@ -138,8 +133,7 @@ describe("concurrency", () => {
       expect(t.host.table.phase).toBe("active");
       expect((await a.request("game", "intent", { name: "inc" })).type).toBe("ack");
       expect((await a.request("game", "intent", { name: "inc" })).type).toBe("ack");
-      await sleep(50);
-      expect(t.host.table.phase).toBe("finished");
+      await until(() => t.host.table.phase === "finished");
       expect(errors.length).toBeGreaterThan(0); // logged for whoever maintains the game
     } finally {
       console.error = orig;

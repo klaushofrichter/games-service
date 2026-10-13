@@ -4,32 +4,18 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import WebSocket from "ws";
 import { RTCPeerConnection, type RTCDataChannel } from "werift";
 import { startCloud } from "../apps/cloud/src/server.ts";
-import { sleep, testHost } from "./helpers.ts";
+import { pairTable, sleep, testHost, until } from "./helpers.ts";
 
 const ADMIN = "admin-token-for-tests-123";
 let cloud: Awaited<ReturnType<typeof startCloud>>;
 let base: string;
 const cleanup: (() => unknown)[] = [];
 
-async function until<T>(fn: () => T | Promise<T>, ms = 5000): Promise<NonNullable<T>> {
-  const end = Date.now() + ms;
-  for (;;) {
-    const v = await fn();
-    if (v) return v as NonNullable<T>;
-    if (Date.now() > end) throw new Error("condition not met in time");
-    await sleep(25);
-  }
-}
-
-const admin = (method: string, path: string) => fetch(`${base}${path}`, { method, headers: { authorization: `Bearer ${ADMIN}` } });
-
 /** A table paired with the cloud and online. */
 async function pairedHost(o: Parameters<typeof testHost>[0] = {}) {
   const t = await testHost({ cloudUrl: base, cloudPollMs: 30, cloudHeartbeatMs: 50, ...o });
   cleanup.push(() => t.close());
-  const code = await until(() => t.host.table.cloud.pairingCode);
-  expect((await admin("POST", `/admin/api/tables/pair/${code}`)).status).toBe(200);
-  await until(() => t.host.table.cloud.status === "online");
+  await pairTable(t, base, ADMIN);
   await until(() => t.host.gateway && (t.host.cloud as any)?.socket?.readyState === WebSocket.OPEN);
   return t;
 }

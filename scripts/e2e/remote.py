@@ -3,52 +3,25 @@ browser opens the invite page, joins by name, and gets the board and its private
 data channel to the table. Also checks the board-control switch and reconnecting after a reload.
   python3 scripts/e2e/remote.py out/
 """
-import json, os, re, subprocess, sys, tempfile, time, urllib.request
+import os, re, sys, time
 from playwright.sync_api import sync_playwright
+from common import call, errors, join_deck, start_cloud, start_table, wait, watch
 
-REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 OUT = sys.argv[1] if len(sys.argv) > 1 else "e2e-out"
 os.makedirs(OUT, exist_ok=True)
 ADMIN = "admin-token-for-e2e-0001"
 CLOUD, TABLE = "http://127.0.0.1:8095", "http://127.0.0.1:8096"
-errors = []
 
-cloud = subprocess.Popen(["node", "apps/cloud/src/main.ts"], cwd=REPO,
-                         env=dict(os.environ, ADMIN_TOKEN=ADMIN, PORT="8095", PUBLIC_URL=CLOUD, ICE_SERVERS="[]"))
-time.sleep(1.5)
-data = tempfile.mkdtemp(prefix="remote-e2e-")
-host = subprocess.Popen(["node", "apps/table-host/src/main.ts"], cwd=REPO,
-                        env=dict(os.environ, PORT="8096", PUBLIC_URL=TABLE, TABLE_KEY="k", TABLE_NAME="Living room", CLOUD_URL=CLOUD, DATA_DIR=data))
-time.sleep(2.5)
-
-
-def call(base, method, path, body=None, headers=None):
-    req = urllib.request.Request(base + path, method=method, data=json.dumps(body).encode() if body is not None else None,
-                                 headers={"content-type": "application/json", **(headers or {})})
-    return json.loads(urllib.request.urlopen(req).read() or b"{}")
+cloud = start_cloud(8095, ADMIN_TOKEN=ADMIN, PUBLIC_URL=CLOUD, ICE_SERVERS="[]")
+host = start_table(8096, PUBLIC_URL=TABLE, TABLE_KEY="k", TABLE_NAME="Living room", CLOUD_URL=CLOUD)
 
 
 def state():
     return call(TABLE, "GET", "/api/v1/state", headers={"x-table-key": "k"})
 
 
-def wait(fn, secs=20):
-    end = time.time() + secs
-    while time.time() < end:
-        v = fn()
-        if v:
-            return v
-        time.sleep(0.25)
-    raise AssertionError("timed out")
-
-
-def watch(page, label):
-    page.on("console", lambda m: m.type == "error" and errors.append(f"{label}: {m.text}"))
-    page.on("pageerror", lambda e: errors.append(f"{label}: {e}"))
-
-
 try:
-    code = state()["cloud"]["pairingCode"]
+    code = wait(lambda: state()["cloud"].get("pairingCode"), 15, "the pairing code")
     call(CLOUD, "POST", f"/admin/api/tables/pair/{code}", {}, {"authorization": f"Bearer {ADMIN}"})
     wait(lambda: state()["cloud"]["status"] == "online")
     time.sleep(1.0)  # signaling socket opens right after
@@ -133,10 +106,7 @@ try:
         call(TABLE, "POST", "/api/v1/layout", {"seats": 4}, {"x-table-key": "k"})
         local = b.new_context(viewport={"width": 390, "height": 844}, has_touch=True).new_page()
         watch(local, "Ana")
-        local.goto(call(TABLE, "GET", "/api/v1/join", headers={"x-table-key": "k"})["url"])
-        local.fill("input[name=name]", "Ana")
-        local.click("button[type=submit]")
-        local.wait_for_selector(".seatcard")
+        join_deck(local, call(TABLE, "GET", "/api/v1/join", headers={"x-table-key": "k"})["url"], "Ana")
         rboard.locator("button.tile[data-game=pachisi]").click()  # the remote board picks the game
         rboard.locator(".dialog button.primary").click()          # settings dialog: defaults
         wait(lambda: state()["phase"] == "ready")
@@ -155,7 +125,7 @@ try:
             who = seats.get(v["turn"])
             page = deck if who == "Rita" else local
             if v["phase"] == "roll":
-                (page.locator(".pc-roll:not([hidden])") if who == "Rita" else page.locator(".pc-roll:not([hidden])")).click(timeout=5000)
+                page.locator(".pc-roll:not([hidden])").click(timeout=5000)
             else:
                 page.locator("button[data-token]").first.click(timeout=5000)
             moves[who] += 1

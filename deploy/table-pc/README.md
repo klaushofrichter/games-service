@@ -34,10 +34,10 @@ The board shows a 6-character **pairing code**. Approve it in the admin portal a
 | --- | --- |
 | Change settings (name, cloud URL, timeouts) | edit `/opt/gametable/.env`, then `sudo /opt/gametable/update.sh` |
 | Update to the latest version | `sudo /opt/gametable/update.sh` |
-| Pin a version | add `VERSION=0.3.0` to `/opt/gametable/.env`, then update |
+| Pin a version | add `VERSION=v2026.10.13.1` (an image tag: `v<YYYY.MM.DD.N>` as on the GitHub releases page; default `latest`) to `/opt/gametable/.env`, then update |
 | Host logs | `sudo docker logs -f $(sudo docker ps -qf name=table-host)` |
 | Restart the board browser | `sudo systemctl restart gametable-kiosk` |
-| Health | `curl http://127.0.0.1:8080/health` |
+| Health | `curl http://127.0.0.1:8080/health` (`{"status":"ok","version":…,"protocol":…}`) |
 
 Game logs and saves live in `/var/lib/gametable` and are deleted after the retention period set in the service (default 90 days).
 

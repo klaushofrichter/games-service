@@ -1,7 +1,7 @@
 // The edges of the board control API: invalid input, caps, and the table staying responsive while
 // it runs a long AI-only simulation.
 import { afterEach, describe, expect, it } from "vitest";
-import { mkdtemp, mkdir, writeFile, cp } from "node:fs/promises";
+import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { testHost } from "./helpers.ts";
@@ -84,7 +84,6 @@ describe("simulation API", () => {
 
   it("stops a simulation of a game that can never finish, instead of hanging", async () => {
     const dir = await mkdtemp(join(tmpdir(), "games-"));
-    await cp(join(import.meta.dirname, "..", "games", "coin-flip"), join(dir, "coin-flip"), { recursive: true });
     await mkdir(join(dir, "stuck"));
     await writeFile(
       join(dir, "stuck", "manifest.json"),

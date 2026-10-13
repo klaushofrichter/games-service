@@ -1,6 +1,6 @@
 // Automated lobby tests: drive the board control API and fake decks against a real Table Host.
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { Deck, sleep, testHost } from "./helpers.ts";
+import { Deck, sleep, testHost, until } from "./helpers.ts";
 import { LogStore } from "../apps/table-host/src/logs.ts";
 import { replay } from "../apps/table-host/src/runtime.ts";
 
@@ -210,8 +210,7 @@ describe("ready flow and play", () => {
     const done = await a.waitState((s) => s.phase === "finished");
     expect(done.summary?.text).toMatch(/wins|Tie/);
     expect(done.summary?.highlights).toHaveProperty("flips");
-    await sleep(100);
-    expect((await t.ok("GET", "/metrics")).gamesPlayed).toBe(1);
+    await until(async () => (await t.ok("GET", "/metrics")).gamesPlayed === 1);
 
     // the log replays to the same final state
     const logs = await t.ok("GET", "/logs");
@@ -231,9 +230,8 @@ describe("ready flow and play", () => {
     await t.ok("POST", "/game/select", { gameId: "coin-flip", settings: { rounds: 1, roundMs: 0 } });
     await a.request("lobby", "ready", { ready: true });
     await t.ok("POST", "/game/start");
-    await sleep(50);
-    const board = await t.ok("GET", "/game/board");
-    expect(board.view.seats.find((s: any) => s.seat === 1).hasGuessed).toBe(true);
+    // the AI seat guesses on its own
+    await until(async () => (await t.ok("GET", "/game/board")).view.seats.find((s: any) => s.seat === 1).hasGuessed);
     await a.request("game", "intent", { name: "guess", payload: "tails" });
     expect((await a.waitState((s) => s.phase === "finished")).summary).not.toBeNull();
   });
@@ -267,8 +265,7 @@ describe("ready flow and play", () => {
     await t.ok("POST", "/game/end");
     const s = await a.waitState((s) => s.phase === "finished");
     expect(s.summary?.text).toMatch(/ended from the lobby/);
-    await sleep(50);
-    expect((await t.ok("GET", "/metrics")).gamesTerminated).toBe(1);
+    await until(async () => (await t.ok("GET", "/metrics")).gamesTerminated === 1);
     expect((await t.ok("POST", "/game/close")).phase).toBe("idle");
   });
 
@@ -292,8 +289,10 @@ describe("disconnects and eviction", () => {
     const a = await t.joinDeck("A");
     await t.joinDeck("B");
     a.close();
-    await sleep(80);
-    let s = await t.ok("GET", "/state");
+    let s = await until(async () => {
+      const st = await t.ok("GET", "/state");
+      return st.players.find((p: any) => p.id === a.playerId)?.connected === false && st;
+    });
     expect(s.players.find((p: any) => p.id === a.playerId)).toMatchObject({ connected: false, seat: 0 });
     const again = await Deck.connect(t.base, { sessionToken: a.sessionToken });
     t.decks.push(again);
@@ -306,8 +305,7 @@ describe("disconnects and eviction", () => {
   it("frees the seat once the grace period runs out", async () => {
     const a = await t.joinDeck("A");
     a.close();
-    await sleep(450);
-    expect((await t.ok("GET", "/state")).players).toHaveLength(0);
+    await until(async () => (await t.ok("GET", "/state")).players.length === 0); // after the grace period
     await expect(Deck.connect(t.base, { sessionToken: a.sessionToken })).rejects.toThrow(/session expired/);
   });
 
@@ -316,8 +314,7 @@ describe("disconnects and eviction", () => {
     const removed = a.next((m) => m.ch === "system" && m.type === "removed");
     await t.ok("DELETE", `/players/${a.playerId}`);
     expect((await removed).payload.reason).toBe("evicted");
-    await sleep(50);
-    expect(a.closeCode).toBe(4001);
+    expect(await until(() => a.closeCode)).toBe(4001);
     await expect(Deck.connect(t.base, { sessionToken: a.sessionToken })).rejects.toThrow(/session expired/);
   });
 
@@ -330,8 +327,7 @@ describe("disconnects and eviction", () => {
     await t.ok("POST", "/game/start");
     await a.request("game", "intent", { name: "guess", payload: "heads" });
     b.close();
-    await sleep(450);
-    // with B gone, A's guess completes the round
+    // once B's grace period is over, B is removed and A's guess completes the round
     const v = await a.waitView((v) => v.view.round === 2);
     expect(v.view.lastFlip).toMatch(/heads|tails/);
     expect((await t.ok("GET", "/state")).phase).toBe("active");
