@@ -94,3 +94,13 @@ def reset(base=BASE, key=KEY):
         api("DELETE", f"/players/{p['id']}", base=base, key=key)
     if api("GET", "/state", base=base, key=key)["frontEdge"] != "south":
         api("POST", "/rotate", {"degrees": 180}, base=base, key=key)
+
+
+def pick_game(page, game_id):
+    """Click a game's tile on the board, paging through the games until it is shown."""
+    tile = page.locator(f"button.tile[data-game={game_id}]")
+    for _ in range(10):
+        if tile.count():
+            return tile.click()
+        page.locator(".pager button[data-page='1']").click()
+    raise AssertionError(f"no tile for {game_id} on any page")

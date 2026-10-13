@@ -90,6 +90,78 @@ describe("joining", () => {
 });
 
 describe("seats and orientation", () => {
+  it("names AI players from a list of short names, marked (AI), never twice at one table", async () => {
+    await t.ok("POST", "/layout", { seats: 8 });
+    for (let i = 0; i < 8; i++) await t.ok("POST", "/ai", {});
+    const names: string[] = (await t.ok("GET", "/state")).players.map((p: any) => p.name);
+    expect(names).toHaveLength(8);
+    expect(new Set(names).size).toBe(8);
+    for (const n of names) expect(n).toMatch(/^[A-Z][a-z]{1,4} \(AI\)$/);
+  });
+
+  const ais = async () => (await t.ok("GET", "/state")).players.filter((p: any) => p.kind === "ai");
+
+  it("removing an AI and adding another never repeats a name still at the table", async () => {
+    await t.ok("POST", "/layout", { seats: 4 });
+    await t.ok("POST", "/ai", {});
+    await t.ok("POST", "/ai", {});
+    // The old naming counted AI players, so removing "AI 1" and adding one made a second "AI 2".
+    for (let i = 0; i < 40; i++) {
+      const [first] = await ais();
+      await t.ok("DELETE", `/players/${first.id}`);
+      await t.ok("POST", "/ai", {});
+      const names = (await ais()).map((p: any) => p.name);
+      expect(names).toHaveLength(2);
+      expect(new Set(names).size).toBe(2);
+    }
+  });
+
+  it("a removed AI frees its seat and its name; re-adding fills the free seat", async () => {
+    await t.ok("POST", "/layout", { seats: 4 });
+    for (let i = 0; i < 4; i++) await t.ok("POST", "/ai", {});
+    expect((await t.api("POST", "/ai", {})).status).toBe(409); // table full
+    const gone = (await ais())[1];
+    await t.ok("DELETE", `/players/${gone.id}`);
+    expect((await ais()).map((p: any) => p.seat)).not.toContain(gone.seat);
+    await t.ok("POST", "/ai", {});
+    const now = await ais();
+    expect(now).toHaveLength(4);
+    expect(now.find((p: any) => p.seat === gone.seat)).toBeDefined();
+    expect(new Set(now.map((p: any) => p.name)).size).toBe(4);
+  });
+
+  it("an AI never takes the name of a person at the table, and AI names don't collide with people", async () => {
+    await t.ok("POST", "/layout", { seats: 8 });
+    const human = await t.joinDeck("Mia");
+    for (let i = 0; i < 7; i++) await t.ok("POST", "/ai", {});
+    const s = await t.ok("GET", "/state");
+    expect(s.players.find((p: any) => p.id === human.playerId).name).toBe("Mia");
+    const names = s.players.map((p: any) => p.name);
+    expect(new Set(names).size).toBe(8);
+    expect(names.filter((n: string) => n.endsWith(" (AI)"))).toHaveLength(7);
+  });
+
+  it("adding an AI to a specific seat uses that seat, and a taken seat is refused", async () => {
+    await t.ok("POST", "/layout", { seats: 4 });
+    const id = (await t.ok("POST", "/ai", { seat: 2 })).playerId;
+    expect((await ais()).find((p: any) => p.id === id).seat).toBe(2);
+    expect((await t.api("POST", "/ai", { seat: 2 })).status).toBe(409);
+  });
+
+  it("over many add/remove cycles every name is from the list and names vary", async () => {
+    await t.ok("POST", "/layout", { seats: 2 });
+    const seen = new Set<string>();
+    for (let i = 0; i < 30; i++) {
+      const id = (await t.ok("POST", "/ai", {})).playerId;
+      const p = (await ais()).find((x: any) => x.id === id);
+      expect(p.name).toMatch(/^[A-Z][a-z]{1,4} \(AI\)$/);
+      seen.add(p.name);
+      await t.ok("DELETE", `/players/${id}`);
+    }
+    expect(seen.size).toBeGreaterThan(5); // random: 30 draws from 24 names
+    expect(await ais()).toHaveLength(0);
+  });
+
   it("moves players between seats and swaps when a seat is taken", async () => {
     const a = await t.joinDeck("A");
     const b = await t.joinDeck("B");
@@ -112,16 +184,19 @@ describe("seats and orientation", () => {
     expect((await t.api("POST", "/rotate", { degrees: 45 })).status).toBe(400);
   });
 
-  it("refuses 90° rotation for a game that only supports north and south", async () => {
+  it("facing east or west blocks no game: games draw the same whichever way the lobby faces (D-079)", async () => {
     for (const n of ["A", "B", "C", "D"]) await t.joinDeck(n);
-    await t.ok("POST", "/game/select", { gameId: "quartet" });
-    const r = await t.api("POST", "/rotate", { degrees: 90 });
-    expect(r.status).toBe(409);
-    expect((await t.ok("POST", "/rotate", { degrees: 180 })).frontEdge).toBe("north");
+    expect((await t.ok("POST", "/face", { edge: "east" })).frontEdge).toBe("east");
+    expect((await t.ok("GET", "/games")).find((g: any) => g.id === "quartet").selectable).toBe(true);
+    await t.ok("POST", "/game/select", { gameId: "quartet" }); // a north/south-only game, chosen while facing east
+    expect((await t.ok("POST", "/face", { edge: "west" })).frontEdge).toBe("west");
+    expect((await t.ok("POST", "/rotate", { degrees: 90 })).frontEdge).toBe("north"); // the old API still works
+    expect((await t.api("POST", "/face", { edge: "up" })).status).toBe(400);
   });
 
   it("names the edge of every seat for each layout", async () => {
     expect((await t.ok("POST", "/layout", { seats: 8 })).seatEdges).toEqual(["south", "south", "south", "north", "north", "north", "east", "west"]);
+    expect((await t.ok("POST", "/layout", { seats: 6 })).seatEdges).toEqual(["south", "south", "north", "north", "east", "west"]);
     expect((await t.ok("POST", "/layout", { seats: 2 })).seatEdges).toEqual(["south", "north"]);
   });
 

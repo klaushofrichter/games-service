@@ -108,6 +108,39 @@ with sync_playwright() as p:
         if filled < 0.97:
             problems.append(f"board {name}: surface uses only {filled:.0%} of the screen")
         page.close()
+    # ----- board controls: corner buttons turn the lobby to that side, and games page three at a time -----
+    page = b.new_page(viewport={"width": 1280, "height": 720})
+    watch(page, "board controls")
+    page.goto(BASE + "/board/")
+    page.wait_for_selector("text=Pick a game")
+    if page.locator("#corners button[data-face]").count() != 4:
+        problems.append("board: expected four corner buttons in the lobby")
+    page.locator("#corners button[data-face='west']").click()
+    wait(lambda: api("GET", "/state")["frontEdge"] == "west", 5, "the table to face west")
+    page.wait_for_timeout(400)
+    page.screenshot(path=os.path.join(OUT, "board-facing-west.png"))
+    for seats in (4, 6, 8):
+        api("POST", "/layout", {"seats": seats})
+        page.wait_for_timeout(300)
+        gap = page.evaluate("""() => { const c = document.getElementById('center').getBoundingClientRect();
+          return Math.min(...[...document.querySelectorAll('.seat')].map((e) => { const s = e.getBoundingClientRect();
+            return Math.max(s.top - c.bottom, c.top - s.bottom, s.left - c.right, c.left - s.right); })); }""")
+        if gap < 20:  # screen px at 1280 x 720
+            problems.append(f"board facing west, {seats} seats: centre panel only {gap:.0f}px from a seat plate")
+    api("POST", "/layout", {"seats": 4})
+    first = page.locator(".games .tile").first.get_attribute("data-game")
+    if page.locator(".games .tile.selectable").count() == 0:
+        problems.append("board facing west: no game can be chosen")
+    if page.locator(".pager").count() == 1:
+        page.locator(".pager button[data-page='1']").click()
+        page.wait_for_timeout(200)
+        if page.locator(".games .tile").first.get_attribute("data-game") == first:
+            problems.append("board: the next-page button did not change the games shown")
+    elif page.locator(".games .tile").count() > 3:
+        problems.append("board: more than three games but no pager")
+    page.locator("#corners button[data-face='south']").click()
+    wait(lambda: api("GET", "/state")["frontEdge"] == "south", 5, "the table to face south")
+    page.close()
     b.close()
 
 if errors:

@@ -5,7 +5,7 @@ data channel to the table. Also checks the board-control switch and reconnecting
 """
 import os, re, sys, time
 from playwright.sync_api import sync_playwright
-from common import call, errors, join_deck, start_cloud, start_table, wait, watch
+from common import call, errors, join_deck, pick_game, start_cloud, start_table, wait, watch
 
 OUT = sys.argv[1] if len(sys.argv) > 1 else "e2e-out"
 os.makedirs(OUT, exist_ok=True)
@@ -68,7 +68,7 @@ try:
         rboard.locator("text=Pick a game").wait_for()
         remote.wait_for_timeout(500)
         remote.screenshot(path=os.path.join(OUT, "remote-north-seat.png"))
-        assert rboard.locator("button[data-rotate]").count() == 0, "remote boards don't turn the table"
+        assert rboard.locator("#corners button[data-face]").count() == 0, "remote boards don't turn the table"
 
         # remote board control: change the layout from the remote board, then the table switches control off
         rboard.locator("button[data-layout='6']").click()
@@ -107,7 +107,7 @@ try:
         local = b.new_context(viewport={"width": 390, "height": 844}, has_touch=True).new_page()
         watch(local, "Ana")
         join_deck(local, call(TABLE, "GET", "/api/v1/join", headers={"x-table-key": "k"})["url"], "Ana")
-        rboard.locator("button.tile[data-game=pachisi]").click()  # the remote board picks the game
+        pick_game(rboard, "pachisi")  # the remote board picks the game
         rboard.locator(".dialog button.primary").click()          # settings dialog: defaults
         wait(lambda: state()["phase"] == "ready")
         local.click("#ready")

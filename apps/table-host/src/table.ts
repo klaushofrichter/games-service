@@ -367,10 +367,15 @@ export class Table extends EventEmitter {
 
   rotate(degrees: number) {
     if (degrees !== 90 && degrees !== 180) throw new TableError(400, "degrees must be 90 or 180");
-    const next = rotateEdge(this.frontEdge, degrees);
-    const m = this.selected?.game.manifest;
-    if (m && !m.edges.includes(next)) throw new TableError(409, `${m.name} cannot be shown facing ${next}`);
-    this.frontEdge = next;
+    this.face(rotateEdge(this.frontEdge, degrees));
+  }
+
+  /** Turns the lobby (and dialogs) to face one edge of the table. Games draw the same whichever way it faces, so
+   *  this never blocks a game (D-079). */
+  face(edge: string) {
+    if (!["north", "east", "south", "west"].includes(edge)) throw new TableError(400, "edge must be north, east, south or west");
+    if (this.frontEdge === edge) return;
+    this.frontEdge = edge as Edge;
     this.changed();
   }
 
@@ -395,12 +400,21 @@ export class Table extends EventEmitter {
     const free = this.freeSeats();
     const target = seat ?? free[0];
     if (target === undefined || !free.includes(target)) throw new TableError(409, "no free seat");
-    const n = [...this.players.values()].filter((p) => p.kind === "ai").length + 1;
-    const p: Player = { id: newId("ai"), name: `AI ${n}`, kind: "ai", location: "local", seat: target, connected: true, ready: true, sessionToken: null, aiSeed: randomInt(2 ** 31) };
+    const p: Player = { id: newId("ai"), name: this.aiName(), kind: "ai", location: "local", seat: target, connected: true, ready: true, sessionToken: null, aiSeed: randomInt(2 ** 31) };
     this.players.set(p.id, p);
     if (this.phase === "ready") this.revalidateSelection();
     this.changed();
     return p.id;
+  }
+
+  /** A random short name, marked as AI, that nobody at the table has yet ("Mia (AI)"). Remove and re-add to get another. */
+  private aiName() {
+    const taken = new Set([...this.players.values()].map((p) => p.name));
+    const free = AI_NAMES.map((n) => `${n} (AI)`).filter((n) => !taken.has(n));
+    if (free.length) return free[randomInt(free.length)];
+    let n = 1;
+    while (taken.has(`AI ${n}`)) n++;
+    return `AI ${n}`;
   }
 
   /** Set an AI player's options (play style, level). Checked against the selected game when there is one. */
@@ -489,7 +503,6 @@ export class Table extends EventEmitter {
     if (seated.length > max) reasons.push(`takes at most ${max} players (${seated.length} seated)`);
     if (!m.ai.supported && seated.some((p) => p.kind === "ai")) reasons.push("has no AI players; remove the AI seats");
     if (seated.length <= max && this.layoutFor(m) === null) reasons.push(`has no seat layout for ${seated.length} players`);
-    if (!m.edges.includes(this.frontEdge)) reasons.push(`cannot be shown facing ${this.frontEdge}; rotate the board`);
     return reasons;
   }
 
@@ -710,6 +723,12 @@ export class Table extends EventEmitter {
     this.runtime?.clearAllTimers();
   }
 }
+
+/** AI player names (D-081): short, so "Name (AI)" fits a seat plate; half female, half male. */
+export const AI_NAMES = [
+  "Anna", "Bea", "Cleo", "Emma", "Ida", "Lena", "Lisa", "Mia", "Nora", "Rosa", "Sara", "Zoe",
+  "Ben", "Bob", "Finn", "Jack", "Leo", "Max", "Noah", "Otto", "Paul", "Sam", "Tom", "Theo",
+];
 
 /** AI options with manifest defaults. The AI configuration screen (later phase) will override these per seat. */
 export function aiDefaults(m: InstalledGame["manifest"], given: Record<string, unknown> = {}): Record<string, unknown> {
