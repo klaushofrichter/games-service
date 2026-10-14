@@ -1,6 +1,6 @@
 // Board UI: lobby, seats around the edge, QR join, game surface and the lobby overlay.
 // Talks to the Table Host through the board control API (same API the tests and local AI agents use).
-import { ROT, W, H, audio, esc, seatName, seatPositions, claimServiceWorkerPage, openTableSocket } from "/shared/board-kit.js";
+import { ROT, W, H, audio, copyText, esc, seatName, seatPositions, claimServiceWorkerPage, openTableSocket } from "/shared/board-kit.js";
 
 const KEY = window.TABLE_KEY;
 // A remote player's copy of the board (phase 1c): it runs inside the cloud's invite page, which carries
@@ -394,13 +394,34 @@ function cloudNotice() {
   return "";
 }
 
+// ---------- copying links (D-094) ----------
+const COPY_ICON = `<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M5 15V6a2 2 0 0 1 2-2h8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`;
+const DONE_ICON = `<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+/** A link with a copy button beside it. */
+const linkLine = (url) =>
+  `<div class="url-line"><span class="url">${esc(url)}</span><button type="button" class="copy" data-copy="${esc(url)}" title="Copy link" aria-label="Copy link">${COPY_ICON}</button></div>`;
+document.addEventListener("click", async (e) => {
+  const b = e.target.closest("button[data-copy]");
+  if (!b) return;
+  e.stopPropagation();
+  if (!(await copyText(b.dataset.copy))) return toast("Copying is not available in this browser");
+  b.innerHTML = DONE_ICON;
+  b.classList.add("done");
+  b.title = "Copied";
+  setTimeout(() => {
+    b.innerHTML = COPY_ICON;
+    b.classList.remove("done");
+    b.title = "Copy link";
+  }, 1600);
+}, true);
+
 function joinPanel() {
   if (REMOTE) return "";
   const code = state.joinUrl.split("/").pop();
   return `<aside class="join">
     <div class="eyebrow">Scan to join</div>
     <img src="/qr.svg?u=${encodeURIComponent(state.joinUrl)}" alt="QR code to join this table">
-    <div><div class="url">${esc(state.joinUrl)}</div><div class="code" style="text-align:center;margin-top:6px">${esc(code)}</div></div>
+    <div>${linkLine(state.joinUrl)}<div class="code" style="text-align:center;margin-top:6px">${esc(code)}</div></div>
     <div class="faint" style="font-size:.7em;text-align:center">Everyone at the table scans this same code</div>
     <button data-new-code style="font-size:.7em">New code</button>
   </aside>`;
@@ -726,7 +747,7 @@ async function openInvite() {
     o.innerHTML = `<div class="panel invite"><h2>Invite a remote player</h2>
       <div class="muted">Send this link by email or chat. It works once, for one player, until ${esc(until)}.</div>
       <div class="invite-body"><div class="qr">${qr}</div>
-        <div><div class="url">${esc(inv.url)}</div><div class="code">${esc(inv.token)}</div>
+        <div>${linkLine(inv.url)}<div class="code">${esc(inv.token)}</div>
         <div class="faint" style="margin-top:10px">${r.players} of ${r.maxPlayers} remote seats in use</div></div></div>
       <label class="invite-control"><input type="checkbox" name="control" ${r.boardControl ? "checked" : ""}>
         Remote players can use the board controls (pick games, start, end)</label>

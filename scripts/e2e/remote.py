@@ -38,6 +38,11 @@ try:
         board.wait_for_selector(".invite-body .code")
         invite = board.inner_text(".invite-body .code").strip()
         assert board.inner_html(".invite-body .qr").startswith("<svg"), "invite QR missing"
+        # the invite link has a copy button that puts exactly that link on the clipboard (D-094)
+        board.context.grant_permissions(["clipboard-read", "clipboard-write"], origin=TABLE)
+        board.click(".invite-body button[data-copy]")
+        board.wait_for_selector(".invite-body button.copy.done")
+        assert board.evaluate("() => navigator.clipboard.readText()") == board.inner_text(".invite-body .url").strip()
         board.screenshot(path=os.path.join(OUT, "remote-invite-dialog.png"))
 
         remote_ctx = b.new_context(viewport={"width": 1440, "height": 900})

@@ -204,3 +204,11 @@ pre.raw { font-family: var(--mono); font-size: 0.7em; color: var(--ink-soft); ba
 .stepper { display: inline-flex; align-items: center; gap: 6px; }
 .stepper button { width: 52px; height: 48px; padding: 0; font-size: 1.1em; }
 .stepper .value, .overlay.settings .value { min-width: 64px; text-align: center; font-family: var(--mono); color: var(--ink); }
+
+/* A link with its copy button (D-094). */
+.url-line { display: flex; align-items: center; justify-content: center; gap: 10px; }
+.url-line .url { min-width: 0; }
+button.copy { flex: none; width: 44px; height: 44px; padding: 0; border-radius: 10px; display: inline-grid; place-items: center; color: var(--ink-soft); }
+button.copy:hover, button.copy.done { color: var(--brass); border-color: var(--brass-deep); }
+.invite-body .url-line { justify-content: flex-start; }
+#center.sideways .join .url-line { justify-content: flex-start; }
