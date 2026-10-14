@@ -64,6 +64,23 @@ try:
         remote.wait_for_timeout(600)
         remote.screenshot(path=os.path.join(OUT, "remote-player.png"))
 
+        # D-095: the deck window sits top right and is as tall as its content, so it has no scrollbar when the
+        # window has room; in a short window it stops at the window and scrolls.
+        FIT = """() => { const w = document.getElementById('deck-wrap').getBoundingClientRect();
+          const d = document.getElementById('deck').contentDocument.scrollingElement;
+          return { top: w.top, bottom: w.bottom, inner: innerHeight, scrolls: d.scrollHeight > d.clientHeight + 1 }; }"""
+        f = remote.evaluate(FIT)
+        assert abs(f["top"] - 16) < 2, f
+        assert f["bottom"] < f["inner"] - 16 - 40, f"lobby deck should be shorter than the window: {f}"
+        assert not f["scrolls"], f"deck scrolls although the window has room: {f}"
+        remote.set_viewport_size({"width": 1440, "height": 360})
+        remote.wait_for_timeout(400)
+        f = remote.evaluate(FIT)
+        assert abs(f["top"] - 16) < 2 and abs(f["bottom"] - (f["inner"] - 16)) < 2, f"short window: deck should fill it: {f}"
+        assert f["scrolls"], f"short window: the deck needs its scrollbar: {f}"
+        remote.set_viewport_size({"width": 1440, "height": 900})
+        remote.wait_for_timeout(300)
+
         # the remote board turns so Rita's own seat is at the bottom of her screen
         rita = players[0]
         call(TABLE, "POST", "/api/v1/seats/move", {"playerId": rita["id"], "seat": 2}, {"x-table-key": "k"})  # a north seat
