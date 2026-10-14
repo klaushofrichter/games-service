@@ -17,7 +17,10 @@ import {
   type CloudStatus,
 } from "../../../packages/protocol/src/index.ts";
 import { createRng, type GameEvent, type Intent, type SeatInfo } from "../../../packages/sdk/src/index.ts";
-import { settingsWithDefaults, type InstalledGame } from "./games.ts";
+import { HOW_TO_PLAY, settingsWithDefaults, sourceMeta, type InstalledGame } from "./games.ts";
+
+/** The URL a deck fetches a game's rules from (D-099), or null. */
+const howToPlayUrl = (g: InstalledGame) => (g.howToPlay ? `/games/${g.manifest.id}/${HOW_TO_PLAY}` : null);
 import { GameRuntime, realClock } from "./runtime.ts";
 import type { LogStore } from "./logs.ts";
 
@@ -127,6 +130,8 @@ export class Table extends EventEmitter {
             players: allowedPlayerCounts(this.selected.game.manifest),
             needs: this.needsFor(this.selected.game.manifest),
             prefs: this.prefs.get(this.selected.game.manifest.id) ?? {},
+            howToPlay: howToPlayUrl(this.selected.game),
+            settingsShown: this.selected.game.manifest.settings.map((s) => ({ label: s.label ?? s.key, value: this.selected!.settings[s.key] })),
           }
         : null,
       layouts: this.allowedLayouts(),
@@ -474,8 +479,76 @@ export class Table extends EventEmitter {
 
   // ---------- games ----------
 
+  /** The game the current or last runtime was made from (the selection may change after it ends). */
+  private runningGame: InstalledGame | null = null;
+  /** Ids of games that came from extra-game repositories (D-097), as opposed to built-in ones. */
+  private extraIds = new Set<string>();
+  /** A new set of extra games that arrived while a game was running; applied when it ends. */
+  private pendingExtra: Map<string, InstalledGame> | null = null;
+
+  /** Ids of the extra games installed now, and of those waiting for the running game to end. */
+  extraGames() {
+    return { installed: [...this.extraIds].sort(), pending: this.pendingExtra ? [...this.pendingExtra.keys()].sort() : null };
+  }
+
+  /**
+   * Replace the set of extra games (D-097). Never during a game: the change waits until the running game ends.
+   * A built-in game always wins over an extra game with the same id. A chosen game that goes away is unchosen; one
+   * that is updated stays chosen with the new code, if its settings still fit. Returns true if applied now.
+   */
+  setExtraGames(extra: Map<string, InstalledGame>): boolean {
+    if (this.phase === "active" || this.phase === "paused" || this.phase === "terminating") {
+      this.pendingExtra = extra;
+      return false;
+    }
+    this.pendingExtra = null;
+    let changed = false;
+    for (const id of this.extraIds) {
+      if (extra.has(id)) continue;
+      this.games.delete(id);
+      changed = true;
+      if (this.selected?.game.manifest.id === id) this.unselect();
+    }
+    const next = new Set<string>();
+    for (const [id, g] of extra) {
+      const builtIn = this.games.has(id) && !this.extraIds.has(id);
+      if (builtIn) {
+        console.error(`[games] extra game "${id}" from ${g.source?.repo ?? "?"} has the id of a built-in game; skipped`);
+        continue;
+      }
+      next.add(id);
+      if (this.games.get(id) === g) continue;
+      this.games.set(id, g);
+      changed = true;
+      if (this.selected?.game.manifest.id === id) {
+        try {
+          this.selected = { game: g, settings: settingsWithDefaults(g.manifest, this.selected.settings) };
+          if (this.phase === "ready") this.revalidateSelection();
+        } catch {
+          this.unselect();
+        }
+      }
+    }
+    this.extraIds = next;
+    if (changed) this.changed();
+    return true;
+  }
+
+  private applyPendingExtra() {
+    if (this.pendingExtra && this.setExtraGames(this.pendingExtra)) this.emit("extraGamesApplied");
+  }
+
+  /** Drop the chosen game and its result: back to the plain lobby. */
+  private unselect() {
+    this.selected = null;
+    this.summary = null;
+    if (this.phase === "ready" || this.phase === "finished") this.phase = "idle";
+    for (const p of this.players.values()) p.ready = p.kind === "ai";
+  }
+
   availability(): GameAvailability[] {
-    return this.visibleGames().map(({ manifest: m }) => {
+    return this.visibleGames().map((g) => {
+      const { manifest: m, source } = g;
       const reasons = this.blockersFor(m);
       return {
         id: m.id,
@@ -491,6 +564,8 @@ export class Table extends EventEmitter {
         players: allowedPlayerCounts(m),
         settings: m.settings,
         aiOptions: m.ai.options,
+        howToPlay: howToPlayUrl(g),
+        ...(source ? { extra: true } : {}),
       };
     });
   }
@@ -642,6 +717,7 @@ export class Table extends EventEmitter {
     for (const p of this.seated()) if (p.kind === "ai") aiOptions[p.seat!] = aiDefaults(game.manifest, p.aiOptions);
     const rt = new GameRuntime(game.manifest, game.def, randomInt(2 ** 31), settings, seats, realClock, { aiOptions });
     this.runtime = rt;
+    this.runningGame = game;
     this.gameStartedAt = Date.now();
     this.phase = "active";
     rt.onChange((kind, events) => {
@@ -678,6 +754,8 @@ export class Table extends EventEmitter {
     const terminated = rt.log.at(-1)?.t === "end" && (rt.log.at(-1) as { reason: string }).reason === "terminated";
     this.phase = "finished";
     this.pause = null;
+    // Extra games that changed while this one ran take effect now (D-097); the log below still names the code it ran.
+    if (this.pendingExtra) queueMicrotask(() => this.applyPendingExtra());
     this.summary = rt.summary;
     const ms = Date.now() - this.gameStartedAt;
     if (terminated) this.metrics.gamesTerminated++;
@@ -688,7 +766,7 @@ export class Table extends EventEmitter {
     const id = logId(rt.manifest.id);
     if (this.closed) return;
     const saving = this.logs.save(
-      { id, tableName: this.config.tableName, gameId: rt.manifest.id, gameVersion: rt.manifest.version, simulation: false, startedAt: new Date(this.gameStartedAt).toISOString(), endedAt: new Date().toISOString(), games: 1, format: "gametable-log/1" },
+      { id, tableName: this.config.tableName, gameId: rt.manifest.id, gameVersion: rt.manifest.version, simulation: false, startedAt: new Date(this.gameStartedAt).toISOString(), endedAt: new Date().toISOString(), games: 1, format: "gametable-log/1", ...(this.runningGame ? sourceMeta(this.runningGame) : {}) },
       [rt.log],
     );
     this.pendingSaves.add(saving);

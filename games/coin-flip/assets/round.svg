@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 200" width="400" height="200" role="img" aria-label="Coin Flip round: pick, flip, score">
+<title>Coin Flip round: pick, flip, score</title>
+<rect x="1" y="1" width="398" height="198" rx="14" fill="#0f2a24" stroke="#d6a94a" stroke-opacity="0.5" stroke-width="2"/>
+<text x="200.0" y="30" font-size="20" fill="#d6a94a" text-anchor="middle" font-weight="normal" font-family="Georgia, serif" >One round</text>
+<rect x="50" y="58" width="40" height="66" rx="7" fill="none" stroke="#f3eee2" stroke-width="3"/>
+<rect x="57" y="72" width="26" height="14" rx="3" fill="#d6a94a"/>
+<rect x="57" y="92" width="26" height="14" rx="3" fill="none" stroke="#d6a94a" stroke-width="2"/>
+<text x="70" y="152" font-size="17" fill="#f3eee2" text-anchor="middle" font-weight="bold" font-family="sans-serif" >Pick</text>
+<text x="70" y="172" font-size="12.5" fill="#9fb3a9" text-anchor="middle" font-weight="normal" font-family="sans-serif" >heads or tails</text>
+<path d="M 122 92 l 24 0 m -8 -7 l 8 7 l -8 7" fill="none" stroke="#d6a94a" stroke-width="3" stroke-linecap="round"/>
+<ellipse cx="200" cy="92" rx="32" ry="32" fill="#d6a94a" stroke="#8a6216" stroke-width="4"/>
+<text x="200" y="98" font-size="22" fill="#3a2a08" text-anchor="middle" font-weight="bold" font-family="Georgia, serif" >?</text>
+<text x="200" y="152" font-size="17" fill="#f3eee2" text-anchor="middle" font-weight="bold" font-family="sans-serif" >Flip</text>
+<text x="200" y="172" font-size="12.5" fill="#9fb3a9" text-anchor="middle" font-weight="normal" font-family="sans-serif" >when all have picked</text>
+<path d="M 252 92 l 24 0 m -8 -7 l 8 7 l -8 7" fill="none" stroke="#d6a94a" stroke-width="3" stroke-linecap="round"/>
+<circle cx="330" cy="92" r="32" fill="none" stroke="#7fd18b" stroke-width="4"/>
+<path d="M 315 92 l 10 11 l 20 -22" fill="none" stroke="#7fd18b" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="330" y="152" font-size="17" fill="#f3eee2" text-anchor="middle" font-weight="bold" font-family="sans-serif" >Score</text>
+<text x="330" y="172" font-size="12.5" fill="#9fb3a9" text-anchor="middle" font-weight="normal" font-family="sans-serif" >+1 if you were right</text>
+</svg>

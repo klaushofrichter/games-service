@@ -44,8 +44,15 @@ const MIME: Record<string, string> = {
   ".css": "text/css; charset=utf-8",
   ".svg": "image/svg+xml",
   ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".webp": "image/webp",
+  ".gif": "image/gif",
+  ".md": "text/markdown; charset=utf-8",
   ".json": "application/json",
 };
+/** Images and rules a game ships are data, never pages: an SVG opened on its own must not run script (D-099). */
+const ASSET_HEADERS = { "x-content-type-options": "nosniff", "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; img-src data:; sandbox" };
 
 export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
   const clients = new Set<Client & { alive?: boolean }>();
@@ -139,7 +146,8 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
     try {
       let data: Buffer | string = await readFile(file);
       if (transform) data = transform(data.toString("utf8"));
-      res.writeHead(200, { "content-type": MIME[extname(file)] ?? "application/octet-stream", "cache-control": "no-cache" });
+      const asset = root !== opts.publicDir && !/\.(js|css)$/.test(file);
+      res.writeHead(200, { "content-type": MIME[extname(file)] ?? "application/octet-stream", "cache-control": "no-cache", ...(asset ? ASSET_HEADERS : {}) });
       res.end(data);
     } catch {
       json(res, 404, { error: "not found" });
@@ -263,7 +271,7 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
       }
       if (path === "/deck" || path === "/deck/") return await serveFile(res, "deck/index.html");
       if (path.startsWith("/board/") || path.startsWith("/deck/") || path.startsWith("/shared/")) return await serveFile(res, path.slice(1));
-      if ((match = path.match(/^\/games\/([a-z0-9-]+)\/((?:board|deck)\.(?:js|css)|assets\/[\w./-]+)$/))) {
+      if ((match = path.match(/^\/games\/([a-z0-9-]+)\/((?:board|deck)\.(?:js|css)|how-to-play\.md|assets\/[\w./-]+)$/))) {
         // A game's own board and deck UI and its assets; rules and manifest are not served.
         const g = table.games.get(match[1]);
         if (!g || match[2].includes("..")) return json(res, 404, { error: "not found" });

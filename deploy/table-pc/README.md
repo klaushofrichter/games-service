@@ -2,12 +2,12 @@
 
 Turns a Linux PC with a touchscreen into a Game Table: the Table Host runs in Docker, and a kiosk browser shows the board full screen at boot.
 
-**Recommended:** Debian 12 (or Ubuntu 24.04) minimal install, a 16:9 touchscreen (1080p or 4K) lying flat, and the PC on the same WiFi/LAN as the players' phones. On Ubuntu, Chromium comes as a snap; Debian's native Chromium works more reliably in kiosk mode.
+**Recommended:** Debian 12 (Ubuntu 22.04 or later also works) minimal install, a 16:9 touchscreen (1080p or 4K) lying flat, and the PC on the same WiFi/LAN as the players' phones. On Ubuntu, Chromium comes as a snap; Debian's native Chromium works more reliably in kiosk mode.
 
 ## Install
 
 ```sh
-git clone <games-service repo> && cd games-service/deploy/table-pc
+git clone https://github.com/klaushofrichter/games-service && cd games-service/deploy/table-pc
 sudo ./install.sh
 ```
 
@@ -18,11 +18,7 @@ The script:
 3. writes `/opt/gametable/.env` from `env.example` with a freshly generated `TABLE_KEY`;
 4. starts the Table Host container (host networking, data in `/var/lib/gametable`) and enables `gametable-kiosk.service`, which opens `http://127.0.0.1:8080/board/` on the touchscreen once the host answers.
 
-If the container image is private, log in to GitHub's registry first (a token with `read:packages`):
-
-```sh
-echo <token> | sudo docker login ghcr.io -u <github-user> --password-stdin
-```
+The image (`ghcr.io/klaushofrichter/games-table-host`) is public, so no registry login is needed.
 
 ## First start
 
@@ -39,10 +35,10 @@ The board shows a 6-character **pairing code**. Approve it in the admin portal a
 | Restart the board browser | `sudo systemctl restart gametable-kiosk` |
 | Health | `curl http://127.0.0.1:8080/health` (`{"status":"ok","version":…,"protocol":…}`) |
 
-Game logs and saves live in `/var/lib/gametable` and are deleted after the retention period set in the service (default 90 days).
+`/var/lib/gametable` holds the game logs and saves (deleted after the retention period set in the service, default 90 days), the games installed from extra-game repositories (`extra-games/`), and the table's identity (`table.json`): delete that and the table must be paired again.
 
 ## Notes
 
-- The board page and its control API are only served to the PC itself (loopback); phones only get the deck pages. Keep `TABLE_KEY` on this machine.
+- The board page is only served to the PC itself (loopback), which is where it gets `TABLE_KEY`; the control API needs that key from anyone else. Phones only get the deck pages. Keep `TABLE_KEY` on this machine.
 - The PC's address can change (no fixed IP range at venues); the QR code always uses the current LAN address unless `PUBLIC_URL` is set.
 - No offline play: without the service the board shows a notice, new games cannot start, and running games pause until the connection returns.

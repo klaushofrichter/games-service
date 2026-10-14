@@ -9,6 +9,7 @@ import { startServer } from "./server.ts";
 import { Table, type TableConfig } from "./table.ts";
 import { CloudLink } from "./cloud.ts";
 import { RemoteGateway } from "./remote.ts";
+import { ExtraGames } from "./extra-games.ts";
 
 const here = fileURLToPath(new URL(".", import.meta.url));
 
@@ -67,6 +68,10 @@ export async function startHost(o: HostOptions = {}) {
   if (o.cloudUrl) {
     cloud = new CloudLink(table, logs, { cloudUrl: o.cloudUrl.replace(/\/$/, ""), dataDir, pollMs: o.cloudPollMs, heartbeatMs: o.cloudHeartbeatMs });
     cloud.gateway = gateway;
+    // Extra games come only through the service (D-016, D-097): without CLOUD_URL a table has its built-in games.
+    const link = cloud;
+    cloud.extras = new ExtraGames(table, dataDir, (hash) => link.downloadBundle(hash));
+    await cloud.extras.restore();
     await cloud.start();
   }
   const close = async () => {

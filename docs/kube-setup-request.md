@@ -27,7 +27,9 @@ Node 26, listens on **8081**, image `ghcr.io/klaushofrichter/games-cloud`, numer
   signaling sockets belong to one process. Do not scale it out: a second pod would not see the first one's tables.
 - **No volume yet.** Restarting the pod forgets every paired table (they show a new pairing code and must be
   approved again in the portal). A persistent store (likely SQLite on a PVC with Litestream to S3, as cams-admin
-  does) is the next piece of work on the games-service side and will come as a separate request.
+  does) is the next piece of work on the games-service side and will come as a separate request. It will also hold
+  the extra-game repository list and which tables get which repositories (D-098); until then the list is baked into
+  the image (`deploy/game-repos.json`).
 - **Ingress timeouts:** Traefik passes WebSocket upgrades on a normal Ingress. Tables send a ping every 30 s and
   reconnect if cut, so the defaults are fine; if Traefik's idle timeout is below 60 s, raise it for this host.
 
@@ -97,7 +99,8 @@ spec:
 - In: Traefik → pod port **8081**; Traefik → the ACME HTTP-01 solver pod on **8089**
   (`acme.cert-manager.io/http01-solver: "true"`), which is load-bearing for the certificate; Alloy if you scrape it.
 - Out: DNS; **443 to the internet** (Google's token and certificate endpoints for sign-in, `oauth2.googleapis.com`
-  and `www.googleapis.com`), excluding the pod and service CIDRs and `192.168.1.0/24`. Nothing else: the service
+  and `www.googleapis.com`; since D-097 also `api.github.com` and `codeload.github.com` for extra-game repositories),
+  excluding the pod and service CIDRs and `192.168.1.0/24`. Nothing else: the service
   calls nothing in the cluster or on the LAN.
 
 ### 3. `manifests/games-runner/`
@@ -117,15 +120,19 @@ Copy `cams-admin-runner` (it deploys a plain Deployment the same way), with:
 
 `scripts/sync-secrets.sh` in games-service reads its local `.env` and, without printing values:
 
-- `--cluster`: applies `games/games-oauth` (the five sign-in keys) and `games-runner/runner-pat` (key `token`).
+- `--cluster`: applies `games/games-oauth` (the five sign-in keys, plus the optional `GAME_REPO_TOKEN` for private
+  extra-game repositories, D-097; the repository list itself is in the image, D-098) and `games-runner/runner-pat`
+  (key `token`).
   It needs the two namespaces to exist first.
 - `--github`: sets the repo secret `KUBE_SETUP_DEPLOY_TOKEN` (Contents read/write on kube-setup).
 
 ### 5. Pulling the image
 
-The GHCR packages `games-cloud` and `games-table-host` are **private** (the repo is private). Either the cluster
-gets an image pull secret for `games` (a token with `read:packages`), or Klaus makes the packages public. Whatever
-the other private-repo services do here is the right answer; please say which.
+The games-service repo is **public** since 14 Oct 2026 (D-096). A container package's visibility is set separately
+from its repo, so `games-cloud` and `games-table-host` stay private until Klaus switches them to public in the
+package settings; then the cluster (and table PCs) pull without a secret. Until then the cluster needs an image pull
+secret for `games` (a token with `read:packages`). Whatever the other services do here is the right answer; please
+say which.
 
 ### 6. Bookkeeping
 

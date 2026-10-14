@@ -57,7 +57,9 @@ def wait_http(url, secs=15):
 
 
 def start_cloud(port, **env):
-    """Start a cloud service on port and wait for its /health."""
+    """Start a cloud service on port and wait for its /health. No deploy-time game repositories unless a check asks
+    for them (GAME_REPOS_FILE), so the checks never reach the real GitHub."""
+    env.setdefault("GAME_REPOS_FILE", "none")
     proc = subprocess.Popen(["node", "apps/cloud/src/main.ts"], cwd=REPO, env=dict(os.environ, PORT=str(port), **env))
     wait_http(f"http://127.0.0.1:{port}/health")
     return proc

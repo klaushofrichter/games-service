@@ -38,8 +38,7 @@ systemctl enable gametable-kiosk.service
 
 echo "==> Starting the Table Host"
 if ! (cd "$DIR" && docker compose pull); then
-  echo "    Could not pull the image. If the package is private, log in first:"
-  echo "    echo <github-token-with-read:packages> | docker login ghcr.io -u <github-user> --password-stdin"
+  echo "    Could not pull the image (it is public: check the network and the VERSION in ${DIR}/.env),"
   echo "    then run: sudo ${DIR}/update.sh"
   exit 1
 fi

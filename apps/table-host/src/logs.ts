@@ -14,6 +14,8 @@ export interface RunMeta {
   endedAt: string;
   games: number;
   format: "gametable-log/1";
+  /** Extra games only (D-097): "owner/name@ref commit (bundle <hash>)", so a log names the exact code it ran. */
+  gameSource?: string;
 }
 
 export class LogStore {
@@ -61,8 +63,12 @@ export class LogStore {
     await mkdir(this.dir, { recursive: true });
     const out = [];
     for (const f of (await readdir(this.dir)).filter((f) => f.endsWith(".zip"))) {
-      const s = await stat(join(this.dir, f));
-      out.push({ id: f.slice(0, -4), bytes: s.size, modified: s.mtime.toISOString() });
+      // Retention pruning may delete a log between readdir and stat: a log that is gone is simply not listed.
+      const s = await stat(join(this.dir, f)).catch((e: NodeJS.ErrnoException) => {
+        if (e.code === "ENOENT") return null;
+        throw e;
+      });
+      if (s) out.push({ id: f.slice(0, -4), bytes: s.size, modified: s.mtime.toISOString() });
     }
     return out.sort((a, b) => b.modified.localeCompare(a.modified));
   }

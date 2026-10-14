@@ -23,10 +23,11 @@ run() {
   if ! "$@"; then failed+=("$*"); fi
   echo "::endgroup::"
 }
-for game in roulette pachisi holdem coinflip endings dialogs; do run python3 scripts/e2e/play.py "$game" "$OUT"; done
+for game in roulette pachisi holdem coinflip endings dialogs rules; do run python3 scripts/e2e/play.py "$game" "$OUT"; done
 run python3 scripts/e2e/layout.py "$OUT"
 run python3 scripts/e2e/admin.py "$OUT"
 run python3 scripts/e2e/remote.py "$OUT"
+run python3 scripts/e2e/extra.py "$OUT"
 
 if ((${#failed[@]})); then
   printf '::error::e2e failed: %s\n' "${failed[@]}"
