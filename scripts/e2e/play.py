@@ -65,6 +65,22 @@ def roulette(browser, board):
     api("POST", "/rotate", {"degrees": 180})
     time.sleep(0.8)
     shot(board, "board-rotated")
+    # D-101: the turn-around button sits left of the gear (in the viewer's frame) and turns the game back; the seat
+    # plates stay where they are, and a lobby turned east leaves the game facing the way it was
+    plates = lambda: board.evaluate("() => [...document.querySelectorAll('#seats > .seat')].map(e => { const r = e.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.top)]; })")
+    before = plates()
+    flip, gear = board.locator("#flip-button").bounding_box(), board.locator("#settings-button").bounding_box()
+    assert flip["x"] > gear["x"], f"facing north, the turn-around button belongs to the viewer's left of the gear: {flip} {gear}"
+    board.click("#flip-button")
+    wait(lambda: api("GET", "/state")["frontEdge"] == "south", 5, "the game to face south")
+    time.sleep(0.6)
+    flip, gear = board.locator("#flip-button").bounding_box(), board.locator("#settings-button").bounding_box()
+    assert flip["x"] < gear["x"], f"facing south, the turn-around button is left of the gear: {flip} {gear}"
+    assert plates() == before, "turning the game must not move the seat plates"
+    api("POST", "/face", {"edge": "east"})
+    time.sleep(0.5)
+    assert board.evaluate("() => document.querySelector('#flip-button svg').style.transform") == "rotate(0deg)", "a lobby turned east must leave the game facing south"
+    api("POST", "/face", {"edge": "south"})
     return decks
 
 

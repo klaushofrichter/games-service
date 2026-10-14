@@ -11,8 +11,10 @@ html, body { overflow: hidden; }
     radial-gradient(ellipse 70% 60% at 50% 50%, rgba(255, 255, 255, 0.06), transparent 70%),
     repeating-radial-gradient(circle at 50% 50%, rgba(255,255,255,0.012) 0 2px, transparent 2px 5px),
     var(--felt);
-  border: 10px solid #1c130a;
-  box-shadow: inset 0 0 0 2px var(--brass-deep), inset 0 0 120px rgba(0,0,0,0.55);
+  /* The wooden frame is drawn, not a border (D-101): a border would shrink the area children are positioned in to
+     1900 × 1060, starting 10 px in, so everything placed on the 1920 × 1080 grid sat 10 px toward the bottom right
+     (seats 42 px from the north and west edges, 22 px from the south and east). */
+  box-shadow: inset 0 0 0 10px #1c130a, inset 0 0 0 12px var(--brass-deep), inset 0 0 120px rgba(0,0,0,0.55);
   border-radius: 28px;
   overflow: hidden;
   font-size: 22px;
@@ -131,15 +133,15 @@ pre.raw { font-family: var(--mono); font-size: 0.7em; color: var(--ink-soft); ba
   position: absolute; z-index: 20; font-size: 0.8em;
   background: rgba(10, 29, 25, 0.85); border-color: var(--brass-deep);
 }
-#lobby-button.bottom-right { right: 28px; bottom: 28px; }
-#lobby-button.bottom-left { left: 28px; bottom: 28px; }
-#lobby-button.top-right { right: 28px; top: 28px; }
-#lobby-button.top-left { left: 28px; top: 28px; }
+#lobby-button.bottom-right { right: 38px; bottom: 38px; }
+#lobby-button.bottom-left { left: 38px; bottom: 38px; }
+#lobby-button.top-right { right: 38px; top: 38px; }
+#lobby-button.top-left { left: 38px; top: 38px; }
 #result-button { position: absolute; z-index: 20; font-size: 0.9em; }
-#result-button.bottom-right { right: 28px; bottom: 28px; }
-#result-button.bottom-left { left: 28px; bottom: 28px; }
-#result-button.top-right { right: 28px; top: 28px; }
-#result-button.top-left { left: 28px; top: 28px; }
+#result-button.bottom-right { right: 38px; bottom: 38px; }
+#result-button.bottom-left { left: 38px; bottom: 38px; }
+#result-button.top-right { right: 38px; top: 38px; }
+#result-button.top-left { left: 38px; top: 38px; }
 .summary-table { margin: 20px 0 8px; border-collapse: collapse; font-size: 26px; }
 .summary-table th { font-size: 15px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-soft); font-weight: 500; padding: 4px 22px; }
 .summary-table td { padding: 8px 22px; text-align: center; border-top: 1px solid var(--felt-line); }
@@ -175,10 +177,10 @@ pre.raw { font-family: var(--mono); font-size: 0.7em; color: var(--ink-soft); ba
   transition: opacity .2s, border-color .2s, color .2s; }
 #corners .corner:hover, #corners .corner:active { opacity: 1; border-color: var(--brass); color: var(--brass); }
 #corners .corner.on { opacity: .9; border-color: var(--brass); color: var(--brass); }
-#corners .tl { left: 22px; top: 22px; }
-#corners .tr { right: 22px; top: 22px; }
-#corners .br { right: 22px; bottom: 22px; }
-#corners .bl { left: 22px; bottom: 22px; }
+#corners .tl { left: 32px; top: 32px; }
+#corners .tr { right: 32px; top: 32px; }
+#corners .br { right: 32px; bottom: 32px; }
+#corners .bl { left: 32px; bottom: 32px; }
 
 /* Settings button (D-088): a quiet gear beside a corner, at the left end of the edge the board faces. */
 #settings-button {
@@ -188,14 +190,14 @@ pre.raw { font-family: var(--mono); font-size: 0.7em; color: var(--ink-soft); ba
 }
 #settings-button:hover { opacity: 1; color: var(--brass); border-color: var(--brass-deep); }
 #settings-button svg { transition: transform .3s; }
-#settings-button.along-x.bl { left: 92px; bottom: 22px; }
-#settings-button.along-x.br { right: 92px; bottom: 22px; }
-#settings-button.along-x.tl { left: 92px; top: 22px; }
-#settings-button.along-x.tr { right: 92px; top: 22px; }
-#settings-button.along-y.tl { left: 22px; top: 92px; }
-#settings-button.along-y.bl { left: 22px; bottom: 92px; }
-#settings-button.along-y.tr { right: 22px; top: 92px; }
-#settings-button.along-y.br { right: 22px; bottom: 92px; }
+#settings-button.along-x.bl { left: 102px; bottom: 32px; }
+#settings-button.along-x.br { right: 102px; bottom: 32px; }
+#settings-button.along-x.tl { left: 102px; top: 32px; }
+#settings-button.along-x.tr { right: 102px; top: 32px; }
+#settings-button.along-y.tl { left: 32px; top: 102px; }
+#settings-button.along-y.bl { left: 32px; bottom: 102px; }
+#settings-button.along-y.tr { right: 32px; top: 102px; }
+#settings-button.along-y.br { right: 32px; bottom: 102px; }
 .overlay.settings .panel { min-width: 560px; }
 .overlay.settings .seg button.on, .overlay.settings button.on:not(.swatch) { border-color: var(--brass); color: var(--brass); }
 .swatches { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
@@ -212,3 +214,13 @@ button.copy { flex: none; width: 44px; height: 44px; padding: 0; border-radius: 
 button.copy:hover, button.copy.done { color: var(--brass); border-color: var(--brass-deep); }
 .invite-body .url-line { justify-content: flex-start; }
 #center.sideways .join .url-line { justify-content: flex-start; }
+
+/* Turn the game around (D-101): beside the gear, during a game, on the table's own board only. */
+#flip-button { position: absolute; z-index: 21; width: 58px; height: 58px; border-radius: 50%; display: grid; place-items: center; padding: 0;
+  background: rgba(8, 22, 19, 0.55); border: 1px solid var(--felt-line); color: var(--ink-soft); opacity: .75; }
+#flip-button:hover, #flip-button:active { opacity: 1; color: var(--brass); border-color: var(--brass-deep); }
+#flip-button svg { transition: transform .3s; }
+/* A remote player on an east or west seat chooses their own view (D-101): outside the surface, so it never turns. */
+#view-button { position: fixed; left: 12px; top: 12px; z-index: 30; display: flex; align-items: center; gap: 8px; padding: 8px 14px;
+  font-size: 15px; border-radius: 999px; background: rgba(8, 22, 19, 0.8); border: 1px solid var(--felt-line); color: var(--ink-soft); }
+#view-button:hover { color: var(--brass); border-color: var(--brass-deep); }

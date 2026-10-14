@@ -107,6 +107,13 @@ with sync_playwright() as p:
         filled = max((fit["r"] - fit["l"]) / w, (fit["b"] - fit["t"]) / h)
         if filled < 0.97:
             problems.append(f"board {name}: surface uses only {filled:.0%} of the screen")
+        # the seat plates sit the same distance from the board's edge on all four sides (D-101)
+        gaps = page.evaluate("""() => { const s = document.getElementById('surface').getBoundingClientRect();
+          const r = [...document.querySelectorAll('#seats > .seat')].map(e => e.getBoundingClientRect());
+          return [Math.min(...r.map(x => x.top)) - s.top, s.bottom - Math.max(...r.map(x => x.bottom)),
+                  Math.min(...r.map(x => x.left)) - s.left, s.right - Math.max(...r.map(x => x.right))]; }""")
+        if max(gaps) - min(gaps) > 1.5:
+            problems.append(f"board {name}: seat margins differ (top, bottom, left, right: {[round(g, 1) for g in gaps]})")
         page.close()
     # ----- board controls: corner buttons turn the lobby to that side, and games page three at a time -----
     page = b.new_page(viewport={"width": 1280, "height": 720})

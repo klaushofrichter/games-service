@@ -17,6 +17,8 @@ const gameLayer = document.getElementById("game-layer");
 const pauseLayer = document.getElementById("pause-layer");
 const cornersEl = document.getElementById("corners");
 const settingsBtn = document.getElementById("settings-button");
+const flipBtn = document.getElementById("flip-button");
+const viewBtn = document.getElementById("view-button");
 const resultBtn = document.getElementById("result-button");
 
 let state = null;
@@ -137,13 +139,60 @@ function myEdge() {
   const p = id && state.players.find((x) => x.id === id);
   return p && p.seat !== null ? state.seatEdges[p.seat] ?? null : null;
 }
-const viewEdge = () => myEdge() ?? state.frontEdge;
+/**
+ * A remote player on an east or west seat sees the board turned a quarter so their seat is at the bottom, which leaves a
+ * landscape screen mostly empty. They may choose the full width instead (D-101): the board upright, their seat on a
+ * side. Their own choice, remembered on their device. North and south seats have no such choice (no upside-down view).
+ */
+const LANDSCAPE_KEY = `gametable.remote.${REMOTE_INV}.landscape`;
+let landscape = (() => {
+  try {
+    return localStorage.getItem(LANDSCAPE_KEY) === "1";
+  } catch {
+    return false;
+  }
+})();
+const sideSeat = (e) => e === "east" || e === "west";
+/** The edge a remote player's view is turned to: their seat's, or upright (south) when they chose the full width. */
+function remoteEdge() {
+  const e = myEdge();
+  return e && sideSeat(e) && landscape ? "south" : e;
+}
+const viewEdge = () => remoteEdge() ?? state.frontEdge;
+
+/**
+ * Games use the board's full width (D-101): on the table's own board a game faces north or south only, whichever the
+ * lobby faced last; the turn button flips between the two. Turning the lobby's menus east or west during a game
+ * leaves the game as it was. Remote boards keep facing their player (or upright, as they chose).
+ */
+let lastFacing = "south";
+function gameEdge() {
+  if (REMOTE) return viewEdge();
+  if (state.frontEdge === "north" || state.frontEdge === "south") lastFacing = state.frontEdge;
+  return lastFacing;
+}
+
+function renderViewButton() {
+  const show = REMOTE && sideSeat(myEdge());
+  viewBtn.hidden = !show;
+  if (!show) return;
+  viewBtn.textContent = landscape ? "⤾ Put my seat at the bottom" : "⤢ Use the full width";
+  viewBtn.title = landscape ? "Turn the board so your seat is at the bottom" : "Show the board upright across the whole screen; your seat stays on the side";
+}
+viewBtn.addEventListener("click", () => {
+  landscape = !landscape;
+  try {
+    localStorage.setItem(LANDSCAPE_KEY, landscape ? "1" : "0");
+  } catch {}
+  fit();
+  render();
+});
 if (REMOTE) window.addEventListener("storage", (e) => e.key?.startsWith("gametable.remote.") && state && (render(), game?.inst && gameMsg && game.inst.update(gameMsg.view, [], gameInfo())));
 
 // ---------- scaling ----------
 function fit() {
-  const e = myEdge();
-  const sideways = e === "east" || e === "west";
+  const e = remoteEdge();
+  const sideways = sideSeat(e);
   const s = sideways ? Math.min(window.innerWidth / H, window.innerHeight / W) : Math.min(window.innerWidth / W, window.innerHeight / H);
   surface.style.transform = `${e ? `rotate(${-ROT[e]}deg) ` : ""}scale(${s})`;
 }
@@ -236,12 +285,33 @@ const LOBBY_CORNER = { "top-left": "tl", "top-right": "tr", "bottom-left": "bl",
 function placeSettings(playing) {
   settingsBtn.hidden = REMOTE;
   if (REMOTE) return;
-  const front = viewEdge();
+  const front = playing ? gameEdge() : viewEdge();
   let [corner, other] = FRONT_CORNERS[front];
   if (playing && LOBBY_CORNER[state.game?.lobbyButton ?? "bottom-right"] === corner) corner = other;
   settingsBtn.className = `${corner} along-${front === "south" || front === "north" ? "x" : "y"}`;
   settingsBtn.querySelector("svg").style.transform = `rotate(${ROT[front]}deg)`;
+  placeFlip(playing, front, corner);
 }
+
+/**
+ * The turn button sits to the left of the gear as seen by whoever the game faces (D-101): in the corner itself when the
+ * gear is at that player's left end (the corner buttons are hidden during a game), else one step toward the middle.
+ */
+function placeFlip(playing, front, gearCorner) {
+  flipBtn.hidden = REMOTE || !playing;
+  if (flipBtn.hidden) return;
+  const leftEnd = gearCorner === FRONT_CORNERS[front][0];
+  const along = leftEnd ? 32 : 172; // the gear is 102 px from its corner; the button is 58 px wide, with a 12 px gap
+  const st = flipBtn.style;
+  st.left = st.right = st.top = st.bottom = "";
+  st[gearCorner[1] === "l" ? "left" : "right"] = `${along}px`;
+  st[gearCorner[0] === "t" ? "top" : "bottom"] = "32px";
+  flipBtn.querySelector("svg").style.transform = `rotate(${ROT[front]}deg)`;
+  const label = `Turn the game to face ${front === "south" ? "north" : "south"}`;
+  flipBtn.title = label;
+  flipBtn.setAttribute("aria-label", label);
+}
+flipBtn.addEventListener("click", () => act("POST", "/face", { edge: gameEdge() === "south" ? "north" : "south" }));
 settingsBtn.addEventListener("click", () => openSettings());
 
 /**
@@ -355,8 +425,10 @@ function openSettings() {
 // ---------- center panel ----------
 function render() {
   if (!state) return;
+  gameEdge(); // keeps the last north/south facing current, so a game starts facing the way the lobby last did
   renderSeats();
   if (REMOTE) fit();
+  renderViewButton();
   const front = viewEdge();
   center.style.transform = `rotate(${ROT[front]}deg)`;
   center.classList.toggle("sideways", front === "east" || front === "west");
@@ -564,8 +636,8 @@ function gameInfo() {
     players: state.players,
     seatEdges: state.seatEdges,
     seatPositions: seatPositions(state.seatEdges),
-    frontEdge: viewEdge(),
-    rotation: ROT[viewEdge()],
+    frontEdge: gameEdge(),
+    rotation: ROT[gameEdge()],
     settings: state.game?.settings ?? {},
     prefs: state.game?.prefs ?? {},
     sound: state.display?.sound !== false, // sound effects on (D-092)
