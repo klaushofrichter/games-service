@@ -92,6 +92,7 @@ try:
         remote.screenshot(path=os.path.join(OUT, "remote-north-seat.png"))
         assert rboard.locator("#corners button[data-face]").count() == 0, "remote boards don't turn the table"
         assert not rboard.locator("#settings-button").is_visible(), "settings stay with the table (D-088)"
+        assert not rboard.locator("#view-button").is_visible(), "the full-width view is only for east and west seats (D-101)"
 
         # remote board control: change the layout from the remote board, then the table switches control off
         rboard.locator("button[data-layout='6']").click()
@@ -124,6 +125,19 @@ try:
         assert box[0] >= -1 and box[1] >= -1 and box[2] <= box[4] + 1 and box[3] <= box[5] + 1, f"sideways board overflows its frame: {box}"
         remote.wait_for_timeout(500)
         remote.screenshot(path=os.path.join(OUT, "remote-east-seat.png"))
+        # on a side seat the remote player may put the board upright to use the full width (D-101), and back
+        view = rboard.locator("#view-button")
+        assert view.is_visible() and "full width" in view.inner_text(), "east seat: the full-width button is missing"
+        view.click()
+        wait(lambda: "rotate(0deg)" in bframe.evaluate("() => document.getElementById('surface').style.transform"), 5)
+        box = bframe.evaluate("() => { const r = document.getElementById('surface').getBoundingClientRect(); return [r.right - r.left, innerWidth]; }")
+        assert box[0] >= box[1] - 2, f"the upright board should use the full width: {box}"
+        assert "bottom" in view.inner_text()
+        assert state()["frontEdge"] == "south", "the remote view choice must not turn the table"
+        remote.wait_for_timeout(400)
+        remote.screenshot(path=os.path.join(OUT, "remote-east-seat-full-width.png"))
+        view.click()
+        wait(lambda: "rotate(90deg)" in bframe.evaluate("() => document.getElementById('surface').style.transform"), 5)
 
         # a real game: Ana at the table, Rita remote, Pachisi; Rita plays from her deck in the invite page
         call(TABLE, "POST", "/api/v1/layout", {"seats": 4}, {"x-table-key": "k"})

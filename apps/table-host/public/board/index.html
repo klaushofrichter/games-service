@@ -22,10 +22,14 @@
       <button id="lobby-button" hidden aria-label="Open lobby">☰ Lobby</button>
       <!-- When a game ends, its last screen stays until someone taps this (D-091). -->
       <button id="result-button" class="primary" hidden>Show result ›</button>
+      <!-- Turn the game 180° (D-101): to the left of the gear, during a game, on the table's own board. -->
+      <button id="flip-button" hidden aria-label="Turn the game around" title="Turn the game around"><svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" d="M4.5 9.5a7.5 7.5 0 0 1 13.4-2.8M19.5 14.5a7.5 7.5 0 0 1-13.4 2.8M18.6 3.6v3.7h-3.7M5.4 20.4v-3.7h3.7"/></svg></button>
       <!-- Settings (D-088): beside the corner at the left end of the edge the board faces. -->
       <button id="settings-button" hidden aria-label="Settings" title="Settings"><svg viewBox="0 0 24 24" width="32" height="32" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" d="M10.3 2.6h3.4l.5 2.6a7.4 7.4 0 0 1 1.9 1.1l2.5-.9 1.7 2.9-2 1.7a7.4 7.4 0 0 1 0 2.2l2 1.7-1.7 2.9-2.5-.9a7.4 7.4 0 0 1-1.9 1.1l-.5 2.6h-3.4l-.5-2.6a7.4 7.4 0 0 1-1.9-1.1l-2.5.9-1.7-2.9 2-1.7a7.4 7.4 0 0 1 0-2.2l-2-1.7 1.7-2.9 2.5.9a7.4 7.4 0 0 1 1.9-1.1z"/><circle cx="12" cy="12" r="3.1" fill="none" stroke="currentColor" stroke-width="1.9"/></svg></button>
     </div>
   </div>
+  <!-- A remote player on an east or west seat: their seat at the bottom, or the full width (D-101). -->
+  <button id="view-button" hidden></button>
   <div id="overlay-root"></div>
   <script type="module" src="/board/board.js"></script>
 </body>

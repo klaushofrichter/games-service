@@ -1,6 +1,6 @@
 // Deck UI: join with a name, lobby with Ready, and the game's own private deck view.
 // A game package may ship deck.js exporting mount(root, ctx) -> { update(view, events, info), destroy() }.
-import { esc, claimServiceWorkerPage, openTableSocket, seatName, seatTitle } from "/shared/board-kit.js";
+import { esc, claimServiceWorkerPage, inkOn, openTableSocket, playerColor, seatName, seatTitle } from "/shared/board-kit.js";
 import { renderRules } from "/shared/markdown.js";
 
 const app = document.getElementById("app");
@@ -120,7 +120,7 @@ function renderTop() {
   top.innerHTML = `${paused}${banner ? `<div class="banner">${esc(banner)}</div>` : ""}
     <div class="who"><div><div class="eyebrow">${esc(state.tableName)}${inGame ? ` · ${esc(state.game?.name)}` : ""}</div><h1>${esc(p?.name ?? "")}</h1></div>
       <div class="who-side">${state.game?.howToPlay ? `<button type="button" class="rules-btn" data-rules aria-haspopup="dialog">Rules</button>` : ""}
-      ${p?.seat == null ? "" : `<div class="badge" title="${esc(seatTitle(state.seatEdges, p.seat))}" aria-label="${esc(seatTitle(state.seatEdges, p.seat))}">${esc(seatBadge(state.seatEdges, p.seat))}</div>`}</div></div>
+      ${p?.seat == null ? "" : seatBadgeHtml(p)}</div></div>
     ${inGame || p?.seat != null ? "" : `<div class="card muted">No seat yet. You'll get one when a seat opens.</div>`}`;
 }
 
@@ -182,6 +182,16 @@ async function openRules() {
   } catch {
     modal.querySelector(".rules-body").innerHTML = settings + `<p class="muted">The rules could not be loaded. Try again in a moment.</p>`;
   }
+}
+
+/**
+ * The seat badge in the player's colour (D-101), the same colour as the frame of their plate on the board (a game's
+ * colour choice, e.g. Pachisi's, or the seat's), with near-black or white letters, whichever contrasts more.
+ */
+function seatBadgeHtml(p) {
+  const color = playerColor({ players: state.players, prefs: state.game?.prefs ?? {} }, p.seat);
+  const title = esc(seatTitle(state.seatEdges, p.seat));
+  return `<div class="badge" style="background:${color};color:${inkOn(color)}" title="${title}, your colour" aria-label="${title}">${esc(seatBadge(state.seatEdges, p.seat))}</div>`;
 }
 
 /** The seat as compass initials for the badge beside the name (D-093): "NE", "S". */
