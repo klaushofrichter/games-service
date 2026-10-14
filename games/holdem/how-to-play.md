@@ -4,6 +4,13 @@ Win the most points by making the best poker hand, or by getting everyone else t
 
 This is fixed-limit Texas Hold'em: every bet and raise has a set size. For 2 to 8 players. Points have no real-world value.
 
+## In short
+
+- Your two cards are on your phone; five shared cards come out on the board.
+- Four betting rounds: before the flop, flop, turn and river. On your turn: fold, check or call, or bet or raise. Bets have fixed sizes.
+- The best five-card hand at the showdown wins the pot, or the last player who has not folded.
+- Most points at the end wins.
+
 ## What you see
 
 - **The board** shows the five shared cards, the pot, each player's bet, the dealer button **D**, and whose turn it is. Other players' cards stay face down until the showdown.

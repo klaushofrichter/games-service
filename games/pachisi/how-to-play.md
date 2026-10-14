@@ -2,6 +2,13 @@
 
 Be the first to bring all your tokens around the board and into the home space in the middle. For 2 to 4 players.
 
+## In short
+
+- On your turn, tap **Roll the die**, then **Move** next to a token.
+- You need a 6 to bring a token out of your base. A 6 gives you another roll; three sixes in a row end your turn.
+- Land on other players' tokens to send them back to their base, except on the ★ squares.
+- Go once around the track and up your home column, landing exactly on HOME. The first with all tokens home wins.
+
 ## What you see
 
 - **The board** shows the track, everyone's tokens, the die, whose turn it is and a log of the last moves. Tokens that can move bob up and down.

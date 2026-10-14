@@ -2,6 +2,12 @@
 
 Guess heads or tails correctly more often than anyone else. For 1 to 8 players.
 
+## In short
+
+- Tap **Heads** or **Tails** on your phone before the time runs out.
+- Every right guess scores one point.
+- Most points after the last round wins.
+
 ## What you see
 
 - **The board** shows the round, the coin, a countdown, and who has picked already (but not what). While the coin is in the air it shows everyone's pick, and ✓ or ✗ once it lands.

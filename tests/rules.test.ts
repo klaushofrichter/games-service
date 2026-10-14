@@ -110,6 +110,18 @@ describe("every built-in game ships rules", () => {
     }
   });
 
+  it("each game starts with a short summary: an In short section first, a few bullets, readable in a few seconds", async () => {
+    for (const id of (await readdir(GAMES, { withFileTypes: true })).filter((d) => d.isDirectory()).map((d) => d.name)) {
+      const md = await readFile(join(GAMES, id, "how-to-play.md"), "utf8");
+      const sections = md.split(/^## /m);
+      expect(sections[1]?.startsWith("In short\n"), `${id}: the first section is "In short"`).toBe(true);
+      const bullets = sections[1].split("\n").filter((l) => l.startsWith("- "));
+      expect(bullets.length, id).toBeGreaterThanOrEqual(2);
+      expect(bullets.length, id).toBeLessThanOrEqual(5);
+      expect(sections[1].split(/\s+/).length, `${id}: words in the summary`).toBeLessThanOrEqual(90);
+    }
+  });
+
   it("the illustrations are well-formed SVG with no script, links or foreign content", async () => {
     for (const id of await readdir(GAMES)) {
       const dir = join(GAMES, id, "assets");

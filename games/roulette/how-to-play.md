@@ -4,6 +4,14 @@ Finish the last spin with more points than anyone else at the table.
 
 This is European roulette with one zero. Everyone bets at the same time from their phone, then the wheel spins. For 1 to 6 players. Points have no real-world value.
 
+## In short
+
+- Pick a chip on your phone and tap the bets you want, then tap **Done betting**.
+- The wheel spins when everyone is done or the time runs out.
+- A number pays 35 to 1, a dozen or column 2 to 1, red/black, odd/even and 1–18/19–36 pay 1 to 1.
+- Zero is green: only a bet on 0 wins then.
+- Most points at the end wins.
+
 ## What you see
 
 - **The board** shows the wheel, the betting layout with everyone's chips in their seat colour, the last numbers and a countdown.
