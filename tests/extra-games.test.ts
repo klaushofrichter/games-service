@@ -557,3 +557,93 @@ describe("the service, edge cases", () => {
     for (const s of ["Game repositories", "repo-form", "pair-repos", "Extra games"]) expect(html).toContain(s);
   });
 });
+
+// ----- the deploy-time list (D-098) -----
+import { parseRepoConfig } from "../apps/cloud/src/game-repos.ts";
+import { spawn } from "node:child_process";
+
+describe("the deploy-time repository list", () => {
+  it("deploy/game-repos.json is valid and lists extra-games on its production branch", async () => {
+    const text = await readFile(new URL("../deploy/game-repos.json", import.meta.url), "utf8");
+    expect(parseRepoConfig(text)).toEqual(["klaushofrichter/extra-games@production"]);
+  });
+
+  it("parses entries with and without a branch, and refuses anything malformed", () => {
+    expect(parseRepoConfig('{"repos":[{"repo":"a/b"},{"repo":"c/d","ref":"x/y"}]}')).toEqual(["a/b", "c/d@x/y"]);
+    expect(parseRepoConfig('{"repos":[]}')).toEqual([]);
+    for (const bad of ["", "{", "[]", '{"repos":{}}', '{"repos":[{"ref":"main"}]}', '{"repos":[{"repo":"nope"}]}', '{"repos":[{"repo":"a/b","ref":1}]}', '{"repos":[{"repo":"a/b","ref":"x..y"}]}'])
+      expect(() => parseRepoConfig(bad), bad).toThrow();
+  });
+
+  it("deploy-time repositories are marked and can't be removed in the console; console ones can", async () => {
+    const c = await startCloud({ port: 0, host: "127.0.0.1", adminToken: ADMIN, publicUrl: "https://games.skylar.technology", githubApiUrl: githubUrl, gameRepoToken: TOKEN, gameRepos: ["klaushofrichter/extra-games"], gameRepoRefreshMs: 0 });
+    const b = `http://127.0.0.1:${c.port}`;
+    const call = async (method: string, path: string, body?: unknown) => {
+      const r = await fetch(`${b}${path}`, { method, headers: { authorization: `Bearer ${ADMIN}`, "content-type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
+      return { status: r.status, body: await r.json() };
+    };
+    try {
+      repos.set("someone/more-games@main", { sha: "fff0000", files: gameFiles("coin-race") });
+      expect((await call("POST", "/admin/api/repos", { repo: "someone/more-games" })).body.origin).toBe("console");
+      const list = (await call("GET", "/admin/api/repos")).body.repos;
+      expect(list.map((r: { id: string; origin: string }) => [r.id, r.origin])).toEqual([["extra-games", "deploy"], ["more-games", "console"]]);
+      const refused = await call("DELETE", "/admin/api/repos/extra-games");
+      expect(refused.status).toBe(409);
+      expect(refused.body.error).toMatch(/deploy\/game-repos\.json/);
+      expect((await call("DELETE", "/admin/api/repos/more-games")).status).toBe(200);
+      // A deploy-time repository can still be ticked and unticked per table, and refreshed.
+      expect((await call("POST", "/admin/api/repos/extra-games/refresh")).status).toBe(200);
+    } finally {
+      await c.close();
+    }
+  });
+
+  /** Start the real entry point (main.ts) and return its exit code, or the repos it lists once it answers. */
+  async function runMain(env: Record<string, string>): Promise<{ code: number | null; out: string; repos?: { repo: string; ref: string; origin: string }[] }> {
+    const port = 20000 + Math.floor(Math.random() * 20000);
+    const child = spawn(process.execPath, ["apps/cloud/src/main.ts"], {
+      cwd: new URL("..", import.meta.url).pathname,
+      env: { ...process.env, PORT: String(port), PUBLIC_URL: `http://127.0.0.1:${port}`, ADMIN_TOKEN: ADMIN, GAME_REPO_API_URL: githubUrl, GAME_REPOS: "", ...env },
+    });
+    let out = "";
+    child.stdout.on("data", (d) => (out += d));
+    child.stderr.on("data", (d) => (out += d));
+    const exited = new Promise<number | null>((ok) => child.on("exit", (c) => ok(c)));
+    try {
+      const up = await Promise.race([
+        exited.then(() => false),
+        until(async () => (await fetch(`http://127.0.0.1:${port}/health`).catch(() => null))?.ok, 10000).then(() => true),
+      ]);
+      if (!up) return { code: await exited, out };
+      const r = await (await fetch(`http://127.0.0.1:${port}/admin/api/repos`, { headers: { authorization: `Bearer ${ADMIN}` } })).json();
+      return { code: null, out, repos: r.repos };
+    } finally {
+      child.kill();
+    }
+  }
+
+  it("the service starts with the repositories of deploy/game-repos.json, plus GAME_REPOS", async () => {
+    const r = await runMain({ GAME_REPOS: "someone/more-games" });
+    expect(r.repos?.map((x) => [x.repo, x.ref, x.origin])).toEqual([
+      ["klaushofrichter/extra-games", "production", "deploy"],
+      ["someone/more-games", "main", "deploy"],
+    ]);
+  }, 20000);
+
+  it("a broken GAME_REPOS_FILE stops the service with a clear message", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "repo-file-"));
+    try {
+      await writeFile(join(dir, "bad.json"), '{"repos":[{"repo":"not a repo"}]}');
+      const bad = await runMain({ GAME_REPOS_FILE: join(dir, "bad.json") });
+      expect(bad.code).toBe(1);
+      expect(bad.out).toMatch(/bad\.json: .*not a GitHub repository/);
+      const missing = await runMain({ GAME_REPOS_FILE: join(dir, "missing.json") });
+      expect(missing.code).toBe(1);
+      expect(missing.out).toMatch(/cannot be read/);
+      const none = await runMain({ GAME_REPOS_FILE: "none" });
+      expect(none.repos).toEqual([]);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  }, 30000);
+});

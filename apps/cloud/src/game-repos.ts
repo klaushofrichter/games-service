@@ -14,6 +14,9 @@ export interface GameRepoOptions {
 export interface GameRepo {
   /** Short id used in the console and in table assignments: the repository name, made unique. */
   id: string;
+  /** "deploy": from deploy/game-repos.json (or GAME_REPOS), back after every restart and not removable in the console.
+   *  "console": added in the console, gone at the next restart. */
+  origin: "deploy" | "console";
   /** owner/name on GitHub. */
   repo: string;
   /** Branch or tag to fetch. */
@@ -108,6 +111,29 @@ export function packRepoTarball(gz: Buffer, repo: string, ref: string) {
   return { hash, payload, games, commit, bytes: payload.length };
 }
 
+/**
+ * The deploy-time list (D-098): `{ "repos": [{ "repo": "owner/name", "ref": "branch" }] }`, as deploy/game-repos.json
+ * holds it. Returns "owner/name@ref" specs; throws on anything malformed, so a broken file stops the service at start
+ * (and the deploy's smoke test) instead of silently starting with fewer repositories.
+ */
+export function parseRepoConfig(text: string): string[] {
+  let j: unknown;
+  try {
+    j = JSON.parse(text);
+  } catch (e) {
+    throw new Error(`not JSON: ${(e as Error).message}`);
+  }
+  const list = (j as { repos?: unknown })?.repos;
+  if (!Array.isArray(list)) throw new Error('expected { "repos": [ { "repo": "owner/name", "ref": "branch" } ] }');
+  return list.map((x, i) => {
+    const e = x as { repo?: unknown; ref?: unknown };
+    if (typeof e?.repo !== "string" || (e.ref !== undefined && typeof e.ref !== "string")) throw new Error(`repos[${i}] needs "repo" (and optionally "ref") as strings`);
+    const spec = e.ref ? `${e.repo}@${e.ref}` : e.repo;
+    parseRepoSpec(spec); // throws with a readable message
+    return spec;
+  });
+}
+
 /** The console's list of repositories, kept in memory like the rest of the service's state (D-036). */
 export class GameRepoStore {
   readonly repos = new Map<string, GameRepo>();
@@ -118,19 +144,23 @@ export class GameRepoStore {
     this.o = o;
   }
 
-  add(spec: string): GameRepo {
+  add(spec: string, origin: GameRepo["origin"] = "console"): GameRepo {
     const { repo, ref } = parseRepoSpec(spec);
     for (const r of this.repos.values()) if (r.repo.toLowerCase() === repo.toLowerCase() && r.ref === ref) throw Object.assign(new Error(`${repo}@${ref} is already in the list`), { status: 409 });
     if (this.repos.size >= 50) throw Object.assign(new Error("at most 50 repositories"), { status: 409 });
     const base = repo.split("/")[1].toLowerCase().replace(/[^a-z0-9-]/g, "-").slice(0, 40) || "repo";
     let id = base;
     for (let n = 2; this.repos.has(id); n++) id = `${base}-${n}`;
-    const r: GameRepo = { id, repo, ref, addedAt: Date.now(), bundle: null, error: null, lastAttempt: null };
+    const r: GameRepo = { id, repo, ref, origin, addedAt: Date.now(), bundle: null, error: null, lastAttempt: null };
     this.repos.set(id, r);
     return r;
   }
 
+  /** Remove a repository added in the console. Deploy-time ones are refused: the next restart would bring them back. */
   remove(id: string) {
+    const r = this.repos.get(id);
+    if (!r) return false;
+    if (r.origin === "deploy") throw Object.assign(new Error(`${r.repo}@${r.ref} is in the deploy configuration (deploy/game-repos.json); remove it there`), { status: 409 });
     return this.repos.delete(id);
   }
 
@@ -168,6 +198,7 @@ export class GameRepoStore {
       id: r.id,
       repo: r.repo,
       ref: r.ref,
+      origin: r.origin,
       addedAt: r.addedAt,
       error: r.error,
       lastAttempt: r.lastAttempt,

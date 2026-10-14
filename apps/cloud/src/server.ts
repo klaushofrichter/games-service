@@ -59,7 +59,7 @@ export interface CloudOptions {
   trustProxy?: boolean | string[];
   /** Cap on the total size of stored logs (default 256 MB). */
   maxLogBytes?: number;
-  /** Extra-game repositories to list from the start ("owner/name" or "owner/name@ref"), as GAME_REPOS gives them. */
+  /** Extra-game repositories every start lists ("owner/name" or "owner/name@ref"): deploy/game-repos.json and GAME_REPOS. */
   gameRepos?: string[];
   /** Read token for private extra-game repositories (GAME_REPO_TOKEN). */
   gameRepoToken?: string;
@@ -104,9 +104,9 @@ export function startCloud(o: CloudOptions) {
   const gameRepos = new GameRepoStore({ token: o.gameRepoToken, apiUrl: o.githubApiUrl });
   for (const spec of o.gameRepos ?? []) {
     try {
-      gameRepos.add(spec);
+      gameRepos.add(spec, "deploy");
     } catch (e) {
-      console.warn(`[cloud] GAME_REPOS: ${(e as Error).message}`);
+      console.warn(`[cloud] deploy-time game repository skipped: ${(e as Error).message}`);
     }
   }
   void gameRepos.refreshAll();
@@ -404,7 +404,7 @@ export function startCloud(o: CloudOptions) {
           return json(res, 200, gameRepos.list().find((x) => x.id === match![1]));
         }
         if (m === "DELETE" && (match = p.match(/^\/admin\/api\/repos\/([\w-]+)$/))) {
-          if (!gameRepos.remove(match[1])) return json(res, 404, { error: "no such repository" });
+          if (!gameRepos.remove(match[1])) return json(res, 404, { error: "no such repository" }); // a deploy-time one throws 409
           // Tables lose its games at their next heartbeat.
           for (const t of tables.values()) t.repos = t.repos.filter((id) => id !== match![1]);
           return json(res, 200, { ok: true });

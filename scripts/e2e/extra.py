@@ -1,12 +1,12 @@
 """Browser end-to-end check of extra-game repositories (D-097), the whole chain:
 
   a fake GitHub serves a PRIVATE repository (needs the token) with a game in it
-  -> the console adds the repository and shows its game
+  -> the service lists it from the start, from deploy/game-repos.json (D-098), marked "deploy config", not removable
   -> the console approves a table with the repository ticked
   -> the table's board shows the game, marked "extra"
   -> a remote player, through an invite, sees it on their board too, chooses it and plays it with a local phone
   -> unticking the repository on the table's row removes the game; ticking brings it back
-  -> removing the repository from the console removes it from the table
+  -> a repository added in the console ("until restart") serves the table instead, and Remove takes the game away
 
 Starts its own fake GitHub, cloud service (development sign-in with ADMIN_TOKEN) and table host.
   python3 scripts/e2e/extra.py out/
@@ -43,7 +43,7 @@ def tarball(sha):
 
 class FakeGitHub(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
-        m = re.match(r"^/repos/klaushofrichter/extra-games/tarball/production$", self.path)
+        m = re.match(r"^/repos/klaushofrichter/extra-games/tarball/(production|main)$", self.path)
         # Private: without the token GitHub answers 404, as it does for a private repository.
         if not m or self.headers.get("authorization") != f"Bearer {TOKEN}":
             self.send_response(404)
@@ -64,7 +64,7 @@ class FakeGitHub(http.server.BaseHTTPRequestHandler):
 github = http.server.ThreadingHTTPServer(("127.0.0.1", GITHUB_PORT), FakeGitHub)
 threading.Thread(target=github.serve_forever, daemon=True).start()
 cloud = start_cloud(CLOUD_PORT, ADMIN_TOKEN=ADMIN, PUBLIC_URL=CLOUD, ICE_SERVERS="[]", GAME_REPO_TOKEN=TOKEN,
-                    GAME_REPO_API_URL=f"http://127.0.0.1:{GITHUB_PORT}")
+                    GAME_REPO_API_URL=f"http://127.0.0.1:{GITHUB_PORT}", GAME_REPOS_FILE=os.path.join(REPO, "deploy", "game-repos.json"))
 host = start_table(TABLE_PORT, PUBLIC_URL=TABLE, TABLE_KEY="k", TABLE_NAME="Den", CLOUD_URL=CLOUD, AI_DELAY_MS="200")
 
 
@@ -85,7 +85,7 @@ try:
     with sync_playwright() as p:
         b = p.chromium.launch(args=["--disable-features=WebRtcHideLocalIpsWithMdns"])
 
-        # ----- console: add the repository -----
+        # ----- console: the deploy-time repository is there from the start -----
         console = b.new_page(viewport={"width": 1400, "height": 1000})
         # Development mode asks /admin/api/me before signing in, which answers 401: expected, as in admin.py.
         watch(console, "console", ignore=("status of 401",))
@@ -95,11 +95,10 @@ try:
         console.click("#signin-form button")
         console.wait_for_selector("#repo-form")
         assert "GAME_REPO_TOKEN" in console.inner_text("#repo-token")
-        console.fill("#repo-name", "klaushofrichter/extra-games")
-        console.fill("#repo-ref", "production")
-        console.click("#repo-form button")
         console.wait_for_selector("#repos >> text=Dice Duel")
-        assert "commit e2e0001" in console.inner_text("#repos"), console.inner_text("#repos")
+        row = console.locator("#repos tr", has_text="extra-games@production")
+        assert "deploy config" in row.inner_text() and "commit e2e0001" in row.inner_text(), row.inner_text()
+        assert row.locator("button[data-repo-remove]").count() == 0, "a deploy-time repository must not offer Remove"
         assert fetches, "the console never asked GitHub"
 
         # ----- approve the table with the repository ticked -----
@@ -186,10 +185,21 @@ try:
         shot(board, "local-board-played")
         t("POST", "/game/close")
 
-        # ----- removing the repository takes the game off the table -----
-        console.click("button[data-repo-remove=extra-games]")
+        # ----- a repository added in the console lasts until the restart, and Remove takes it away -----
+        console.fill("#repo-name", "klaushofrichter/extra-games")
+        console.fill("#repo-ref", "main")
+        console.click("#repo-form button")
+        console.wait_for_selector("#repos >> text=extra-games@main")
+        added = console.locator("#repos tr", has_text="extra-games@main")
+        assert "until restart" in added.inner_text(), added.inner_text()
+        console.uncheck("[data-table-repos] input[value=extra-games]")
+        console.check("[data-table-repos] input[value=extra-games-2]")
+        wait(lambda: "dice-duel" in table_games() and console.locator("[data-table-repos] input[value=extra-games]:not(:checked)").count(), 20, "the game from the console-added repository")
+        shot(console, "console-added")
+        console.click("button[data-repo-remove=extra-games-2]")
         wait(lambda: "dice-duel" not in table_games(), 20, "the game to leave after Remove")
-        console.wait_for_selector("#repos >> text=No repositories yet.")
+        console.wait_for_selector("#repos >> text=extra-games@production")
+        assert console.locator("#repos >> text=extra-games@main").count() == 0
         shot(console, "console-removed")
         b.close()
 finally:
@@ -200,4 +210,4 @@ finally:
 if errors:
     print("BROWSER ERRORS:\n" + "\n".join(errors))
     sys.exit(1)
-print(f"ok: extra-game repository added, installed at approval, shown and played remotely, removed; screenshots in {OUT}")
+print(f"ok: extra-game repositories: deploy-time list, installed at approval, shown and played remotely, console-added one removed; screenshots in {OUT}")

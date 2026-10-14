@@ -125,9 +125,11 @@ Rules must be deterministic: all randomness through `ctx.random()`. The host log
 Games can also come from other GitHub repositories, private ones included (D-097), for private games and early
 releases. The first is [`klaushofrichter/extra-games`](https://github.com/klaushofrichter/extra-games) (private).
 
-- **Console, *Game repositories*:** add `owner/name` and a branch. The service fetches the repository's `games/`
-  folder as one bundle and lists its games; *Refresh* fetches again (it also does every hour). A private repository
-  needs `GAME_REPO_TOKEN`, a fine-grained token with Contents: read on it.
+- **The list:** [`deploy/game-repos.json`](deploy/game-repos.json) is baked into the cloud image, so these
+  repositories are back after every restart (D-098); change it by PR. In the console they are marked *deploy config*.
+- **Console, *Game repositories*:** you can also add `owner/name` and a branch there, until the next restart. The service
+  fetches each repository's `games/` folder as one bundle and lists its games; *Refresh* fetches again (it also does
+  every hour). A private repository needs `GAME_REPO_TOKEN`, a fine-grained token with Contents: read on it.
 - **Per table:** tick a repository when approving the table's pairing code, or later on its row. The table installs the
   games within 15 seconds, between games, and its board marks them *extra*. Remote players see them too: their board
   comes from the table.
@@ -135,8 +137,8 @@ releases. The first is [`klaushofrichter/extra-games`](https://github.com/klaush
   `import { defineGame } from "@game-table/sdk"` (the host maps the name to its own SDK). See the extra-games README for
   how it tests against this repository.
 
-Ticking a repository trusts its code on that table PC (rules run in-process, D-035). The list and the ticks are in
-memory, like pairings; `GAME_REPOS` restores the list after a deploy.
+Ticking a repository trusts its code on that table PC (rules run in-process, D-035). The ticks are in memory, like
+pairings; they move to the persistent store (a PVC) with the rest of the service's state.
 
 ## Remote play
 
@@ -167,7 +169,8 @@ In the cluster these come from the `games-oauth` Secret (created by `scripts/syn
 | `ADMIN_TOKEN` | Optional bearer token for scripts (`Authorization: Bearer …`); in local development it is the portal sign-in |
 | `TRUST_PROXY` | `1` = trust `X-Forwarded-For` from loopback and the k3s pod/service networks, or a CIDR list |
 | `LOG_RETENTION_DAYS`, `ICE_SERVERS` | Log retention (default 90); STUN/TURN for remote play |
-| `GAME_REPOS`, `GAME_REPO_TOKEN` | Extra-game repositories listed from the start (`owner/name@ref`, comma-separated); a read token for private ones (D-097) |
+| `GAME_REPO_TOKEN` | Read token for private extra-game repositories (D-097) |
+| `GAME_REPOS_FILE`, `GAME_REPOS` | The deploy-time repository list (default `deploy/game-repos.json`; `none` turns it off), and more repositories (`owner/name@ref`, comma-separated) for local development (D-098) |
 | `APP_VERSION` | Stamped into the image by the deploy (`YYYY.MM.DD.N`); `/health` (`{status, version}`, on the Table Host also `protocol`) reports it, `dev` otherwise |
 
 ## Branches, CI and deployment
@@ -206,6 +209,6 @@ python3 scripts/e2e/layout.py out/         # decks at 4 phone sizes x 3 games, t
 - Game rules run in-process; the isolated sandbox for third-party games comes later.
 - The cloud keeps its state in memory: one replica, and a restart (every deploy) forgets paired tables, invites and uploaded logs. A persistent store comes next.
 - Tables authenticate to the cloud with an issued bearer token, not yet a key pair or certificate.
-- Extra-game repositories and the per-table ticks are in memory too; `GAME_REPOS` restores the list after a restart.
+- The per-table extra-game ticks and console-added repositories are in memory too; the deploy-time list (`deploy/game-repos.json`) is back after every restart.
 - Host-side AI configuration (`ai.hostConfig`, e.g. API keys) is parsed but has no screen yet.
 - werift waits up to 5 s for STUN during connection setup when STUN is unreachable.

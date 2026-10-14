@@ -27,7 +27,9 @@ Node 26, listens on **8081**, image `ghcr.io/klaushofrichter/games-cloud`, numer
   signaling sockets belong to one process. Do not scale it out: a second pod would not see the first one's tables.
 - **No volume yet.** Restarting the pod forgets every paired table (they show a new pairing code and must be
   approved again in the portal). A persistent store (likely SQLite on a PVC with Litestream to S3, as cams-admin
-  does) is the next piece of work on the games-service side and will come as a separate request.
+  does) is the next piece of work on the games-service side and will come as a separate request. It will also hold
+  the extra-game repository list and which tables get which repositories (D-098); until then the list is baked into
+  the image (`deploy/game-repos.json`).
 - **Ingress timeouts:** Traefik passes WebSocket upgrades on a normal Ingress. Tables send a ping every 30 s and
   reconnect if cut, so the defaults are fine; if Traefik's idle timeout is below 60 s, raise it for this host.
 
@@ -118,8 +120,9 @@ Copy `cams-admin-runner` (it deploys a plain Deployment the same way), with:
 
 `scripts/sync-secrets.sh` in games-service reads its local `.env` and, without printing values:
 
-- `--cluster`: applies `games/games-oauth` (the five sign-in keys, plus the optional `GAME_REPO_TOKEN` and
-  `GAME_REPOS` for extra-game repositories, D-097) and `games-runner/runner-pat` (key `token`).
+- `--cluster`: applies `games/games-oauth` (the five sign-in keys, plus the optional `GAME_REPO_TOKEN` for private
+  extra-game repositories, D-097; the repository list itself is in the image, D-098) and `games-runner/runner-pat`
+  (key `token`).
   It needs the two namespaces to exist first.
 - `--github`: sets the repo secret `KUBE_SETUP_DEPLOY_TOKEN` (Contents read/write on kube-setup).
 

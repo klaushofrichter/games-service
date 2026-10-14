@@ -89,7 +89,7 @@
 
   <section>
     <h2>Game repositories</h2>
-    <p class="muted">Extra games from other GitHub repositories, each with a <span class="mono">games/</span> folder like games-service's. A table gets a repository's games when it is ticked on the table's row, or when approving it. <span id="repo-token"></span></p>
+    <p class="muted">Extra games from other GitHub repositories, each with a <span class="mono">games/</span> folder like games-service's. A table gets a repository's games when it is ticked on the table's row, or when approving it. Repositories marked <em>deploy config</em> come from <span class="mono">deploy/game-repos.json</span> and are back after every restart; ones added here last until the next restart, and so do the ticks. <span id="repo-token"></span></p>
     <form id="repo-form" class="row" style="margin-bottom:14px">
       <input id="repo-name" placeholder="owner/name" style="width:280px" class="mono" autocomplete="off">
       <input id="repo-ref" placeholder="main" style="width:140px" class="mono" autocomplete="off">
@@ -177,11 +177,11 @@ function drawRepos(data) {
     const b = r.bundle;
     const games = b ? b.games.map((g) => `${esc(g.name)} <span class="faint">${esc(g.version)}</span>${r.clashes.includes(g.id) ? ` <span class="pill revoked" title="another repository has a game with this id">id clash</span>` : ""}`).join(", ") : `<span class="faint">none yet</span>`;
     return `<tr>
-      <td><div class="mono">${esc(r.repo)}<span class="faint">@${esc(r.ref)}</span></div><div class="faint">id ${esc(r.id)}${b ? ` · commit <span class="mono">${esc(b.commit)}</span> · bundle <span class="mono">${esc(b.hash.slice(0, 12))}</span> · ${size(b.bytes)}` : ""}</div>
+      <td><div class="mono">${esc(r.repo)}<span class="faint">@${esc(r.ref)}</span> ${r.origin === "deploy" ? `<span class="pill approved" title="deploy/game-repos.json: back after every restart">deploy config</span>` : `<span class="pill pending" title="added here: gone at the next restart; add it to deploy/game-repos.json to keep it">until restart</span>`}</div><div class="faint">id ${esc(r.id)}${b ? ` · commit <span class="mono">${esc(b.commit)}</span> · bundle <span class="mono">${esc(b.hash.slice(0, 12))}</span> · ${size(b.bytes)}` : ""}</div>
         ${r.error ? `<div class="msg err" style="margin-top:4px">${esc(r.error)}${b ? " (tables keep the last good bundle)" : ""}</div>` : ""}</td>
       <td class="games">${games}</td>
       <td>${b ? ago(b.fetchedAt) : r.lastAttempt ? "failed" : "…"}</td>
-      <td style="text-align:right;white-space:nowrap"><button data-repo-refresh="${esc(r.id)}">Refresh</button> <button class="danger" data-repo-remove="${esc(r.id)}">Remove</button></td></tr>`;
+      <td style="text-align:right;white-space:nowrap"><button data-repo-refresh="${esc(r.id)}">Refresh</button> ${r.origin === "deploy" ? "" : `<button class="danger" data-repo-remove="${esc(r.id)}">Remove</button>`}</td></tr>`;
   }).join("") || `<tr><td colspan="4" class="faint">No repositories yet.</td></tr>`;
   // The approval checkboxes are redrawn only when the list changes, so the 10-second refresh keeps what is ticked.
   const key = repos.map((r) => r.id).join(",");
