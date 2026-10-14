@@ -791,6 +791,23 @@ export class Table extends EventEmitter {
     return r;
   }
 
+  /**
+   * An intent sent by touching the board for a player (D-102). Only names the running game lists in `boardIntents`.
+   * The table's own board acts for humans sitting at the table; a remote board (`remoteSession` set) only for the
+   * player who came through that session, whatever the board-control switch says, since it is their own move.
+   */
+  boardIntent(playerId: unknown, intent: Intent, remoteSession: string | null) {
+    const p = typeof playerId === "string" ? this.players.get(playerId) : undefined;
+    if (!p) throw new TableError(404, "no such player");
+    if (!intent || typeof intent.name !== "string") throw new TableError(400, "intent needs a name");
+    if (this.phase !== "active" || !this.runtime) throw new TableError(409, this.phase === "paused" ? "the game is paused" : "no game is running");
+    if (!this.runtime.manifest.boardIntents.includes(intent.name)) throw new TableError(403, `${intent.name} is done on the phone, not on the board`);
+    if (remoteSession === null ? p.kind !== "human" || p.location !== "local" : p.remoteSession !== remoteSession)
+      throw new TableError(403, remoteSession === null ? "only players at the table can move from the board" : "you can only move your own pieces");
+    if (p.seat === null || !this.runtime.seats.some((s) => s.seat === p.seat)) throw new TableError(409, `${p.name} is not playing in this game`);
+    return this.runtime.submit(p.seat, { name: intent.name, payload: intent.payload }, "board");
+  }
+
   private aiTimers = new Map<string, NodeJS.Timeout>(); // one pending move per AI player
   private aiRngs = new Map<string, () => number>();
 

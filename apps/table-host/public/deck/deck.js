@@ -253,7 +253,8 @@ function renderJoin() {
 
 function renderLobby(p) {
   const players = state.players
-    .map((x) => `<div class="row"><span class="${x.id === me ? "me" : ""}">${esc(x.name)}</span>
+    // Each name with a dot in that player's colour (D-104), the colour of their plate on the board; no seat, no colour.
+    .map((x) => `<div class="row"><span class="${x.id === me ? "me" : ""}"><span class="pdot${x.seat == null ? " none" : ""}"${x.seat == null ? "" : ` style="background:${playerColor({ players: state.players, prefs: state.game?.prefs ?? {} }, x.seat)}"`} aria-hidden="true"></span>${esc(x.name)}</span>
       <span class="muted">${x.seat == null ? "no seat" : `${esc(seatName(state.seatEdges, x.seat))} seat`}${state.phase === "ready" ? (x.ready ? " · ready" : " · not ready") : ""}${x.connected ? "" : " · away"}</span></div>`)
     .join("");
   let action = `<div class="card muted">Choose a game on the board.</div>`;

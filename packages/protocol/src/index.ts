@@ -94,6 +94,12 @@ export const manifestSchema = z.object({
     .default({ supported: false, options: [], hostConfig: [] }),
   simulation: z.object({ supported: z.boolean(), headless: z.boolean() }).default({ supported: false, headless: false }),
   remoteBoardControl: z.boolean().default(true),
+  /**
+   * Intents a player may also send by touching the board (D-102), e.g. Pachisi's "move": tapping a token on the table's
+   * screen instead of the phone. The table's board may send them for players sitting at the table, a remote board
+   * only for its own player. Anything else still comes from the phones only.
+   */
+  boardIntents: z.array(z.string().regex(/^[A-Za-z][\w-]{0,39}$/)).max(10).default([]),
   lobbyButton: z.enum(["top-left", "top-right", "bottom-left", "bottom-right"]).default("bottom-right"),
   deck: z.object({ minWidth: z.number().optional(), orientation: z.string().optional() }).optional(),
   permissions: z.array(z.string()).default([]),

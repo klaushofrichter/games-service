@@ -1,5 +1,6 @@
-// Pachisi deck UI: roll the die, then pick which token to move.
+// Pachisi deck UI: roll the die, then pick which token to move (here, or by tapping it on the board, D-102).
 import { esc, playerColor, remainingMs } from "/shared/board-kit.js";
+import { pieceFace, pieceName } from "./board.js";
 
 const FINISH = 44;
 const PIPS = { 1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] };
@@ -43,14 +44,14 @@ export function mount(root, ctx) {
       root.querySelector(".pc-who").innerHTML = v.over ? "Game over" : v.myTurn ? `<span style="color:${color}">Your turn</span>` : `${esc(v.turnName)}'s turn`;
       root.querySelector(".pc-what").textContent = v.over
         ? v.winner ? `${v.winner} wins` : "No winner"
-        : v.myTurn ? (v.phase === "roll" ? "Roll the die" : `You rolled ${v.die}. Pick a token.`) : v.phase === "move" ? `${v.turnName} rolled ${v.die}` : "Waiting…";
+        : v.myTurn ? (v.phase === "roll" ? "Roll the die" : `You rolled ${v.die}. Pick a token here or on the board.`) : v.phase === "move" ? `${v.turnName} rolled ${v.die}` : "Waiting…";
       const roll = root.querySelector(".pc-roll");
       roll.hidden = !(v.myTurn && v.phase === "roll");
       root.querySelector(".pc-tokens").innerHTML = v.tokens
         .map((p, k) => {
           const legal = v.legal.includes(k);
           return `<div class="card" style="display:flex;align-items:center;gap:14px;padding:12px 14px;${legal ? `border-color:${color}` : ""}">
-            <div style="width:40px;height:40px;border-radius:50%;background:${color};display:grid;place-items:center;font-weight:700;color:rgba(0,0,0,.6);flex:none">${k + 1}</div>
+            <div class="pc-piece" data-piece="${k}" role="img" aria-label="${esc(pieceName(k, i.prefs))}" style="width:40px;height:40px;border-radius:50%;background:${color};display:grid;place-items:center;font-weight:700;color:rgba(0,0,0,.62);flex:none">${pieceFace(k, i.prefs, 24)}</div>
             <div style="flex:1"><div>${p === FINISH ? "Home ✓" : esc(v.where[k])}</div>${legal ? `<div class="muted" style="font-size:.8em">moves to ${after(p, v.die)}</div>` : ""}</div>
             ${legal ? `<button class="primary" data-token="${k}">Move</button>` : ""}</div>`;
         })

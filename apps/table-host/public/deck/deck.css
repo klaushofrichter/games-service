@@ -17,6 +17,9 @@ h1 { font-family: var(--display); font-weight: 600; font-size: 1.9em; margin: 4p
 .list .row { display: flex; justify-content: space-between; padding: 9px 0; border-bottom: 1px solid var(--felt-line); font-size: 0.95em; }
 .list .row:last-child { border-bottom: 0; }
 .me { color: var(--brass); }
+/* The player's colour before each name in "At the table" (D-104); a hollow ring for someone without a seat. */
+.pdot { display: inline-block; width: 0.72em; height: 0.72em; border-radius: 50%; margin-right: 0.55em; vertical-align: 0.02em; box-shadow: 0 0 0 1.5px rgba(0,0,0,.35); }
+.pdot.none { background: transparent; box-shadow: inset 0 0 0 1.5px var(--ink-soft, #9aa); }
 
 input[type=text] {
   font: inherit; width: 100%; padding: 14px 16px; border-radius: 12px;
