@@ -38,6 +38,11 @@ try:
         board.wait_for_selector(".invite-body .code")
         invite = board.inner_text(".invite-body .code").strip()
         assert board.inner_html(".invite-body .qr").startswith("<svg"), "invite QR missing"
+        # the invite link has a copy button that puts exactly that link on the clipboard (D-094)
+        board.context.grant_permissions(["clipboard-read", "clipboard-write"], origin=TABLE)
+        board.click(".invite-body button[data-copy]")
+        board.wait_for_selector(".invite-body button.copy.done")
+        assert board.evaluate("() => navigator.clipboard.readText()") == board.inner_text(".invite-body .url").strip()
         board.screenshot(path=os.path.join(OUT, "remote-invite-dialog.png"))
 
         remote_ctx = b.new_context(viewport={"width": 1440, "height": 900})
@@ -58,6 +63,23 @@ try:
         board.wait_for_selector(".invite-body >> text=1 of 4 remote seats in use")
         remote.wait_for_timeout(600)
         remote.screenshot(path=os.path.join(OUT, "remote-player.png"))
+
+        # D-095: the deck window sits top right and is as tall as its content, so it has no scrollbar when the
+        # window has room; in a short window it stops at the window and scrolls.
+        FIT = """() => { const w = document.getElementById('deck-wrap').getBoundingClientRect();
+          const d = document.getElementById('deck').contentDocument.scrollingElement;
+          return { top: w.top, bottom: w.bottom, inner: innerHeight, scrolls: d.scrollHeight > d.clientHeight + 1 }; }"""
+        f = remote.evaluate(FIT)
+        assert abs(f["top"] - 16) < 2, f
+        assert f["bottom"] < f["inner"] - 16 - 40, f"lobby deck should be shorter than the window: {f}"
+        assert not f["scrolls"], f"deck scrolls although the window has room: {f}"
+        remote.set_viewport_size({"width": 1440, "height": 360})
+        remote.wait_for_timeout(400)
+        f = remote.evaluate(FIT)
+        assert abs(f["top"] - 16) < 2 and abs(f["bottom"] - (f["inner"] - 16)) < 2, f"short window: deck should fill it: {f}"
+        assert f["scrolls"], f"short window: the deck needs its scrollbar: {f}"
+        remote.set_viewport_size({"width": 1440, "height": 900})
+        remote.wait_for_timeout(300)
 
         # the remote board turns so Rita's own seat is at the bottom of her screen
         rita = players[0]

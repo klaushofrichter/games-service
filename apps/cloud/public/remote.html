@@ -11,6 +11,7 @@
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; background: var(--felt-deep); color: var(--ink); font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
   [hidden] { display: none !important; }
+  html { color-scheme: dark; scrollbar-color: #2f6457 var(--felt-deep); }
   .center { min-height: 100%; display: grid; place-items: center; padding: 24px 16px; }
   .card { width: 100%; max-width: 420px; background: var(--felt); border: 1px solid var(--line); border-radius: 16px; padding: 28px; }
   .eyebrow { text-transform: uppercase; letter-spacing: .16em; font-size: .75em; color: var(--brass); }
@@ -25,7 +26,9 @@
   /* (an iframe doesn't stretch between left and right: it needs an explicit size) */
   #board { position: absolute; top: 0; left: 0; width: calc(100% - 412px); height: 100%; border: 0; background: var(--felt-deep); }
   #play.deck-min #board { width: 100%; }
-  #deck-wrap { position: absolute; right: 16px; bottom: 16px; width: 380px; height: min(640px, calc(100% - 32px)); display: flex; flex-direction: column;
+  /* Top right, as tall as the deck's content up to the window (D-095): fitDeck() sets the height, so a scrollbar
+     appears only when the content is taller than the window. */
+  #deck-wrap { position: absolute; right: 16px; top: 16px; width: 380px; height: min(640px, calc(100% - 32px)); max-height: calc(100% - 32px); display: flex; flex-direction: column;
     border: 1px solid var(--line); border-radius: 16px; overflow: hidden; box-shadow: 0 18px 50px rgba(0,0,0,.55); background: var(--felt-deep); }
   #deck-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 10px; background: var(--felt); font-size: .85em; color: var(--soft); }
   #deck-bar button { padding: 4px 10px; font-size: .9em; }
@@ -36,7 +39,8 @@
   @media (max-width: 700px) {
     #board { width: 100%; height: 45%; }
     #play.deck-min #board { height: calc(100% - 44px); }
-    #deck-wrap { left: 0; right: 0; bottom: 0; width: auto; height: 55%; border-radius: 16px 16px 0 0; }
+    #deck-wrap { left: 0; right: 0; top: auto; bottom: 0; width: auto; height: 55% !important; border-radius: 16px 16px 0 0; }
+    #deck-wrap.min { height: auto !important; }
   }
 </style>
 </head>
@@ -267,7 +271,54 @@
     w.classList.toggle("min");
     $("play").classList.toggle("deck-min", w.classList.contains("min"));
     $("deck-min").textContent = w.classList.contains("min") ? "Show" : "Hide";
+    fitDeck();
   });
+
+  // ---------- the deck window takes the height of its content (D-095) ----------
+  // The deck frame is same-origin, so its content can be measured: the bottom of the last item in #app, plus
+  // #app's bottom padding and the footer. Its body stretches to the frame, so measuring the body would only
+  // ever report the frame's own height. The CSS max-height caps it at the window.
+  let fitQueued = false;
+  function fitDeck() {
+    const wrap = $("deck-wrap");
+    if (wrap.classList.contains("min")) return void (wrap.style.height = "");
+    let doc;
+    try {
+      doc = $("deck").contentDocument;
+    } catch {
+      return;
+    }
+    const app = doc && doc.getElementById("app");
+    if (!app || !app.lastElementChild) return;
+    const win = doc.defaultView;
+    const bottom = app.lastElementChild.getBoundingClientRect().bottom + win.scrollY;
+    const pad = parseFloat(win.getComputedStyle(app).paddingBottom) || 0;
+    const footer = doc.querySelector("footer");
+    const content = Math.ceil(bottom + pad + (footer ? footer.offsetHeight : 0));
+    wrap.style.height = `${content + $("deck-bar").offsetHeight + 2}px`;
+  }
+  function fitDeckSoon() {
+    if (fitQueued) return;
+    fitQueued = true;
+    requestAnimationFrame(() => {
+      fitQueued = false;
+      fitDeck();
+    });
+  }
+  $("deck").addEventListener("load", () => {
+    let doc;
+    try {
+      doc = $("deck").contentDocument;
+    } catch {
+      return;
+    }
+    const app = doc && doc.getElementById("app");
+    if (!app) return;
+    new MutationObserver(fitDeckSoon).observe(app, { childList: true, subtree: true, characterData: true, attributes: true });
+    if (doc.fonts) doc.fonts.ready.then(fitDeckSoon);
+    fitDeckSoon();
+  });
+  window.addEventListener("resize", fitDeckSoon);
   $("terms").addEventListener("click", (e) => {
     e.preventDefault();
     $("join-err").hidden = false;

@@ -11,6 +11,31 @@ export const ROT = { south: 0, west: 90, north: 180, east: -90 };
 export const SEAT_COLORS = ["#e8b04a", "#5fb7e8", "#e8735f", "#7fd18b", "#c38be8", "#e8e15f", "#5fe0c8", "#e88fbf"];
 export const seatColor = (seat) => SEAT_COLORS[seat % SEAT_COLORS.length];
 
+/**
+ * Copy text to the clipboard (D-094). The clipboard API needs a secure context (https, localhost); a board opened
+ * over plain http on the LAN falls back to the older copy command. Resolves true when it worked.
+ */
+export async function copyText(text) {
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch {}
+  const ta = document.createElement("textarea");
+  ta.value = text;
+  ta.setAttribute("readonly", "");
+  ta.style.cssText = "position:fixed;left:-9999px;top:0;opacity:0";
+  document.body.appendChild(ta);
+  ta.select();
+  let ok = false;
+  try {
+    ok = document.execCommand("copy");
+  } catch {}
+  ta.remove();
+  return ok;
+}
+
 // ---------- sound effects (D-092) ----------
 // One shared AudioContext for the page. Browsers start it suspended until the page has been touched; the board
 // resumes it on the first touch (the table PC's kiosk browser allows sound from the start).
