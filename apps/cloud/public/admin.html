@@ -50,7 +50,11 @@
   button.copy:hover, button.copy.done { color:var(--brass); }
   #signin { max-width:440px; margin:12vh auto; }
   .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:22px; }
-  @media (max-width: 800px) { .grid2 { grid-template-columns:1fr; } th:nth-child(4), td:nth-child(4) { display:none; } }
+  @media (max-width: 800px) { .grid2 { grid-template-columns:1fr; } #tables td:nth-child(4), thead th:nth-child(4) { display:none; } }
+  .checks { display:flex; gap:6px 16px; flex-wrap:wrap; }
+  .checks label { display:inline-flex; gap:6px; align-items:center; white-space:nowrap; cursor:pointer; }
+  .checks input { accent-color:var(--brass); width:16px; height:16px; padding:0; }
+  .games { color:var(--soft); font-size:13px; }
   [hidden] { display:none !important; }
 </style>
 </head>
@@ -77,9 +81,22 @@
     <form id="pair-form" class="row" style="margin-bottom:14px">
       <span class="muted">Approve a new table: enter the pairing code shown on its board</span>
       <input id="pair-code" maxlength="6" placeholder="ABC234" style="width:120px;text-transform:uppercase" class="mono"><button class="primary">Approve</button>
+      <span class="checks" id="pair-repos"></span>
     </form>
     <div class="msg" id="pair-msg"></div>
-    <table><thead><tr><th>Table</th><th>Status</th><th>Connection</th><th>Games</th><th></th></tr></thead><tbody id="tables"></tbody></table>
+    <table><thead><tr><th>Table</th><th>Status</th><th>Connection</th><th>Games</th><th>Extra games</th><th></th></tr></thead><tbody id="tables"></tbody></table>
+  </section>
+
+  <section>
+    <h2>Game repositories</h2>
+    <p class="muted">Extra games from other GitHub repositories, each with a <span class="mono">games/</span> folder like games-service's. A table gets a repository's games when it is ticked on the table's row, or when approving it. <span id="repo-token"></span></p>
+    <form id="repo-form" class="row" style="margin-bottom:14px">
+      <input id="repo-name" placeholder="owner/name" style="width:280px" class="mono" autocomplete="off">
+      <input id="repo-ref" placeholder="main" style="width:140px" class="mono" autocomplete="off">
+      <button class="primary">Add</button>
+    </form>
+    <div class="msg" id="repo-msg"></div>
+    <table><thead><tr><th>Repository</th><th>Games</th><th>Fetched</th><th></th></tr></thead><tbody id="repos"></tbody></table>
   </section>
 
   <div class="grid2">
@@ -148,9 +165,37 @@ async function start() {
 }
 async function loadSettings() { try { const s = await api("GET", "/admin/api/settings"); $("#ret-days").value = s.logRetentionDays; } catch {} }
 
+/** Repository checkboxes: one per listed repository, ticked for the ids given. */
+const repoChecks = (ids, attrs) => repos.map((r) => `<label title="${esc(r.repo)}@${esc(r.ref)}"><input type="checkbox" value="${esc(r.id)}" ${attrs}${ids.includes(r.id) ? " checked" : ""}>${esc(r.id)}</label>`).join("");
+let repos = [];
+let pairReposKey = null;
+
+function drawRepos(data) {
+  repos = data.repos;
+  $("#repo-token").textContent = data.token ? "Private repositories are read with GAME_REPO_TOKEN." : "No GAME_REPO_TOKEN is set, so only public repositories can be fetched.";
+  $("#repos").innerHTML = repos.map((r) => {
+    const b = r.bundle;
+    const games = b ? b.games.map((g) => `${esc(g.name)} <span class="faint">${esc(g.version)}</span>${r.clashes.includes(g.id) ? ` <span class="pill revoked" title="another repository has a game with this id">id clash</span>` : ""}`).join(", ") : `<span class="faint">none yet</span>`;
+    return `<tr>
+      <td><div class="mono">${esc(r.repo)}<span class="faint">@${esc(r.ref)}</span></div><div class="faint">id ${esc(r.id)}${b ? ` · commit <span class="mono">${esc(b.commit)}</span> · bundle <span class="mono">${esc(b.hash.slice(0, 12))}</span> · ${size(b.bytes)}` : ""}</div>
+        ${r.error ? `<div class="msg err" style="margin-top:4px">${esc(r.error)}${b ? " (tables keep the last good bundle)" : ""}</div>` : ""}</td>
+      <td class="games">${games}</td>
+      <td>${b ? ago(b.fetchedAt) : r.lastAttempt ? "failed" : "…"}</td>
+      <td style="text-align:right;white-space:nowrap"><button data-repo-refresh="${esc(r.id)}">Refresh</button> <button class="danger" data-repo-remove="${esc(r.id)}">Remove</button></td></tr>`;
+  }).join("") || `<tr><td colspan="4" class="faint">No repositories yet.</td></tr>`;
+  // The approval checkboxes are redrawn only when the list changes, so the 10-second refresh keeps what is ticked.
+  const key = repos.map((r) => r.id).join(",");
+  if (key !== pairReposKey) {
+    const ticked = [...document.querySelectorAll("#pair-repos input:checked")].map((i) => i.value);
+    $("#pair-repos").innerHTML = repos.length ? `<span class="faint">with games from</span>${repoChecks(ticked, "")}` : "";
+    pairReposKey = key;
+  }
+}
+
 async function refresh() {
   try {
-    const [m, tables, logs] = await Promise.all([api("GET", "/admin/api/metrics"), api("GET", "/admin/api/tables"), api("GET", "/admin/api/logs")]);
+    const [m, tables, logs, repoData] = await Promise.all([api("GET", "/admin/api/metrics"), api("GET", "/admin/api/tables"), api("GET", "/admin/api/logs"), api("GET", "/admin/api/repos")]);
+    drawRepos(repoData);
     const mins = Math.round(m.totalGameMs / 60000);
     $("#metrics").innerHTML = [
       [m.tables, "tables"], [tables.filter((t) => t.online).length, "online now"], [m.gamesPlayed, "games played"],
@@ -161,10 +206,11 @@ async function refresh() {
       <td><span class="pill ${t.status}">${t.status}</span>${t.status === "pending" ? ` <span class="mono">${esc(t.pairingCode)}</span>` : ""}</td>
       <td><span class="dot ${t.online ? "on" : ""}"></span>${t.online ? "online" : `last seen ${ago(t.lastSeen)}`}</td>
       <td>${t.metrics.gamesPlayed ?? 0}</td>
+      <td>${t.status === "pending" ? `<span class="faint">ticked when approving</span>` : repos.length ? `<span class="checks" data-table-repos="${esc(t.tableId)}">${repoChecks(t.repos ?? [], "")}</span>` : `<span class="faint">no repositories</span>`}</td>
       <td style="text-align:right">${t.status === "pending" ? `<button class="primary" data-pair="${esc(t.pairingCode)}">Approve</button>` : ""}
         ${t.status !== "revoked" ? `<button class="danger" data-revoke="${esc(t.tableId)}" data-name="${esc(t.name)}">Disconnect</button>`
           : `<button class="primary" data-reconnect="${esc(t.tableId)}">Reconnect</button>`}</td></tr>`).join("")
-      || `<tr><td colspan="5" class="faint">No tables yet. Start a table with CLOUD_URL pointing here; its board shows a pairing code.</td></tr>`;
+      || `<tr><td colspan="6" class="faint">No tables yet. Start a table with CLOUD_URL pointing here; its board shows a pairing code.</td></tr>`;
     $("#logs").innerHTML = logs.sort((a, b) => b.uploadedAt - a.uploadedAt).map((l) => `<tr>
       <td class="mono">${esc(l.id)}</td><td>${esc(l.gameId)}${l.simulation ? ` <span class="pill">sim</span>` : ""}</td><td>${size(l.bytes)}</td>
       <td style="text-align:right"><button data-log="${esc(l.id)}">Download</button></td></tr>`).join("") || `<tr><td colspan="4" class="faint">No logs uploaded yet.</td></tr>`;
@@ -180,13 +226,47 @@ $("#signin-form").addEventListener("submit", async (e) => {
 $("#signout").addEventListener("click", signOut);
 
 async function pair(code) {
-  try { await api("POST", `/admin/api/tables/pair/${encodeURIComponent(code.toUpperCase())}`); msg("#pair-msg", `Table ${code.toUpperCase()} approved. It connects within a few seconds.`, true); $("#pair-code").value = ""; refresh(); }
+  const picked = [...document.querySelectorAll("#pair-repos input:checked")].map((i) => i.value);
+  try {
+    await api("POST", `/admin/api/tables/pair/${encodeURIComponent(code.toUpperCase())}`, { repos: picked });
+    msg("#pair-msg", `Table ${code.toUpperCase()} approved${picked.length ? ` with games from ${picked.join(", ")}` : ""}. It connects within a few seconds.`, true);
+    $("#pair-code").value = ""; document.querySelectorAll("#pair-repos input").forEach((i) => (i.checked = false)); refresh();
+  }
   catch (e) { msg("#pair-msg", e.message); }
 }
 $("#pair-form").addEventListener("submit", (e) => { e.preventDefault(); pair($("#pair-code").value.trim()); });
 
+// Ticking a repository on a table's row takes effect at the table's next heartbeat (within 15 s).
+document.addEventListener("change", async (e) => {
+  const box = e.target.closest("[data-table-repos] input"); if (!box) return;
+  const holder = box.closest("[data-table-repos]");
+  const ids = [...holder.querySelectorAll("input:checked")].map((i) => i.value);
+  try { await api("PUT", `/admin/api/tables/${encodeURIComponent(holder.dataset.tableRepos)}/repos`, { repos: ids }); msg("#pair-msg", "Saved. The table picks up the change within 15 seconds, between games.", true); }
+  catch (err) { msg("#pair-msg", err.message); refresh(); }
+});
+
+$("#repo-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const repo = $("#repo-name").value.trim(), ref = $("#repo-ref").value.trim();
+  msg("#repo-msg", "Fetching…", true);
+  try {
+    const r = await api("POST", "/admin/api/repos", { repo, ref: ref || undefined });
+    if (r.error) msg("#repo-msg", `Added, but the fetch failed: ${r.error}`);
+    else msg("#repo-msg", `Added ${r.repo} with ${r.bundle.games.length} game${r.bundle.games.length === 1 ? "" : "s"}.`, true);
+    $("#repo-name").value = ""; $("#repo-ref").value = ""; refresh();
+  } catch (err) { msg("#repo-msg", err.message); }
+});
+
 document.addEventListener("click", async (e) => {
   const b = e.target.closest("button"); if (!b) return;
+  if (b.dataset.repoRefresh) {
+    b.disabled = true;
+    try { const r = await api("POST", `/admin/api/repos/${encodeURIComponent(b.dataset.repoRefresh)}/refresh`); r.error ? msg("#repo-msg", r.error) : msg("#repo-msg", `${r.repo} is at commit ${r.bundle.commit}.`, true); refresh(); }
+    catch (err) { msg("#repo-msg", err.message); } finally { b.disabled = false; }
+  }
+  if (b.dataset.repoRemove && confirm(`Remove ${b.dataset.repoRemove}? Tables lose its games at their next heartbeat.`)) {
+    try { await api("DELETE", `/admin/api/repos/${encodeURIComponent(b.dataset.repoRemove)}`); msg("#repo-msg", "Removed.", true); refresh(); } catch (err) { msg("#repo-msg", err.message); }
+  }
   if (b.dataset.pair) pair(b.dataset.pair);
   if (b.dataset.reconnect) {
     try { await api("POST", `/admin/api/tables/${encodeURIComponent(b.dataset.reconnect)}/reconnect`); refresh(); } catch (err) { msg("#pair-msg", err.message); }

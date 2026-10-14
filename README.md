@@ -7,9 +7,8 @@
 <!-- Static assertion: GitHub publishes no endpoint for alert status. -->
 [![Dependabot](https://img.shields.io/badge/dependabot-enabled-025E8C?logo=dependabot&logoColor=white)](https://github.com/klaushofrichter/games-service/security/dependabot)
 
-<!-- The repo is private, so these badges render blank: they are fetched anonymously and no token can help.
-     They start working if the repo ever goes public. Versions live on the release badge and the releases page,
-     never in this text. -->
+<!-- The repo is public since 14 Oct 2026 (D-096), so these badges render. Versions live on the release badge and the
+     releases page, never in this text. -->
 
 Game Table platform: a touchscreen **board** lying flat on a table, players' phones as private **decks**, a Linux **Table Host** that runs the games, and a **cloud service** at `games.skylar.technology` that enrolls tables, collects metrics and logs, and (from phase 1c) brokers remote players.
 
@@ -52,7 +51,8 @@ curl -X POST -H "Authorization: Bearer $ADMIN_TOKEN" http://localhost:8081/admin
 | `games/holdem` | Fixed-limit Texas Hold'em, 2–6 players, private hole cards, side pots, two AI styles |
 | `games/coin-flip` | Stub game: 1–8 players, simultaneous, AI, dynamic players, timers |
 | `games/quartet` | Stub game: exactly 4 humans, no AI, sequential turns, ends if a player leaves |
-| `scripts/e2e/` | Browser end-to-end checks (Playwright): `run-all.sh` runs them all, `play.py` per game, `layout.py`, `admin.py` for the portal and sign-in, `remote.py` for remote play; shared helpers in `common.py` |
+| `apps/cloud/src/game-repos.ts`, `apps/table-host/src/extra-games.ts`, `packages/protocol/src/bundle.ts` | Extra-game repositories: fetching and packing on the service, installing on tables, the bundle format |
+| `scripts/e2e/` | Browser end-to-end checks (Playwright): `run-all.sh` runs them all, `play.py` per game, `layout.py`, `admin.py` for the portal and sign-in, `remote.py` for remote play, `extra.py` for extra-game repositories; shared helpers in `common.py` |
 | `scripts/sync-secrets.sh` | Puts the values from your local `.env` into GitHub and the cluster, without printing them |
 | `scripts/release-notes.sh`, `release.sh` | The release step of the deploy |
 | `scripts/soak.ts` | AI-only soak run over every game and player count |
@@ -120,6 +120,24 @@ The UI modules export `mount(root, ctx)` returning `{ update(view, events, info)
 
 Rules must be deterministic: all randomness through `ctx.random()`. The host logs the seed and every input (intents, timer firings, seat changes), so `replay()` rebuilds any game exactly; the tests check this for live games and simulations.
 
+## Extra-game repositories
+
+Games can also come from other GitHub repositories, private ones included (D-097), for private games and early
+releases. The first is [`klaushofrichter/extra-games`](https://github.com/klaushofrichter/extra-games) (private).
+
+- **Console, *Game repositories*:** add `owner/name` and a branch. The service fetches the repository's `games/`
+  folder as one bundle and lists its games; *Refresh* fetches again (it also does every hour). A private repository
+  needs `GAME_REPO_TOKEN`, a fine-grained token with Contents: read on it.
+- **Per table:** tick a repository when approving the table's pairing code, or later on its row. The table installs the
+  games within 15 seconds, between games, and its board marks them *extra*. Remote players see them too: their board
+  comes from the table.
+- **A game repository** has a `games/` folder like this one, and its rules import the SDK by name:
+  `import { defineGame } from "@game-table/sdk"` (the host maps the name to its own SDK). See the extra-games README for
+  how it tests against this repository.
+
+Ticking a repository trusts its code on that table PC (rules run in-process, D-035). The list and the ticks are in
+memory, like pairings; `GAME_REPOS` restores the list after a deploy.
+
 ## Remote play
 
 A remote player gets an invite link (`https://games.skylar.technology/i/CODE`) from the board (*Invite…*). Opening it asks for a name, then connects the browser **directly to the table** over WebRTC; the service only relays the connection offer and answer. The browser shows the same board as the table, with the player's private deck beside it.
@@ -149,6 +167,7 @@ In the cluster these come from the `games-oauth` Secret (created by `scripts/syn
 | `ADMIN_TOKEN` | Optional bearer token for scripts (`Authorization: Bearer …`); in local development it is the portal sign-in |
 | `TRUST_PROXY` | `1` = trust `X-Forwarded-For` from loopback and the k3s pod/service networks, or a CIDR list |
 | `LOG_RETENTION_DAYS`, `ICE_SERVERS` | Log retention (default 90); STUN/TURN for remote play |
+| `GAME_REPOS`, `GAME_REPO_TOKEN` | Extra-game repositories listed from the start (`owner/name@ref`, comma-separated); a read token for private ones (D-097) |
 | `APP_VERSION` | Stamped into the image by the deploy (`YYYY.MM.DD.N`); `/health` (`{status, version}`, on the Table Host also `protocol`) reports it, `dev` otherwise |
 
 ## Branches, CI and deployment
@@ -178,6 +197,7 @@ scripts/e2e/run-all.sh out/                # every browser check, as CI runs the
 python3 scripts/e2e/play.py roulette out/  # also: pachisi, holdem, coinflip, dialogs
 python3 scripts/e2e/admin.py out/          # admin portal, sign-in and logout (starts its own cloud and host)
 python3 scripts/e2e/remote.py out/         # remote play in a second browser (starts its own cloud and host)
+python3 scripts/e2e/extra.py out/          # extra-game repositories: console, table, remote player (starts its own fake GitHub, cloud and host)
 python3 scripts/e2e/layout.py out/         # decks at 4 phone sizes x 3 games, the board at 5 screen sizes
 ```
 
@@ -186,5 +206,6 @@ python3 scripts/e2e/layout.py out/         # decks at 4 phone sizes x 3 games, t
 - Game rules run in-process; the isolated sandbox for third-party games comes later.
 - The cloud keeps its state in memory: one replica, and a restart (every deploy) forgets paired tables, invites and uploaded logs. A persistent store comes next.
 - Tables authenticate to the cloud with an issued bearer token, not yet a key pair or certificate.
+- Extra-game repositories and the per-table ticks are in memory too; `GAME_REPOS` restores the list after a restart.
 - Host-side AI configuration (`ai.hostConfig`, e.g. API keys) is parsed but has no screen yet.
 - werift waits up to 5 s for STUN during connection setup when STUN is unreachable.

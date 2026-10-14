@@ -9,7 +9,12 @@
     "erasableSyntaxOnly": true,
     "verbatimModuleSyntax": true,
     "skipLibCheck": true,
-    "types": ["node"]
+    "types": ["node"],
+    // Extra games import the SDK by name; the table host maps it at run time (D-097, apps/table-host/src/games.ts).
+    "paths": {
+      "@game-table/sdk": ["./packages/sdk/src/index.ts"],
+      "@game-table/sdk/cards": ["./packages/sdk/src/cards.ts"]
+    }
   },
   "include": ["packages/*/src/**/*.ts", "apps/*/src/**/*.ts", "games/*/*.ts", "tests/**/*.ts"]
 }

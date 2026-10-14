@@ -466,7 +466,7 @@ function gameTiles() {
     .slice(gamePage * PAGE_SIZE, (gamePage + 1) * PAGE_SIZE)
     .map((g) => `<button class="tile ${g.selectable ? "selectable" : ""}" data-game="${g.id}" ${g.selectable ? "" : "disabled"}>
           <span class="title">${esc(g.name)}</span><span class="desc">${esc(g.description ?? "")}</span>
-          <span class="faint" style="font-size:.66em">${playersLabel(g.players)}${g.ai ? " · AI" : ""}</span>
+          <span class="faint" style="font-size:.66em">${playersLabel(g.players)}${g.ai ? " · AI" : ""}${g.extra ? ` · <span style="color:var(--brass)">extra</span>` : ""}</span>
           ${g.selectable ? `<span class="hint">${esc(tileHint(g))}</span>` : `<span class="why">${esc(g.reasons[0])}</span>`}</button>`)
     .join("");
   const pager = pages < 2 ? "" : `<div class="pager">

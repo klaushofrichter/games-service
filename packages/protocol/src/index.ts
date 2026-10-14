@@ -193,4 +193,6 @@ export interface GameAvailability {
   players: number[];
   settings: Manifest["settings"];
   aiOptions: Manifest["ai"]["options"];
+  /** The game came from an extra-game repository (D-097), not with the table. */
+  extra?: boolean;
 }

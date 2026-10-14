@@ -27,6 +27,7 @@ for game in roulette pachisi holdem coinflip endings dialogs; do run python3 scr
 run python3 scripts/e2e/layout.py "$OUT"
 run python3 scripts/e2e/admin.py "$OUT"
 run python3 scripts/e2e/remote.py "$OUT"
+run python3 scripts/e2e/extra.py "$OUT"
 
 if ((${#failed[@]})); then
   printf '::error::e2e failed: %s\n' "${failed[@]}"

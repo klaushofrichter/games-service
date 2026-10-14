@@ -3,7 +3,8 @@
 #   GitHub secret  KUBE_SETUP_DEPLOY_TOKEN      <- GITHUB_KUBE_SETUP_PAT    (the deploy pushes the kube-setup manifest)
 #   k8s Secret     games-runner/runner-pat      <- GITHUB_GAMES_SERVICE_PAT (key `token`: the runner registers itself)
 #   k8s Secret     games/games-oauth            <- GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI,
-#                                                  ALLOWED_EMAILS, COOKIE_SECRET, and ADMIN_TOKEN if set
+#                                                  ALLOWED_EMAILS, COOKIE_SECRET, and ADMIN_TOKEN, GAME_REPO_TOKEN,
+#                                                  GAME_REPOS if set
 #
 #   scripts/sync-secrets.sh --check     validate .env and list what would be set (default)
 #   scripts/sync-secrets.sh --github    set the GitHub secret (needs `gh` signed in with admin on the repo)
@@ -50,10 +51,15 @@ need GITHUB_KUBE_SETUP_PAT GITHUB_GAMES_SERVICE_PAT GOOGLE_CLIENT_ID GOOGLE_CLIE
 for k in GITHUB_KUBE_SETUP_PAT GITHUB_GAMES_SERVICE_PAT; do
   [[ "${V[$k]:-}" == github_pat_* || "${V[$k]:-}" == ghp_* ]] || problems+=("$k does not look like a GitHub token")
 done
+[ -z "${V[GAME_REPO_TOKEN]:-}" ] || [[ "${V[GAME_REPO_TOKEN]}" == github_pat_* || "${V[GAME_REPO_TOKEN]}" == ghp_* ]] || problems+=("GAME_REPO_TOKEN does not look like a GitHub token")
+[ -z "${V[GAME_REPOS]:-}" ] || [[ "${V[GAME_REPOS]}" =~ ^[A-Za-z0-9-]+/[A-Za-z0-9._-]+(@[A-Za-z0-9._/-]+)?(,[A-Za-z0-9-]+/[A-Za-z0-9._-]+(@[A-Za-z0-9._/-]+)?)*$ ]] || problems+=("GAME_REPOS must be owner/name[@ref], comma-separated, no spaces")
 
 if ((${#problems[@]})); then printf 'problem: %s\n' "${problems[@]}" >&2; exit 1; fi
 OAUTH_KEYS=(GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET GOOGLE_REDIRECT_URI ALLOWED_EMAILS COOKIE_SECRET)
 [ -n "${V[ADMIN_TOKEN]:-}" ] && OAUTH_KEYS+=(ADMIN_TOKEN)
+# Extra-game repositories (D-097): the read token for private ones, and the list the console starts with. Both optional.
+[ -n "${V[GAME_REPO_TOKEN]:-}" ] && OAUTH_KEYS+=(GAME_REPO_TOKEN)
+[ -n "${V[GAME_REPOS]:-}" ] && OAUTH_KEYS+=(GAME_REPOS)
 echo ".env ok. Keys (values not shown):"
 echo "  GitHub secret KUBE_SETUP_DEPLOY_TOKEN  <- GITHUB_KUBE_SETUP_PAT"
 echo "  games-runner/runner-pat (token)        <- GITHUB_GAMES_SERVICE_PAT"

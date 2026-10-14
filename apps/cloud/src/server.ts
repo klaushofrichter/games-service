@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 import { BlockList, isIPv4, isIPv6 } from "node:net";
 import { WebSocketServer, type WebSocket } from "ws";
 import { createAdminAuth, esc, HTML_HEADERS, randomToken, same, sendPage, type GoogleAuthOptions } from "./auth.ts";
+import { GameRepoStore } from "./game-repos.ts";
 
 const ADMIN_PAGE = fileURLToPath(new URL("../public/admin.html", import.meta.url));
 const REMOTE_PAGE = fileURLToPath(new URL("../public/remote.html", import.meta.url));
@@ -58,6 +59,14 @@ export interface CloudOptions {
   trustProxy?: boolean | string[];
   /** Cap on the total size of stored logs (default 256 MB). */
   maxLogBytes?: number;
+  /** Extra-game repositories to list from the start ("owner/name" or "owner/name@ref"), as GAME_REPOS gives them. */
+  gameRepos?: string[];
+  /** Read token for private extra-game repositories (GAME_REPO_TOKEN). */
+  gameRepoToken?: string;
+  /** GitHub's REST API (tests use a fake). */
+  githubApiUrl?: string;
+  /** How often every repository is fetched again (default hourly; 0 = only on add and on Refresh). */
+  gameRepoRefreshMs?: number;
 }
 
 interface TableRecord {
@@ -71,6 +80,8 @@ interface TableRecord {
   lastHello?: number;
   metrics: Record<string, number>;
   createdAt: number;
+  /** Extra-game repositories this table gets (D-097), by repository id. Kept across Disconnect and Reconnect. */
+  repos: string[];
 }
 
 interface LogRecordMeta {
@@ -90,6 +101,27 @@ export function startCloud(o: CloudOptions) {
   const invites = new Map<string, { tableId: string; expiresAt: number; used: boolean }>();
   const downloadTokens = new Map<string, { gameId: string | null; expiresAt: number }>();
   const settings = { logRetentionDays: o.logRetentionDays ?? 90 };
+  const gameRepos = new GameRepoStore({ token: o.gameRepoToken, apiUrl: o.githubApiUrl });
+  for (const spec of o.gameRepos ?? []) {
+    try {
+      gameRepos.add(spec);
+    } catch (e) {
+      console.warn(`[cloud] GAME_REPOS: ${(e as Error).message}`);
+    }
+  }
+  void gameRepos.refreshAll();
+  const repoTimer = o.gameRepoRefreshMs === 0 ? null : setInterval(() => void gameRepos.refreshAll(), o.gameRepoRefreshMs ?? 3600_000);
+  repoTimer?.unref();
+  /** What the table should run besides its built-in games: its repositories' current bundles. */
+  const tableConfig = (t: TableRecord) => ({ ...settings, gameBundles: gameRepos.forTable(t.repos) });
+  /** Repository ids from a request body, each one known: unknown ids are an error, not silently dropped. */
+  const repoIds = (v: unknown): string[] => {
+    if (v === undefined) return [];
+    if (!Array.isArray(v) || v.some((x) => typeof x !== "string")) throw Object.assign(new Error("repos must be a list of repository ids"), { status: 400 });
+    const unknown = v.filter((id) => !gameRepos.repos.has(id));
+    if (unknown.length) throw Object.assign(new Error(`unknown repositories: ${unknown.join(", ")}`), { status: 400 });
+    return [...new Set(v as string[])];
+  };
   const maxLogBytes = o.maxLogBytes ?? MAX_LOG_BYTES;
   const lookups = new Map<string, { n: number; reset: number }>(); // invite lookup rate limit per IP
   const iceServers = o.iceServers ?? [{ urls: "stun:stun.l.google.com:19302" }];
@@ -256,7 +288,7 @@ export function startCloud(o: CloudOptions) {
             prunePending();
             if (pendingCount() >= MAX_PENDING) return json(res, 503, { error: "too many tables waiting for approval; try again later" });
           }
-          t = { tableId, name: String(b.name ?? "Game Table").slice(0, 60), status: "pending", pairingCode: code(6), tableToken: null, lastSeen: null, metrics: {}, createdAt: Date.now() };
+          t = { tableId, name: String(b.name ?? "Game Table").slice(0, 60), status: "pending", pairingCode: code(6), tableToken: null, lastSeen: null, metrics: {}, createdAt: Date.now(), repos: [] };
           tables.set(tableId, t);
         }
         if (t.status === "revoked") return json(res, 403, { status: "revoked" });
@@ -270,7 +302,7 @@ export function startCloud(o: CloudOptions) {
           tokenIndex.set(tokenKey(t.tableToken), t.tableId);
         }
         else if (!same(bearer(req), t.tableToken)) return json(res, 200, { status: "approved", tokenIssued: true });
-        return json(res, 200, { status: "approved", tableToken: t.tableToken, config: settings });
+        return json(res, 200, { status: "approved", tableToken: t.tableToken, config: tableConfig(t) });
       }
       if (m === "POST" && p === "/api/tables/heartbeat") {
         const t = tableFor(req);
@@ -278,7 +310,16 @@ export function startCloud(o: CloudOptions) {
         const b = await jsonBody(req);
         t.lastSeen = Date.now();
         if (b.metrics && typeof b.metrics === "object") t.metrics = b.metrics;
-        return json(res, 200, { config: settings });
+        return json(res, 200, { config: tableConfig(t) });
+      }
+      if (m === "GET" && (match = p.match(/^\/api\/tables\/bundles\/([0-9a-f]{64})$/))) {
+        // Only the bundles of this table's repositories: a table can't fetch games it was not given.
+        const t = tableFor(req);
+        if (!t) return json(res, 401, { error: "unknown or revoked table" });
+        const data = gameRepos.payloadFor(t.repos, match[1]);
+        if (!data) return json(res, 404, { error: "no such bundle for this table" });
+        res.writeHead(200, { "content-type": "application/gzip", "cache-control": "no-store" });
+        return res.end(data);
       }
       if (m === "PUT" && (match = p.match(/^\/api\/tables\/logs\/([\w-]+)$/))) {
         const t = tableFor(req);
@@ -332,10 +373,41 @@ export function startCloud(o: CloudOptions) {
           return json(res, 200, [...tables.values()].map(({ tableToken, ...t }) => ({ ...t, online: !!t.lastSeen && Date.now() - t.lastSeen < 60_000 })));
         }
         if (m === "POST" && (match = p.match(/^\/admin\/api\/tables\/pair\/([A-Z0-9]{6})$/))) {
+          // The console ticks the extra-game repositories this table gets as it approves it (D-097).
+          const repos = repoIds((await jsonBody(req)).repos);
           const t = [...tables.values()].find((x) => x.status === "pending" && x.pairingCode === match![1]);
           if (!t) return json(res, 404, { error: "no table waiting with that pairing code" });
           t.status = "approved";
-          return json(res, 200, { tableId: t.tableId, status: t.status });
+          t.repos = repos;
+          return json(res, 200, { tableId: t.tableId, status: t.status, repos: t.repos });
+        }
+        if (m === "PUT" && (match = p.match(/^\/admin\/api\/tables\/([\w-]+)\/repos$/))) {
+          const t = tables.get(match[1]);
+          if (!t) return json(res, 404, { error: "no such table" });
+          t.repos = repoIds((await jsonBody(req)).repos);
+          return json(res, 200, { tableId: t.tableId, repos: t.repos });
+        }
+        if (m === "GET" && p === "/admin/api/repos") return json(res, 200, { repos: gameRepos.list(), token: !!o.gameRepoToken });
+        if (m === "POST" && p === "/admin/api/repos") {
+          const b = await jsonBody(req);
+          let r;
+          try {
+            r = gameRepos.add(String(b.repo ?? "") + (b.ref ? `@${String(b.ref)}` : ""));
+          } catch (e) {
+            throw Object.assign(e as Error, { status: (e as { status?: number }).status ?? 400 });
+          }
+          await gameRepos.refresh(r.id); // the console shows at once whether it worked; the repository stays listed either way
+          return json(res, 201, gameRepos.list().find((x) => x.id === r.id));
+        }
+        if (m === "POST" && (match = p.match(/^\/admin\/api\/repos\/([\w-]+)\/refresh$/))) {
+          await gameRepos.refresh(match[1]);
+          return json(res, 200, gameRepos.list().find((x) => x.id === match![1]));
+        }
+        if (m === "DELETE" && (match = p.match(/^\/admin\/api\/repos\/([\w-]+)$/))) {
+          if (!gameRepos.remove(match[1])) return json(res, 404, { error: "no such repository" });
+          // Tables lose its games at their next heartbeat.
+          for (const t of tables.values()) t.repos = t.repos.filter((id) => id !== match![1]);
+          return json(res, 200, { ok: true });
         }
         if (m === "POST" && (match = p.match(/^\/admin\/api\/tables\/([\w-]+)\/revoke$/))) {
           const t = tables.get(match[1]);
@@ -486,6 +558,7 @@ export function startCloud(o: CloudOptions) {
         close: () =>
           new Promise((r) => {
             clearInterval(pruneTimer);
+            if (repoTimer) clearInterval(repoTimer);
             for (const c of wss.clients) c.terminate();
             wss.close();
             server.closeAllConnections();

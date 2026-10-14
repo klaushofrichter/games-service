@@ -68,6 +68,13 @@ const cloud = await startCloud({
   iceServers: env.ICE_SERVERS ? JSON.parse(env.ICE_SERVERS) : undefined,
   // "1": trust X-Forwarded-For from loopback and the k3s pod/service networks; or a comma-separated CIDR list.
   trustProxy: parseTrustProxy(env.TRUST_PROXY),
+  // Extra-game repositories (D-097): listed in the console from the start, e.g. "klaushofrichter/extra-games@main".
+  // The console can add more; like everything else here they are in memory until the persistent store lands.
+  gameRepos: (env.GAME_REPOS ?? "").split(",").map((x) => x.trim()).filter(Boolean),
+  // A fine-grained token with Contents: read on the private repositories (public ones need none).
+  gameRepoToken: env.GAME_REPO_TOKEN || undefined,
+  // GitHub's REST API; only the browser checks change it (scripts/e2e/extra.py serves a fake GitHub).
+  githubApiUrl: env.GAME_REPO_API_URL || undefined,
 });
 console.log(`[cloud] ${env.APP_VERSION || "dev"} listening on ${cloud.port}; admin sign-in: ${google ? `Google (${google.allowedEmails.length} allowed)` : "ADMIN_TOKEN only (development)"}`);
 for (const sig of ["SIGINT", "SIGTERM"] as const) process.on(sig, async () => (await cloud.close(), process.exit(0)));

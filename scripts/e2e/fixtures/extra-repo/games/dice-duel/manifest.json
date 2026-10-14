@@ -1,0 +1,20 @@
+{
+  "id": "dice-duel",
+  "name": "Dice Duel",
+  "version": "0.1.0",
+  "sdk": "^0.1",
+  "description": "Everyone rolls one die; the highest roll wins. A fixture for the extra-game repository check (scripts/e2e/extra.py).",
+  "players": { "min": 1, "max": 6 },
+  "turnModel": "simultaneous",
+  "seatLayouts": [2, 4, 6],
+  "edges": ["north", "south", "east", "west"],
+  "seatConstraints": null,
+  "dynamicPlayers": false,
+  "saveGame": false,
+  "settings": [],
+  "ai": { "supported": true, "options": [], "hostConfig": [] },
+  "simulation": { "supported": true, "headless": true },
+  "remoteBoardControl": true,
+  "lobbyButton": "bottom-right",
+  "permissions": []
+}
