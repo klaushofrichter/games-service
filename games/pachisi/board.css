@@ -20,6 +20,11 @@
   transition: transform .55s cubic-bezier(.3,.8,.3,1.15); z-index: 3;
   display: grid; place-items: center; font: 700 18px var(--text); color: rgba(0,0,0,.6);
 }
+.pc-token .pc-icon { display: block; color: rgba(0,0,0,.62); }
+/* A token the board may move (D-102): a larger invisible touch area around it, and a pressed look once tapped. */
+.pc-token.tap { cursor: pointer; }
+.pc-token.tap::before { content: ""; position: absolute; inset: -16px; border-radius: 50%; }
+.pc-token.can.sent { animation: none; filter: brightness(1.15); }
 .pc-token.can { animation: pc-bob .7s ease-in-out infinite alternate; box-shadow: 0 0 0 4px #fff, 0 0 26px var(--c); }
 @keyframes pc-bob { to { margin-top: -31px; } }
 .pc-side { position: absolute; top: 330px; width: 380px; text-align: center; }

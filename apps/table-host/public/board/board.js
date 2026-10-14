@@ -76,9 +76,9 @@ function confirmDialog(title, text, okLabel = "Confirm") {
 
 /**
  * A small form for manifest-described fields (game settings, AI options). Resolves with the values,
- * or null when cancelled.
+ * or null when cancelled. With `removeLabel`, a red button on the left resolves with "remove" (D-103).
  */
-function formDialog(title, intro, fields, values = {}, okLabel = "OK") {
+function formDialog(title, intro, fields, values = {}, okLabel = "OK", removeLabel = null) {
   return new Promise((resolve) => {
     const d = document.createElement("div");
     d.className = "dialog-backdrop";
@@ -90,12 +90,12 @@ function formDialog(title, intro, fields, values = {}, okLabel = "OK") {
       return `<input type="text" name="${f.key}" value="${esc(v ?? "")}">`;
     };
     d.innerHTML = `<div class="dialog form"><h2>${esc(title)}</h2>${intro ? `<div class="muted">${esc(intro)}</div>` : ""}
-      <div class="fields">${fields.map((f) => `<label><span>${esc(f.label ?? f.key)}</span>${input(f)}</label>`).join("") || `<div class="faint">Nothing to set for this game.</div>`}</div>
-      <div class="actions"><button data-x="no">Cancel</button><button class="primary" data-x="yes">${esc(okLabel)}</button></div></div>`;
+      <div class="fields">${fields.map((f) => `<label><span>${esc(f.label ?? f.key)}</span>${input(f)}</label>`).join("") || `<div class="faint">${state?.game ? "Nothing to set for this game." : "Pick a game to choose how it plays."}</div>`}</div>
+      <div class="actions">${removeLabel ? `<button class="danger" data-x="remove" style="margin-right:auto">${esc(removeLabel)}</button>` : ""}<button data-x="no">Cancel</button><button class="primary" data-x="yes">${esc(okLabel)}</button></div></div>`;
     d.addEventListener("click", (e) => {
       const x = e.target.closest("button")?.dataset.x;
       if (!x && e.target !== d) return;
-      let out = null;
+      let out = x === "remove" ? "remove" : null;
       if (x === "yes") {
         out = {};
         for (const f of fields) {
@@ -118,12 +118,19 @@ async function chooseGame(id) {
   if (settings) act("POST", "/game/select", { gameId: id, settings });
 }
 
+/** The AI player's window: how it plays in the chosen game, and Remove (D-103), which works with or without a game. */
 async function configureAi(playerId) {
   const p = state.players.find((x) => x.id === playerId);
-  if (!state.game) return toast("Pick a game first: AI options depend on the game");
-  const g = games.find((x) => x.id === state.game.id);
-  const opts = await formDialog(`${p.name} · ${g.name}`, "How this AI player plays.", g.aiOptions ?? [], p.aiOptions ?? {}, "Save");
-  if (opts) act("POST", `/players/${playerId}/ai-options`, { options: opts });
+  if (!p) return;
+  const g = state.game ? games.find((x) => x.id === state.game.id) : null;
+  const title = g ? `${p.name} · ${g.name}` : p.name;
+  const opts = await formDialog(title, g ? "How this AI player plays." : "", g?.aiOptions ?? [], p.aiOptions ?? {}, g ? "Save" : "Done", "Remove");
+  if (opts === "remove") {
+    if (await confirmDialog(`Remove ${p.name}?`, "The AI player leaves its seat.", "Remove")) {
+      if (selectedPlayer === playerId) selectedPlayer = null;
+      act("DELETE", `/players/${playerId}`);
+    }
+  } else if (opts && g) act("POST", `/players/${playerId}/ai-options`, { options: opts });
 }
 
 // ---------- orientation ----------
@@ -631,8 +638,36 @@ pauseLayer.addEventListener("click", async (e) => {
 // A game package may ship board.js exporting mount(root, ctx) -> { update(view, events, info), destroy() }.
 let game = null; // { key, inst, loading }
 
+/**
+ * Seats the board may move for by touch (D-102): on the table's board every human sitting at the table; on a remote
+ * board only its own player. A game uses it to decide which tokens answer a tap; the table checks again.
+ */
+function controlSeats() {
+  if (!state) return [];
+  if (REMOTE) {
+    let id = null;
+    try {
+      id = localStorage.getItem(`gametable.remote.${REMOTE_INV}.player`);
+    } catch {}
+    const p = id && state.players.find((x) => x.id === id);
+    return p && p.seat !== null ? [p.seat] : [];
+  }
+  return state.players.filter((p) => p.kind === "human" && p.location === "local" && p.seat !== null).map((p) => p.seat);
+}
+
+/** Send an intent for the player in `seat`, made by touching the board. Resolves { ok, reason }; a rejection toasts. */
+function boardAct(seat, name, payload) {
+  const p = state?.players.find((x) => x.seat === seat);
+  if (!p) return Promise.resolve({ ok: false, reason: "nobody sits there" });
+  return wsSend("game", "intent", { playerId: p.id, name, payload }).then((r) => {
+    if (!r.ok && r.reason) toast(r.reason);
+    return r;
+  });
+}
+
 function gameInfo() {
   return {
+    controlSeats: controlSeats(),
     players: state.players,
     seatEdges: state.seatEdges,
     seatPositions: seatPositions(state.seatEdges),
@@ -661,7 +696,7 @@ async function showGame() {
       mod = { mount: genericBoard };
     }
     if (game !== mine) return; // a newer game replaced this one while loading
-    mine.inst = mod.mount(gameLayer, { gameId: state.game.id, assetUrl: (p) => `/games/${state.game.id}/assets/${p}` });
+    mine.inst = mod.mount(gameLayer, { gameId: state.game.id, assetUrl: (p) => `/games/${state.game.id}/assets/${p}`, act: boardAct });
   }
   if (game.inst && gameMsg) game.inst.update(gameMsg.view, [], gameInfo());
 }
@@ -842,11 +877,31 @@ async function refreshGames() {
   games = await api("GET", "/games").catch(() => games);
 }
 
+// Requests on the socket that expect an answer (a board intent, D-102): seq -> resolve.
+let ws = null;
+let wsSeq = 0;
+const wsPending = new Map();
+function wsSend(ch, type, payload) {
+  if (ws?.readyState !== 1) return Promise.resolve({ ok: false, reason: "not connected to the table" });
+  const seq = ++wsSeq;
+  ws.send(JSON.stringify({ v: 1, ch, type, seq, payload }));
+  return new Promise((resolve) => {
+    wsPending.set(seq, resolve);
+    setTimeout(() => wsPending.delete(seq) && resolve({ ok: false, reason: "no answer from the table" }), 5000);
+  });
+}
+
 function connect() {
-  const ws = openTableSocket(REMOTE);
+  ws = openTableSocket(REMOTE);
   ws.onopen = () => ws.send(JSON.stringify({ v: 1, ch: "system", type: "hello", payload: REMOTE ? { role: "board" } : { role: "board", key: KEY } }));
   ws.onmessage = async (ev) => {
     const m = JSON.parse(ev.data);
+    const answer = m.ch === "system" && m.seq !== undefined && wsPending.get(m.seq);
+    if (answer) {
+      wsPending.delete(m.seq);
+      answer(m.type === "ack" ? { ok: true } : { ok: false, reason: m.payload?.reason ?? m.payload?.message });
+      return;
+    }
     if (m.ch === "lobby" && m.type === "state") {
       state = m.payload;
       if (selectedPlayer && !state.players.some((p) => p.id === selectedPlayer)) selectedPlayer = null;
@@ -860,6 +915,10 @@ function connect() {
       else if (state && (state.phase === "active" || state.phase === "paused")) showGame();
     }
   };
-  ws.onclose = () => setTimeout(connect, 1000);
+  ws.onclose = () => {
+    for (const r of wsPending.values()) r({ ok: false, reason: "connection lost" });
+    wsPending.clear();
+    setTimeout(connect, 1000);
+  };
 }
 connect();

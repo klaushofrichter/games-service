@@ -155,19 +155,36 @@ try:
         wait(lambda: state()["phase"] == "active")
         seats = {p["seat"]: p["name"] for p in state()["players"]}
         moves = {"Ana": 0, "Rita": 0}
-        for _ in range(120):
+        taps = {"Ana": 0, "Rita": 0}  # D-102: moves made by tapping a token on a board
+        token_moves = {"Ana": 0, "Rita": 0}  # every other token move is a tap
+        for _ in range(160):
             v = call(TABLE, "GET", "/api/v1/game/board", headers={"x-table-key": "k"})["view"]
-            if v["over"] or (moves["Rita"] >= 4 and moves["Ana"] >= 4):
+            if v["over"] or (moves["Rita"] >= 4 and moves["Ana"] >= 4 and min(taps.values()) >= 2):
                 break
             who = seats.get(v["turn"])
             page = deck if who == "Rita" else local
             if v["phase"] == "roll":
                 page.locator(".pc-roll:not([hidden])").click(timeout=5000)
+            elif token_moves[who] % 2:
+                # Rita taps on her own board, Ana on the table's board. Rita's board never offers Ana's tokens, and
+                # the table's board never offers Rita's (she is remote).
+                here, other = (rboard, board) if who == "Rita" else (board, rboard)
+                here.locator(".pc-token.tap").first.wait_for(timeout=5000)
+                assert other.locator(".pc-token.tap").count() == 0, f"{who}'s tokens answer taps on the other board"
+                seats_offered = here.locator(".pc-token.tap").evaluate_all("(els) => els.map((e) => Number(e.dataset.seat))")
+                assert set(seats_offered) == {v["turn"]}, seats_offered
+                before = v["players"]
+                here.locator(".pc-token.tap").first.click(force=True)  # it bobs
+                wait(lambda: call(TABLE, "GET", "/api/v1/game/board", headers={"x-table-key": "k"})["view"]["players"] != before, 5)
+                taps[who] += 1
+                token_moves[who] += 1
             else:
                 page.locator("button[data-token]").first.click(timeout=5000)
+                token_moves[who] += 1
             moves[who] += 1
             time.sleep(0.3)
         assert moves["Rita"] >= 4, moves
+        assert taps["Rita"] >= 1 and taps["Ana"] >= 1, taps
         rboard.locator(".pc-wrap").wait_for(timeout=5000)
         remote.wait_for_timeout(600)
         remote.screenshot(path=os.path.join(OUT, "remote-pachisi.png"))

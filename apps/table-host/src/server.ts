@@ -334,6 +334,12 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
           table.setReady(c.playerId, !!msg.payload?.ready);
           return reply("ack", {}, msg.seq);
         }
+        if (c.role === "board" && msg.ch === "game" && msg.type === "intent") {
+          // A move made by touching the board (D-102): payload { playerId, name, payload }.
+          const b = msg.payload ?? {};
+          const r = table.boardIntent(b.playerId, { name: b.name, payload: b.payload }, remoteCtx ? remoteCtx.session : null);
+          return r.ok ? reply("ack", {}, msg.seq) : reply("reject", { reason: r.reason }, msg.seq);
+        }
         if (c.role === "deck" && msg.ch === "game" && msg.type === "intent") {
           const r = table.intent(c.playerId, msg.payload);
           return r.ok ? reply("ack", {}, msg.seq) : reply("reject", { reason: r.reason }, msg.seq);

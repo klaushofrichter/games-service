@@ -19,3 +19,8 @@ page is the history. Leave it empty if there is nothing to add beyond the commit
   game 180° without moving the players. Remote players on an east or west seat can show the board upright, at full
   width. The seat plates now sit the same distance from the edge on all four sides, and each phone shows the
   player's colour in its seat badge.
+- Pachisi: sound effects (rolling, moving, a six, a token sent back); a **Pieces** setting to show icons instead of
+  numbers; and tokens can be moved by tapping them on the board, for players at the table and remote players on their
+  own board. Games can allow such board moves with `boardIntents` in their manifest.
+- An AI player's window has a **Remove** button, and opens before a game is chosen too.
+- The phones' *At the table* list shows each player's colour before their name.
