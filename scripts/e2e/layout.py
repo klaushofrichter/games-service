@@ -113,6 +113,12 @@ with sync_playwright() as p:
     watch(page, "board controls")
     page.goto(BASE + "/board/")
     page.wait_for_selector("text=Pick a game")
+    # the join link has a copy button (D-094)
+    page.context.grant_permissions(["clipboard-read", "clipboard-write"], origin=BASE)
+    page.click(".join button[data-copy]")
+    page.wait_for_selector(".join button.copy.done")
+    if page.evaluate("() => navigator.clipboard.readText()") != api("GET", "/state")["joinUrl"]:
+        problems.append("board: the join link's copy button did not copy the join link")
     # the settings gear opens a modal with Fullscreen, and closes again (D-088)
     page.click("#settings-button")
     page.wait_for_selector(".overlay.settings >> text=Fullscreen")
