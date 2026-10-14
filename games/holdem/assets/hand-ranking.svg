@@ -1,0 +1,218 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 380 556" width="380" height="556" role="img" aria-label="Poker hand ranking from best to worst">
+<title>Poker hand ranking from best to worst</title>
+<rect x="1" y="1" width="378" height="554" rx="14" fill="#0f2a24" stroke="#d6a94a" stroke-opacity="0.5" stroke-width="2"/>
+<text x="190.0" y="32" font-size="20" fill="#d6a94a" text-anchor="middle" font-weight="normal" font-family="Georgia, serif" >Poker hands, best to worst</text>
+<rect x="8" y="49" width="364" height="50" rx="8" fill="#163b33"/>
+<text x="26" y="79" font-size="18" fill="#d6a94a" text-anchor="middle" font-weight="bold" font-family="Georgia, serif" >1</text>
+<text x="44" y="72" font-size="15" fill="#f3eee2" text-anchor="start" font-weight="bold" font-family="sans-serif" >Straight flush</text>
+<text x="44" y="90" font-size="11.5" fill="#9fb3a9" text-anchor="start" font-weight="normal" font-family="sans-serif" >Five in a row, all one suit</text>
+<g opacity="1"><rect x="186" y="54" width="32" height="42" rx="4" fill="#fbf8ef" stroke="#000" stroke-opacity=".4"/>
+<text x="202" y="72" font-size="15" fill="#c0392b" text-anchor="middle" font-weight="bold" font-family="sans-serif" >A</text>
+<text x="202" y="90" font-size="15" fill="#c0392b" text-anchor="middle" font-weight="normal" font-family="sans-serif" >♥</text>
+</g>
+<g opacity="1"><rect x="222" y="54" width="32" height="42" rx="4" fill="#fbf8ef" stroke="#000" stroke-opacity=".4"/>
+<text x="238" y="72" font-size="15" fill="#c0392b" text-anchor="middle" font-weight="bold" font-family="sans-serif" >K</text>
+<text x="238" y="90" font-size="15" fill="#c0392b" text-anchor="middle" font-weight="normal" font-family="sans-serif" >♥</text>
+</g>
+<g opacity="1"><rect x="258" y="54" width="32" height="42" rx="4" fill="#fbf8ef" stroke="#000" stroke-opacity=".4"/>
+<text x="274" y="72" font-size="15" fill="#c0392b" text-anchor="middle" font-weight="bold" font-family="sans-serif" >Q</text>
+<text x="274" y="90" font-size="15" fill="#c0392b" text-anchor="middle" font-weight="normal" font-family="sans-serif" >♥</text>
+</g>
+<g opacity="1"><rect x="294" y="54" width="32" height="42" rx="4" fill="#fbf8ef" stroke="#000" stroke-opacity=".4"/>
+<text x="310" y="72" font-size="15" fill="#c0392b" text-anchor="middle" font-weight="bold" font-family="sans-serif" >J</text>
+<text x="310" y="90" font-size="15" fill="#c0392b" text-anchor="middle" font-weight="normal" font-family="sans-serif" >♥</text>
+</g>
+<g opacity="1"><rect x="330" y="54" width="32" height="42" rx="4" fill="#fbf8ef" stroke="#000" stroke-opacity=".4"/>
+<text x="346" y="72" font-size="15" fill="#c0392b" text-anchor="middle" font-weight="bold" font-family="sans-serif" >10</text>
+<text x="346" y="90" font-size="15" fill="#c0392b" text-anchor="middle" font-weight="normal" font-family="sans-serif" >♥</text>
+</g>
+<text x="26" y="131" font-size="18" fill="#d6a94a" text-anchor="middle" font-weight="bold" font-family="Georgia, serif" >2</text>
+<text x="44" y="124" font-size="15" fill="#f3eee2" text-anchor="start" font-weight="bold" font-family="sans-serif" >Four of a kind</text>
+<text x="44" y="142" font-size="11.5" fill="#9fb3a9" text-anchor="start" font-weight="normal" font-family="sans-serif" >Four of one rank</text>
+<g opacity="1"><rect x="186" y="106" width="32" height="42" rx="4" fill="#fbf8ef" stroke="#000" stroke-opacity=".4"/>
+<text x="202" y="124" font-size="15" fill="#1b1a17" text-anchor="middle" font-weight="bold" font-family="sans-serif" >9</text>
+<text x="202" y="142" font-size="15" fill="#1b1a17" text-anchor="middle" font-weight="normal" font-family="sans-serif" >♠</text>
+</g>
+<g opacity="1"><rect x="222" y="106" width="32" height="42" rx="4" fill="#fbf8ef" stroke="#000" stroke-opacity=".4"/>
+<text x="238" y="124" font-size="15" fill="#c0392b" text-anchor="middle" font-weight="bold" font-family="sans-serif" >9</text>
+<text x="238" y="142" font-size="15" fill="#c0392b" text-anchor="middle" font-weight="normal" font-family="sans-serif" >♥</text>
+</g>
+<g opacity="1"><rect x="258" y="106" width="32" height="42" rx="4" fill="#fbf8ef" stroke="#000" stroke-opacity=".4"/>
+<text x="274" y="124" font-size="15" fill="#c0392b" text-anchor="middle" font-weight="bold" font-family="sans-serif" >9</text>
+<text x="274" y="142" font-size="15" fill="#c0392b" text-anchor="middle" font-weight="normal" font-family="sans-serif" >♦</text>
+</g>
+<g opacity="1"><rect x="294" y="106" width="32" height="42" rx="4" fill="#fbf8ef" stroke="#000" stroke-opacity=".4"/>
+<text x="310" y="124" font-size="15" fill="#1b1a17" text-anchor="middle" font-weight="bold" font-family="sans-serif" >9</text>
+<text x="310" y="142" font-size="15" fill="#1b1a17" text-anchor="middle" font-weight="normal" font-family="sans-serif" >♣</text>
+</g>
+<g opacity=".35"><rect x="330" y="106" width="32" height="42" rx="4" fill="#fbf8ef" stroke="#000" stroke-opacity=".4"/>
+<text x="346" y="124" font-size="15" fill="#1b1a17" text-anchor="middle" font-weight="bold" font-family="sans-serif" >K</text>
+<text x="346" y="142" font-size="15" fill="#1b1a17" text-anchor="middle" font-weight="normal" font-family="sans-serif" >♠</text>
+</g>
+<rect x="8" y="153" width="364" height="50" rx="8" fill="#163b33"/>
+<text x="26" y="183" font-size="18" fill="#d6a94a" text-anchor="middle" font-weight="bold" font-family="Georgia, serif" >3</text>
+<text x="44" y="176" font-size="15" fill="#f3eee2" text-anchor="start" font-weight="bold" font-family="sans-serif" >Full house</text>
+<text x="44" y="194" font-size="11.5" fill="#9fb3a9" text-anchor="start" font-weight="normal" font-family="sans-serif" >Three + a pair</text>
+<g opacity="1"><rect x="186" y="158" width="32" height="42" rx="4" fill="#fbf8ef" stroke="#000" stroke-opacity=".4"/>
+<text x="202" y="176" font-size="15" fill="#1b1a17" text-anchor="middle" font-weight="bold" font-family="sans-serif" >Q</text>
+<text x="202" y="194" font-size="15" fill="#1b1a17" text-anchor="middle" font-weight="normal" font-family="sans-serif" >♣</text>
+</g>
+<g opacity="1"><rect x="222" y="158" width="32" height="42" rx="4" fill="#fbf8ef" stroke="#000" stroke-opacity=".4"/>
+<text x="238" y="176" font-size="15" fill="#c0392b" text-anchor="middle" font-weight="bold" font-family="sans-serif" >Q</text>
+<text x="238" y="194" font-size="15" fill="#c0392b" text-anchor="middle" font-weight="normal" font-family="sans-serif" >♦</text>
+</g>
+<g opacity="1"><rect x="258" y="158" width="32" height="42" rx="4" fill="#fbf8ef" stroke="#000" stroke-opacity=".4"/>
+<text x="274" y="176" font-size="15" fill="#1b1a17" text-anchor="middle" font-weight="bold" font-family="sans-serif" >Q</text>
+<text x="274" y="194" font-size="15" fill="#1b1a17" text-anchor="middle" font-weight="normal" font-family="sans-serif" >♠</text>
+</g>
+<g opacity="1"><rect x="294" y="158" width="32" height="42" rx="4" fill="#fbf8ef" stroke="#000" stroke-opacity=".4"/>
+<text x="310" y="176" font-size="15" fill="#c0392b" text-anchor="middle" font-weight="bold" font-family="sans-serif" >7</text>
+<text x="310" y="194" font-size="15" fill="#c0392b" text-anchor="middle" font-weight="normal" font-family="sans-serif" >♥</text>
+</g>
+<g opacity="1"><rect x="330" y="158" width="32" height="42" rx="4" fill="#fbf8ef" stroke="#000" stroke-opacity=".4"/>
+<text x="346" y="176" font-size="15" fill="#1b1a17" text-anchor="middle" font-weight="bold" font-family="sans-serif" >7</text>
+<text x="346" y="194" font-size="15" fill="#1b1a17" text-anchor="middle" font-weight="normal" font-family="sans-serif" >♣</text>
+</g>
+<text x="26" y="235" font-size="18" fill="#d6a94a" text-anchor="middle" font-weight="bold" font-family="Georgia, serif" >4</text>
+<text x="44" y="228" font-size="15" fill="#f3eee2" text-anchor="start" font-weight="bold" font-family="sans-serif" >Flush</text>
+<text x="44" y="246" font-size="11.5" fill="#9fb3a9" text-anchor="start" font-weight="normal" font-family="sans-serif" >Five of one suit</text>
+<g opacity="1"><rect x="186" y="210" width="32" height="42" rx="4" fill="#fbf8ef" stroke="#000" stroke-opacity=".4"/>
+<text x="202" y="228" font-size="15" fill="#c0392b" text-anchor="middle" font-weight="bold" font-family="sans-serif" >A</text>
+<text x="202" y="246" font-size="15" fill="#c0392b" text-anchor="middle" font-weight="normal" font-family="sans-serif" >♦</text>
+</g>
+<g opacity="1"><rect x="222" y="210" width="32" height="42" rx="4" fill="#fbf8ef" stroke="#000" stroke-opacity=".4"/>
+<text x="238" y="228" font-size="15" fill="#c0392b" text-anchor="middle" font-weight="bold" font-family="sans-serif" >J</text>
+<text x="238" y="246" font-size="15" fill="#c0392b" text-anchor="middle" font-weight="normal" font-family="sans-serif" >♦</text>
+</g>
+<g opacity="1"><rect x="258" y="210" width="32" height="42" rx="4" fill="#fbf8ef" stroke="#000" stroke-opacity=".4"/>
+<text x="274" y="228" font-size="15" fill="#c0392b" text-anchor="middle" font-weight="bold" font-family="sans-serif" >8</text>
+<text x="274" y="246" font-size="15" fill="#c0392b" text-anchor="middle" font-weight="normal" font-family="sans-serif" >♦</text>
+</g>
+<g opacity="1"><rect x="294" y="210" width="32" height="42" rx="4" fill="#fbf8ef" stroke="#000" stroke-opacity=".4"/>
+<text x="310" y="228" font-size="15" fill="#c0392b" text-anchor="middle" font-weight="bold" font-family="sans-serif" >5</text>
+<text x="310" y="246" font-size="15" fill="#c0392b" text-anchor="middle" font-weight="normal" font-family="sans-serif" >♦</text>
+</g>
+<g opacity="1"><rect x="330" y="210" width="32" height="42" rx="4" fill="#fbf8ef" stroke="#000" stroke-opacity=".4"/>
+<text x="346" y="228" font-size="15" fill="#c0392b" text-anchor="middle" font-weight="bold" font-family="sans-serif" >2</text>
+<text x="346" y="246" font-size="15" fill="#c0392b" text-anchor="middle" font-weight="normal" font-family="sans-serif" >♦</text>
+</g>
+<rect x="8" y="257" width="364" height="50" rx="8" fill="#163b33"/>
+<text x="26" y="287" font-size="18" fill="#d6a94a" text-anchor="middle" font-weight="bold" font-family="Georgia, serif" >5</text>
+<text x="44" y="280" font-size="15" fill="#f3eee2" text-anchor="start" font-weight="bold" font-family="sans-serif" >Straight</text>
+<text x="44" y="298" font-size="11.5" fill="#9fb3a9" text-anchor="start" font-weight="normal" font-family="sans-serif" >Five in a row, any suits</text>
+<g opacity="1"><rect x="186" y="262" width="32" height="42" rx="4" fill="#fbf8ef" stroke="#000" stroke-opacity=".4"/>
+<text x="202" y="280" font-size="15" fill="#1b1a17" text-anchor="middle" font-weight="bold" font-family="sans-serif" >10</text>
+<text x="202" y="298" font-size="15" fill="#1b1a17" text-anchor="middle" font-weight="normal" font-family="sans-serif" >♣</text>
+</g>
+<g opacity="1"><rect x="222" y="262" width="32" height="42" rx="4" fill="#fbf8ef" stroke="#000" stroke-opacity=".4"/>
+<text x="238" y="280" font-size="15" fill="#c0392b" text-anchor="middle" font-weight="bold" font-family="sans-serif" >9</text>
+<text x="238" y="298" font-size="15" fill="#c0392b" text-anchor="middle" font-weight="normal" font-family="sans-serif" >♦</text>
+</g>
+<g opacity="1"><rect x="258" y="262" width="32" height="42" rx="4" fill="#fbf8ef" stroke="#000" stroke-opacity=".4"/>
+<text x="274" y="280" font-size="15" fill="#1b1a17" text-anchor="middle" font-weight="bold" font-family="sans-serif" >8</text>
+<text x="274" y="298" font-size="15" fill="#1b1a17" text-anchor="middle" font-weight="normal" font-family="sans-serif" >♠</text>
+</g>
+<g opacity="1"><rect x="294" y="262" width="32" height="42" rx="4" fill="#fbf8ef" stroke="#000" stroke-opacity=".4"/>
+<text x="310" y="280" font-size="15" fill="#c0392b" text-anchor="middle" font-weight="bold" font-family="sans-serif" >7</text>
+<text x="310" y="298" font-size="15" fill="#c0392b" text-anchor="middle" font-weight="normal" font-family="sans-serif" >♥</text>
+</g>
+<g opacity="1"><rect x="330" y="262" width="32" height="42" rx="4" fill="#fbf8ef" stroke="#000" stroke-opacity=".4"/>
+<text x="346" y="280" font-size="15" fill="#1b1a17" text-anchor="middle" font-weight="bold" font-family="sans-serif" >6</text>
+<text x="346" y="298" font-size="15" fill="#1b1a17" text-anchor="middle" font-weight="normal" font-family="sans-serif" >♣</text>
+</g>
+<text x="26" y="339" font-size="18" fill="#d6a94a" text-anchor="middle" font-weight="bold" font-family="Georgia, serif" >6</text>
+<text x="44" y="332" font-size="15" fill="#f3eee2" text-anchor="start" font-weight="bold" font-family="sans-serif" >Three of a kind</text>
+<text x="44" y="350" font-size="11.5" fill="#9fb3a9" text-anchor="start" font-weight="normal" font-family="sans-serif" >Three of one rank</text>
+<g opacity="1"><rect x="186" y="314" width="32" height="42" rx="4" fill="#fbf8ef" stroke="#000" stroke-opacity=".4"/>
+<text x="202" y="332" font-size="15" fill="#1b1a17" text-anchor="middle" font-weight="bold" font-family="sans-serif" >7</text>
+<text x="202" y="350" font-size="15" fill="#1b1a17" text-anchor="middle" font-weight="normal" font-family="sans-serif" >♠</text>
+</g>
+<g opacity="1"><rect x="222" y="314" width="32" height="42" rx="4" fill="#fbf8ef" stroke="#000" stroke-opacity=".4"/>
+<text x="238" y="332" font-size="15" fill="#c0392b" text-anchor="middle" font-weight="bold" font-family="sans-serif" >7</text>
+<text x="238" y="350" font-size="15" fill="#c0392b" text-anchor="middle" font-weight="normal" font-family="sans-serif" >♦</text>
+</g>
+<g opacity="1"><rect x="258" y="314" width="32" height="42" rx="4" fill="#fbf8ef" stroke="#000" stroke-opacity=".4"/>
+<text x="274" y="332" font-size="15" fill="#1b1a17" text-anchor="middle" font-weight="bold" font-family="sans-serif" >7</text>
+<text x="274" y="350" font-size="15" fill="#1b1a17" text-anchor="middle" font-weight="normal" font-family="sans-serif" >♣</text>
+</g>
+<g opacity=".35"><rect x="294" y="314" width="32" height="42" rx="4" fill="#fbf8ef" stroke="#000" stroke-opacity=".4"/>
+<text x="310" y="332" font-size="15" fill="#c0392b" text-anchor="middle" font-weight="bold" font-family="sans-serif" >K</text>
+<text x="310" y="350" font-size="15" fill="#c0392b" text-anchor="middle" font-weight="normal" font-family="sans-serif" >♥</text>
+</g>
+<g opacity=".35"><rect x="330" y="314" width="32" height="42" rx="4" fill="#fbf8ef" stroke="#000" stroke-opacity=".4"/>
+<text x="346" y="332" font-size="15" fill="#1b1a17" text-anchor="middle" font-weight="bold" font-family="sans-serif" >2</text>
+<text x="346" y="350" font-size="15" fill="#1b1a17" text-anchor="middle" font-weight="normal" font-family="sans-serif" >♠</text>
+</g>
+<rect x="8" y="361" width="364" height="50" rx="8" fill="#163b33"/>
+<text x="26" y="391" font-size="18" fill="#d6a94a" text-anchor="middle" font-weight="bold" font-family="Georgia, serif" >7</text>
+<text x="44" y="384" font-size="15" fill="#f3eee2" text-anchor="start" font-weight="bold" font-family="sans-serif" >Two pair</text>
+<text x="44" y="402" font-size="11.5" fill="#9fb3a9" text-anchor="start" font-weight="normal" font-family="sans-serif" >Two different pairs</text>
+<g opacity="1"><rect x="186" y="366" width="32" height="42" rx="4" fill="#fbf8ef" stroke="#000" stroke-opacity=".4"/>
+<text x="202" y="384" font-size="15" fill="#c0392b" text-anchor="middle" font-weight="bold" font-family="sans-serif" >J</text>
+<text x="202" y="402" font-size="15" fill="#c0392b" text-anchor="middle" font-weight="normal" font-family="sans-serif" >♥</text>
+</g>
+<g opacity="1"><rect x="222" y="366" width="32" height="42" rx="4" fill="#fbf8ef" stroke="#000" stroke-opacity=".4"/>
+<text x="238" y="384" font-size="15" fill="#1b1a17" text-anchor="middle" font-weight="bold" font-family="sans-serif" >J</text>
+<text x="238" y="402" font-size="15" fill="#1b1a17" text-anchor="middle" font-weight="normal" font-family="sans-serif" >♠</text>
+</g>
+<g opacity="1"><rect x="258" y="366" width="32" height="42" rx="4" fill="#fbf8ef" stroke="#000" stroke-opacity=".4"/>
+<text x="274" y="384" font-size="15" fill="#c0392b" text-anchor="middle" font-weight="bold" font-family="sans-serif" >4</text>
+<text x="274" y="402" font-size="15" fill="#c0392b" text-anchor="middle" font-weight="normal" font-family="sans-serif" >♦</text>
+</g>
+<g opacity="1"><rect x="294" y="366" width="32" height="42" rx="4" fill="#fbf8ef" stroke="#000" stroke-opacity=".4"/>
+<text x="310" y="384" font-size="15" fill="#1b1a17" text-anchor="middle" font-weight="bold" font-family="sans-serif" >4</text>
+<text x="310" y="402" font-size="15" fill="#1b1a17" text-anchor="middle" font-weight="normal" font-family="sans-serif" >♣</text>
+</g>
+<g opacity=".35"><rect x="330" y="366" width="32" height="42" rx="4" fill="#fbf8ef" stroke="#000" stroke-opacity=".4"/>
+<text x="346" y="384" font-size="15" fill="#1b1a17" text-anchor="middle" font-weight="bold" font-family="sans-serif" >A</text>
+<text x="346" y="402" font-size="15" fill="#1b1a17" text-anchor="middle" font-weight="normal" font-family="sans-serif" >♠</text>
+</g>
+<text x="26" y="443" font-size="18" fill="#d6a94a" text-anchor="middle" font-weight="bold" font-family="Georgia, serif" >8</text>
+<text x="44" y="436" font-size="15" fill="#f3eee2" text-anchor="start" font-weight="bold" font-family="sans-serif" >Pair</text>
+<text x="44" y="454" font-size="11.5" fill="#9fb3a9" text-anchor="start" font-weight="normal" font-family="sans-serif" >Two of one rank</text>
+<g opacity="1"><rect x="186" y="418" width="32" height="42" rx="4" fill="#fbf8ef" stroke="#000" stroke-opacity=".4"/>
+<text x="202" y="436" font-size="15" fill="#1b1a17" text-anchor="middle" font-weight="bold" font-family="sans-serif" >A</text>
+<text x="202" y="454" font-size="15" fill="#1b1a17" text-anchor="middle" font-weight="normal" font-family="sans-serif" >♣</text>
+</g>
+<g opacity="1"><rect x="222" y="418" width="32" height="42" rx="4" fill="#fbf8ef" stroke="#000" stroke-opacity=".4"/>
+<text x="238" y="436" font-size="15" fill="#c0392b" text-anchor="middle" font-weight="bold" font-family="sans-serif" >A</text>
+<text x="238" y="454" font-size="15" fill="#c0392b" text-anchor="middle" font-weight="normal" font-family="sans-serif" >♦</text>
+</g>
+<g opacity=".35"><rect x="258" y="418" width="32" height="42" rx="4" fill="#fbf8ef" stroke="#000" stroke-opacity=".4"/>
+<text x="274" y="436" font-size="15" fill="#c0392b" text-anchor="middle" font-weight="bold" font-family="sans-serif" >9</text>
+<text x="274" y="454" font-size="15" fill="#c0392b" text-anchor="middle" font-weight="normal" font-family="sans-serif" >♥</text>
+</g>
+<g opacity=".35"><rect x="294" y="418" width="32" height="42" rx="4" fill="#fbf8ef" stroke="#000" stroke-opacity=".4"/>
+<text x="310" y="436" font-size="15" fill="#1b1a17" text-anchor="middle" font-weight="bold" font-family="sans-serif" >6</text>
+<text x="310" y="454" font-size="15" fill="#1b1a17" text-anchor="middle" font-weight="normal" font-family="sans-serif" >♠</text>
+</g>
+<g opacity=".35"><rect x="330" y="418" width="32" height="42" rx="4" fill="#fbf8ef" stroke="#000" stroke-opacity=".4"/>
+<text x="346" y="436" font-size="15" fill="#1b1a17" text-anchor="middle" font-weight="bold" font-family="sans-serif" >3</text>
+<text x="346" y="454" font-size="15" fill="#1b1a17" text-anchor="middle" font-weight="normal" font-family="sans-serif" >♣</text>
+</g>
+<rect x="8" y="465" width="364" height="50" rx="8" fill="#163b33"/>
+<text x="26" y="495" font-size="18" fill="#d6a94a" text-anchor="middle" font-weight="bold" font-family="Georgia, serif" >9</text>
+<text x="44" y="488" font-size="15" fill="#f3eee2" text-anchor="start" font-weight="bold" font-family="sans-serif" >High card</text>
+<text x="44" y="506" font-size="11.5" fill="#9fb3a9" text-anchor="start" font-weight="normal" font-family="sans-serif" >None of the above</text>
+<g opacity="1"><rect x="186" y="470" width="32" height="42" rx="4" fill="#fbf8ef" stroke="#000" stroke-opacity=".4"/>
+<text x="202" y="488" font-size="15" fill="#c0392b" text-anchor="middle" font-weight="bold" font-family="sans-serif" >A</text>
+<text x="202" y="506" font-size="15" fill="#c0392b" text-anchor="middle" font-weight="normal" font-family="sans-serif" >♥</text>
+</g>
+<g opacity=".35"><rect x="222" y="470" width="32" height="42" rx="4" fill="#fbf8ef" stroke="#000" stroke-opacity=".4"/>
+<text x="238" y="488" font-size="15" fill="#1b1a17" text-anchor="middle" font-weight="bold" font-family="sans-serif" >Q</text>
+<text x="238" y="506" font-size="15" fill="#1b1a17" text-anchor="middle" font-weight="normal" font-family="sans-serif" >♠</text>
+</g>
+<g opacity=".35"><rect x="258" y="470" width="32" height="42" rx="4" fill="#fbf8ef" stroke="#000" stroke-opacity=".4"/>
+<text x="274" y="488" font-size="15" fill="#c0392b" text-anchor="middle" font-weight="bold" font-family="sans-serif" >9</text>
+<text x="274" y="506" font-size="15" fill="#c0392b" text-anchor="middle" font-weight="normal" font-family="sans-serif" >♦</text>
+</g>
+<g opacity=".35"><rect x="294" y="470" width="32" height="42" rx="4" fill="#fbf8ef" stroke="#000" stroke-opacity=".4"/>
+<text x="310" y="488" font-size="15" fill="#1b1a17" text-anchor="middle" font-weight="bold" font-family="sans-serif" >5</text>
+<text x="310" y="506" font-size="15" fill="#1b1a17" text-anchor="middle" font-weight="normal" font-family="sans-serif" >♣</text>
+</g>
+<g opacity=".35"><rect x="330" y="470" width="32" height="42" rx="4" fill="#fbf8ef" stroke="#000" stroke-opacity=".4"/>
+<text x="346" y="488" font-size="15" fill="#c0392b" text-anchor="middle" font-weight="bold" font-family="sans-serif" >3</text>
+<text x="346" y="506" font-size="15" fill="#c0392b" text-anchor="middle" font-weight="normal" font-family="sans-serif" >♥</text>
+</g>
+<text x="190.0" y="542" font-size="12.5" fill="#9fb3a9" text-anchor="middle" font-weight="normal" font-family="sans-serif" >Faded cards do not count for the hand; they break ties.</text>
+</svg>

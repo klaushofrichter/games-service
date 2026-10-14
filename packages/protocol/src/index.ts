@@ -157,6 +157,10 @@ export interface LobbyState {
      * Kept per game on this table, shared with the board and every deck; never part of the game's rules or log.
      */
     prefs: Record<string, unknown>;
+    /** Where the game's rules for players are (`/games/<id>/how-to-play.md`), or null if it ships none (D-099). */
+    howToPlay: string | null;
+    /** The chosen settings as the rules page lists them: label and value, in the manifest's order. */
+    settingsShown: { label: string; value: unknown }[];
   } | null;
   /** Seat layouts that may be chosen now: the selected game's, or, with none selected, any visible game's. */
   layouts: SeatLayout[];
@@ -195,4 +199,6 @@ export interface GameAvailability {
   aiOptions: Manifest["ai"]["options"];
   /** The game came from an extra-game repository (D-097), not with the table. */
   extra?: boolean;
+  /** Where the game's rules for players are, or null (D-099). */
+  howToPlay: string | null;
 }

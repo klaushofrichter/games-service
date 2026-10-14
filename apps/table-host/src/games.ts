@@ -12,7 +12,12 @@ export interface InstalledGame {
   dir: string;
   /** Where an extra game came from (D-097): "owner/name@ref", its commit and bundle hash. Absent for built-in games. */
   source?: { repo: string; commit: string; hash: string };
+  /** The game ships rules for players: how-to-play.md in its folder (D-099). */
+  howToPlay?: boolean;
 }
+
+/** The rules file a game may ship (D-099): Markdown, with images from the game's assets/ folder. */
+export const HOW_TO_PLAY = "how-to-play.md";
 
 /**
  * Games outside this repository import the SDK by name: `@game-table/sdk` (and `@game-table/sdk/cards`), never by a
@@ -51,7 +56,8 @@ export async function loadGames(dir: string, source?: InstalledGame["source"]): 
       // Phase 1a: rules run in-process. Phase 1 later: isolated worker sandbox (see architecture doc).
       const mod = await import(pathToFileURL(join(gameDir, rulesFile)).href);
       if (!mod.default || typeof mod.default.setup !== "function") throw new Error("rules must export default defineGame({...})");
-      games.set(manifest.id, { manifest, def: mod.default, dir: gameDir, ...(source ? { source } : {}) });
+      const howToPlay = (await readdir(gameDir)).includes(HOW_TO_PLAY);
+      games.set(manifest.id, { manifest, def: mod.default, dir: gameDir, howToPlay, ...(source ? { source } : {}) });
     } catch (err) {
       console.error(`[games] skipping ${entry}: ${(err as Error).message}`);
     }

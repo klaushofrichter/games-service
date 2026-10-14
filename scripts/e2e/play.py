@@ -308,6 +308,47 @@ def dialogs(browser, board):
     return decks
 
 
+@scenario
+def rules(browser, board):
+    """Every game's rules on the smallest phone (D-099): the Rules button, the modal, its images, the settings at this
+    table, nothing wider than the screen, and closing it again (button, backdrop, Escape)."""
+    ctx = browser.new_context(viewport={"width": 320, "height": 568}, device_scale_factor=2, has_touch=True)
+    d = ctx.new_page()
+    watch(d, "phone")
+    join_deck(d, api("GET", "/join")["url"], "Klaus")
+    api("POST", "/ai", {})
+    assert d.locator("[data-rules]").count() == 0, "no Rules button before a game is chosen"
+    games = [g for g in api("GET", "/games") if g["howToPlay"]]
+    assert {"roulette", "pachisi", "holdem", "coin-flip"} <= {g["id"] for g in games}, [g["id"] for g in games]
+    for g in games:
+        if g["id"] == "quartet":
+            continue  # needs four humans; its rules are checked by tests/rules.test.ts
+        api("POST", "/game/select", {"gameId": g["id"]})
+        d.locator("[data-rules]").click()
+        d.locator(".rules-modal .md h3").first.wait_for()
+        title = d.inner_text(".rules-modal .rules-head h2")
+        assert title.strip(), f"{g['id']}: no title"
+        imgs = d.locator(".rules-modal .md img")
+        for k in range(imgs.count()):
+            imgs.nth(k).scroll_into_view_if_needed()
+            wait(lambda: imgs.nth(k).evaluate("i => i.complete && i.naturalWidth > 0"), 10, f"{g['id']} image {k}")
+        if g["settings"]:
+            assert d.locator(".rules-settings tr").count() == len(g["settings"]), f"{g['id']}: settings at this table"
+        wide = d.evaluate("() => [...document.querySelectorAll('.rules-modal *')].filter(e => e.getBoundingClientRect().right > innerWidth + 1 && !e.closest('.md-table')).map(e => e.tagName + '.' + e.className).slice(0, 3)")
+        assert not wide, f"{g['id']}: sticks out of a 320 px phone: {wide}"
+        d.locator(".rules-modal .rules-body").evaluate("b => b.scrollTop = 0")
+        shot(d, f"rules-{g['id']}")
+        if g["id"] == "roulette":
+            d.keyboard.press("Escape")
+        elif g["id"] == "pachisi":
+            d.mouse.click(160, 4)  # the backdrop above the sheet
+        else:
+            d.locator(".rules-modal .rules-close").click()
+        d.wait_for_selector(".rules-modal", state="detached")
+    api("POST", "/game/close", {})
+    return [d]
+
+
 def main():
     with sync_playwright() as p:
         browser = p.chromium.launch()

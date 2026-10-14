@@ -1,0 +1,103 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 464 618" width="464" height="618" role="img" aria-label="Pachisi board: track, start squares, safe squares, home columns">
+<title>Pachisi board: track, start squares, safe squares, home columns</title>
+<rect x="1" y="1" width="462" height="616" rx="14" fill="#0f2a24" stroke="#d6a94a" stroke-opacity="0.5" stroke-width="2"/>
+<text x="232.0" y="32" font-size="20" fill="#d6a94a" text-anchor="middle" font-weight="normal" font-family="Georgia, serif" >The Pachisi board</text>
+<rect x="254" y="91" width="146" height="146" rx="12" fill="#d6a94a" fill-opacity=".18" stroke="#d6a94a" stroke-width="2"/>
+<circle cx="289" cy="124" r="11" fill="#d6a94a" stroke="#000" stroke-opacity=".5" stroke-width="2"/>
+<circle cx="365" cy="124" r="11" fill="#d6a94a" stroke="#000" stroke-opacity=".5" stroke-width="2"/>
+<circle cx="289" cy="200" r="11" fill="#d6a94a" stroke="#000" stroke-opacity=".5" stroke-width="2"/>
+<circle cx="365" cy="200" r="11" fill="#d6a94a" stroke="#000" stroke-opacity=".5" stroke-width="2"/>
+<rect x="254" y="281" width="146" height="146" rx="12" fill="#d2574a" fill-opacity=".18" stroke="#d2574a" stroke-width="2"/>
+<circle cx="289" cy="314" r="11" fill="#d2574a" stroke="#000" stroke-opacity=".5" stroke-width="2"/>
+<circle cx="365" cy="314" r="11" fill="#d2574a" stroke="#000" stroke-opacity=".5" stroke-width="2"/>
+<circle cx="289" cy="390" r="11" fill="#d2574a" stroke="#000" stroke-opacity=".5" stroke-width="2"/>
+<circle cx="365" cy="390" r="11" fill="#d2574a" stroke="#000" stroke-opacity=".5" stroke-width="2"/>
+<rect x="64" y="281" width="146" height="146" rx="12" fill="#5b9bd5" fill-opacity=".18" stroke="#5b9bd5" stroke-width="2"/>
+<circle cx="99" cy="314" r="11" fill="#5b9bd5" stroke="#000" stroke-opacity=".5" stroke-width="2"/>
+<circle cx="175" cy="314" r="11" fill="#5b9bd5" stroke="#000" stroke-opacity=".5" stroke-width="2"/>
+<circle cx="99" cy="390" r="11" fill="#5b9bd5" stroke="#000" stroke-opacity=".5" stroke-width="2"/>
+<circle cx="175" cy="390" r="11" fill="#5b9bd5" stroke="#000" stroke-opacity=".5" stroke-width="2"/>
+<rect x="64" y="91" width="146" height="146" rx="12" fill="#6cc28a" fill-opacity=".18" stroke="#6cc28a" stroke-width="2"/>
+<circle cx="99" cy="124" r="11" fill="#6cc28a" stroke="#000" stroke-opacity=".5" stroke-width="2"/>
+<circle cx="175" cy="124" r="11" fill="#6cc28a" stroke="#000" stroke-opacity=".5" stroke-width="2"/>
+<circle cx="99" cy="200" r="11" fill="#6cc28a" stroke="#000" stroke-opacity=".5" stroke-width="2"/>
+<circle cx="175" cy="200" r="11" fill="#6cc28a" stroke="#000" stroke-opacity=".5" stroke-width="2"/>
+<rect x="25" y="52" width="34" height="34" rx="6" fill="#e9e1cc"/>
+<rect x="63" y="52" width="34" height="34" rx="6" fill="#e9e1cc"/>
+<rect x="101" y="52" width="34" height="34" rx="6" fill="#e9e1cc"/>
+<rect x="139" y="52" width="34" height="34" rx="6" fill="#e9e1cc"/>
+<rect x="177" y="52" width="34" height="34" rx="6" fill="#e9e1cc"/>
+<rect x="215" y="52" width="34" height="34" rx="6" fill="#e9e1cc"/>
+<rect x="253" y="52" width="34" height="34" rx="6" fill="#d6a94a"/>
+<text x="270.0" y="76.0" font-size="20" fill="#000" text-anchor="middle" font-weight="normal" font-family="sans-serif" fill-opacity=".55">★</text>
+<rect x="291" y="52" width="34" height="34" rx="6" fill="#e9e1cc"/>
+<rect x="329" y="52" width="34" height="34" rx="6" fill="#e9e1cc"/>
+<rect x="367" y="52" width="34" height="34" rx="6" fill="#e9e1cc"/>
+<rect x="405" y="52" width="34" height="34" rx="6" fill="#e9e1cc"/>
+<rect x="405" y="90" width="34" height="34" rx="6" fill="#e9e1cc"/>
+<rect x="405" y="128" width="34" height="34" rx="6" fill="#e9e1cc"/>
+<rect x="405" y="166" width="34" height="34" rx="6" fill="#e9e1cc"/>
+<rect x="405" y="204" width="34" height="34" rx="6" fill="#e9e1cc"/>
+<rect x="405" y="242" width="34" height="34" rx="6" fill="#e9e1cc"/>
+<rect x="405" y="280" width="34" height="34" rx="6" fill="#d2574a"/>
+<text x="422.0" y="304.0" font-size="20" fill="#000" text-anchor="middle" font-weight="normal" font-family="sans-serif" fill-opacity=".55">★</text>
+<rect x="405" y="318" width="34" height="34" rx="6" fill="#e9e1cc"/>
+<rect x="405" y="356" width="34" height="34" rx="6" fill="#e9e1cc"/>
+<rect x="405" y="394" width="34" height="34" rx="6" fill="#e9e1cc"/>
+<rect x="405" y="432" width="34" height="34" rx="6" fill="#e9e1cc"/>
+<rect x="367" y="432" width="34" height="34" rx="6" fill="#e9e1cc"/>
+<rect x="329" y="432" width="34" height="34" rx="6" fill="#e9e1cc"/>
+<rect x="291" y="432" width="34" height="34" rx="6" fill="#e9e1cc"/>
+<rect x="253" y="432" width="34" height="34" rx="6" fill="#e9e1cc"/>
+<rect x="215" y="432" width="34" height="34" rx="6" fill="#e9e1cc"/>
+<rect x="177" y="432" width="34" height="34" rx="6" fill="#5b9bd5"/>
+<text x="194.0" y="456.0" font-size="20" fill="#000" text-anchor="middle" font-weight="normal" font-family="sans-serif" fill-opacity=".55">★</text>
+<rect x="139" y="432" width="34" height="34" rx="6" fill="#e9e1cc"/>
+<rect x="101" y="432" width="34" height="34" rx="6" fill="#e9e1cc"/>
+<rect x="63" y="432" width="34" height="34" rx="6" fill="#e9e1cc"/>
+<rect x="25" y="432" width="34" height="34" rx="6" fill="#e9e1cc"/>
+<rect x="25" y="394" width="34" height="34" rx="6" fill="#e9e1cc"/>
+<rect x="25" y="356" width="34" height="34" rx="6" fill="#e9e1cc"/>
+<rect x="25" y="318" width="34" height="34" rx="6" fill="#e9e1cc"/>
+<rect x="25" y="280" width="34" height="34" rx="6" fill="#e9e1cc"/>
+<rect x="25" y="242" width="34" height="34" rx="6" fill="#e9e1cc"/>
+<rect x="25" y="204" width="34" height="34" rx="6" fill="#6cc28a"/>
+<text x="42.0" y="228.0" font-size="20" fill="#000" text-anchor="middle" font-weight="normal" font-family="sans-serif" fill-opacity=".55">★</text>
+<rect x="25" y="166" width="34" height="34" rx="6" fill="#e9e1cc"/>
+<rect x="25" y="128" width="34" height="34" rx="6" fill="#e9e1cc"/>
+<rect x="25" y="90" width="34" height="34" rx="6" fill="#e9e1cc"/>
+<rect x="215" y="90" width="34" height="34" rx="6" fill="#d6a94a" fill-opacity=".75"/>
+<rect x="215" y="128" width="34" height="34" rx="6" fill="#d6a94a" fill-opacity=".75"/>
+<rect x="215" y="166" width="34" height="34" rx="6" fill="#d6a94a" fill-opacity=".75"/>
+<rect x="215" y="204" width="34" height="34" rx="6" fill="#d6a94a" fill-opacity=".75"/>
+<rect x="367" y="242" width="34" height="34" rx="6" fill="#d2574a" fill-opacity=".75"/>
+<rect x="329" y="242" width="34" height="34" rx="6" fill="#d2574a" fill-opacity=".75"/>
+<rect x="291" y="242" width="34" height="34" rx="6" fill="#d2574a" fill-opacity=".75"/>
+<rect x="253" y="242" width="34" height="34" rx="6" fill="#d2574a" fill-opacity=".75"/>
+<rect x="215" y="394" width="34" height="34" rx="6" fill="#5b9bd5" fill-opacity=".75"/>
+<rect x="215" y="356" width="34" height="34" rx="6" fill="#5b9bd5" fill-opacity=".75"/>
+<rect x="215" y="318" width="34" height="34" rx="6" fill="#5b9bd5" fill-opacity=".75"/>
+<rect x="215" y="280" width="34" height="34" rx="6" fill="#5b9bd5" fill-opacity=".75"/>
+<rect x="63" y="242" width="34" height="34" rx="6" fill="#6cc28a" fill-opacity=".75"/>
+<rect x="101" y="242" width="34" height="34" rx="6" fill="#6cc28a" fill-opacity=".75"/>
+<rect x="139" y="242" width="34" height="34" rx="6" fill="#6cc28a" fill-opacity=".75"/>
+<rect x="177" y="242" width="34" height="34" rx="6" fill="#6cc28a" fill-opacity=".75"/>
+<circle cx="232.0" cy="259.0" r="16.0" fill="#d6a94a" stroke="#f3eee2" stroke-width="2"/>
+<text x="232.0" y="263.0" font-size="9" fill="#2a1c05" text-anchor="middle" font-weight="bold" font-family="sans-serif" >HOME</text>
+<path d="M 270.0 69.0 L 422.0 69.0 L 422.0 449.0 L 42.0 449.0 L 42.0 69.0 L 232.0 69.0 L 232.0 236.2" fill="none" stroke="#1b1a17" stroke-width="3" stroke-dasharray="7 5" stroke-linejoin="round" opacity=".8"/>
+<path d="M 225.0 226.20000000000002 L 232.0 236.20000000000002 L 239.0 226.20000000000002" fill="none" stroke="#1b1a17" stroke-width="3"/>
+<path d="M -6 -7 L 6 0 L -6 7 Z" transform="translate(346.0 69.0) rotate(0)" fill="#1b1a17"/>
+<path d="M -6 -7 L 6 0 L -6 7 Z" transform="translate(422.0 259.0) rotate(90)" fill="#1b1a17"/>
+<path d="M -6 -7 L 6 0 L -6 7 Z" transform="translate(137 449.0) rotate(180)" fill="#1b1a17"/>
+<path d="M -6 -7 L 6 0 L -6 7 Z" transform="translate(42.0 164) rotate(270)" fill="#1b1a17"/>
+<rect x="20" y="480" width="18" height="18" rx="4" fill="#d6a94a"/><text x="29" y="494" font-size="12" fill="#000" text-anchor="middle" font-weight="normal" font-family="sans-serif" fill-opacity=".55">★</text>
+<text x="48" y="494" font-size="14" fill="#f3eee2" text-anchor="start" font-weight="normal" font-family="sans-serif" >Your start square: a 6 brings a token out here</text>
+<rect x="20" y="505" width="18" height="18" rx="4" fill="#5b9bd5"/><text x="29" y="519" font-size="12" fill="#000" text-anchor="middle" font-weight="normal" font-family="sans-serif" fill-opacity=".55">★</text>
+<text x="48" y="519" font-size="14" fill="#f3eee2" text-anchor="start" font-weight="normal" font-family="sans-serif" >★ squares are safe: nobody can be sent back there</text>
+<rect x="20" y="530" width="18" height="18" rx="4" fill="#d6a94a" fill-opacity=".75"/>
+<text x="48" y="544" font-size="14" fill="#f3eee2" text-anchor="start" font-weight="normal" font-family="sans-serif" >Your home column leads to HOME in the middle</text>
+<line x1="18" y1="564" x2="40" y2="564" stroke="#f3eee2" stroke-width="3" stroke-dasharray="6 4"/>
+<text x="48" y="569" font-size="14" fill="#f3eee2" text-anchor="start" font-weight="normal" font-family="sans-serif" >Dashed line: the route of the top player's tokens</text>
+<rect x="20" y="580" width="18" height="18" rx="4" fill="#d6a94a" fill-opacity=".18" stroke="#d6a94a" stroke-width="2"/>
+<text x="48" y="594" font-size="14" fill="#f3eee2" text-anchor="start" font-weight="normal" font-family="sans-serif" >Corner area: your base, where tokens wait</text>
+</svg>

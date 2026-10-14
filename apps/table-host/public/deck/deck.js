@@ -1,6 +1,7 @@
 // Deck UI: join with a name, lobby with Ready, and the game's own private deck view.
 // A game package may ship deck.js exporting mount(root, ctx) -> { update(view, events, info), destroy() }.
 import { esc, claimServiceWorkerPage, openTableSocket, seatName, seatTitle } from "/shared/board-kit.js";
+import { renderRules } from "/shared/markdown.js";
 
 const app = document.getElementById("app");
 const params = new URLSearchParams(location.search);
@@ -118,8 +119,69 @@ function renderTop() {
   const paused = state.phase === "paused" ? `<div class="banner">Game paused: the table lost its connection. It continues by itself when the connection is back.</div>` : "";
   top.innerHTML = `${paused}${banner ? `<div class="banner">${esc(banner)}</div>` : ""}
     <div class="who"><div><div class="eyebrow">${esc(state.tableName)}${inGame ? ` · ${esc(state.game?.name)}` : ""}</div><h1>${esc(p?.name ?? "")}</h1></div>
-      ${p?.seat == null ? "" : `<div class="badge" title="${esc(seatTitle(state.seatEdges, p.seat))}" aria-label="${esc(seatTitle(state.seatEdges, p.seat))}">${esc(seatBadge(state.seatEdges, p.seat))}</div>`}</div>
+      <div class="who-side">${state.game?.howToPlay ? `<button type="button" class="rules-btn" data-rules aria-haspopup="dialog">Rules</button>` : ""}
+      ${p?.seat == null ? "" : `<div class="badge" title="${esc(seatTitle(state.seatEdges, p.seat))}" aria-label="${esc(seatTitle(state.seatEdges, p.seat))}">${esc(seatBadge(state.seatEdges, p.seat))}</div>`}</div></div>
     ${inGame || p?.seat != null ? "" : `<div class="card muted">No seat yet. You'll get one when a seat opens.</div>`}`;
+}
+
+// ---------- game rules (D-099): the chosen game's how-to-play.md in a modal, with this table's settings on top ----------
+
+const rulesCache = new Map(); // url -> markdown
+let rulesOpen = null; // the open modal element
+
+top.addEventListener("click", (e) => {
+  if (e.target.closest("[data-rules]")) void openRules();
+});
+
+async function openRules() {
+  const g = state?.game;
+  if (!g?.howToPlay || rulesOpen) return;
+  const modal = document.createElement("div");
+  modal.className = "rules-modal";
+  modal.setAttribute("role", "dialog");
+  modal.setAttribute("aria-modal", "true");
+  modal.setAttribute("aria-label", `How to play ${g.name}`);
+  modal.innerHTML = `<div class="rules-sheet"><div class="rules-head"><div><div class="eyebrow">How to play</div><h2>${esc(g.name)}</h2></div>
+      <button type="button" class="rules-close" data-close aria-label="Close the rules">✕</button></div>
+    <div class="rules-body"><p class="muted">Loading…</p></div>
+    <button type="button" class="big" data-close>Close</button></div>`;
+  document.body.appendChild(modal);
+  document.body.classList.add("modal-open");
+  rulesOpen = modal;
+  const close = () => {
+    modal.remove();
+    document.body.classList.remove("modal-open");
+    document.removeEventListener("keydown", onKey);
+    rulesOpen = null;
+    top.querySelector("[data-rules]")?.focus();
+  };
+  const onKey = (e) => e.key === "Escape" && close();
+  document.addEventListener("keydown", onKey);
+  modal.addEventListener("click", (e) => {
+    if (e.target === modal || e.target.closest("[data-close]")) close();
+  });
+  modal.querySelector(".rules-close").focus();
+  const shown = (g.settingsShown ?? []).filter((s) => s.value !== undefined);
+  const settings = shown.length
+    ? `<div class="rules-settings"><div class="eyebrow">At this table</div><table>${shown
+        .map((s) => `<tr><td>${esc(s.label)}</td><td>${esc(typeof s.value === "boolean" ? (s.value ? "On" : "Off") : s.value)}</td></tr>`)
+        .join("")}</table></div>`
+    : "";
+  try {
+    let md = rulesCache.get(g.howToPlay);
+    if (md === undefined) {
+      const r = await fetch(g.howToPlay);
+      if (!r.ok) throw new Error(String(r.status));
+      md = await r.text();
+      rulesCache.set(g.howToPlay, md);
+    }
+    const base = g.howToPlay.replace(/[^/]*$/, ""); // "/games/<id>/": images come from the game's own assets/
+    const { title, html } = renderRules(md, base);
+    if (title) modal.querySelector(".rules-head h2").innerHTML = title;
+    modal.querySelector(".rules-body").innerHTML = settings + `<div class="md">${html}</div>`;
+  } catch {
+    modal.querySelector(".rules-body").innerHTML = settings + `<p class="muted">The rules could not be loaded. Try again in a moment.</p>`;
+  }
 }
 
 /** The seat as compass initials for the badge beside the name (D-093): "NE", "S". */

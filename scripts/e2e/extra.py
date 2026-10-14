@@ -171,6 +171,13 @@ try:
         rboard.locator(".dialog [data-x=yes]").click()
         wait(lambda: (t("GET", "/state").get("game") or {}).get("id") == "dice-duel", 10, "Dice Duel chosen")
         rdeck = remote.frame_locator("#deck")
+        # The game's rules on the remote phone (D-099): fetched, with its image, over the same WebRTC channel.
+        rdeck.locator("[data-rules]").click()
+        rdeck.locator(".rules-modal h2", has_text="Dice Duel").wait_for(timeout=15000)
+        rdeck.locator(".rules-modal .md img").wait_for(timeout=15000)
+        wait(lambda: rdeck.locator(".rules-modal .md img").evaluate("i => i.complete && i.naturalWidth > 0"), 15, "the rules image on the remote phone")
+        shot(remote, "remote-rules")
+        rdeck.locator(".rules-modal .rules-close").click()
         rdeck.locator("#ready").click()
         local.click("#ready")
         wait(lambda: all(p_["ready"] for p_ in t("GET", "/state")["players"] if p_["seat"] is not None), 10, "everyone ready")

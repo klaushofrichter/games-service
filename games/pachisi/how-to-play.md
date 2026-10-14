@@ -1,0 +1,68 @@
+# Pachisi
+
+Be the first to bring all your tokens around the board and into the home space in the middle. For 2 to 4 players.
+
+## What you see
+
+- **The board** shows the track, everyone's tokens, the die, whose turn it is and a log of the last moves. Tokens that can move bob up and down.
+- **Your phone** has the **Roll the die** button and a list of your tokens. Each token shows where it is and, after you roll, where it would go.
+
+![The Pachisi board](assets/board.svg)
+
+## The board
+
+- Each player owns one side of the board, the side where they sit. Your base is the corner area in your colour.
+- The **track** is the ring of 40 squares around the edge. Everyone moves clockwise.
+- Your **start square** is in your colour, just past the middle of your side.
+- The four **★ squares** are safe. They are the four start squares, including those of empty sides.
+- Your **home column** is the row of 4 squares in your colour that leads from the middle of your side to HOME.
+
+A token goes once around the track, from your start square to the square just before it. Then it turns into your home column and on to HOME.
+
+## How a turn works
+
+1. Tap **Roll the die** on your phone.
+2. If a token can move, tap **Move** next to the one you want.
+3. The token moves forward by the number you rolled.
+4. If you rolled a 6, you roll again. Otherwise the next player clockwise takes a turn.
+
+If none of your tokens can move, your turn simply ends, even after a 6.
+
+## Rules
+
+- **Leaving the base:** you need a 6 to move a token from your base onto your start square.
+- **Exact finish:** a token must land exactly on HOME. If the roll would take it past HOME, it cannot move.
+- **Three sixes:** if you roll a 6 three times in a row, your turn ends at once. Moves you already made with the first two sixes stay.
+- **Sending tokens back:** if your token lands on a track square with other players' tokens, all of them go back to their base. This does not give you an extra roll.
+- **Safe squares:** nobody can be sent back on a ★ square. Tokens of different players can share it.
+- Tokens in a home column are always safe.
+- Your own tokens can share a square.
+
+Who starts: the player with the bottom side of the board. If nobody has it, the first player clockwise from the top starts. Then play goes clockwise around the board.
+
+## Time limit
+
+With a time limit, a countdown runs on your turn. If it runs out, the table rolls for you. If you still do not choose, the table moves a token for you with a sensible choice. Each step gets its own countdown.
+
+## Settings
+
+| Setting | Default | What it does |
+|---|---|---|
+| Tokens per player | 4 | Tokens each player races (1–4) |
+| Seconds per move (0 = no limit) | 30 | Time for each roll and each move |
+
+AI players come in two levels: *beginner* (moves any token at random) and *average* (prefers finishing, leaving the base, sending others back and safe squares).
+
+Players can change their colours in the board's settings.
+
+## Players leaving
+
+If a player leaves, their tokens are removed from the board. If only one player is left, that player wins.
+
+## End of the game
+
+The game ends as soon as one player has every token at HOME. That player wins. There are no second places. The result screen shows how many tokens each player got home, and how many they sent back or lost.
+
+## Tips
+
+> A 6 is precious: use it to bring a new token out, or to escape when someone is close behind you. Parking on a ★ square keeps you safe.

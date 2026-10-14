@@ -17,7 +17,10 @@ import {
   type CloudStatus,
 } from "../../../packages/protocol/src/index.ts";
 import { createRng, type GameEvent, type Intent, type SeatInfo } from "../../../packages/sdk/src/index.ts";
-import { settingsWithDefaults, sourceMeta, type InstalledGame } from "./games.ts";
+import { HOW_TO_PLAY, settingsWithDefaults, sourceMeta, type InstalledGame } from "./games.ts";
+
+/** The URL a deck fetches a game's rules from (D-099), or null. */
+const howToPlayUrl = (g: InstalledGame) => (g.howToPlay ? `/games/${g.manifest.id}/${HOW_TO_PLAY}` : null);
 import { GameRuntime, realClock } from "./runtime.ts";
 import type { LogStore } from "./logs.ts";
 
@@ -127,6 +130,8 @@ export class Table extends EventEmitter {
             players: allowedPlayerCounts(this.selected.game.manifest),
             needs: this.needsFor(this.selected.game.manifest),
             prefs: this.prefs.get(this.selected.game.manifest.id) ?? {},
+            howToPlay: howToPlayUrl(this.selected.game),
+            settingsShown: this.selected.game.manifest.settings.map((s) => ({ label: s.label ?? s.key, value: this.selected!.settings[s.key] })),
           }
         : null,
       layouts: this.allowedLayouts(),
@@ -542,7 +547,8 @@ export class Table extends EventEmitter {
   }
 
   availability(): GameAvailability[] {
-    return this.visibleGames().map(({ manifest: m, source }) => {
+    return this.visibleGames().map((g) => {
+      const { manifest: m, source } = g;
       const reasons = this.blockersFor(m);
       return {
         id: m.id,
@@ -558,6 +564,7 @@ export class Table extends EventEmitter {
         players: allowedPlayerCounts(m),
         settings: m.settings,
         aiOptions: m.ai.options,
+        howToPlay: howToPlayUrl(g),
         ...(source ? { extra: true } : {}),
       };
     });
