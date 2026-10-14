@@ -3,7 +3,7 @@
   "name": "Coin Flip",
   "version": "0.2.0",
   "sdk": "^0.1",
-  "description": "Everyone guesses heads or tails, then the coin flips. A stub game for platform tests.",
+  "description": "Everyone guesses heads or tails, then the coin flips. Most correct guesses wins.",
   "players": {
     "min": 1,
     "max": 8

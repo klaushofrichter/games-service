@@ -6,6 +6,8 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 COPY packages ./packages
 COPY apps/cloud ./apps/cloud
+# The extra-game repositories every start lists (D-098).
+COPY deploy/game-repos.json ./deploy/game-repos.json
 # Calendar version (YYYY.MM.DD.N), stamped by the deploy workflow; any other build reports "dev".
 ARG APP_VERSION=dev
 ENV APP_VERSION=$APP_VERSION

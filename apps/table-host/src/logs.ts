@@ -14,6 +14,8 @@ export interface RunMeta {
   endedAt: string;
   games: number;
   format: "gametable-log/1";
+  /** Extra games only (D-097): "owner/name@ref commit (bundle <hash>)", so a log names the exact code it ran. */
+  gameSource?: string;
 }
 
 export class LogStore {

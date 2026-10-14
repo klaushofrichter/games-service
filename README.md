@@ -7,13 +7,12 @@
 <!-- Static assertion: GitHub publishes no endpoint for alert status. -->
 [![Dependabot](https://img.shields.io/badge/dependabot-enabled-025E8C?logo=dependabot&logoColor=white)](https://github.com/klaushofrichter/games-service/security/dependabot)
 
-<!-- The repo is private, so these badges render blank: they are fetched anonymously and no token can help.
-     They start working if the repo ever goes public. Versions live on the release badge and the releases page,
-     never in this text. -->
+<!-- The repo is public since 13 Oct 2026 (D-096), so these badges render. Versions live on the release badge and the
+     releases page, never in this text. -->
 
 Game Table platform: a touchscreen **board** lying flat on a table, players' phones as private **decks**, a Linux **Table Host** that runs the games, and a **cloud service** at `games.skylar.technology` that enrolls tables, collects metrics and logs, and (from phase 1c) brokers remote players.
 
-This repository implements phases 1a, 1b and 1c of the *Game Table — Concept & Architecture* document: lobby, seats, game selection, the game runtime with replayable logs, AI-only simulation, the board control API, pause on a lost service connection, the admin portal, a table PC kit, **remote play** over WebRTC, automated tests, and three playable games with their own board and phone UIs: **Roulette**, **Pachisi** and **Hold'em**. Decisions are recorded in [`docs/decisions.md`](docs/decisions.md).
+This repository implements phases 1a, 1b and 1c of the *Game Table — Concept & Architecture* document: lobby, seats, game selection, the game runtime with replayable logs, AI-only simulation, the board control API, pause on a lost service connection, the admin portal, a table PC kit, **remote play** over WebRTC, automated tests, and four playable games with their own board and phone UIs and rules for players: **Roulette**, **Pachisi**, **Hold'em** and **Coin Flip**. More games can come from other repositories, private ones included (*Extra-game repositories* below). Decisions are recorded in [`docs/decisions.md`](docs/decisions.md).
 
 ## Quick start
 
@@ -27,10 +26,10 @@ TABLE_KEY=dev npm run host
 
 Open `http://localhost:8080/board/` on the table PC (full screen, 1920 × 1080 or 4K). Phones on the same WiFi scan the QR code, or type the URL shown under it.
 
-With Docker: `docker compose -f deploy/docker-compose.yml up --build` starts a cloud service and a table host. The table shows a 6-character pairing code; approve it in the admin portal at `http://localhost:8081/admin` (in local development it asks for `ADMIN_TOKEN`), or with
+With Docker: `docker compose -f deploy/docker-compose.yml up --build` starts a cloud service and a table host. The table shows a 6-character pairing code; approve it in the admin portal at `http://localhost:8081/admin` (in local development it asks for `ADMIN_TOKEN`: `change-me-dev-admin-token` unless you set your own), or with
 
 ```sh
-curl -X POST -H "Authorization: Bearer $ADMIN_TOKEN" http://localhost:8081/admin/api/tables/pair/<CODE>
+curl -X POST -H "Authorization: Bearer ${ADMIN_TOKEN:-change-me-dev-admin-token}" http://localhost:8081/admin/api/tables/pair/<CODE>
 ```
 
 ## A table on a Mac (development)
@@ -42,20 +41,22 @@ curl -X POST -H "Authorization: Bearer $ADMIN_TOKEN" http://localhost:8081/admin
 | Path | What it is |
 | --- | --- |
 | `packages/protocol` | Message envelope, manifest schema (zod), seat layouts and edges, lobby types |
-| `packages/sdk` | `defineGame`, seeded RNG, the `GameContext` games receive |
+| `packages/sdk` | `defineGame`, seeded RNG, the `GameContext` games receive, `count()` and `list()` for end-of-game texts, cards (`cards.ts`) |
 | `apps/table-host/src` | HTTP + WebSocket server, lobby (`table.ts`), game runtime and replay (`runtime.ts`), logs, simulation, cloud link, remote-play gateway (`remote.ts`, WebRTC) |
-| `apps/table-host/public` | Board and deck pages (plain HTML/CSS/JS) |
+| `apps/table-host/public` | Board and deck pages (plain HTML/CSS/JS); `shared/` has the board kit and the rules renderer (`markdown.js`) |
 | `apps/cloud/src` | Cloud service: pairing, heartbeat, metrics, log upload/download, download tokens, invites and WebRTC signaling |
 | `apps/cloud/public` | Admin portal (`/admin`) and the remote player's invite page (`/i/CODE`) with its service worker |
 | `games/roulette` | European roulette, 1–6 players, simultaneous betting, three AI styles |
 | `games/pachisi` | Ludo-style race with dice and captures, 2–4 players, two AI levels |
-| `games/holdem` | Fixed-limit Texas Hold'em, 2–6 players, private hole cards, side pots, two AI styles |
-| `games/coin-flip` | Stub game: 1–8 players, simultaneous, AI, dynamic players, timers |
-| `games/quartet` | Stub game: exactly 4 humans, no AI, sequential turns, ends if a player leaves |
-| `scripts/e2e/` | Browser end-to-end checks (Playwright): `run-all.sh` runs them all, `play.py` per game, `layout.py`, `admin.py` for the portal and sign-in, `remote.py` for remote play; shared helpers in `common.py` |
+| `games/holdem` | Fixed-limit Texas Hold'em, 2–8 players, private hole cards, side pots, two AI styles |
+| `games/coin-flip` | Guess heads or tails, 1–8 players, simultaneous, AI, players can join mid-game, optional time limit, per-player statistics |
+| `games/quartet` | Test game (hidden unless `SHOW_TEST_GAMES=1`): exactly 4 humans, no AI, sequential turns, ends if a player leaves |
+| `apps/cloud/src/game-repos.ts`, `apps/table-host/src/extra-games.ts`, `packages/protocol/src/bundle.ts` | Extra-game repositories: fetching and packing on the service, installing on tables, the bundle format |
+| `scripts/e2e/` | Browser end-to-end checks (Playwright): `run-all.sh` runs them all, `play.py` per game, `layout.py`, `admin.py` for the portal and sign-in, `remote.py` for remote play, `extra.py` for extra-game repositories; shared helpers in `common.py` |
 | `scripts/sync-secrets.sh` | Puts the values from your local `.env` into GitHub and the cluster, without printing them |
 | `scripts/release-notes.sh`, `release.sh` | The release step of the deploy |
 | `scripts/soak.ts` | AI-only soak run over every game and player count |
+| `scripts/mac-table.sh` | A Table Host on a Mac against the live service (see above) |
 | `docs/` | Decision log; the request to the kube-setup session for the cluster side |
 | `tests/` | Vitest suites that drive a real host through the board control API and fake decks |
 | `deploy/` | Dockerfiles, docker-compose, the table PC kit |
@@ -75,8 +76,8 @@ curl -X POST -H "Authorization: Bearer $ADMIN_TOKEN" http://localhost:8081/admin
 | `AI_DELAY_MS` | 800 | Pause before an AI player acts |
 | `MAX_REMOTE_PLAYERS` | 4 | Remote seat limit (phase 1c) |
 | `ALLOW_REMOTE_BOARD` | 0 | Serve the board to non-loopback clients (development only) |
-| `SHOW_TEST_GAMES` | 0 | `1` lists the stub games (`coin-flip`, `quartet`) in the game menu; the tests and `run-all.sh` turn it on |
-| `DATA_DIR`, `GAMES_DIR` | `./data`, `./games` | Logs and table identity; installed games |
+| `SHOW_TEST_GAMES` | 0 | `1` lists the test game (`quartet`) in the game menu; the tests and `run-all.sh` turn it on |
+| `DATA_DIR`, `GAMES_DIR` | `<repo>/data`, `<repo>/games` | Logs, saves, the table's identity (`table.json`) and extra-game bundles (`extra-games/`); the built-in games |
 
 ## Board control API
 
@@ -94,13 +95,15 @@ curl -s -H "$K" -X POST $H/simulation -d '{"gameId":"coin-flip","players":4,"gam
 curl -s -H "$K" $H/logs/<id>.zip -o run.zip                # JSONL game logs
 ```
 
-Full list: `GET /state, /join, /games, /metrics, /game/board, /logs, /logs/{id}.zip` and `POST /layout, /face, /rotate, /seats/move, /ai, /game/select, /game/settings, /game/prefs, /display, /game/start, /game/end, /game/close, /game/resume, /game/save, /simulation, /players/{id}/ai-options, /invites, /remote`, `GET /saves, /qr?text=URL`, `DELETE /players/{id}`.
+Full list: `GET /state, /join, /games, /metrics, /game/board, /logs, /logs/{id}.zip` and `POST /join/new, /layout, /face, /rotate, /seats/move, /ai, /game/select, /game/settings, /game/prefs, /display, /game/start, /game/end, /game/close, /game/resume, /game/save, /simulation, /players/{id}/ai-options, /invites, /remote`, `GET /saves, /qr?text=URL`, `DELETE /players/{id}`.
 
-Decks speak JSON envelopes over `/ws`: `system.hello {joinToken, name}` or `{sessionToken}`, then `lobby.ready {ready}` and `game.intent {name, payload}`. The host answers with `lobby.state`, `game.view` (this seat only) and `system.ack | reject | error`.
+Remote players reach a subset over WebRTC (D-057): reads, except the join code, logs, saves, simulations, invites, the remote settings and QR codes; changes only `/layout` and `/game/select|start|end|close`.
+
+Decks speak JSON envelopes over `/ws`: `system.hello {joinToken, name}` or `{sessionToken}` (remote decks: `{name}`), then `lobby.ready {ready}` and `game.intent {name, payload}`. The host answers with `system.welcome {playerId, sessionToken}`, `lobby.state`, `game.view {seat, view, events, over, timers, now}` (this seat only), `system.ack | reject {reason} | error {message}`, and `system.removed {reason}` when the player is removed. The board says `system.hello {role: "board", key}` and gets `game.board` instead of `game.view`.
 
 ## Writing a game
 
-A game is a folder with `manifest.json` (validated by `packages/protocol`), `rules.ts`, and optionally its own UI: `board.js`, `deck.js`, CSS files and an `assets/` folder. The host serves the UI files to boards and decks but never the rules. `rules.ts`:
+A game is a folder with `manifest.json` (validated by `packages/protocol`; the folder name is the game's id), `rules.ts`, and optionally its own UI: `board.js`, `deck.js`, `board.css`, `deck.css`, `how-to-play.md` (rules for players, below) and an `assets/` folder. The host serves exactly those files to boards and decks, never `rules.ts` or the manifest. `rules.ts`:
 
 ```ts
 import { defineGame } from "../../packages/sdk/src/index.ts";
@@ -114,11 +117,33 @@ export default defineGame<State>({
 });
 ```
 
-The UI modules export `mount(root, ctx)` returning `{ update(view, events, info), destroy() }`. `info` carries the players, seat positions, the front edge and rotation, settings, and host timer deadlines for countdowns; the deck's `ctx.send(name, payload)` submits an intent and resolves with `{ ok, reason }`. `/shared/board-kit.js` has helpers for seat plates, rotation and countdowns, and `packages/sdk/src/cards.ts` has a deck, seeded shuffle and poker hand evaluation.
+The UI modules export `mount(root, ctx)` returning `{ update(view, events, info), destroy() }`. `info` carries the players, seat positions, the front edge and rotation, settings, and host timer deadlines for countdowns; the deck's `ctx.send(name, payload)` submits an intent and resolves with `{ ok, reason }`. `/shared/board-kit.js` has helpers for seat plates, rotation and countdowns, and `packages/sdk/src/cards.ts` has a deck, seeded shuffle and poker hand evaluation. The SDK also has `count(n, singular, plural?)` ("one die", "three dice") and `list(names)` ("Ann, Bob and Cleo") for natural end-of-game texts.
+
+**Rules for players (D-099).** A game provides its rules as `how-to-play.md` in its folder. Every phone then has a **Rules** button while the game is chosen or running, which opens the rules in a modal, with the settings chosen at this table on top (label and value, from the manifest). Images and diagrams go in the game's `assets/` folder and appear with `![alt text](assets/board.svg)`; SVG, PNG, JPEG, WebP and GIF work. The renderer (`/shared/markdown.js`) takes a small, safe subset of Markdown: `#` title, `##`/`###` headings, paragraphs, `-` and `1.` lists (one level), `**bold**`, `*italic*`, `` `code` ``, `> tip`, `---`, simple tables, `https` links and those images; everything else shows as plain text. The lobby state carries `game.howToPlay` (the URL, or `null`) and `game.settingsShown`; `GET /games` lists `howToPlay` per game. Start with the one-sentence goal and an `## In short` section of two to five bullets (the tests require it), then the details. Write for a phone about 360 px wide: short tables, illustrations around 360–720 px wide. Assets and rules are served with a content security policy that keeps an SVG from running script.
 
 **Board settings.** The board's gear button opens a settings modal: Fullscreen for every game, then anything the chosen game adds. A game adds items by exporting `settings({ info, setPrefs })` from its `board.js`, which returns a list of `{ type: "toggle" | "choice" | "swatches" | "button", label, value, options, onChange }`. `setPrefs(patch)` stores display choices for that game on the table (`POST /game/prefs`, at most 20 keys and 4 KB, `null` removes a key). Board and decks get them as `info.prefs`, and they last until the host restarts. They are display choices only: not part of the rules, the log or replay. Pachisi uses this for player colours, and `playerColor(info, seat)` in the board kit applies them. Remote boards have no settings. The modal also lists the chosen game's manifest settings: changeable with − / + until the game starts (`POST /game/settings`), read-only while it runs; a setting may give a `step`. A game's `isOver()` summary may include `table: { columns, rows }`, which the result screen and the phones show; when a game ends by itself the board keeps its final screen until someone taps *Show result*. Sound effects go through `playSound(info, name, make)` from the board kit, which respects the table's sound setting (`info.sound`).
 
 Rules must be deterministic: all randomness through `ctx.random()`. The host logs the seed and every input (intents, timer firings, seat changes), so `replay()` rebuilds any game exactly; the tests check this for live games and simulations.
+
+## Extra-game repositories
+
+Games can also come from other GitHub repositories, private ones included (D-097), for private games and early
+releases. The first is [`klaushofrichter/extra-games`](https://github.com/klaushofrichter/extra-games) (private).
+
+- **The list:** [`deploy/game-repos.json`](deploy/game-repos.json) is baked into the cloud image, so these
+  repositories are back after every restart (D-098); change it by PR. In the console they are marked *deploy config*.
+- **Console, *Game repositories*:** you can also add `owner/name` and a branch there, until the next restart. The service
+  fetches each repository's `games/` folder as one bundle and lists its games; *Refresh* fetches again (it also does
+  every hour). A private repository needs `GAME_REPO_TOKEN`, a fine-grained token with Contents: read on it.
+- **Per table:** tick a repository when approving the table's pairing code, or later on its row. The table installs the
+  games within 15 seconds, between games, and its board marks them *extra*. Remote players see them too: their board
+  comes from the table.
+- **A game repository** has a `games/` folder like this one, and its rules import the SDK by name:
+  `import { defineGame } from "@game-table/sdk"` (the host maps the name to its own SDK). See the extra-games README for
+  how it tests against this repository.
+
+Ticking a repository trusts its code on that table PC (rules run in-process, D-035). The ticks are in memory, like
+pairings; they move to the persistent store (a PVC) with the rest of the service's state.
 
 ## Remote play
 
@@ -145,11 +170,15 @@ In the cluster these come from the `games-oauth` Secret (created by `scripts/syn
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | The service's own OAuth client, in Google Cloud project `skylar-technology` |
 | `GOOGLE_REDIRECT_URI` | Exactly `PUBLIC_URL/auth/google/callback`; the service refuses to start otherwise |
 | `ALLOWED_EMAILS` | Comma-separated admin allow-list, checked at sign-in and on every request |
-| `COOKIE_SECRET` | Signs the session cookie (`openssl rand -hex 32`). Replace it and restart to end every session |
-| `ADMIN_TOKEN` | Optional bearer token for scripts (`Authorization: Bearer …`); in local development it is the portal sign-in |
+| `COOKIE_SECRET` | Signs the session cookie (`openssl rand -hex 32`, at least 32 characters). Replace it and restart to end every session |
+| `ADMIN_TOKEN` | Optional bearer token for scripts (`Authorization: Bearer …`, at least 16 characters); in local development it is the portal sign-in |
 | `TRUST_PROXY` | `1` = trust `X-Forwarded-For` from loopback and the k3s pod/service networks, or a CIDR list |
+| `PORT` | HTTP port (default 8081) |
+| `MAX_REPLICAS` | Must be `1` (set by the cluster manifest); the service warns at start otherwise, since its state is in one process |
 | `LOG_RETENTION_DAYS`, `ICE_SERVERS` | Log retention (default 90); STUN/TURN for remote play |
-| `APP_VERSION` | Stamped into the image by the deploy (`YYYY.MM.DD.N`); `/health` (`{status, version}`, on the Table Host also `protocol`) reports it, `dev` otherwise |
+| `GAME_REPO_TOKEN` | Read token for private extra-game repositories (D-097) |
+| `GAME_REPOS_FILE`, `GAME_REPOS` | The deploy-time repository list (default `deploy/game-repos.json`; `none` turns it off), and more repositories (`owner/name@ref`, comma-separated) for local development (D-098) |
+| `APP_VERSION` | Stamped into the image by the deploy (`YYYY.MM.DD.N`); `/health` (`{status, version}`, on the Table Host also `protocol`) reports it; `main` for main builds, `dev` when unset |
 
 ## Branches, CI and deployment
 
@@ -170,14 +199,15 @@ feature branch → PR → main → (PR) → production → deploy
 ## Testing
 
 ```sh
-npm test                                   # rules, fuzzing, lobby, concurrency, API limits, platform, pause, cloud, sign-in, remote play (Vitest)
+npm test                                   # rules, fuzzing, lobby, concurrency, API limits, platform, pause, cloud, sign-in, remote play, extra-game repositories, rules for players, seat names, SDK texts (Vitest)
 npm run typecheck                          # tsconfig.check.json: apps, packages, games, tests, scripts
 node scripts/soak.ts 100                   # 100 AI-only games per game and player count
-scripts/e2e/run-all.sh out/                # every browser check, as CI runs them (pip install -r scripts/e2e/requirements.txt)
+scripts/e2e/run-all.sh out/                # every browser check, as CI runs them (pip install -r scripts/e2e/requirements.txt && python -m playwright install chromium)
 # single checks; play.py and layout.py need a running host on port 8090 with TABLE_KEY=devkey
-python3 scripts/e2e/play.py roulette out/  # also: pachisi, holdem, coinflip, dialogs
+python3 scripts/e2e/play.py roulette out/  # also: pachisi, holdem, coinflip, endings, dialogs, rules (every game's rules on a 320 px phone)
 python3 scripts/e2e/admin.py out/          # admin portal, sign-in and logout (starts its own cloud and host)
 python3 scripts/e2e/remote.py out/         # remote play in a second browser (starts its own cloud and host)
+python3 scripts/e2e/extra.py out/          # extra-game repositories: console, table, remote player (starts its own fake GitHub, cloud and host)
 python3 scripts/e2e/layout.py out/         # decks at 4 phone sizes x 3 games, the board at 5 screen sizes
 ```
 
@@ -186,5 +216,6 @@ python3 scripts/e2e/layout.py out/         # decks at 4 phone sizes x 3 games, t
 - Game rules run in-process; the isolated sandbox for third-party games comes later.
 - The cloud keeps its state in memory: one replica, and a restart (every deploy) forgets paired tables, invites and uploaded logs. A persistent store comes next.
 - Tables authenticate to the cloud with an issued bearer token, not yet a key pair or certificate.
+- The per-table extra-game ticks and console-added repositories are in memory too; the deploy-time list (`deploy/game-repos.json`) is back after every restart.
 - Host-side AI configuration (`ai.hostConfig`, e.g. API keys) is parsed but has no screen yet.
 - werift waits up to 5 s for STUN during connection setup when STUN is unreachable.

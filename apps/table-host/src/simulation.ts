@@ -1,7 +1,7 @@
 // Headless AI-only simulation: runs games with virtual time and packages one log zip per run.
 import { createRng, type SeatInfo } from "../../../packages/sdk/src/index.ts";
 import { allowedPlayerCounts, seatEdges, type SeatLayout } from "../../../packages/protocol/src/index.ts";
-import { settingsWithDefaults, type InstalledGame } from "./games.ts";
+import { settingsWithDefaults, sourceMeta, type InstalledGame } from "./games.ts";
 import { GameRuntime, VirtualClock, type LogRecord } from "./runtime.ts";
 import { aiDefaults, logId, TableError } from "./table.ts";
 import type { LogStore } from "./logs.ts";
@@ -90,6 +90,6 @@ export async function runSimulation(game: InstalledGame, req: SimulationRequest,
   }
 
   const id = logId(`${m.id}-sim`);
-  await logs.save({ id, tableName, gameId: m.id, gameVersion: m.version, simulation: true, startedAt, endedAt: new Date().toISOString(), games, format: "gametable-log/1" }, logsOut);
+  await logs.save({ id, tableName, gameId: m.id, gameVersion: m.version, simulation: true, startedAt, endedAt: new Date().toISOString(), games, format: "gametable-log/1", ...sourceMeta(game) }, logsOut);
   return { logId: id, games: results };
 }

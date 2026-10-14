@@ -7,6 +7,14 @@ import WebSocket from "ws";
 import type { Table } from "./table.ts";
 import type { LogStore } from "./logs.ts";
 import type { RemoteGateway } from "./remote.ts";
+import type { BundleRef, ExtraGames } from "./extra-games.ts";
+
+/** What the service sends with every approved hello and heartbeat. */
+interface TableConfigMsg {
+  logRetentionDays: number;
+  /** Extra-game bundles this table gets (D-097); absent from services older than that. */
+  gameBundles?: BundleRef[];
+}
 
 export interface CloudLinkOptions {
   cloudUrl: string;
@@ -55,6 +63,18 @@ export class CloudLink {
   // ----- signaling socket for remote play (opened once the table is approved) -----
 
   gateway: RemoteGateway | null = null;
+  /** Installs extra games (D-097); set by host.ts. */
+  extras: ExtraGames | null = null;
+
+  /** Download one extra-game bundle over the table's own authenticated link. */
+  async downloadBundle(hash: string): Promise<Buffer> {
+    const r = await fetch(`${this.o.cloudUrl}/api/tables/bundles/${hash}`, {
+      headers: { authorization: `Bearer ${this.identity.tableToken}` },
+      signal: AbortSignal.timeout(120_000),
+    });
+    if (!r.ok) throw new Error(`the service refused bundle ${hash.slice(0, 12)} (${r.status})`);
+    return Buffer.from(await r.arrayBuffer());
+  }
   private socket: WebSocket | null = null;
   private socketRetry: NodeJS.Timeout | null = null;
 
@@ -122,7 +142,7 @@ export class CloudLink {
     try {
       if (!this.identity.tableToken) {
         const r = await this.req("POST", "/api/tables/hello", { tableId: this.identity.tableId, name: this.table.config.tableName });
-        const b = (await r.json()) as { status: string; pairingCode?: string; tableToken?: string; config?: { logRetentionDays: number } };
+        const b = (await r.json()) as { status: string; pairingCode?: string; tableToken?: string; config?: TableConfigMsg };
         if (b.status === "pending") {
           this.table.setCloud({ status: "pending", pairingCode: b.pairingCode });
           return this.schedule(this.o.pollMs ?? 5000);
@@ -139,13 +159,15 @@ export class CloudLink {
       }
       const r = await this.req("POST", "/api/tables/heartbeat", { metrics: this.table.metrics, phase: this.table.phase });
       if (r.status === 401) {
-        // Revoked by an admin: forget the token and go back to pairing.
+        // Revoked by an admin: forget the token and go back to pairing. Extra games go too: they were given to this
+        // table while it was approved, and come back with the admin's ticks when it is approved again (D-097).
         this.identity.tableToken = null;
+        void this.extras?.sync([]);
         await this.save();
         this.table.setCloud({ status: "revoked" });
         return this.schedule(this.o.pollMs ?? 5000);
       }
-      const b = (await r.json()) as { config?: { logRetentionDays: number } };
+      const b = (await r.json()) as { config?: TableConfigMsg };
       if (b.config) this.applyConfig(b.config);
       this.table.setCloud({ status: "online" });
       this.openSocket();
@@ -155,7 +177,9 @@ export class CloudLink {
     this.schedule(this.o.heartbeatMs ?? 15_000);
   }
 
-  private applyConfig(c: { logRetentionDays: number }) {
+  private applyConfig(c: TableConfigMsg) {
+    // Old services send no gameBundles: leave whatever is installed alone.
+    if (Array.isArray(c.gameBundles)) void this.extras?.sync(c.gameBundles);
     if (!Number.isInteger(c.logRetentionDays) || c.logRetentionDays === this.logs.retentionDays) return;
     const shorter = c.logRetentionDays < this.logs.retentionDays;
     this.logs.retentionDays = c.logRetentionDays;
