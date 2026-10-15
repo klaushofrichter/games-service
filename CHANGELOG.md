@@ -24,3 +24,4 @@ page is the history. Leave it empty if there is nothing to add beyond the commit
   own board. Games can allow such board moves with `boardIntents` in their manifest.
 - An AI player's window has a **Remove** button, and opens before a game is chosen too.
 - The phones' *At the table* list shows each player's colour before their name.
+- Scrollbars in the console (e.g. Game logs), the invite page and the sign-in pages use the green felt colours instead of white.

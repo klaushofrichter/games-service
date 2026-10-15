@@ -12,6 +12,9 @@
   html, body { margin: 0; height: 100%; background: var(--felt-deep); color: var(--ink); font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
   [hidden] { display: none !important; }
   html { color-scheme: dark; scrollbar-color: #2f6457 var(--felt-deep); }
+  ::-webkit-scrollbar { width: 10px; height: 10px; background: var(--felt-deep); }
+  ::-webkit-scrollbar-thumb { background: #2f6457; border-radius: 6px; border: 2px solid var(--felt-deep); }
+  ::-webkit-scrollbar-corner { background: var(--felt-deep); }
   .center { min-height: 100%; display: grid; place-items: center; padding: 24px 16px; }
   .card { width: 100%; max-width: 420px; background: var(--felt); border: 1px solid var(--line); border-radius: 16px; padding: 28px; }
   .eyebrow { text-transform: uppercase; letter-spacing: .16em; font-size: .75em; color: var(--brass); }
