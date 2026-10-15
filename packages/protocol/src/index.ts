@@ -207,6 +207,18 @@ export interface LobbyState {
 export interface CloudStatus {
   status: "disabled" | "pending" | "online" | "offline" | "revoked";
   pairingCode?: string;
+  /**
+   * The table's pre-approved access code (D-113), if it has one: never the code, only its first two characters, where
+   * it came from (TABLE_CODE/--code at start, or typed on the board) and what the service said about it ("waiting"
+   * until it has answered).
+   */
+  code?: AccessCodeStatus | null;
+}
+
+export interface AccessCodeStatus {
+  hint: string;
+  source: "start" | "board";
+  status: "waiting" | "accepted" | "unknown" | "expired" | "revoked" | "in-use";
 }
 
 export interface GameAvailability {

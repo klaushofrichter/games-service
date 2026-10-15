@@ -24,6 +24,8 @@ export interface HostOptions extends Partial<TableConfig> {
   cloudUrl?: string;
   cloudPollMs?: number;
   cloudHeartbeatMs?: number;
+  /** A pre-approved access code (TABLE_CODE or --code, D-113); it wins over one typed on the board. */
+  accessCode?: string;
 }
 
 export function lanAddress(): string {
@@ -48,6 +50,7 @@ export async function startHost(o: HostOptions = {}) {
     requireCloud: o.requireCloud ?? false,
     maxRemotePlayers: o.maxRemotePlayers ?? 4,
     showTestGames: o.showTestGames ?? true,
+    logSnapshotEvery: o.logSnapshotEvery ?? 0,
   };
   const table = new Table(config, games, logs);
   const server = await startServer(table, logs, {
@@ -57,6 +60,7 @@ export async function startHost(o: HostOptions = {}) {
     publicDir: resolve(join(here, "../public")),
     allowRemoteBoard: o.allowRemoteBoard ?? false,
     createInvite: o.cloudUrl ? () => cloud!.createInvite() : undefined,
+    setAccessCode: o.cloudUrl ? (code) => cloud!.setAccessCode(code) : undefined,
   });
   const gateway = new RemoteGateway(server.handler, server.attachSocket);
   if (!config.publicUrl) config.publicUrl = `http://${lanAddress()}:${server.port}`;
@@ -66,14 +70,16 @@ export async function startHost(o: HostOptions = {}) {
   pruneTimer.unref();
   let cloud: CloudLink | null = null;
   if (o.cloudUrl) {
-    cloud = new CloudLink(table, logs, { cloudUrl: o.cloudUrl.replace(/\/$/, ""), dataDir, pollMs: o.cloudPollMs, heartbeatMs: o.cloudHeartbeatMs });
+    cloud = new CloudLink(table, logs, { cloudUrl: o.cloudUrl.replace(/\/$/, ""), dataDir, pollMs: o.cloudPollMs, heartbeatMs: o.cloudHeartbeatMs, accessCode: o.accessCode || undefined });
     cloud.gateway = gateway;
     // Extra games come only through the service (D-016, D-097): without CLOUD_URL a table has its built-in games.
     const link = cloud;
     cloud.extras = new ExtraGames(table, dataDir, (hash) => link.downloadBundle(hash));
     await cloud.extras.restore();
-    await cloud.start();
   }
+  // Games the table stopped in the middle of last time (D-116): after the extra games are back, so they can be replayed.
+  await table.recoverInterrupted();
+  await cloud?.start();
   const close = async () => {
     clearInterval(pruneTimer);
     cloud?.stop();

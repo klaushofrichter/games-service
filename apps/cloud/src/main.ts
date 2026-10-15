@@ -41,11 +41,14 @@ if (present.length) {
   fail("Local development needs ADMIN_TOKEN (at least 16 characters) when Google sign-in is not configured");
 }
 
-// State lives in this one process (D-036): a second replica would not see the first one's tables. The replica count is
-// in kube-setup's manifest, far from this code, so the manifest passes it in and we warn loudly when it is wrong.
+// One process owns the state database and the tables' sockets (D-071, D-114): a second replica would neither see the
+// first one's sockets nor safely share its SQLite file. The replica count is in kube-setup's manifest, far from this
+// code, so the manifest passes it in and we warn loudly when it is wrong.
 if (env.MAX_REPLICAS !== "1") {
-  console.warn(`[cloud] WARNING: MAX_REPLICAS is ${env.MAX_REPLICAS ?? "unset"}; this service must run as exactly one replica until its state moves to a shared store`);
+  console.warn(`[cloud] WARNING: MAX_REPLICAS is ${env.MAX_REPLICAS ?? "unset"}; this service must run as exactly one replica`);
 }
+// DATA_DIR keeps the state across restarts (D-114): the PVC games-cloud-data at /data in the cluster. Unset = memory only.
+if (!env.DATA_DIR) console.warn("[cloud] DATA_DIR is not set: pairings, access codes and logs are kept in memory and lost at restart");
 
 /** "1" = loopback and the k3s pod/service networks; otherwise a comma-separated list of literal CIDRs. */
 function parseTrustProxy(v: string | undefined): boolean | string[] {
@@ -82,6 +85,8 @@ if (repoFile !== "none") {
   }
 }
 
+for (const k of ["LOG_STORAGE_MB", "DATA_LIMIT_MB"] as const) if (env[k] && !(Number(env[k]) >= 1)) fail(`${k} must be a number of megabytes, at least 1 (it is ${env[k]})`);
+
 const cloud = await startCloud({
   port: Number(env.PORT ?? 8081),
   adminToken,
@@ -97,6 +102,11 @@ const cloud = await startCloud({
   gameRepoToken: env.GAME_REPO_TOKEN || undefined,
   // GitHub's REST API; only the browser checks change it (scripts/e2e/extra.py serves a fake GitHub).
   githubApiUrl: env.GAME_REPO_API_URL || undefined,
+  dataDir: env.DATA_DIR || undefined,
+  // Cap on stored game logs, in MB (default 256); the volume's free space limits them too (D-114).
+  maxLogBytes: env.LOG_STORAGE_MB ? Number(env.LOG_STORAGE_MB) * 1024 * 1024 : undefined,
+  // The service's whole budget in DATA_DIR, in MB (default 1024, the PVC's size): a local-path PVC has no quota itself.
+  dataLimitBytes: env.DATA_LIMIT_MB ? Number(env.DATA_LIMIT_MB) * 1024 * 1024 : undefined,
 });
 console.log(`[cloud] ${env.APP_VERSION || "dev"} listening on ${cloud.port}; admin sign-in: ${google ? `Google (${google.allowedEmails.length} allowed)` : "ADMIN_TOKEN only (development)"}`);
 for (const sig of ["SIGINT", "SIGTERM"] as const) process.on(sig, async () => (await cloud.close(), process.exit(0)));
