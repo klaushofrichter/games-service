@@ -341,6 +341,109 @@ describe("tables get the games of their repositories", () => {
   });
 });
 
+// Several independent repositories at once, as in production: extra-games and loopy-game, both private, read with the
+// one GAME_REPO_TOKEN (a fine-grained token that covers both), each ticked for some tables and not others.
+describe("several independent repositories", () => {
+  const LOOPY = "klaushofrichter/loopy-game@main";
+  /** Bundle folders a table has unpacked: <dataDir>/extra-games/<hash>. */
+  const bundleDirs = async (t: Awaited<ReturnType<typeof pairedTable>>["t"]) =>
+    (await readdir(join(t.host.cloud!["o"].dataDir, "extra-games"))).filter((f) => /^[0-9a-f]{64}$/.test(f)).sort();
+
+  beforeEach(async () => {
+    repos.set(LOOPY, { sha: "1009100", files: { ...gameFiles("loopy-lite", { label: "loopy" }), ...gameFiles("loopy-practice", { label: "practice" }) }, private: true });
+    expect((await admin("POST", "/admin/api/repos", { repo: "klaushofrichter/extra-games" })).body.error).toBeNull();
+    expect((await admin("POST", "/admin/api/repos", { repo: "klaushofrichter/loopy-game" })).body.error).toBeNull();
+  });
+
+  it("each table gets exactly the repositories ticked for it; a table with both has both bundles side by side and plays from each", async () => {
+    const list = (await admin("GET", "/admin/api/repos")).body.repos;
+    expect(list.map((r: { id: string; clashes: string[] }) => [r.id, r.clashes])).toEqual([["extra-games", []], ["loopy-game", []]]);
+    const a = await pairedTable(["extra-games"]);
+    const b = await pairedTable(["loopy-game"]);
+    const c = await pairedTable(["extra-games", "loopy-game"]);
+    try {
+      await until(() => a.t.host.table.games.has("dice-duel") && b.t.host.table.games.has("loopy-lite") && c.t.host.table.games.has("loopy-practice") && c.t.host.table.games.has("dice-duel"));
+      // Wait for every table's heartbeat to have settled, then nothing more may arrive.
+      await sleep(200);
+      expect(a.t.host.table.extraGames().installed).toEqual(["dice-duel"]);
+      expect(b.t.host.table.extraGames().installed).toEqual(["loopy-lite", "loopy-practice"]);
+      expect(c.t.host.table.extraGames().installed).toEqual(["dice-duel", "loopy-lite", "loopy-practice"]);
+      expect(await bundleDirs(a.t)).toHaveLength(1);
+      expect(await bundleDirs(b.t)).toHaveLength(1);
+      expect(await bundleDirs(c.t)).toEqual([...(await bundleDirs(a.t)), ...(await bundleDirs(b.t))].sort());
+
+      // Every game knows which repository and commit it came from.
+      expect(c.t.host.table.games.get("dice-duel")!.source).toMatchObject({ repo: "klaushofrichter/extra-games@main", commit: "abc1234" });
+      expect(c.t.host.table.games.get("loopy-lite")!.source).toMatchObject({ repo: LOOPY, commit: "1009100" });
+      const ids = (await c.t.ok("GET", "/games")).filter((g: { extra?: boolean }) => g.extra).map((g: { id: string }) => g.id).sort();
+      expect(ids).toEqual(["dice-duel", "loopy-lite", "loopy-practice"]);
+
+      // A table only downloads its own repositories' bundles.
+      const bHash = (await bundleDirs(b.t))[0];
+      const aToken = JSON.parse(await readFile(join(a.t.host.cloud!["o"].dataDir, "table.json"), "utf8")).tableToken;
+      expect((await fetch(`${base}/api/tables/bundles/${bHash}`, { headers: { authorization: `Bearer ${aToken}` } })).status).toBe(404);
+
+      // One game from each repository, one after the other, on the table that has both.
+      const ann = await c.t.joinDeck("Ann");
+      await c.t.ok("POST", "/ai", {});
+      for (const [gameId, label] of [["loopy-lite", "loopy"], ["dice-duel", "v1"]]) {
+        await c.t.ok("POST", "/game/select", { gameId });
+        await ann.request("lobby", "ready", { ready: true });
+        await c.t.ok("POST", "/game/start");
+        await ann.request("game", "intent", { name: "roll" });
+        await until(() => c.t.host.table.phase === "finished");
+        expect(c.t.host.table.state().summary!.highlights).toMatchObject({ label });
+        await c.t.ok("POST", "/game/close");
+      }
+    } finally {
+      await a.t.close();
+      await b.t.close();
+      await c.t.close();
+    }
+  });
+
+  it("repositories update, fail and go away independently of each other", async () => {
+    const c = await pairedTable(["extra-games", "loopy-game"]);
+    try {
+      await until(() => c.t.host.table.games.has("dice-duel") && c.t.host.table.games.has("loopy-lite"));
+      const extraHash = c.t.host.table.games.get("dice-duel")!.source!.hash;
+
+      // A new loopy-game commit replaces only loopy-game's games; extra-games keeps its bundle, nothing is refetched.
+      repos.set(LOOPY, { sha: "2009200", files: { ...gameFiles("loopy-lite", { version: "0.2.0" }), ...gameFiles("loopy-practice") }, private: true });
+      const extraFetches = tarballRequests;
+      await admin("POST", "/admin/api/repos/loopy-game/refresh");
+      await until(() => c.t.host.table.games.get("loopy-lite")?.manifest.version === "0.2.0");
+      expect(tarballRequests - extraFetches).toBe(1);
+      expect(c.t.host.table.games.get("dice-duel")!.source!.hash).toBe(extraHash);
+      await until(async () => (await bundleDirs(c.t)).length === 2); // the old loopy bundle is deleted
+
+      // A broken loopy-game push: loopy-game shows the error and keeps its last good bundle; extra-games is unaffected.
+      repos.get(LOOPY)!.files["games/loopy-lite/manifest.json"] = "{ broken";
+      const bad = await admin("POST", "/admin/api/repos/loopy-game/refresh");
+      expect(bad.body.error).toMatch(/not valid/);
+      const list = (await admin("GET", "/admin/api/repos")).body.repos;
+      expect(list.find((r: { id: string }) => r.id === "extra-games").error).toBeNull();
+      expect(c.t.host.table.games.get("loopy-lite")!.manifest.version).toBe("0.2.0");
+
+      // A repository that disappears from GitHub: same, the last good bundle stays.
+      repos.delete(LOOPY);
+      expect((await admin("POST", "/admin/api/repos/loopy-game/refresh")).body.error).toMatch(/does not exist/);
+      expect((await admin("POST", "/admin/api/repos/extra-games/refresh")).body.error).toBeNull();
+      await sleep(200);
+      expect(c.t.host.table.extraGames().installed).toEqual(["dice-duel", "loopy-lite", "loopy-practice"]);
+
+      // Removing one repository drops only its games.
+      expect((await admin("DELETE", "/admin/api/repos/loopy-game")).status).toBe(200);
+      await until(() => !c.t.host.table.games.has("loopy-lite"));
+      expect(c.t.host.table.extraGames().installed).toEqual(["dice-duel"]);
+      expect((await admin("GET", "/admin/api/tables")).body[0].repos).toEqual(["extra-games"]);
+      await until(async () => (await bundleDirs(c.t)).length === 1);
+    } finally {
+      await c.t.close();
+    }
+  });
+});
+
 // ----- the table's installer on its own: what it does with bad, malicious or repeated input -----
 import { ExtraGames } from "../apps/table-host/src/extra-games.ts";
 import { BUNDLE_FORMAT, encodeBundle } from "../packages/protocol/src/bundle.ts";
