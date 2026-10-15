@@ -5,16 +5,21 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Terms of service · Game Table</title>
   <link rel="stylesheet" href="/shared/theme.css">
-  <style>main { max-width: 640px; margin: 0 auto; padding: 28px 22px 60px; line-height: 1.55; } h1 { font-family: var(--display); } a { color: var(--brass); }</style>
+  <link rel="stylesheet" href="/deck/deck.css">
+  <style>main { max-width: 640px; margin: 0 auto; padding: 28px 22px 60px; } h1 { font-family: var(--display); }</style>
 </head>
 <body>
-  <main>
-    <p class="eyebrow">Draft — to be replaced by the final text</p>
-    <h1>Terms of service</h1>
-    <p>Games on this table are for entertainment. Points, chips or virtual money in games have no real-world value and cannot be exchanged.</p>
-    <p>Each game is logged: the game settings, the display name you chose, your seat and every move. Logs are kept for a limited time (90 days by default) on the table and on the Game Table service, and may be used to improve games and their AI players.</p>
-    <p>No login is needed. Use any display name; avoid entering personal information as your name.</p>
-    <p><a href="javascript:history.back()">← Back</a></p>
-  </main>
+  <!-- The terms on a page of their own, for a direct link. The phones and boards show the same text in a window with a
+       close button (D-108); the text is /shared/terms.md. No "Back" link: in a new tab there is nothing to go back to. -->
+  <main><h1>Terms of service</h1><div class="md" id="terms"><p class="muted">Loading…</p></div></main>
+  <script type="module">
+    import { renderRules } from "/shared/markdown.js";
+    const el = document.getElementById("terms");
+    fetch("/shared/terms.md").then((r) => (r.ok ? r.text() : Promise.reject())).then((md) => {
+      const { title, html } = renderRules(md, "/shared/");
+      if (title) document.querySelector("h1").innerHTML = title;
+      el.innerHTML = html;
+    }).catch(() => (el.innerHTML = `<p class="muted">The terms could not be loaded. Try again in a moment.</p>`));
+  </script>
 </body>
 </html>

@@ -1,9 +1,9 @@
 // Pachisi board UI: the cross-shaped race track, tokens that glide between cells, and a big die. Sounds for rolling,
 // moving, a six and a capture; the player whose turn it is may tap a token on the board instead of the phone (D-102).
-import { SEAT_COLORS, esc, html, ping, playerColor, playSound, remainingMs, seatPlates, useStyles } from "/shared/board-kit.js";
+import { esc, html, ping, playerColor, playSound, remainingMs, seatPlates, useStyles } from "/shared/board-kit.js";
 
 /**
- * What a token shows (D-102): its number (the default), or with the "Icons" setting one icon per token, the same set for
+ * What a token shows (D-102, D-109): an icon per token (the default), or its number with the "Numbers" setting; the same set for
  * every player; the token keeps the player's colour. The deck imports this too, so both show the same pieces.
  */
 export const PIECE_ICONS = [
@@ -12,7 +12,7 @@ export const PIECE_ICONS = [
   ["bullseye", '<circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="12" cy="12" r="5.2" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="12" cy="12" r="1.9" fill="currentColor"/>'],
   ["moon", '<path d="M15.2 3.2a9 9 0 1 0 5.6 15.2A7.4 7.4 0 0 1 15.2 3.2z" fill="currentColor"/>'],
 ];
-export const iconsOn = (prefs) => prefs?.pieces === "icons";
+export const iconsOn = (prefs) => prefs?.pieces !== "numbers"; // icons unless numbers were chosen (D-109)
 /** The inside of token i (0-based): its number, or its icon at `size` px. */
 export function pieceFace(i, prefs, size = 26) {
   if (!iconsOn(prefs)) return String(i + 1);
@@ -117,32 +117,17 @@ function tokenXY(side, p, i) {
 
 const canMove = (p, die) => (p === -1 ? die === 6 : p !== FINISH && p + die <= FINISH);
 
-/**
- * What Pachisi adds to the board's settings (D-088): each player's colour. Picking a colour another player has
- * swaps the two, so colours stay distinct. The board and the decks draw with playerColor(), which reads these.
- */
+/** What Pachisi adds to the board's settings (D-088): the pieces, numbers or icons. Player colours are the table's (D-106). */
 export function settings({ info, setPrefs }) {
-  const seated = info.players.filter((p) => p.seat !== null).sort((a, b) => a.seat - b.seat);
-  const current = Object.fromEntries(seated.map((p) => [p.id, playerColor(info, p.seat)]));
-  const pieces = {
-    type: "choice",
-    label: "Pieces",
-    value: iconsOn(info.prefs) ? "icons" : "numbers",
-    options: [{ value: "numbers", label: "Numbers" }, { value: "icons", label: "Icons" }],
-    onChange: (v) => setPrefs({ pieces: v }),
-  };
-  return [pieces, ...seated.map((p) => ({
-    type: "swatches",
-    label: p.name,
-    value: current[p.id],
-    options: SEAT_COLORS,
-    onChange(color) {
-      const next = { ...current, [p.id]: color };
-      const other = seated.find((q) => q.id !== p.id && current[q.id] === color);
-      if (other) next[other.id] = current[p.id];
-      return setPrefs({ colors: next });
+  return [
+    {
+      type: "choice",
+      label: "Pieces",
+      value: iconsOn(info.prefs) ? "icons" : "numbers",
+      options: [{ value: "numbers", label: "Numbers" }, { value: "icons", label: "Icons" }],
+      onChange: (v) => setPrefs({ pieces: v }),
     },
-  }))];
+  ];
 }
 
 export function mount(root, ctx = {}) {

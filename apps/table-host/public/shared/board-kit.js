@@ -84,12 +84,12 @@ export function ping(ctx, out, t, { freq = 2600, partials = [1, 1.58, 2.27], dec
 }
 
 /**
- * A player's colour (D-088): the one chosen in the board's settings for this game (`info.prefs.colors`,
- * keyed by player id), else the seat's colour. Boards and decks both use this, so they always agree.
+ * A player's colour (D-106): the table gives every seated player one (`player.color` in the lobby state), chosen in
+ * the board's settings or else their seat's, the same in the lobby and in every game. Boards and decks both use this,
+ * so they always agree. A seat nobody sits in gets the seat's colour.
  */
 export function playerColor(info, seat) {
-  const id = info?.players?.find((p) => p.seat === seat)?.id;
-  const c = id && info?.prefs?.colors?.[id];
+  const c = info?.players?.find((p) => p.seat === seat)?.color;
   return typeof c === "string" && /^#[0-9a-f]{6}$/i.test(c) ? c : seatColor(seat);
 }
 
@@ -205,7 +205,7 @@ export function seatPlates(layer, info, extra = () => "", opts = {}) {
       const at = pos[p.seat];
       const active = opts.active === p.seat;
       return `<div class="kit-plate ${active ? "active" : ""} ${p.connected ? "" : "away"}" style="left:${at.x}px;top:${at.y}px;transform:translate(-50%,-50%) rotate(${at.rot}deg);--seat:${playerColor(info, p.seat)}">
-        <div class="kit-name">${esc(p.name)}</div>
+        <div class="kit-name"><span class="kit-dot" aria-hidden="true"></span>${esc(p.name)}</div>
         <div class="kit-extra">${p.connected ? extra(p.seat, p) : "Reconnecting…"}</div></div>`;
     })
     .join("");

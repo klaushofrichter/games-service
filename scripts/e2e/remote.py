@@ -188,6 +188,19 @@ try:
         rboard.locator(".pc-wrap").wait_for(timeout=5000)
         remote.wait_for_timeout(600)
         remote.screenshot(path=os.path.join(OUT, "remote-pachisi.png"))
+        # D-108: the terms open in a window on the remote board and a sheet on the remote deck, never a new tab
+        tabs = len(remote_ctx.pages)
+        rboard.locator("#lobby-button").click()
+        rboard.locator(".overlay [data-terms]").click()
+        rboard.locator(".overlay.terms .md p").first.wait_for(timeout=5000)
+        rboard.locator(".overlay.terms .terms-close").click()
+        rboard.locator(".overlay.terms").wait_for(state="detached")
+        rboard.locator("[data-close-overlay]").click()
+        deck.locator("footer a[data-terms]").click()
+        deck.locator(".rules-modal .md p").first.wait_for(timeout=5000)
+        deck.locator(".rules-modal .rules-close").click()
+        deck.locator(".rules-modal").wait_for(state="detached")
+        assert len(remote_ctx.pages) == tabs, "the terms opened a new tab"
         b.close()
 finally:
     host.terminate()

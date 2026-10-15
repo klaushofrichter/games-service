@@ -20,6 +20,7 @@ Be the first to bring all your tokens around the board and into the home space i
 ## The board
 
 - Each player owns one side of the board, the side where they sit. Your base is the corner area in your colour.
+- With two players, they always get **opposite** sides, so neither starts just ahead of the other.
 - The **track** is the ring of 40 squares around the edge. Everyone moves clockwise.
 - Your **start square** is in your colour, just past the middle of your side.
 - The four **★ squares** are safe. They are the four start squares, including those of empty sides.
@@ -61,7 +62,7 @@ With a time limit, a countdown runs on your turn. If it runs out, the table roll
 
 AI players come in two levels: *beginner* (moves any token at random) and *average* (prefers finishing, leaving the base, sending others back and safe squares).
 
-In the board's settings (the gear): **Pieces** shows numbers (the default) or icons on the tokens, a smiley, a star, a bullseye and a moon, the same four for everyone and in each player's colour, on the board and on the phones. Players can also change their colours there.
+In the board's settings (the gear): **Pieces** shows icons on the tokens (the default), a smiley, a star, a bullseye and a moon, the same four for everyone and in each player's colour, on the board and on the phones; or numbers 1 to 4. Player colours are chosen there too, for every game at the table.
 
 ## Players leaving
 
