@@ -84,6 +84,8 @@ button.danger { border-color: rgba(210, 87, 74, 0.6); color: #f1a197; }
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35); transition: box-shadow 0.25s, opacity 0.25s;
 }
 .kit-plate .kit-name { font-family: var(--display); font-size: 26px; color: var(--ink); white-space: nowrap; }
+/* The player's colour before their name (D-106), as on the lobby's seat cards and the phones. */
+.kit-dot { display: inline-block; width: 0.5em; height: 0.5em; border-radius: 50%; background: var(--seat); margin-right: 0.35em; vertical-align: 0.08em; box-shadow: 0 0 0 2px rgba(0,0,0,.35); }
 .kit-plate .kit-extra { font-size: 18px; color: var(--ink-soft); margin-top: 2px; }
 .kit-plate.active { box-shadow: 0 0 0 4px var(--seat), 0 0 40px var(--seat); }
 .kit-plate.away { opacity: 0.5; border-style: dashed; }

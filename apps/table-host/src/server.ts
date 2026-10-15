@@ -196,6 +196,7 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
       table.setAiOptions(match[1], (body.options ?? {}) as Record<string, unknown>);
       return json(res, 200, table.state());
     }
+    if (m === "POST" && (match = path.match(/^\/players\/([\w-]+)\/color$/))) return (table.setColor(match[1], body.color), json(res, 200, table.state()));
     if (m === "DELETE" && (match = path.match(/^\/players\/([\w-]+)$/))) return (table.removePlayer(match[1], "evicted"), json(res, 200, table.state()));
     if (m === "POST" && path === "/game/select") {
       table.selectGame(String(body.gameId), (body.settings as Record<string, unknown>) ?? {});
@@ -333,6 +334,12 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
         if (c.role === "deck" && msg.ch === "lobby" && msg.type === "ready") {
           table.setReady(c.playerId, !!msg.payload?.ready);
           return reply("ack", {}, msg.seq);
+        }
+        if (c.role === "board" && msg.ch === "game" && msg.type === "intent") {
+          // A move made by touching the board (D-102): payload { playerId, name, payload }.
+          const b = msg.payload ?? {};
+          const r = table.boardIntent(b.playerId, { name: b.name, payload: b.payload }, remoteCtx ? remoteCtx.session : null);
+          return r.ok ? reply("ack", {}, msg.seq) : reply("reject", { reason: r.reason }, msg.seq);
         }
         if (c.role === "deck" && msg.ch === "game" && msg.type === "intent") {
           const r = table.intent(c.playerId, msg.payload);

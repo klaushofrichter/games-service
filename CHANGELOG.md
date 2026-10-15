@@ -15,3 +15,18 @@ page is the history. Leave it empty if there is nothing to add beyond the commit
   config* in the console); repositories added in the console last until the next restart.
 - Rules for every game on the phones: a **Rules** button opens the chosen game's rules, with illustrations and the
   settings chosen at this table. Games provide them as `how-to-play.md` with images in `assets/`.
+- Games on the board face north or south only, using the long sides; a turn-around button left of the gear turns a
+  game 180° without moving the players. Remote players on an east or west seat can show the board upright, at full
+  width. The seat plates now sit the same distance from the edge on all four sides, and each phone shows the
+  player's colour in its seat badge.
+- Pachisi: sound effects (rolling, moving, a six, a token sent back); a **Pieces** setting (icons or
+  numbers); and tokens can be moved by tapping them on the board, for players at the table and remote players on their
+  own board. Games can allow such board moves with `boardIntents` in their manifest.
+- An AI player's window has a **Remove** button, and opens before a game is chosen too.
+- The phones' *At the table* list shows each player's colour before their name.
+- Scrollbars in the console (e.g. Game logs), the invite page and the sign-in pages use the green felt colours instead of white.
+- Player colours are a board setting for every game (gear → Player colours), shown on the board as the card's border
+  and a dot before each name, in the lobby and in games. Pachisi no longer has its own colour setting.
+- Pachisi with two players puts them on opposite sides of the board.
+- Pachisi's pieces show icons by default; *Pieces → Numbers* shows 1–4.
+- The terms of service open in a window with ✕ on the phones and the board (also remote), not in a new tab.

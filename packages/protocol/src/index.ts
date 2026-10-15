@@ -94,6 +94,12 @@ export const manifestSchema = z.object({
     .default({ supported: false, options: [], hostConfig: [] }),
   simulation: z.object({ supported: z.boolean(), headless: z.boolean() }).default({ supported: false, headless: false }),
   remoteBoardControl: z.boolean().default(true),
+  /**
+   * Intents a player may also send by touching the board (D-102), e.g. Pachisi's "move": tapping a token on the table's
+   * screen instead of the phone. The table's board may send them for players sitting at the table, a remote board
+   * only for its own player. Anything else still comes from the phones only.
+   */
+  boardIntents: z.array(z.string().regex(/^[A-Za-z][\w-]{0,39}$/)).max(10).default([]),
   lobbyButton: z.enum(["top-left", "top-right", "bottom-left", "bottom-right"]).default("bottom-right"),
   deck: z.object({ minWidth: z.number().optional(), orientation: z.string().optional() }).optional(),
   permissions: z.array(z.string()).default([]),
@@ -114,6 +120,12 @@ export function allowedPlayerCounts(m: Manifest): number[] {
 
 export type Phase = "idle" | "loading" | "ready" | "active" | "paused" | "terminating" | "finished";
 
+/**
+ * Player colours (D-106): one per player, chosen in the board's settings and the same in every game. By default a player
+ * takes their seat's colour, `PLAYER_COLORS[seat % 8]`. Distinct for common colour-vision deficiencies on the felt.
+ */
+export const PLAYER_COLORS = ["#e8b04a", "#5fb7e8", "#e8735f", "#7fd18b", "#c38be8", "#e8e15f", "#5fe0c8", "#e88fbf"] as const;
+
 export interface PlayerInfo {
   id: string;
   name: string;
@@ -124,6 +136,8 @@ export interface PlayerInfo {
   ready: boolean;
   /** AI players: options chosen on the board (e.g. play style); manifest defaults fill the rest at start. */
   aiOptions?: Record<string, unknown>;
+  /** This player's colour while seated (D-106): their own choice, else their seat's; null without a seat. */
+  color?: string | null;
 }
 
 export interface GameSummary {

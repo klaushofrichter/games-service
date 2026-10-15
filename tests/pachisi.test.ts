@@ -39,6 +39,24 @@ describe("board geometry", () => {
     expect(assignSides(seats(3, "human", 6))).toEqual({ 0: 2, 1: 1, 2: 0 }); // two on the south edge, one north
     expect(assignSides(seats(3, "human", 8))).toEqual({ 0: 2, 1: 1, 2: 3 }); // three on the south edge
   });
+
+  it("puts two players on opposite sides, wherever they sit (D-107)", () => {
+    const four = seats(4); // edges: south, west, north, east
+    const pick = (...ids: number[]) => ids.map((i) => four[i]);
+    const opposite = (r: Record<number, number>) => {
+      const [x, y] = Object.values(r);
+      return (x + 2) % 4 === y;
+    };
+    expect(assignSides(pick(0, 2))).toEqual({ 0: 2, 2: 0 }); // south and north: bottom and top, as before
+    expect(assignSides(pick(1, 3))).toEqual({ 1: 3, 3: 1 }); // west and east: their own sides
+    expect(assignSides(pick(0, 1))).toEqual({ 0: 1, 1: 3 }); // south and west: west keeps its side, south gets the opposite
+    for (const layout of [4, 6, 8] as const) {
+      const all = seats(layout, "human", layout);
+      for (let i = 0; i < layout; i++) for (let j = i + 1; j < layout; j++) expect(opposite(assignSides([all[i], all[j]])), `${layout}: seats ${i}, ${j}`).toBe(true);
+    }
+    // three or four players are unchanged: one side each, nearest first
+    expect(assignSides(pick(0, 1, 2))).toEqual({ 0: 2, 1: 3, 2: 0 });
+  });
 });
 
 describe("rules", () => {

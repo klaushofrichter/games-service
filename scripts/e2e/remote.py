@@ -92,6 +92,7 @@ try:
         remote.screenshot(path=os.path.join(OUT, "remote-north-seat.png"))
         assert rboard.locator("#corners button[data-face]").count() == 0, "remote boards don't turn the table"
         assert not rboard.locator("#settings-button").is_visible(), "settings stay with the table (D-088)"
+        assert not rboard.locator("#view-button").is_visible(), "the full-width view is only for east and west seats (D-101)"
 
         # remote board control: change the layout from the remote board, then the table switches control off
         rboard.locator("button[data-layout='6']").click()
@@ -124,6 +125,19 @@ try:
         assert box[0] >= -1 and box[1] >= -1 and box[2] <= box[4] + 1 and box[3] <= box[5] + 1, f"sideways board overflows its frame: {box}"
         remote.wait_for_timeout(500)
         remote.screenshot(path=os.path.join(OUT, "remote-east-seat.png"))
+        # on a side seat the remote player may put the board upright to use the full width (D-101), and back
+        view = rboard.locator("#view-button")
+        assert view.is_visible() and "full width" in view.inner_text(), "east seat: the full-width button is missing"
+        view.click()
+        wait(lambda: "rotate(0deg)" in bframe.evaluate("() => document.getElementById('surface').style.transform"), 5)
+        box = bframe.evaluate("() => { const r = document.getElementById('surface').getBoundingClientRect(); return [r.right - r.left, innerWidth]; }")
+        assert box[0] >= box[1] - 2, f"the upright board should use the full width: {box}"
+        assert "bottom" in view.inner_text()
+        assert state()["frontEdge"] == "south", "the remote view choice must not turn the table"
+        remote.wait_for_timeout(400)
+        remote.screenshot(path=os.path.join(OUT, "remote-east-seat-full-width.png"))
+        view.click()
+        wait(lambda: "rotate(90deg)" in bframe.evaluate("() => document.getElementById('surface').style.transform"), 5)
 
         # a real game: Ana at the table, Rita remote, Pachisi; Rita plays from her deck in the invite page
         call(TABLE, "POST", "/api/v1/layout", {"seats": 4}, {"x-table-key": "k"})
@@ -141,22 +155,52 @@ try:
         wait(lambda: state()["phase"] == "active")
         seats = {p["seat"]: p["name"] for p in state()["players"]}
         moves = {"Ana": 0, "Rita": 0}
-        for _ in range(120):
+        taps = {"Ana": 0, "Rita": 0}  # D-102: moves made by tapping a token on a board
+        token_moves = {"Ana": 0, "Rita": 0}  # every other token move is a tap
+        for _ in range(160):
             v = call(TABLE, "GET", "/api/v1/game/board", headers={"x-table-key": "k"})["view"]
-            if v["over"] or (moves["Rita"] >= 4 and moves["Ana"] >= 4):
+            if v["over"] or (moves["Rita"] >= 4 and moves["Ana"] >= 4 and min(taps.values()) >= 2):
                 break
             who = seats.get(v["turn"])
             page = deck if who == "Rita" else local
             if v["phase"] == "roll":
                 page.locator(".pc-roll:not([hidden])").click(timeout=5000)
+            elif token_moves[who] % 2:
+                # Rita taps on her own board, Ana on the table's board. Rita's board never offers Ana's tokens, and
+                # the table's board never offers Rita's (she is remote).
+                here, other = (rboard, board) if who == "Rita" else (board, rboard)
+                here.locator(".pc-token.tap").first.wait_for(timeout=5000)
+                assert other.locator(".pc-token.tap").count() == 0, f"{who}'s tokens answer taps on the other board"
+                seats_offered = here.locator(".pc-token.tap").evaluate_all("(els) => els.map((e) => Number(e.dataset.seat))")
+                assert set(seats_offered) == {v["turn"]}, seats_offered
+                before = v["players"]
+                here.locator(".pc-token.tap").first.click(force=True)  # it bobs
+                wait(lambda: call(TABLE, "GET", "/api/v1/game/board", headers={"x-table-key": "k"})["view"]["players"] != before, 5)
+                taps[who] += 1
+                token_moves[who] += 1
             else:
                 page.locator("button[data-token]").first.click(timeout=5000)
+                token_moves[who] += 1
             moves[who] += 1
             time.sleep(0.3)
         assert moves["Rita"] >= 4, moves
+        assert taps["Rita"] >= 1 and taps["Ana"] >= 1, taps
         rboard.locator(".pc-wrap").wait_for(timeout=5000)
         remote.wait_for_timeout(600)
         remote.screenshot(path=os.path.join(OUT, "remote-pachisi.png"))
+        # D-108: the terms open in a window on the remote board and a sheet on the remote deck, never a new tab
+        tabs = len(remote_ctx.pages)
+        rboard.locator("#lobby-button").click()
+        rboard.locator(".overlay [data-terms]").click()
+        rboard.locator(".overlay.terms .md >> text=entertainment").wait_for(timeout=5000)
+        rboard.locator(".overlay.terms .terms-close").click()
+        rboard.locator(".overlay.terms").wait_for(state="detached")
+        rboard.locator("[data-close-overlay]").click()
+        deck.locator("footer a[data-terms]").click()
+        deck.locator(".rules-modal .md >> text=entertainment").wait_for(timeout=5000)
+        deck.locator(".rules-modal .rules-close").click()
+        deck.locator(".rules-modal").wait_for(state="detached")
+        assert len(remote_ctx.pages) == tabs, "the terms opened a new tab"
         b.close()
 finally:
     host.terminate()

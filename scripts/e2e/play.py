@@ -65,6 +65,22 @@ def roulette(browser, board):
     api("POST", "/rotate", {"degrees": 180})
     time.sleep(0.8)
     shot(board, "board-rotated")
+    # D-101: the turn-around button sits left of the gear (in the viewer's frame) and turns the game back; the seat
+    # plates stay where they are, and a lobby turned east leaves the game facing the way it was
+    plates = lambda: board.evaluate("() => [...document.querySelectorAll('#seats > .seat')].map(e => { const r = e.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.top)]; })")
+    before = plates()
+    flip, gear = board.locator("#flip-button").bounding_box(), board.locator("#settings-button").bounding_box()
+    assert flip["x"] > gear["x"], f"facing north, the turn-around button belongs to the viewer's left of the gear: {flip} {gear}"
+    board.click("#flip-button")
+    wait(lambda: api("GET", "/state")["frontEdge"] == "south", 5, "the game to face south")
+    time.sleep(0.6)
+    flip, gear = board.locator("#flip-button").bounding_box(), board.locator("#settings-button").bounding_box()
+    assert flip["x"] < gear["x"], f"facing south, the turn-around button is left of the gear: {flip} {gear}"
+    assert plates() == before, "turning the game must not move the seat plates"
+    api("POST", "/face", {"edge": "east"})
+    time.sleep(0.5)
+    assert board.evaluate("() => document.querySelector('#flip-button svg').style.transform") == "rotate(0deg)", "a lobby turned east must leave the game facing south"
+    api("POST", "/face", {"edge": "south"})
     return decks
 
 
@@ -80,10 +96,12 @@ def pachisi(browser, board):
     time.sleep(0.4)
     api("POST", "/game/start")
     decks[0].wait_for_selector(".pc-what")
-    # Settings (D-088): Pachisi adds player colours. Klaus picks purple, then Mira picks purple too and they swap.
+    # Player colours are the board's own setting (D-106), the same in every game. Klaus picks purple, then Mira picks
+    # purple too and they swap. The board's cards and the phones follow.
     board.click("#settings-button")
-    board.wait_for_selector(".game-settings")
-    rows = board.locator(".game-settings .row")
+    board.wait_for_selector(".player-colors")
+    rows = board.locator(".player-colors .row")
+    assert rows.count() == 3, "one row per seated player"
     rows.nth(0).locator(".swatch").nth(4).click()
     purple = "rgb(195, 139, 232)"
     wait_for = lambda page, sel, color: page.wait_for_function(
@@ -92,24 +110,75 @@ def pachisi(browser, board):
     klaus_before = rows.nth(0).locator(".swatch.on").get_attribute("style")
     rows.nth(1).locator(".swatch").nth(4).click()
     wait_for(decks[1], ".pc-tokens .card > div:first-child", purple)
-    board.wait_for_function("() => document.querySelectorAll('.game-settings .swatch.on').length === 3")
+    board.wait_for_function("() => document.querySelectorAll('.player-colors .swatch.on').length === 3")
     assert rows.nth(0).locator(".swatch.on").get_attribute("style") != klaus_before, "picking a taken colour swaps it"
+    # on the board: each player's card has a border and a dot before the name in their colour
+    time.sleep(0.3)
+    plates = board.evaluate("""() => [...document.querySelectorAll('.kit-plate')].map((e) => [e.querySelector('.kit-name').textContent.trim(),
+      getComputedStyle(e).borderTopColor, getComputedStyle(e.querySelector('.kit-dot')).backgroundColor])""")
+    rgb = lambda h: f"rgb({int(h[1:3], 16)}, {int(h[3:5], 16)}, {int(h[5:7], 16)})"
+    want = {p["name"]: rgb(p["color"]) for p in api("GET", "/state")["players"]}
+    assert len(plates) == 3 and all(border == dot == want[name] for name, border, dot in plates), f"plates {plates}, colours {want}"
+    assert want["Mira"] == purple
+    # Pachisi's own setting: the pieces, numbers or icons (D-102); its colour rows are gone
+    game_rows = board.locator(".game-settings .row")
+    assert game_rows.count() == 1 and "Numbers" in game_rows.nth(0).inner_text(), "Pachisi no longer has its own colour rows"
+    # icons are the default (D-109); Numbers switches to 1-4 and Icons back
+    board.wait_for_function("() => document.querySelectorAll('.pc-token svg[data-icon]').length === 12")
+    game_rows.nth(0).locator("button", has_text="Numbers").click()
+    board.wait_for_function("() => document.querySelectorAll('.pc-token svg').length === 0 && document.querySelector('.pc-token').textContent.trim() === '1'")
+    decks[0].wait_for_function("() => document.querySelectorAll('.pc-piece svg').length === 0")
+    game_rows.nth(0).locator("button", has_text="Icons").click()
+    board.wait_for_selector(".game-settings .seg button.on >> text=Icons")
+    on = board.evaluate("() => { const b = document.querySelector('.game-settings .seg button.on'); const cs = getComputedStyle(b); return [cs.color, cs.backgroundColor]; }")
+    assert on[0] != on[1], f"the chosen option's label is invisible: {on}"
+    icons = ["smiley", "star", "bullseye", "moon"]
+    board.wait_for_function("() => document.querySelectorAll('.pc-token svg[data-icon]').length === 12")
+    for d in decks:
+        d.wait_for_function("() => document.querySelectorAll('.pc-piece svg[data-icon]').length === 4")
+        assert d.evaluate("() => [...document.querySelectorAll('.pc-piece svg')].map((s) => s.dataset.icon)") == icons
+    assert board.evaluate("() => [...document.querySelectorAll('.pc-token svg')].slice(0, 4).map((s) => s.dataset.icon)") == icons
     shot(board, "settings-pachisi")
     board.click("[data-close-overlay]")
-    moves = 0
+    time.sleep(0.4)
+    shot(decks[0], "deck-icons")
+    moves = board_moves = 0
     shot_move = False
-    for _ in range(160):
+    six = captured = shot_mid = False
+    # every sound, not only the last 50 the board keeps
+    board.evaluate("""() => { const all = (window.allSounds = []); const list = (window.gameTableSounds = []);
+      const push = list.push; list.push = function (...a) { all.push(...a); return push.apply(this, a); }; }""")
+    for _ in range(200):
         v = api("GET", "/game/board")["view"]
         if v["over"]:
             break
+        six = six or v["die"] == 6
+        captured = captured or bool(v["lastMove"] and v["lastMove"]["captured"])
         seat = v["turn"]
-        if seat > 1:  # AI seat plays by itself
+        if seat > 1:  # AI seat plays by itself; the board offers none of its tokens to tap
+            if v["phase"] == "move":
+                assert board.locator(".pc-token.tap").count() == 0, "an AI player's token answers a tap on the board"
             time.sleep(0.35)
             continue
         d = decks[seat]
         if v["phase"] == "roll":
             d.wait_for_selector(".pc-roll:not([hidden])", timeout=3000)
+            assert board.locator(".pc-token.tap").count() == 0, "tokens answer taps before the die is rolled"
             d.click(".pc-roll")
+        elif moves % 2:
+            # D-102: every other move by tapping the token on the board; only this player's movable tokens answer,
+            # and the phone follows
+            board.wait_for_selector(".pc-token.tap", timeout=3000)
+            taps = board.evaluate("() => [...document.querySelectorAll('.pc-token.tap')].map((e) => [Number(e.dataset.seat), Number(e.dataset.token)])")
+            assert taps and all(s == seat for s, _ in taps), f"tappable tokens {taps} on seat {seat}'s turn"
+            legal = d.evaluate("() => [...document.querySelectorAll('button[data-token]')].map((b) => Number(b.dataset.token))")
+            assert sorted(t for _, t in taps) == sorted(legal), f"board {taps} and phone {legal} offer different tokens"
+            before = api("GET", "/game/board")["view"]["players"]
+            board.locator(f".pc-token.tap[data-seat='{seat}'][data-token='{taps[0][1]}']").click(force=True)  # it bobs, so never "stable"
+            wait(lambda: api("GET", "/game/board")["view"]["players"] != before, 5, "the tapped token to move")
+            d.wait_for_selector("button[data-token]", state="detached", timeout=3000)  # the phone no longer asks
+            moves += 1
+            board_moves += 1
         else:
             d.wait_for_selector("button[data-token]", timeout=3000)
             if not shot_move and moves > 6:
@@ -117,10 +186,20 @@ def pachisi(browser, board):
                 shot_move = True
             d.click("button[data-token]")
             moves += 1
-            if moves == 14:
+            if moves >= 14 and not shot_mid:
                 time.sleep(0.8)
                 shot(board, "board-midgame")
+                shot_mid = True
         time.sleep(0.25)
+    assert board_moves >= 4, f"only {board_moves} moves by tapping the board"
+    # sounds: rolling, moving, and a six and a capture when they happened
+    time.sleep(1.0)
+    played = board.evaluate("() => window.allSounds")
+    assert "pachisi-roll" in played and "pachisi-move" in played, played
+    if six:
+        assert "pachisi-six" in played, played
+    if captured:
+        assert "pachisi-capture" in played, played
     assert moves >= 10, f"only {moves} human moves"
     shot(decks[1], "deck-waiting")
     return decks
@@ -237,11 +316,12 @@ def endings(browser, board):
     api("POST", "/layout", {"seats": 2})
     decks = [join(browser, n) for n in ["Klaus", "Mira"]]
     # the phone: name on the left, the seat's compass badge on the right, no separate seat card
-    assert decks[0].inner_text(".who .badge") == "S" and decks[1].inner_text(".who .badge") == "N"
-    assert decks[0].locator(".seatcard").count() == 0
+    badges = [d.inner_text(".who .badge") for d in decks]
+    assert badges == ["S", "N"], f"seat badges {badges}"
+    assert decks[0].locator(".seatcard").count() == 0, "no separate seat card"
     extra = join(browser, "Paul")  # the 2-seat table is full
     extra.wait_for_selector("text=No seat yet")
-    assert extra.locator(".who .badge").count() == 0
+    assert extra.locator(".who .badge").count() == 0, "a player without a seat has no badge"
     extra.close()
     # sound off: a whole game plays without a single sound effect
     api("POST", "/display", {"sound": False})
@@ -270,6 +350,15 @@ def endings(browser, board):
     api("POST", "/game/start")
     board.wait_for_selector("#lobby-button:not([hidden])")
     board.click("#lobby-button")
+    # D-108: the terms open in a window on the board (✕ and Close), not in a new tab
+    pages = len(board.context.pages)
+    board.click(".overlay [data-terms]")
+    # wait for the text itself: the window says "Loading…" in the same place first (that race failed on GitHub)
+    board.locator(".overlay.terms .md >> text=entertainment").wait_for()
+    assert len(board.context.pages) == pages, "the terms opened a new tab"
+    shot(board, "terms")
+    board.click(".overlay.terms .terms-close")
+    board.wait_for_selector(".overlay.terms", state="detached")
     board.click("[data-end]")
     board.click(".dialog [data-x=yes]")
     wait(lambda: api("GET", "/state")["phase"] == "finished", 5, "the game to end")
@@ -286,6 +375,29 @@ def dialogs(browser, board):
     decks = [join(browser, "Klaus")]
     ai = api("POST", "/ai", {})["playerId"]
     time.sleep(0.5)
+    # D-104: the phone's "At the table" list shows each player's colour before the name (the seat's colour, which
+    # framed their plate in a game)
+    hexes = ["#e8b04a", "#5fb7e8", "#e8735f", "#7fd18b", "#c38be8", "#e8e15f", "#5fe0c8", "#e88fbf"]
+    rgb = lambda h: f"rgb({int(h[1:3], 16)}, {int(h[3:5], 16)}, {int(h[5:7], 16)})"
+    want = [rgb(hexes[p["seat"]]) for p in api("GET", "/state")["players"]]
+    decks[0].wait_for_function("(n) => document.querySelectorAll('.list .row .pdot').length === n", arg=len(want))
+    dots = decks[0].evaluate("() => [...document.querySelectorAll('.list .row .pdot')].map((e) => getComputedStyle(e).backgroundColor)")
+    assert dots == want, f"dots {dots}, expected {want}"
+    # D-106: the lobby's seat cards show the same colour as a border and a dot before the name
+    cards = board.evaluate("""() => [...document.querySelectorAll('#seats .seat.taken')].map((e) => [getComputedStyle(e).borderTopColor,
+      getComputedStyle(e.querySelector('.pdot')).backgroundColor])""")
+    assert sorted(c[0] for c in cards) == sorted(want) and all(a == b for a, b in cards), f"cards {cards}, colours {want}"
+    # colours are a board setting before any game is chosen too; the phone and the card follow
+    board.click("#settings-button")
+    board.wait_for_selector(".player-colors")
+    assert board.locator(".game-settings").count() == 0
+    board.locator(".player-colors .row").nth(0).locator(".swatch").nth(6).click()  # Klaus: teal
+    teal = rgb(hexes[6])
+    decks[0].wait_for_function("(c) => getComputedStyle(document.querySelector('.who .badge')).backgroundColor === c", arg=teal, timeout=5000)
+    board.wait_for_function("(c) => [...document.querySelectorAll('#seats .seat.taken')].some((e) => getComputedStyle(e).borderTopColor === c)", arg=teal, timeout=5000)
+    shot(board, "settings-colours-lobby")
+    board.click("[data-close-overlay]")
+    shot(board, "lobby-colours")
     pick_game(board, "roulette")
     board.wait_for_selector(".dialog.form")
     board.fill(".dialog [name=rounds]", "4")
@@ -305,6 +417,31 @@ def dialogs(browser, board):
     st = api("GET", "/state")
     assert next(p for p in st["players"] if p["id"] == ai)["aiOptions"] == {"style": "aggressive"}
     shot(board, "ready-with-ai")
+    # D-103: the AI player's window removes it (after a confirmation); Cancel there keeps it. The seat is still
+    # selected from before, so its Configure button is still there.
+    board.click(f"[data-config='{ai}']")
+    board.wait_for_selector(".dialog.form [data-x=remove]")
+    shot(board, "ai-dialog-remove")
+    board.click(".dialog.form [data-x=remove]")
+    board.wait_for_selector(".dialog:not(.form) [data-x=no]")
+    board.click(".dialog [data-x=no]")
+    time.sleep(0.3)
+    assert any(p["id"] == ai for p in api("GET", "/state")["players"]), "cancelling must keep the AI player"
+    board.click(f"[data-config='{ai}']")
+    board.click(".dialog.form [data-x=remove]")
+    board.click(".dialog:not(.form) [data-x=yes]")
+    wait(lambda: all(p["id"] != ai for p in api("GET", "/state")["players"]), 5, "the AI player to leave")
+    # and before any game is chosen: the window opens (no options yet) and still removes
+    api("POST", "/game/close")
+    ai2 = api("POST", "/ai", {})["playerId"]
+    time.sleep(0.4)
+    seat2 = next(p["seat"] for p in api("GET", "/state")["players"] if p["id"] == ai2)
+    board.locator(".seat").nth(seat2).click()
+    board.click(f"[data-config='{ai2}']")
+    board.wait_for_selector(".dialog.form >> text=Pick a game to choose how it plays.")
+    board.click(".dialog.form [data-x=remove]")
+    board.click(".dialog:not(.form) [data-x=yes]")
+    wait(lambda: all(p["id"] != ai2 for p in api("GET", "/state")["players"]), 5, "the second AI player to leave")
     return decks
 
 
@@ -346,6 +483,18 @@ def rules(browser, board):
             d.locator(".rules-modal .rules-close").click()
         d.wait_for_selector(".rules-modal", state="detached")
     api("POST", "/game/close", {})
+    # D-108: the terms open in the same sheet on the phone, with ✕ top right, and the page stays where it is
+    url = d.url
+    d.click("footer a[data-terms]")
+    d.locator(".rules-modal .md >> text=entertainment").wait_for()
+    assert "Terms of service" in d.inner_text(".rules-modal .rules-head h2")
+    assert "entertainment" in d.inner_text(".rules-modal .rules-body")
+    assert d.url == url, "the terms must not navigate away from the deck"
+    close = d.locator(".rules-modal .rules-close").bounding_box()
+    assert close["x"] + close["width"] > 320 - 40 and close["y"] < 80, f"the ✕ belongs top right: {close}"
+    shot(d, "terms")
+    d.locator(".rules-modal .rules-close").click()
+    d.wait_for_selector(".rules-modal", state="detached")
     return [d]
 
 
@@ -368,4 +517,10 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        # On GitHub, an annotation carries the reason to the PR page; the job log itself may be out of reach.
+        if os.environ.get("GITHUB_ACTIONS"):
+            print(f"::error file=scripts/e2e/play.py::{GAME}: {type(e).__name__}: {str(e)[:900]}".replace("\n", " "))
+        raise

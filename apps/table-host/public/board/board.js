@@ -1,6 +1,7 @@
 // Board UI: lobby, seats around the edge, QR join, game surface and the lobby overlay.
 // Talks to the Table Host through the board control API (same API the tests and local AI agents use).
-import { ROT, W, H, audio, copyText, esc, seatName, seatPositions, claimServiceWorkerPage, openTableSocket } from "/shared/board-kit.js";
+import { renderRules } from "/shared/markdown.js";
+import { ROT, W, H, SEAT_COLORS, audio, copyText, esc, seatName, seatPositions, claimServiceWorkerPage, openTableSocket } from "/shared/board-kit.js";
 
 const KEY = window.TABLE_KEY;
 // A remote player's copy of the board (phase 1c): it runs inside the cloud's invite page, which carries
@@ -17,6 +18,8 @@ const gameLayer = document.getElementById("game-layer");
 const pauseLayer = document.getElementById("pause-layer");
 const cornersEl = document.getElementById("corners");
 const settingsBtn = document.getElementById("settings-button");
+const flipBtn = document.getElementById("flip-button");
+const viewBtn = document.getElementById("view-button");
 const resultBtn = document.getElementById("result-button");
 
 let state = null;
@@ -74,9 +77,9 @@ function confirmDialog(title, text, okLabel = "Confirm") {
 
 /**
  * A small form for manifest-described fields (game settings, AI options). Resolves with the values,
- * or null when cancelled.
+ * or null when cancelled. With `removeLabel`, a red button on the left resolves with "remove" (D-103).
  */
-function formDialog(title, intro, fields, values = {}, okLabel = "OK") {
+function formDialog(title, intro, fields, values = {}, okLabel = "OK", removeLabel = null) {
   return new Promise((resolve) => {
     const d = document.createElement("div");
     d.className = "dialog-backdrop";
@@ -88,12 +91,12 @@ function formDialog(title, intro, fields, values = {}, okLabel = "OK") {
       return `<input type="text" name="${f.key}" value="${esc(v ?? "")}">`;
     };
     d.innerHTML = `<div class="dialog form"><h2>${esc(title)}</h2>${intro ? `<div class="muted">${esc(intro)}</div>` : ""}
-      <div class="fields">${fields.map((f) => `<label><span>${esc(f.label ?? f.key)}</span>${input(f)}</label>`).join("") || `<div class="faint">Nothing to set for this game.</div>`}</div>
-      <div class="actions"><button data-x="no">Cancel</button><button class="primary" data-x="yes">${esc(okLabel)}</button></div></div>`;
+      <div class="fields">${fields.map((f) => `<label><span>${esc(f.label ?? f.key)}</span>${input(f)}</label>`).join("") || `<div class="faint">${state?.game ? "Nothing to set for this game." : "Pick a game to choose how it plays."}</div>`}</div>
+      <div class="actions">${removeLabel ? `<button class="danger" data-x="remove" style="margin-right:auto">${esc(removeLabel)}</button>` : ""}<button data-x="no">Cancel</button><button class="primary" data-x="yes">${esc(okLabel)}</button></div></div>`;
     d.addEventListener("click", (e) => {
       const x = e.target.closest("button")?.dataset.x;
       if (!x && e.target !== d) return;
-      let out = null;
+      let out = x === "remove" ? "remove" : null;
       if (x === "yes") {
         out = {};
         for (const f of fields) {
@@ -116,12 +119,19 @@ async function chooseGame(id) {
   if (settings) act("POST", "/game/select", { gameId: id, settings });
 }
 
+/** The AI player's window: how it plays in the chosen game, and Remove (D-103), which works with or without a game. */
 async function configureAi(playerId) {
   const p = state.players.find((x) => x.id === playerId);
-  if (!state.game) return toast("Pick a game first: AI options depend on the game");
-  const g = games.find((x) => x.id === state.game.id);
-  const opts = await formDialog(`${p.name} · ${g.name}`, "How this AI player plays.", g.aiOptions ?? [], p.aiOptions ?? {}, "Save");
-  if (opts) act("POST", `/players/${playerId}/ai-options`, { options: opts });
+  if (!p) return;
+  const g = state.game ? games.find((x) => x.id === state.game.id) : null;
+  const title = g ? `${p.name} · ${g.name}` : p.name;
+  const opts = await formDialog(title, g ? "How this AI player plays." : "", g?.aiOptions ?? [], p.aiOptions ?? {}, g ? "Save" : "Done", "Remove");
+  if (opts === "remove") {
+    if (await confirmDialog(`Remove ${p.name}?`, "The AI player leaves its seat.", "Remove")) {
+      if (selectedPlayer === playerId) selectedPlayer = null;
+      act("DELETE", `/players/${playerId}`);
+    }
+  } else if (opts && g) act("POST", `/players/${playerId}/ai-options`, { options: opts });
 }
 
 // ---------- orientation ----------
@@ -137,13 +147,60 @@ function myEdge() {
   const p = id && state.players.find((x) => x.id === id);
   return p && p.seat !== null ? state.seatEdges[p.seat] ?? null : null;
 }
-const viewEdge = () => myEdge() ?? state.frontEdge;
+/**
+ * A remote player on an east or west seat sees the board turned a quarter so their seat is at the bottom, which leaves a
+ * landscape screen mostly empty. They may choose the full width instead (D-101): the board upright, their seat on a
+ * side. Their own choice, remembered on their device. North and south seats have no such choice (no upside-down view).
+ */
+const LANDSCAPE_KEY = `gametable.remote.${REMOTE_INV}.landscape`;
+let landscape = (() => {
+  try {
+    return localStorage.getItem(LANDSCAPE_KEY) === "1";
+  } catch {
+    return false;
+  }
+})();
+const sideSeat = (e) => e === "east" || e === "west";
+/** The edge a remote player's view is turned to: their seat's, or upright (south) when they chose the full width. */
+function remoteEdge() {
+  const e = myEdge();
+  return e && sideSeat(e) && landscape ? "south" : e;
+}
+const viewEdge = () => remoteEdge() ?? state.frontEdge;
+
+/**
+ * Games use the board's full width (D-101): on the table's own board a game faces north or south only, whichever the
+ * lobby faced last; the turn button flips between the two. Turning the lobby's menus east or west during a game
+ * leaves the game as it was. Remote boards keep facing their player (or upright, as they chose).
+ */
+let lastFacing = "south";
+function gameEdge() {
+  if (REMOTE) return viewEdge();
+  if (state.frontEdge === "north" || state.frontEdge === "south") lastFacing = state.frontEdge;
+  return lastFacing;
+}
+
+function renderViewButton() {
+  const show = REMOTE && sideSeat(myEdge());
+  viewBtn.hidden = !show;
+  if (!show) return;
+  viewBtn.textContent = landscape ? "⤾ Put my seat at the bottom" : "⤢ Use the full width";
+  viewBtn.title = landscape ? "Turn the board so your seat is at the bottom" : "Show the board upright across the whole screen; your seat stays on the side";
+}
+viewBtn.addEventListener("click", () => {
+  landscape = !landscape;
+  try {
+    localStorage.setItem(LANDSCAPE_KEY, landscape ? "1" : "0");
+  } catch {}
+  fit();
+  render();
+});
 if (REMOTE) window.addEventListener("storage", (e) => e.key?.startsWith("gametable.remote.") && state && (render(), game?.inst && gameMsg && game.inst.update(gameMsg.view, [], gameInfo())));
 
 // ---------- scaling ----------
 function fit() {
-  const e = myEdge();
-  const sideways = e === "east" || e === "west";
+  const e = remoteEdge();
+  const sideways = sideSeat(e);
   const s = sideways ? Math.min(window.innerWidth / H, window.innerHeight / W) : Math.min(window.innerWidth / W, window.innerHeight / H);
   surface.style.transform = `${e ? `rotate(${-ROT[e]}deg) ` : ""}scale(${s})`;
 }
@@ -168,6 +225,7 @@ function renderSeats() {
     if (pl?.ready) el.classList.add("ready");
     if (pl && pl.id === selectedPlayer) el.classList.add("selected");
     if (allowed && !allowed.includes(p.edge)) el.classList.add("unused");
+    if (pl?.color) el.style.setProperty("--pc", pl.color); // the player's colour: card border and name dot (D-106)
     el.style.left = `${p.x}px`;
     el.style.top = `${p.y}px`;
     el.style.transform = `translate(-50%, -50%) rotate(${p.rot}deg)`;
@@ -179,7 +237,7 @@ function renderSeats() {
           ? `<span class="dot"></span>${pl.ready ? "Ready" : "Not ready"}`
           : pl.kind === "ai" ? `AI player${pl.aiOptions ? ` · ${esc(Object.values(pl.aiOptions).join(", "))}` : ""}` : pl.location === "remote" ? "Remote" : "";
     el.innerHTML = `<div class="num">${esc(seatName(state.seatEdges, seat))}</div>
-      <div class="name">${pl ? esc(pl.name) : "—"}</div><div class="status">${status}</div>`;
+      <div class="name">${pl ? `<span class="pdot" aria-hidden="true"></span>${esc(pl.name)}` : "—"}</div><div class="status">${status}</div>`;
     if (!playing && !REMOTE) el.addEventListener("click", () => onSeatTap(seat, pl)); // seating stays with the table
     seatsEl.appendChild(el);
   });
@@ -236,12 +294,33 @@ const LOBBY_CORNER = { "top-left": "tl", "top-right": "tr", "bottom-left": "bl",
 function placeSettings(playing) {
   settingsBtn.hidden = REMOTE;
   if (REMOTE) return;
-  const front = viewEdge();
+  const front = playing ? gameEdge() : viewEdge();
   let [corner, other] = FRONT_CORNERS[front];
   if (playing && LOBBY_CORNER[state.game?.lobbyButton ?? "bottom-right"] === corner) corner = other;
   settingsBtn.className = `${corner} along-${front === "south" || front === "north" ? "x" : "y"}`;
   settingsBtn.querySelector("svg").style.transform = `rotate(${ROT[front]}deg)`;
+  placeFlip(playing, front, corner);
 }
+
+/**
+ * The turn button sits to the left of the gear as seen by whoever the game faces (D-101): in the corner itself when the
+ * gear is at that player's left end (the corner buttons are hidden during a game), else one step toward the middle.
+ */
+function placeFlip(playing, front, gearCorner) {
+  flipBtn.hidden = REMOTE || !playing;
+  if (flipBtn.hidden) return;
+  const leftEnd = gearCorner === FRONT_CORNERS[front][0];
+  const along = leftEnd ? 32 : 172; // the gear is 102 px from its corner; the button is 58 px wide, with a 12 px gap
+  const st = flipBtn.style;
+  st.left = st.right = st.top = st.bottom = "";
+  st[gearCorner[1] === "l" ? "left" : "right"] = `${along}px`;
+  st[gearCorner[0] === "t" ? "top" : "bottom"] = "32px";
+  flipBtn.querySelector("svg").style.transform = `rotate(${ROT[front]}deg)`;
+  const label = `Turn the game to face ${front === "south" ? "north" : "south"}`;
+  flipBtn.title = label;
+  flipBtn.setAttribute("aria-label", label);
+}
+flipBtn.addEventListener("click", () => act("POST", "/face", { edge: gameEdge() === "south" ? "north" : "south" }));
 settingsBtn.addEventListener("click", () => openSettings());
 
 /**
@@ -299,6 +378,15 @@ function openSettings() {
       if (f.type === "enum") return `<span class="seg">${f.values.map((x) => `<button class="${String(v) === x ? "on" : ""}" data-setting="${esc(f.key)}" data-value="${esc(x)}">${esc(x)}</button>`).join("")}</span>`;
       return `<span class="value">${esc(v)}</span>`;
     };
+    // Player colours (D-106): a table setting for every seated player, used in the lobby and by every game.
+    const playerColors = () => {
+      const seated = state.players.filter((p) => p.seat !== null).sort((a, b) => a.seat - b.seat);
+      if (!seated.length) return "";
+      return `<div class="group player-colors"><div class="eyebrow">Player colours</div>
+        ${seated.map((p) => `<div class="row"><span><span class="pdot" style="background:${esc(p.color ?? "")}"></span>${esc(p.name)}</span><span class="swatches">${SEAT_COLORS.map((c, i) =>
+          `<button class="swatch ${c === p.color ? "on" : ""}" style="--c:${c}" data-color-player="${esc(p.id)}" data-color="${c}" aria-label="${esc(p.name)}: colour ${i + 1}"></button>`).join("")}</span></div>`).join("")}
+        <div class="faint" style="font-size:.7em;margin-top:6px">Picking a colour someone else has swaps the two.</div></div>`;
+    };
     const gameSettings = fields.length
       ? `<div class="group game-rules"><div class="eyebrow">${esc(state.game.name)} · game settings</div>
           ${fields.map((f) => `<div class="row"><span>${esc(f.label ?? f.key)}</span>${setting(f)}</div>`).join("")}
@@ -308,6 +396,7 @@ function openSettings() {
       <div class="group"><div class="eyebrow">Display</div>
         <div class="row"><span>Sound effects</span><button data-sound class="${state.display?.sound !== false ? "on" : ""}" role="switch" aria-checked="${state.display?.sound !== false}">${state.display?.sound !== false ? "On" : "Off"}</button></div>
         <div class="row"><span>Fullscreen</span>${fs ? `<button data-fs class="${document.fullscreenElement ? "on" : ""}">${document.fullscreenElement ? "Leave fullscreen" : "Fullscreen"}</button>` : `<span class="faint">not available in this browser</span>`}</div></div>
+      ${playerColors()}
       ${gameSettings}
       ${items.length ? `<div class="group game-settings"><div class="eyebrow">${esc(state.game.name)}</div>${items.map((it, k) => `<div class="row"><span>${esc(it.label)}</span>${control(it, k)}</div>`).join("")}</div>` : ""}
       <div class="actions" style="display:flex;justify-content:flex-end;margin-top:20px"><button class="primary" data-close-overlay>Done</button></div></div>`;
@@ -330,6 +419,7 @@ function openSettings() {
       (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()).catch(() => toast("Fullscreen was refused by the browser"));
     }
     if (b.dataset.sound !== undefined) return void act("POST", "/display", { sound: state.display?.sound === false });
+    if (b.dataset.colorPlayer) return void act("POST", `/players/${encodeURIComponent(b.dataset.colorPlayer)}/color`, { color: b.dataset.color });
     if (b.dataset.setting) {
       const f = ((state.game && games.find((x) => x.id === state.game.id)?.settings) || []).find((x) => x.key === b.dataset.setting);
       if (!f) return;
@@ -355,8 +445,10 @@ function openSettings() {
 // ---------- center panel ----------
 function render() {
   if (!state) return;
+  gameEdge(); // keeps the last north/south facing current, so a game starts facing the way the lobby last did
   renderSeats();
   if (REMOTE) fit();
+  renderViewButton();
   const front = viewEdge();
   center.style.transform = `rotate(${ROT[front]}deg)`;
   center.classList.toggle("sideways", front === "east" || front === "west");
@@ -559,13 +651,41 @@ pauseLayer.addEventListener("click", async (e) => {
 // A game package may ship board.js exporting mount(root, ctx) -> { update(view, events, info), destroy() }.
 let game = null; // { key, inst, loading }
 
+/**
+ * Seats the board may move for by touch (D-102): on the table's board every human sitting at the table; on a remote
+ * board only its own player. A game uses it to decide which tokens answer a tap; the table checks again.
+ */
+function controlSeats() {
+  if (!state) return [];
+  if (REMOTE) {
+    let id = null;
+    try {
+      id = localStorage.getItem(`gametable.remote.${REMOTE_INV}.player`);
+    } catch {}
+    const p = id && state.players.find((x) => x.id === id);
+    return p && p.seat !== null ? [p.seat] : [];
+  }
+  return state.players.filter((p) => p.kind === "human" && p.location === "local" && p.seat !== null).map((p) => p.seat);
+}
+
+/** Send an intent for the player in `seat`, made by touching the board. Resolves { ok, reason }; a rejection toasts. */
+function boardAct(seat, name, payload) {
+  const p = state?.players.find((x) => x.seat === seat);
+  if (!p) return Promise.resolve({ ok: false, reason: "nobody sits there" });
+  return wsSend("game", "intent", { playerId: p.id, name, payload }).then((r) => {
+    if (!r.ok && r.reason) toast(r.reason);
+    return r;
+  });
+}
+
 function gameInfo() {
   return {
+    controlSeats: controlSeats(),
     players: state.players,
     seatEdges: state.seatEdges,
     seatPositions: seatPositions(state.seatEdges),
-    frontEdge: viewEdge(),
-    rotation: ROT[viewEdge()],
+    frontEdge: gameEdge(),
+    rotation: ROT[gameEdge()],
     settings: state.game?.settings ?? {},
     prefs: state.game?.prefs ?? {},
     sound: state.display?.sound !== false, // sound effects on (D-092)
@@ -589,7 +709,7 @@ async function showGame() {
       mod = { mount: genericBoard };
     }
     if (game !== mine) return; // a newer game replaced this one while loading
-    mine.inst = mod.mount(gameLayer, { gameId: state.game.id, assetUrl: (p) => `/games/${state.game.id}/assets/${p}` });
+    mine.inst = mod.mount(gameLayer, { gameId: state.game.id, assetUrl: (p) => `/games/${state.game.id}/assets/${p}`, act: boardAct });
   }
   if (game.inst && gameMsg) game.inst.update(gameMsg.view, [], gameInfo());
 }
@@ -641,6 +761,38 @@ center.addEventListener("click", async (e) => {
 
 lobbyBtn.addEventListener("click", openLobbyOverlay);
 
+/**
+ * The terms of service in a window on the board (D-108), over whatever is open, facing the lobby's edge; closed by ✕,
+ * Close, the backdrop or Escape. Not a new tab: a remote board lives in a frame, and a tab's "Back" went nowhere.
+ */
+async function openTerms() {
+  const o = document.createElement("div");
+  o.className = "overlay terms";
+  o.innerHTML = `<div class="panel" role="dialog" aria-modal="true" aria-label="Terms of service">
+    <div class="terms-head"><h2>Terms of service</h2><button class="terms-close" data-close-terms aria-label="Close">✕</button></div>
+    <div class="md"><p class="muted">Loading…</p></div>
+    <div class="actions" style="display:flex;justify-content:flex-end;margin-top:20px"><button class="primary" data-close-terms>Close</button></div></div>`;
+  faceFront(o.querySelector(".panel"));
+  overlayRoot.appendChild(o);
+  const close = () => {
+    o.remove();
+    document.removeEventListener("keydown", onKey);
+  };
+  const onKey = (e) => e.key === "Escape" && close();
+  document.addEventListener("keydown", onKey);
+  o.addEventListener("click", (e) => {
+    if (e.target === o || e.target.closest("[data-close-terms]")) close();
+  });
+  try {
+    const r = await fetch("/shared/terms.md");
+    if (!r.ok) throw new Error(String(r.status));
+    const { html } = renderRules(await r.text(), "/shared/");
+    o.querySelector(".md").innerHTML = html;
+  } catch {
+    o.querySelector(".md").innerHTML = `<p class="muted">The terms could not be loaded. Try again in a moment.</p>`;
+  }
+}
+
 function openLobbyOverlay() {
   const o = document.createElement("div");
   o.className = "overlay";
@@ -653,7 +805,7 @@ function openLobbyOverlay() {
       ${REMOTE ? "" : `<div class="group"><div class="eyebrow">View</div><div class="row"><span>Lobby and menus face</span>
         <span class="seg">${EDGE_ORDER.map((e) => `<button data-face="${e}" class="${state.frontEdge === e ? "on" : ""}">${e[0].toUpperCase() + e.slice(1)}</button>`).join("")}</span></div></div>`}
       <div class="group">${REMOTE ? "" : `<div class="row"><span>Remote players${state.remote?.players ? ` · ${state.remote.players} joined` : ""}</span><button data-invite>Invite…</button></div>`}
-        <div class="row"><span>Terms of service</span><a href="/deck/terms.html" target="_blank" style="color:var(--brass)">Open</a></div></div>
+        <div class="row"><span>Terms of service</span><button data-terms>Open</button></div></div>
       <div class="actions" style="display:flex;justify-content:space-between;margin-top:20px">
         <button class="danger" data-end>End game</button><button class="primary" data-close-overlay>Back to game</button></div></div>`;
     faceFront(o.querySelector(".panel"));
@@ -666,6 +818,7 @@ function openLobbyOverlay() {
     if (!b) return;
     if (b.dataset.face) act("POST", "/face", { edge: b.dataset.face });
     if (b.dataset.invite !== undefined) openInvite();
+    if (b.dataset.terms !== undefined) openTerms();
     if (b.dataset.remove) {
       const p = state.players.find((x) => x.id === b.dataset.remove);
       if (await confirmDialog(`Remove ${p?.name}?`, "This may end games that cannot continue without them.", "Remove")) act("DELETE", `/players/${b.dataset.remove}`);
@@ -770,11 +923,31 @@ async function refreshGames() {
   games = await api("GET", "/games").catch(() => games);
 }
 
+// Requests on the socket that expect an answer (a board intent, D-102): seq -> resolve.
+let ws = null;
+let wsSeq = 0;
+const wsPending = new Map();
+function wsSend(ch, type, payload) {
+  if (ws?.readyState !== 1) return Promise.resolve({ ok: false, reason: "not connected to the table" });
+  const seq = ++wsSeq;
+  ws.send(JSON.stringify({ v: 1, ch, type, seq, payload }));
+  return new Promise((resolve) => {
+    wsPending.set(seq, resolve);
+    setTimeout(() => wsPending.delete(seq) && resolve({ ok: false, reason: "no answer from the table" }), 5000);
+  });
+}
+
 function connect() {
-  const ws = openTableSocket(REMOTE);
+  ws = openTableSocket(REMOTE);
   ws.onopen = () => ws.send(JSON.stringify({ v: 1, ch: "system", type: "hello", payload: REMOTE ? { role: "board" } : { role: "board", key: KEY } }));
   ws.onmessage = async (ev) => {
     const m = JSON.parse(ev.data);
+    const answer = m.ch === "system" && m.seq !== undefined && wsPending.get(m.seq);
+    if (answer) {
+      wsPending.delete(m.seq);
+      answer(m.type === "ack" ? { ok: true } : { ok: false, reason: m.payload?.reason ?? m.payload?.message });
+      return;
+    }
     if (m.ch === "lobby" && m.type === "state") {
       state = m.payload;
       if (selectedPlayer && !state.players.some((p) => p.id === selectedPlayer)) selectedPlayer = null;
@@ -788,6 +961,10 @@ function connect() {
       else if (state && (state.phase === "active" || state.phase === "paused")) showGame();
     }
   };
-  ws.onclose = () => setTimeout(connect, 1000);
+  ws.onclose = () => {
+    for (const r of wsPending.values()) r({ ok: false, reason: "connection lost" });
+    wsPending.clear();
+    setTimeout(connect, 1000);
+  };
 }
 connect();

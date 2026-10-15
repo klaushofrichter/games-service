@@ -3,6 +3,7 @@
 import { EventEmitter } from "node:events";
 import { randomBytes, randomInt } from "node:crypto";
 import {
+  PLAYER_COLORS,
   allowedPlayerCounts,
   rotateEdge,
   seatEdges,
@@ -48,6 +49,7 @@ interface Player extends PlayerInfo {
   remoteSession?: string; // the cloud session a remote player came through: one player per invite
   graceTimer?: NodeJS.Timeout;
   aiSeed?: number;
+  chosenColor?: string; // picked in the board's settings (D-106); otherwise the seat's colour
 }
 
 // Join tokens avoid look-alike characters so they can be read out loud.
@@ -117,7 +119,7 @@ export class Table extends EventEmitter {
       layout: this.layout,
       seatEdges: seatEdges(this.layout),
       frontEdge: this.frontEdge,
-      players: [...this.players.values()].map(({ sessionToken, graceTimer, aiSeed, remoteSession, ...info }) => info),
+      players: this.playerInfos(),
       phase: this.phase,
       game: this.selected
         ? {
@@ -443,6 +445,52 @@ export class Table extends EventEmitter {
       }
     }
     p.aiOptions = { ...(p.aiOptions ?? {}), ...options };
+    this.changed();
+  }
+
+  /**
+   * Every seated player's colour (D-106), all different: a player's own choice first (in seat order), then their seat's
+   * colour, else the first one nobody has. Players without a seat have none.
+   */
+  colors(): Map<string, string> {
+    const seated = this.seated().sort((a, b) => a.seat! - b.seat!);
+    const out = new Map<string, string>();
+    const used = new Set<string>();
+    for (const p of seated) {
+      if (p.chosenColor && !used.has(p.chosenColor)) {
+        out.set(p.id, p.chosenColor);
+        used.add(p.chosenColor);
+      }
+    }
+    for (const p of seated) {
+      if (out.has(p.id)) continue;
+      const own = PLAYER_COLORS[p.seat! % PLAYER_COLORS.length];
+      const c = used.has(own) ? PLAYER_COLORS.find((x) => !used.has(x)) ?? own : own;
+      out.set(p.id, c);
+      used.add(c);
+    }
+    return out;
+  }
+
+  private playerInfos(): PlayerInfo[] {
+    const colors = this.colors();
+    return [...this.players.values()].map(({ sessionToken, graceTimer, aiSeed, remoteSession, chosenColor, ...info }) => ({ ...info, color: colors.get(info.id) ?? null }));
+  }
+
+  /**
+   * Give a seated player a colour from the palette (D-106). If someone else has it, the two swap, so colours stay
+   * distinct. A table setting, not a game's: it holds in the lobby and in every game until the player leaves.
+   */
+  setColor(playerId: string, color: unknown) {
+    const p = this.mustPlayer(playerId);
+    if (p.seat === null) throw new TableError(409, `${p.name} has no seat`);
+    if (typeof color !== "string" || !(PLAYER_COLORS as readonly string[]).includes(color.toLowerCase())) throw new TableError(400, `color must be one of ${PLAYER_COLORS.join(", ")}`);
+    const c = color.toLowerCase();
+    const colors = this.colors();
+    const mine = colors.get(p.id)!;
+    const other = this.seated().find((q) => q.id !== p.id && colors.get(q.id) === c);
+    if (other) other.chosenColor = mine;
+    p.chosenColor = c;
     this.changed();
   }
 
@@ -789,6 +837,23 @@ export class Table extends EventEmitter {
     if (!intent || typeof intent.name !== "string") throw new TableError(400, "intent needs a name");
     const r = this.runtime.submit(p.seat, { name: intent.name, payload: intent.payload }, p.kind === "ai" ? "ai" : "human");
     return r;
+  }
+
+  /**
+   * An intent sent by touching the board for a player (D-102). Only names the running game lists in `boardIntents`.
+   * The table's own board acts for humans sitting at the table; a remote board (`remoteSession` set) only for the
+   * player who came through that session, whatever the board-control switch says, since it is their own move.
+   */
+  boardIntent(playerId: unknown, intent: Intent, remoteSession: string | null) {
+    const p = typeof playerId === "string" ? this.players.get(playerId) : undefined;
+    if (!p) throw new TableError(404, "no such player");
+    if (!intent || typeof intent.name !== "string") throw new TableError(400, "intent needs a name");
+    if (this.phase !== "active" || !this.runtime) throw new TableError(409, this.phase === "paused" ? "the game is paused" : "no game is running");
+    if (!this.runtime.manifest.boardIntents.includes(intent.name)) throw new TableError(403, `${intent.name} is done on the phone, not on the board`);
+    if (remoteSession === null ? p.kind !== "human" || p.location !== "local" : p.remoteSession !== remoteSession)
+      throw new TableError(403, remoteSession === null ? "only players at the table can move from the board" : "you can only move your own pieces");
+    if (p.seat === null || !this.runtime.seats.some((s) => s.seat === p.seat)) throw new TableError(409, `${p.name} is not playing in this game`);
+    return this.runtime.submit(p.seat, { name: intent.name, payload: intent.payload }, "board");
   }
 
   private aiTimers = new Map<string, NodeJS.Timeout>(); // one pending move per AI player
