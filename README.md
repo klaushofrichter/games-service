@@ -132,7 +132,8 @@ Rules must be deterministic: all randomness through `ctx.random()`. The host log
 ## Extra-game repositories
 
 Games can also come from other GitHub repositories, private ones included (D-097), for private games and early
-releases. The first is [`klaushofrichter/extra-games`](https://github.com/klaushofrichter/extra-games) (private).
+releases. The first is [`klaushofrichter/extra-games`](https://github.com/klaushofrichter/extra-games) (private); the second is
+[`klaushofrichter/loopy-game`](https://github.com/klaushofrichter/loopy-game) (private, Loopy only).
 
 - **The list:** [`deploy/game-repos.json`](deploy/game-repos.json) is baked into the cloud image, so these
   repositories are back after every restart (D-098); change it by PR. In the console they are marked *deploy config*.
