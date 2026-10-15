@@ -15,7 +15,7 @@ export interface GameRepo {
   /** Short id used in the console and in table assignments: the repository name, made unique. */
   id: string;
   /** "deploy": from deploy/game-repos.json (or GAME_REPOS), back after every restart and not removable in the console.
-   *  "console": added in the console; kept across restarts when the service has a DATA_DIR (D-113). */
+   *  "console": added in the console; kept across restarts when the service has a DATA_DIR (D-114). */
   origin: "deploy" | "console";
   /** owner/name on GitHub. */
   repo: string;
@@ -134,7 +134,7 @@ export function parseRepoConfig(text: string): string[] {
   });
 }
 
-/** The console's list of repositories. Console-added ones are saved by the server's store (D-113); bundles are fetched again at start. */
+/** The console's list of repositories. Console-added ones are saved by the server's store (D-114); bundles are fetched again at start. */
 export class GameRepoStore {
   readonly repos = new Map<string, GameRepo>();
   private readonly o: GameRepoOptions;
@@ -144,7 +144,7 @@ export class GameRepoStore {
     this.o = o;
   }
 
-  /** `keep` restores a repository from the persistent store with the id and date it had (D-113). */
+  /** `keep` restores a repository from the persistent store with the id and date it had (D-114). */
   add(spec: string, origin: GameRepo["origin"] = "console", keep?: { id: string; addedAt: number }): GameRepo {
     const { repo, ref } = parseRepoSpec(spec);
     for (const r of this.repos.values()) if (r.repo.toLowerCase() === repo.toLowerCase() && r.ref === ref) throw Object.assign(new Error(`${repo}@${ref} is already in the list`), { status: 409 });

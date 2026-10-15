@@ -12,7 +12,7 @@ page is the history. Leave it empty if there is nothing to add beyond the commit
   `GAME_REPO_TOKEN`), and an administrator ticks them per table, at approval or later. Tables install those games
   between games, and remote players see them too. Games in such a repository import `@game-table/sdk`.
 - The repository list survives restarts: `deploy/game-repos.json` is baked into the cloud image (shown as *deploy
-  config* in the console); repositories added in the console are kept too (D-113).
+  config* in the console); repositories added in the console are kept too (D-114).
 - Rules for every game on the phones: a **Rules** button opens the chosen game's rules, with illustrations and the
   settings chosen at this table. Games provide them as `how-to-play.md` with images in `assets/`.
 - Games on the board face north or south only, using the long sides; a turn-around button left of the gear turns a
@@ -23,17 +23,17 @@ page is the history. Leave it empty if there is nothing to add beyond the commit
   numbers); and tokens can be moved by tapping them on the board, for players at the table and remote players on their
   own board. Games can allow such board moves with `boardIntents` in their manifest.
 - An AI player's window has a **Remove** button, and opens before a game is chosen too.
-- **Access codes** (D-112): the console creates codes that approve a table at once, without a pairing code, valid
+- **Access codes** (D-113): the console creates codes that approve a table at once, without a pairing code, valid
   for a week, a month, a year or forever, with a choice of games (built-in only, all repositories, or chosen ones).
   A table takes a code from `TABLE_CODE`, `--code` or a keypad in the board's settings. A code serves one table;
   the console lists codes with their table and last use, and can edit, release, revoke and delete them. The code
   itself is shown once and stored only as a hash.
-- **The service keeps its state** (D-113): with `DATA_DIR` (the PVC at `/data` in the cluster) paired tables, access
+- **The service keeps its state** (D-114): with `DATA_DIR` (the PVC at `/data` in the cluster) paired tables, access
   codes, repository ticks, console-added repositories, logs, invites and the retention setting survive restarts and
   deploys, so tables no longer need approving again after a deploy. SQLite, with an hourly snapshot the service
   starts from if its database is missing or damaged. Storage stays within a budget (`DATA_LIMIT_MB`, 1 GiB): the
   oldest logs make way, and the console's Overview shows how full it is.
-- The console can delete records (D-114): a disconnected table (optionally with its logs), single logs or all
+- The console can delete records (D-115): a disconnected table (optionally with its logs), single logs or all
   simulation logs, and it lists download tokens with a Revoke button. Runbooks in `docs/runbooks/` reset the
   service's state or restore it from a backup.
 - The phones' *At the table* list shows each player's colour before their name.

@@ -35,6 +35,18 @@ export interface GameContext {
   seats: SeatInfo[];
 }
 
+/**
+ * What an AI player gets besides its view (D-112). `signal` is aborted when the game has moved on (the AI is asked
+ * again with the new view), paused or ended; `deadline` is the time (ms since the epoch) by which the table expects
+ * the move. An AI may answer later than that: the game then pauses until it answers or the players tap "Play now".
+ */
+export interface AiContext {
+  random(): number;
+  randomInt(min: number, max: number): number;
+  signal: AbortSignal;
+  deadline: number;
+}
+
 export type StepResult<S> = { state: S; events?: GameEvent[] } | { reject: string };
 
 export interface GameDefinition<S = unknown> {
@@ -50,8 +62,17 @@ export interface GameDefinition<S = unknown> {
   onSeatJoined?(state: S, seat: SeatInfo, ctx: GameContext): StepResult<S>;
   /** A seat left for good. Return "end" to end the game. */
   onSeatLeft?(state: S, seat: number, ctx: GameContext): StepResult<S> | "end";
-  /** AI player: pick an intent from this seat's view, or null to wait. */
-  ai?(view: unknown, seat: number, ctx: Pick<GameContext, "random" | "randomInt">, options: Record<string, unknown>): Intent | null;
+  /**
+   * AI player: pick an intent from this seat's view, or null to wait. May answer later (a promise), for a search or
+   * a call to a language model (D-112); the table keeps running meanwhile. With `ai.worker` in the manifest it runs
+   * in a worker thread, where it gets the view and options only, as plain data.
+   */
+  ai?(view: unknown, seat: number, ctx: AiContext, options: Record<string, unknown>): Intent | null | Promise<Intent | null>;
+  /**
+   * A quick move for an AI player that is out of time, when the players tap "Play now" (D-112). Synchronous and
+   * fast. Without it, "Play now" asks the AI again.
+   */
+  aiFallback?(view: unknown, seat: number, ctx: Pick<GameContext, "random" | "randomInt">, options: Record<string, unknown>): Intent | null;
 }
 
 export function defineGame<S>(def: GameDefinition<S>): GameDefinition<S> {

@@ -1,4 +1,4 @@
-// Pre-approved access codes (D-112): created in the console, used by one table, approving it without a pairing code.
+// Pre-approved access codes (D-113): created in the console, used by one table, approving it without a pairing code.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";

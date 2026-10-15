@@ -74,7 +74,7 @@ Or skip the pairing code: create an access code in the console (*Access codes*) 
 | `TABLE_KEY` | random per run | Key for the board control API (`X-Table-Key`) |
 | `PUBLIC_URL` | `http://<lan-ip>:<port>` | Base of the join URL in the QR code |
 | `CLOUD_URL` | unset | Cloud service; unset = development mode without cloud |
-| `TABLE_CODE` (or `--code`) | unset | An access code from the console (D-112): the table is approved without a pairing code. Wins over a code typed on the board |
+| `TABLE_CODE` (or `--code`) | unset | An access code from the console (D-113): the table is approved without a pairing code. Wins over a code typed on the board |
 | `REQUIRE_CLOUD` | 0 | `1` blocks new games while the cloud is unreachable (production) |
 | `GRACE_MS` | 60000 | How long a disconnected deck keeps its seat |
 | `AI_DELAY_MS` | 800 | Pause before an AI player acts |
@@ -99,9 +99,9 @@ curl -s -H "$K" -X POST $H/simulation -d '{"gameId":"coin-flip","players":4,"gam
 curl -s -H "$K" $H/logs/<id>.zip -o run.zip                # JSONL game logs
 ```
 
-Full list: `GET /state, /join, /games, /metrics, /game/board, /logs, /logs/{id}.zip` and `POST /join/new, /layout, /face, /rotate, /seats/move, /ai, /game/select, /game/settings, /game/prefs, /display, /game/start, /game/end, /game/close, /game/resume, /game/save, /simulation, /players/{id}/ai-options, /invites, /remote, /cloud/code`, `GET /saves, /qr?text=URL`, `DELETE /players/{id}`.
+Full list: `GET /state, /join, /games, /metrics, /game/board, /logs, /logs/{id}.zip` and `POST /join/new, /layout, /face, /rotate, /seats/move, /ai, /game/select, /game/settings, /game/prefs, /display, /game/start, /game/end, /game/close, /game/resume, /game/play-now, /game/save, /simulation, /players/{id}/ai-options, /invites, /remote, /cloud/code`, `GET /saves, /qr?text=URL`, `DELETE /players/{id}`.
 
-Remote players reach a subset over WebRTC (D-057): reads, except the join code, logs, saves, simulations, invites, the remote settings, QR codes and the access code; changes only `/layout` and `/game/select|start|end|close`.
+Remote players reach a subset over WebRTC (D-057): reads, except the join code, logs, saves, simulations, invites, the remote settings, QR codes and the access code; changes only `/layout` and `/game/select|start|end|close|play-now`.
 
 Decks speak JSON envelopes over `/ws`: `system.hello {joinToken, name}` or `{sessionToken}` (remote decks: `{name}`), then `lobby.ready {ready}` and `game.intent {name, payload}`. The host answers with `system.welcome {playerId, sessionToken}`, `lobby.state`, `game.view {seat, view, events, over, timers, now}` (this seat only), `system.ack | reject {reason} | error {message}`, and `system.removed {reason}` when the player is removed. The board says `system.hello {role: "board", key}` and gets `game.board` instead of `game.view`.
 
@@ -117,13 +117,17 @@ export default defineGame<State>({
   view(state, seat) { ... },                  // private, per seat
   boardView(state) { ... },                   // public
   isOver(state) { ... },                      // summary { text, highlights } or null
-  onTimer, onSeatJoined, onSeatLeft, ai,      // optional
+  onTimer, onSeatJoined, onSeatLeft,         // optional
+  ai(view, seat, ctx, options) { ... },       // optional: an intent, null, or a promise of one (D-112)
+  aiFallback(view, seat, ctx, options) { ... }, // optional: a quick move for "Play now"
 });
 ```
 
 The UI modules export `mount(root, ctx)` returning `{ update(view, events, info), destroy() }`. `info` carries the players, seat positions, the front edge and rotation, settings, and host timer deadlines for countdowns; the deck's `ctx.send(name, payload)` submits an intent and resolves with `{ ok, reason }`. `/shared/board-kit.js` has helpers for seat plates, rotation and countdowns, and `packages/sdk/src/cards.ts` has a deck, seeded shuffle and poker hand evaluation. The SDK also has `count(n, singular, plural?)` ("one die", "three dice") and `list(names)` ("Ann, Bob and Cleo") for natural end-of-game texts.
 
 **Rules for players (D-099).** A game provides its rules as `how-to-play.md` in its folder. Every phone then has a **Rules** button while the game is chosen or running, which opens the rules in a modal, with the settings chosen at this table on top (label and value, from the manifest). Images and diagrams go in the game's `assets/` folder and appear with `![alt text](assets/board.svg)`; SVG, PNG, JPEG, WebP and GIF work. The renderer (`/shared/markdown.js`) takes a small, safe subset of Markdown: `#` title, `##`/`###` headings, paragraphs, `-` and `1.` lists (one level), `**bold**`, `*italic*`, `` `code` ``, `> tip`, `---`, simple tables, `https` links and those images; everything else shows as plain text. The lobby state carries `game.howToPlay` (the URL, or `null`) and `game.settingsShown`; `GET /games` lists `howToPlay` per game. Start with the one-sentence goal and an `## In short` section of two to five bullets (the tests require it), then the details. Write for a phone about 360 px wide: short tables, illustrations around 360–720 px wide. Assets and rules are served with a content security policy that keeps an SVG from running script.
+
+**AI players that take their time (D-112).** `ai()` may answer later: return a promise, for a search or a call to a language model, and the table keeps running meanwhile. `ctx.signal` is aborted when the game moves on (the AI is then asked again with the new view, and a late answer for an old view is dropped), pauses or ends; `ctx.deadline` is when the table expects the move. The manifest's `ai.timeoutSeconds` (default 20) sets that budget per move. When an AI runs out of time, the game pauses (timers stop, nobody moves) and the board shows a card at the AI's seat with **Play now**: tapping it plays the game's `aiFallback()` move for it, a quick synchronous choice (without one, the AI is asked again). If nobody taps, the game goes on as soon as the AI answers. Remote boards with board control can tap it too. A failing AI gets its fallback at once. `"ai": { "worker": true }` runs the AI in a worker thread, one per AI player, so even a synchronous search never blocks the table; it gets the view and options as plain data, and a stale search is stopped by ending the thread. While an AI has been thinking for more than a moment, the lobby state's `aiThinking` lists it (`{ playerId, seat, since, deadline }`), and games get it as `info.aiThinking` on the board and the phones. The log records each such move's thinking time (`ai: { ms, fallback?, worker?, error? }`); replay never looks at it. Simulations wait for the answers and play the fallback when one is out of time. Synchronous AIs work as before.
 
 **Moves on the board (D-102).** A game may let players act by touching the board as well as their phone, to feel more like a real table: list the intent names in the manifest, e.g. Pachisi's `"boardIntents": ["move"]`. The board's `mount(root, ctx)` then gets `ctx.act(seat, name, payload)`, which resolves with `{ ok, reason }` (a rejection also shows as a toast), and `info.controlSeats` lists the seats this board may act for: on the table's board every human sitting at the table, on a remote board only its own player. The table checks again: an intent not in `boardIntents` is refused (403), the table's board never acts for AI or remote players, a remote board only for the player who joined through it, and the game's own rules decide the rest (whose turn, which token). The game log records such intents with `by: "board"`. Everything else, such as Pachisi's roll, stays on the phones. Pachisi: tap a token that can move; the phones follow at once.
 
@@ -153,12 +157,12 @@ releases. The first is [`klaushofrichter/extra-games`](https://github.com/klaush
   how it tests against this repository.
 
 Ticking a repository trusts its code on that table PC (rules run in-process, D-035). The ticks, and repositories added
-in the console, are kept by the service across restarts (D-113). A table approved with an access code gets the
+in the console, are kept by the service across restarts (D-114). A table approved with an access code gets the
 repositories of the code's scope instead of ticks.
 
 ## Access codes
 
-An access code approves a table at once, without a pairing code (D-112). Create one in the console under *Access
+An access code approves a table at once, without a pairing code (D-113). Create one in the console under *Access
 codes*: a label, a validity (one week, one month, one year or forever) and the games it brings (built-in only, all
 repositories, or chosen ones). The console shows the code, like `ABCD-EFGH`, once; the service keeps only a hash.
 
@@ -197,7 +201,7 @@ In the cluster these come from the `games-oauth` Secret (created by `scripts/syn
 | Variable | Meaning |
 | --- | --- |
 | `PUBLIC_URL` | `https://games.skylar.technology`; an https URL requires Google sign-in |
-| `DATA_DIR` | Where the state is kept (D-113): `state.db` (SQLite), `snapshots/state.db` (hourly and at shutdown) and `logs/`. In the cluster the PVC `games-cloud-data` at `/data`. Unset = memory only, lost at restart. A `RESTORE_FROM_SNAPSHOT` file there makes the next start use the snapshot |
+| `DATA_DIR` | Where the state is kept (D-114): `state.db` (SQLite), `snapshots/state.db` (hourly and at shutdown) and `logs/`. In the cluster the PVC `games-cloud-data` at `/data`. Unset = memory only, lost at restart. A `RESTORE_FROM_SNAPSHOT` file there makes the next start use the snapshot |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | The service's own OAuth client, in Google Cloud project `skylar-technology` |
 | `GOOGLE_REDIRECT_URI` | Exactly `PUBLIC_URL/auth/google/callback`; the service refuses to start otherwise |
 | `ALLOWED_EMAILS` | Comma-separated admin allow-list, checked at sign-in and on every request |
@@ -214,8 +218,8 @@ In the cluster these come from the `games-oauth` Secret (created by `scripts/syn
 
 ## The service's data
 
-The service keeps its state on the PVC `games-cloud-data` at `/data` (D-113; `DATA_DIR` above), within a 1 GiB budget.
-Single records are removed in the console (D-114):
+The service keeps its state on the PVC `games-cloud-data` at `/data` (D-114; `DATA_DIR` above), within a 1 GiB budget.
+Single records are removed in the console (D-115):
 
 - **Tables:** *Disconnect*, then *Delete* removes a table for good and frees its access code, optionally with its logs.
   If that PC connects again, it shows a new pairing code.
@@ -265,7 +269,7 @@ python3 scripts/e2e/layout.py out/         # decks at 4 phone sizes x 3 games, t
 ## Known limits
 
 - Game rules run in-process; the isolated sandbox for third-party games comes later.
-- The cloud keeps its state in SQLite on one volume (D-113), so it runs as exactly one replica.
+- The cloud keeps its state in SQLite on one volume (D-114), so it runs as exactly one replica.
 - Tables authenticate to the cloud with an issued bearer token, not yet a key pair or certificate.
-- Host-side AI configuration (`ai.hostConfig`, e.g. API keys) is parsed but has no screen yet.
+- Host-side AI configuration (`ai.hostConfig`, e.g. API keys) is parsed but has no screen yet. For language models it will also hold the model, the effort and a cost limit per game (D-112).
 - werift waits up to 5 s for STUN during connection setup when STUN is unreachable.

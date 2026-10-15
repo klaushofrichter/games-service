@@ -1,4 +1,4 @@
-// The service's persistent state (D-113): one SQLite database (node:sqlite, no native dependency) in DATA_DIR, plus
+// The service's persistent state (D-114): one SQLite database (node:sqlite, no native dependency) in DATA_DIR, plus
 // uploaded game logs as files beside it. The server keeps its working set in memory as before and writes every change
 // through to this store; at start it loads everything back. Without DATA_DIR (tests, local development) the store is
 // an in-memory database and logs stay in memory, which is exactly the old behaviour.
@@ -74,7 +74,7 @@ export class Store {
       // Keep the snapshot this start found, before writing a new one. After a Velero restore that is the consistent
       // copy from the backup; if the service started once before anyone set RESTORE_FROM_SNAPSHOT, the new startup
       // snapshot is a copy of the restored (possibly torn) state.db, and "previous" in the marker still reaches the
-      // good one (kube-setup review of D-114).
+      // good one (kube-setup review of D-115).
       const snapDir = join(this.dataDir!, "snapshots");
       if (existsSync(join(snapDir, "state.db"))) copyFileSync(join(snapDir, "state.db"), join(snapDir, "state.prev.db"));
       this.snapshot(); // a fresh, consistent copy right away, so a backup taken in the next hour has one

@@ -90,8 +90,15 @@ export const manifestSchema = z.object({
       supported: z.boolean(),
       options: z.array(settingSchema).default([]),
       hostConfig: z.array(z.unknown()).default([]),
+      /**
+       * Time an AI player may think about one move before the game pauses and the board offers "Play now" (D-112).
+       * Only an AI that answers asynchronously can take that long; a synchronous one answers at once.
+       */
+      timeoutSeconds: z.number().int().min(1).max(600).default(20),
+      /** Run the AI in a worker thread, so a long search never blocks the table (D-112). */
+      worker: z.boolean().default(false),
     })
-    .default({ supported: false, options: [], hostConfig: [] }),
+    .default({ supported: false, options: [], hostConfig: [], timeoutSeconds: 20, worker: false }),
   simulation: z.object({ supported: z.boolean(), headless: z.boolean() }).default({ supported: false, headless: false }),
   remoteBoardControl: z.boolean().default(true),
   /**
@@ -181,8 +188,16 @@ export interface LobbyState {
   summary: GameSummary | null;
   joinUrl: string;
   cloud: CloudStatus;
-  /** Why the running game is paused and what the board may offer. */
-  pause: { reason: "cloud"; since: number; canSave: boolean } | null;
+  /**
+   * Why the running game is paused and what the board may offer. "ai": an AI player is past its time for a move
+   * (D-112); the board offers "Play now" for it (`ai`), and the game goes on by itself if the AI answers first.
+   */
+  pause: { reason: "cloud" | "ai"; since: number; canSave: boolean; ai?: { playerId: string; name: string; seat: number; since: number } } | null;
+  /**
+   * AI players thinking about a move for more than a moment (D-112): their seat, since when, and the time they may
+   * take (host clock, `deadline`). Games may show it; the board shows "Play now" once a deadline has passed.
+   */
+  aiThinking: { playerId: string; seat: number; since: number; deadline: number }[];
   /** Remote play: whether remote boards may act, and how many remote players fit. */
   remote: { boardControl: boolean; maxPlayers: number; players: number };
   /** The table's display choices from the board's settings (D-092), followed by every board, remote ones too. */
@@ -193,7 +208,7 @@ export interface CloudStatus {
   status: "disabled" | "pending" | "online" | "offline" | "revoked";
   pairingCode?: string;
   /**
-   * The table's pre-approved access code (D-112), if it has one: never the code, only its first two characters, where
+   * The table's pre-approved access code (D-113), if it has one: never the code, only its first two characters, where
    * it came from (TABLE_CODE/--code at start, or typed on the board) and what the service said about it ("waiting"
    * until it has answered).
    */

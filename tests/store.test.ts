@@ -1,4 +1,4 @@
-// The service's persistent store (D-113): state in DATA_DIR survives a restart, a damaged database is replaced by the
+// The service's persistent store (D-114): state in DATA_DIR survives a restart, a damaged database is replaced by the
 // snapshot, and no usable secret is ever written to disk.
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";

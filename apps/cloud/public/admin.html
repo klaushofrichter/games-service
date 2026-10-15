@@ -64,7 +64,7 @@
   .checks label { display:inline-flex; gap:6px; align-items:center; white-space:nowrap; cursor:pointer; }
   .checks input { accent-color:var(--brass); width:16px; height:16px; padding:0; }
   .games { color:var(--soft); font-size:13px; }
-  /* Access codes (D-112) */
+  /* Access codes (D-113) */
   .newcode { margin-top:12px; padding:14px 16px; border:1px solid var(--brass); border-radius:12px; background:rgba(214,169,74,.07); }
   .newcode .big { font:600 28px/1.2 var(--mono); letter-spacing:.12em; color:var(--brass); }
   tr.flag td { background:rgba(210,87,74,.08); }
@@ -262,7 +262,7 @@ async function refresh() {
   } catch (e) { if (signedIn()) msg("#pair-msg", e.message); }
 }
 
-// ----- access codes (D-112) -----
+// ----- access codes (D-113) -----
 const VALIDITY = { week: "1 week", month: "1 month", year: "1 year", forever: "forever" };
 const day = (t) => new Date(t).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
 const repoNames = () => [...new Set(repos.map((r) => r.repo))];
@@ -378,7 +378,7 @@ document.addEventListener("click", async (e) => {
   } catch (err) { msg("#code-msg", err.message); }
 });
 
-/** The service's volume (D-113): how full it is, and what of it is logs. Red when free space nears the reserve. */
+/** The service's volume (D-114): how full it is, and what of it is logs. Red when free space nears the reserve. */
 function storageTile(s) {
   if (!s) return `<div class="tile" title="DATA_DIR is not set: the service keeps its state in memory"><div class="n">memory</div><div class="l">storage · lost at restart</div></div>`;
   const used = s.total - s.free;
@@ -386,7 +386,7 @@ function storageTile(s) {
   return `<div class="tile ${s.low ? "low" : ""}" title="${esc(tip)}"><div class="n">${Math.round((used / s.total) * 100)} %</div><div class="l">of ${s.total >= 2 ** 30 ? `${(s.total / 2 ** 30).toFixed(1)} GiB` : `${Math.round(s.total / 2 ** 20)} MiB`} used · ${s.logs ? `logs ${size(s.logs)}` : "no logs yet"}</div></div>`;
 }
 
-// ----- deleting records (D-114) -----
+// ----- deleting records (D-115) -----
 function drawTokens(list) {
   $("#tokens").innerHTML = list.map((d) => `<tr>
     <td><div>${esc(d.label) || `<span class="faint">no label</span>`}</div><div class="faint" style="font-size:12px">${d.gameId ? `game ${esc(d.gameId)}` : "all games"}${d.createdBy ? ` · by ${esc(d.createdBy)}` : ""}</div></td>

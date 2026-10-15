@@ -24,7 +24,7 @@ export interface HostOptions extends Partial<TableConfig> {
   cloudUrl?: string;
   cloudPollMs?: number;
   cloudHeartbeatMs?: number;
-  /** A pre-approved access code (TABLE_CODE or --code, D-112); it wins over one typed on the board. */
+  /** A pre-approved access code (TABLE_CODE or --code, D-113); it wins over one typed on the board. */
   accessCode?: string;
 }
 

@@ -1,7 +1,7 @@
 # Runbook: restore the service's state
 
 Two situations, from mild to rare. games-cloud keeps its state in SQLite on the PVC `games-cloud-data` at `/data`
-(D-113): the live `state.db`; a consistent copy in `snapshots/state.db`, written at start, hourly and at shutdown;
+(D-114): the live `state.db`; a consistent copy in `snapshots/state.db`, written at start, hourly and at shutdown;
 `snapshots/state.prev.db`, the snapshot as the service found it at its last start; and uploaded logs in `logs/`.
 
 Who runs it: someone with `kubectl` on the cluster (Klaus or kube-setup's on-node session). The commands use Velero's

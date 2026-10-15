@@ -1,4 +1,4 @@
-// Pre-approved table codes (D-112). An administrator creates a code in the console; a board that starts with it (or
+// Pre-approved table codes (D-113). An administrator creates a code in the console; a board that starts with it (or
 // has it typed into its settings) is approved at its first hello, without a pairing code. A code serves one board: the
 // first table that uses it is bound to it, and any other table using it is refused until an administrator releases it.
 // Validity only matters for binding: a bound table keeps working after its code expires, and the console flags it.

@@ -128,6 +128,19 @@ pre.raw { font-family: var(--mono); font-size: 0.7em; color: var(--ink-soft); ba
 #pause-layer p { color: var(--ink-soft); font-size: 24px; margin: 0 0 28px; }
 #pause-layer .row { display: flex; gap: 16px; justify-content: center; }
 #pause-layer button { font-size: 22px; padding: 14px 28px; }
+/* An AI out of time (D-112): the game stays visible; only the card takes touches. */
+#pause-layer.ai-wait { background: none; display: block; pointer-events: none; }
+#pause-layer .ai-wait-card { position: absolute; width: 440px; padding: 22px 26px 24px; pointer-events: auto; text-align: center; background: var(--felt); border: 2px solid var(--brass); border-radius: 20px; box-shadow: 0 18px 44px rgba(0, 0, 0, .55), 0 0 0 6px rgba(4, 10, 9, .35); transition: transform .4s; }
+#pause-layer .ai-wait-card .who { font-family: var(--display); font-size: 34px; display: flex; align-items: center; justify-content: center; gap: 12px; }
+#pause-layer .ai-wait-card .who .dot { width: 16px; height: 16px; border-radius: 50%; box-shadow: 0 0 0 2px rgba(0, 0, 0, .35); }
+#pause-layer .ai-wait-card .what { font-size: 22px; color: var(--ink); margin: 6px 0 10px; display: flex; align-items: center; justify-content: center; gap: 10px; }
+#pause-layer .ai-wait-card p { font-size: 19px; margin: 0 0 18px; }
+#pause-layer .ai-wait-card button { font-size: 21px; padding: 12px 24px; }
+.thinking-dots { display: inline-flex; gap: 5px; }
+.thinking-dots i { width: 8px; height: 8px; border-radius: 50%; background: var(--brass); animation: think 1.2s ease-in-out infinite; }
+.thinking-dots i:nth-child(2) { animation-delay: .2s; }
+.thinking-dots i:nth-child(3) { animation-delay: .4s; }
+@keyframes think { 0%, 80%, 100% { opacity: .25; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-5px); } }
 #pause-layer .spinner { width: 46px; height: 46px; margin: 0 auto; border-radius: 50%; border: 5px solid var(--felt-line); border-top-color: var(--brass); animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
@@ -236,7 +249,7 @@ button.copy:hover, button.copy.done { color: var(--brass); border-color: var(--b
   font-size: 15px; border-radius: 999px; background: rgba(8, 22, 19, 0.8); border: 1px solid var(--felt-line); color: var(--ink-soft); }
 #view-button:hover { color: var(--brass); border-color: var(--brass-deep); }
 
-/* The table's access code (D-112): a row in the settings, and a keypad, since the board has no keyboard. */
+/* The table's access code (D-113): a row in the settings, and a keypad, since the board has no keyboard. */
 .code-cell { display: inline-flex; align-items: center; gap: 14px; }
 .code-value .mono { font-family: var(--mono); letter-spacing: .08em; }
 .code-status { font-size: .8em; padding: 2px 10px; border-radius: 999px; border: 1px solid var(--felt-line); color: var(--ink-soft); }

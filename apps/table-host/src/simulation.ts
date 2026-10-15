@@ -2,7 +2,9 @@
 import { createRng, type SeatInfo } from "../../../packages/sdk/src/index.ts";
 import { allowedPlayerCounts, seatEdges, type SeatLayout } from "../../../packages/protocol/src/index.ts";
 import { settingsWithDefaults, sourceMeta, type InstalledGame } from "./games.ts";
-import { GameRuntime, VirtualClock, type LogRecord } from "./runtime.ts";
+import { GameRuntime, VirtualClock, type AiMoveMeta, type LogRecord } from "./runtime.ts";
+import { AiWorker, aiMove, isPromise, usesWorker } from "./ai.ts";
+import type { Intent } from "../../../packages/sdk/src/index.ts";
 import { aiDefaults, logId, TableError } from "./table.ts";
 import type { LogStore } from "./logs.ts";
 
@@ -60,33 +62,63 @@ export async function runSimulation(game: InstalledGame, req: SimulationRequest,
     aiOptions[s.seat] = aiDefaults(m, given);
   }
 
-  for (let g = 0; g < games; g++) {
-    const clock = new VirtualClock();
-    const gameSeed = Math.floor(master() * 2 ** 31);
-    const rt = new GameRuntime(m, game.def, gameSeed, settings, seats, clock, { simulation: true, aiOptions });
-    const aiRngs = seats.map((s) => createRng(gameSeed ^ (s.seat + 1) * 0x9e3779b1));
-    let steps = 0;
-    while (!rt.over && steps < MAX_STEPS) {
-      if ((steps & 63) === 0) await breathe();
-      let acted = false;
-      for (const s of seats) {
-        if (rt.over) break;
-        const intent = rt.aiIntent(s.seat, aiRngs[s.seat]);
-        if (intent) {
-          // A rejected AI move counts as no move, so a confused AI cannot spin forever; time moves on instead.
-          if (rt.submit(s.seat, intent, "ai").ok) acted = true;
+  // AI players that answer later (D-112) are awaited; with nobody to tap "Play now", the game's quick move is played
+  // when one runs out of time. AIs in worker threads get one thread per seat for the whole run.
+  const budget = m.ai.timeoutSeconds * 1000;
+  const workers = usesWorker(game) ? seats.map(() => new AiWorker(game.rulesFile!)) : null;
+  try {
+    for (let g = 0; g < games; g++) {
+      const clock = new VirtualClock();
+      const gameSeed = Math.floor(master() * 2 ** 31);
+      const rt = new GameRuntime(m, game.def, gameSeed, settings, seats, clock, { simulation: true, aiOptions });
+      const aiRngs = seats.map((s) => createRng(gameSeed ^ (s.seat + 1) * 0x9e3779b1));
+      let steps = 0;
+      while (!rt.over && steps < MAX_STEPS) {
+        if ((steps & 63) === 0) await breathe();
+        let acted = false;
+        for (const s of seats) {
+          if (rt.over) break;
+          const { intent, meta } = await simulatedMove(rt, s.seat, aiRngs[s.seat], workers?.[s.seat] ?? null);
+          if (intent) {
+            // A rejected AI move counts as no move, so a confused AI cannot spin forever; time moves on instead.
+            if (rt.submit(s.seat, intent, "ai", meta).ok) acted = true;
+            steps++;
+          }
+        }
+        if (!acted && !rt.over) {
+          if (!clock.advance()) rt.finish("terminated", { text: "Simulation stalled: no AI move and no timer pending.", highlights: {} });
           steps++;
         }
       }
-      if (!acted && !rt.over) {
-        if (!clock.advance()) rt.finish("terminated", { text: "Simulation stalled: no AI move and no timer pending.", highlights: {} });
-        steps++;
-      }
+      if (!rt.over) rt.finish("terminated", { text: `Simulation stopped after ${MAX_STEPS} steps.`, highlights: {} });
+      const end = rt.log.at(-1) as Extract<LogRecord, { t: "end" }>;
+      logsOut.push(rt.log);
+      results.push({ summary: rt.summary, steps, reason: end.reason, aiOptions });
     }
-    if (!rt.over) rt.finish("terminated", { text: `Simulation stopped after ${MAX_STEPS} steps.`, highlights: {} });
-    const end = rt.log.at(-1) as Extract<LogRecord, { t: "end" }>;
-    logsOut.push(rt.log);
-    results.push({ summary: rt.summary, steps, reason: end.reason, aiOptions });
+  } finally {
+    for (const w of workers ?? []) w.terminate();
+  }
+
+  /** One AI move: at once for a synchronous AI; awaited for one that answers later, with the fallback when time is up. */
+  async function simulatedMove(rt: GameRuntime, seat: number, rng: () => number, worker: AiWorker | null): Promise<{ intent: Intent | null; meta?: AiMoveMeta }> {
+    const controller = new AbortController();
+    const started = Date.now();
+    const answer = aiMove(game, rt, seat, rng, controller.signal, started + budget, worker);
+    if (!isPromise<Intent | null>(answer)) return { intent: answer };
+    const extra = worker ? { worker: true } : {};
+    if (!game.def.aiFallback) return { intent: await answer, meta: { ms: Date.now() - started, ...extra } };
+    let timer: NodeJS.Timeout | undefined;
+    const late = new Promise<"late">((resolve) => (timer = setTimeout(() => resolve("late"), budget)));
+    try {
+      const r = await Promise.race([answer, late]);
+      if (r !== "late") return { intent: r, meta: { ms: Date.now() - started, ...extra } };
+      controller.abort();
+      worker?.cancel();
+      answer.catch(() => {}); // cancelled
+      return { intent: rt.aiFallbackIntent(seat, rng), meta: { ms: Date.now() - started, fallback: true, ...extra } };
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   const id = logId(`${m.id}-sim`);

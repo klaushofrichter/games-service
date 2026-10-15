@@ -27,7 +27,7 @@ Node 26, listens on **8081**, image `ghcr.io/klaushofrichter/games-cloud`, numer
   signaling sockets belong to one process. Do not scale it out: a second pod would not see the first one's tables.
 - **Volume (done 15 Oct 2026, kube-setup `afc7bbe`).** PVC `games-cloud-data` (1Gi, `local-path`, PV set to
   Retain) at `/data`, `DATA_DIR=/data`, pod `fsGroup: 1000`, backed up by Velero's daily file-system backup (30 days).
-  The service keeps its state there as SQLite (D-113): tables, access codes, repository ticks, console repositories,
+  The service keeps its state there as SQLite (D-114): tables, access codes, repository ticks, console repositories,
   logs, invites. It writes a consistent snapshot to `/data/snapshots/state.db` hourly and at shutdown, and starts from
   it when `state.db` is missing or damaged; to force that after a restore, create `/data/RESTORE_FROM_SNAPSHOT`.
 - **Ingress timeouts:** Traefik passes WebSocket upgrades on a normal Ingress. Tables send a ping every 30 s and

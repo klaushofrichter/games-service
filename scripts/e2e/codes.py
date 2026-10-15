@@ -1,4 +1,4 @@
-"""Browser end-to-end check of pre-approved access codes (D-112) and the service's persistent state (D-113).
+"""Browser end-to-end check of pre-approved access codes (D-113) and the service's persistent state (D-114).
   python3 scripts/e2e/codes.py out/
 
 The console creates a code and shows it once; the table's board takes it on its keypad (the board has no keyboard)
@@ -145,7 +145,7 @@ try:
         board.click("button[data-remove]")
         wait(lambda: state(TABLE_A)["cloud"].get("code") is None, 10, "the code to be removed")
 
-        # Deleting records (D-114). A log from table B (still disconnected), a download token, then: delete the log,
+        # Deleting records (D-115). A log from table B (still disconnected), a download token, then: delete the log,
         # revoke the token, delete table B with its logs.
         tok = call(CLOUD, "POST", "/admin/api/codes", {"validity": "week"}, {"authorization": f"Bearer {ADMIN}"})
         t = call(CLOUD, "POST", "/api/tables/hello", {"tableId": "t_e2e_log_owner_1", "name": "Log owner", "accessCode": tok["code"]})

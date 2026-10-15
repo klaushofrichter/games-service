@@ -2,13 +2,13 @@
 # Run a Table Host on this Mac against the live Game Table service, for development and testing.
 #   scripts/mac-table.sh              start it, and open the board in the default browser
 #   scripts/mac-table.sh --no-open    start it without opening the board
-#   scripts/mac-table.sh --code ABCD-EFGH    approved at once with an access code from the console (D-112)
+#   scripts/mac-table.sh --code ABCD-EFGH    approved at once with an access code from the console (D-113)
 # Overrides (environment): TABLE_NAME, PORT, CLOUD_URL (empty = no cloud), PUBLIC_URL, SHOW_TEST_GAMES, DATA_DIR,
 # TABLE_CODE (an access code; the same as --code).
 #
 # The table's identity (tableId, and its token once approved) and its board API key live in DATA_DIR
 # (default ~/.gametable-mac), so a restart is the same table and needs no new approval; the service keeps its
-# pairings across its own restarts too (D-113).
+# pairings across its own restarts too (D-114).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 

@@ -1,6 +1,6 @@
-// Cloud service (games.skylar.technology): table enrollment (pairing codes and pre-approved access codes, D-112),
+// Cloud service (games.skylar.technology): table enrollment (pairing codes and pre-approved access codes, D-113),
 // heartbeat and metrics, log upload with admin and token downloads, invites and remote-play signaling. The working set
-// is in memory and every change is written through to the store (D-113): SQLite in DATA_DIR, so pairings, codes,
+// is in memory and every change is written through to the store (D-114): SQLite in DATA_DIR, so pairings, codes,
 // repository ticks, logs and invites survive restarts. One process owns the database and the table sockets, so the
 // service still runs as exactly one replica (D-071).
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
@@ -86,7 +86,7 @@ export interface CloudOptions {
   githubApiUrl?: string;
   /** How often every repository is fetched again (default hourly; 0 = only on add and on Refresh). */
   gameRepoRefreshMs?: number;
-  /** DATA_DIR: where the state database, its snapshot and uploaded logs live (D-113). Unset = in memory only. */
+  /** DATA_DIR: where the state database, its snapshot and uploaded logs live (D-114). Unset = in memory only. */
   dataDir?: string;
   /** How often the database snapshot is written (default hourly). */
   snapshotMs?: number;
@@ -97,7 +97,7 @@ interface TableRecord {
   name: string;
   status: "pending" | "approved" | "revoked";
   pairingCode: string;
-  /** sha256 of the table's bearer token: the plain token is handed to the table once and never kept (D-113). */
+  /** sha256 of the table's bearer token: the plain token is handed to the table once and never kept (D-114). */
   tokenHash: string | null;
   lastSeen: number | null;
   /** Last hello while pending: waiting tables poll every 5 s; one gone quiet for 10 minutes is dropped. */
@@ -106,7 +106,7 @@ interface TableRecord {
   createdAt: number;
   /** Extra-game repositories this table gets (D-097), by repository id. Kept across Disconnect and Reconnect. */
   repos: string[];
-  /** The access code that approved this table (D-112); while it exists, its scope decides the repositories. */
+  /** The access code that approved this table (D-113); while it exists, its scope decides the repositories. */
   codeId: string | null;
 }
 
@@ -142,7 +142,7 @@ export function startCloud(o: CloudOptions) {
   /** Uploaded logs; the bytes are in memory only without DATA_DIR, else in DATA_DIR/logs. */
   const logs = new Map<string, { meta: LogRecordMeta; data: Buffer | null }>();
   const invites = new Map<string, { tableId: string; expiresAt: number; used: boolean }>(); // by sha256(code)
-  /** Download tokens by sha256(token); `id` names one in the console without revealing it (D-114). */
+  /** Download tokens by sha256(token); `id` names one in the console without revealing it (D-115). */
   const downloadTokens = new Map<string, DownloadToken>();
   const codes = new Map<string, AccessCode>(); // by id
   const codeByHash = new Map<string, string>(); // code hash -> id
@@ -169,7 +169,7 @@ export function startCloud(o: CloudOptions) {
   const saveSettings = () => store.put("setting", "service", settings);
   const saveRemote = (key: string, s: { tableId: string; expiresAt: number }) => store.put("session", key, { tableId: s.tableId, expiresAt: s.expiresAt });
 
-  // ----- load what the store has (D-113) -----
+  // ----- load what the store has (D-114) -----
   const now0 = Date.now();
   for (const { key: spec, value } of store.all<{ id: string; addedAt: number }>("repo")) {
     // A repository later added to the deploy list is that list's now; one that fails to parse is dropped.
@@ -201,7 +201,7 @@ export function startCloud(o: CloudOptions) {
   }
   if (store.removeOrphanLogs(new Set(logs.keys()))) console.log("[cloud] removed log files that no record mentions");
   for (const { key, value } of store.all<{ tableId: string; expiresAt: number; used: boolean }>("invite")) value.expiresAt < now0 ? store.delete("invite", key) : invites.set(key, value);
-  // Tokens saved before D-114 have only gameId and expiresAt.
+  // Tokens saved before D-115 have only gameId and expiresAt.
   for (const { key, value } of store.all<Partial<DownloadToken> & { expiresAt: number }>("download")) {
     if (value.expiresAt < now0) store.delete("download", key);
     else downloadTokens.set(key, { gameId: value.gameId ?? null, label: value.label ?? "", createdAt: value.createdAt ?? 0, createdBy: value.createdBy ?? "", expiresAt: value.expiresAt, id: value.id ?? `d_${key.slice(0, 12)}` });
@@ -215,7 +215,7 @@ export function startCloud(o: CloudOptions) {
   const repoTimer = o.gameRepoRefreshMs === 0 ? null : setInterval(() => void gameRepos.refreshAll(), o.gameRepoRefreshMs ?? 3600_000);
   repoTimer?.unref();
 
-  // ----- access codes (D-112) -----
+  // ----- access codes (D-113) -----
   /** Repository ids for a code's scope; "all" is every repository listed now, so new ones arrive too. */
   const scopeRepos = (s: CodeScope) =>
     s.kind === "none" ? [] : s.kind === "all" ? [...gameRepos.repos.keys()] : [...gameRepos.repos.values()].filter((r) => s.repos.includes(r.repo.toLowerCase())).map((r) => r.id);
@@ -426,7 +426,7 @@ export function startCloud(o: CloudOptions) {
     for (const [k, r] of remoteSessions) if (r.expiresAt < now) (r.ws?.close(4002, "expired"), remoteSessions.delete(k), store.delete("session", k));
     for (const [ip, l] of lookups) if (l.reset < now) lookups.delete(ip);
     for (const [ip, f] of codeFailures) if (f.reset < now) codeFailures.delete(ip);
-    // Codes expired or revoked more than a year ago go, unless a table still uses one (D-112).
+    // Codes expired or revoked more than a year ago go, unless a table still uses one (D-113).
     for (const c of [...codes.values()]) {
       const t = c.tableId ? tables.get(c.tableId) : undefined;
       if (!stale(c, t?.status === "approved" && t.codeId === c.id, now)) continue;
@@ -517,7 +517,7 @@ export function startCloud(o: CloudOptions) {
         if (!/^[A-Za-z0-9_-]{8,64}$/.test(tableId)) return json(res, 400, { error: "tableId required" });
         const name = String(b.name ?? "Game Table").slice(0, 60);
         let t = tables.get(tableId);
-        // A pre-approved access code (D-112) approves a new or waiting table at once. A disconnected table stays
+        // A pre-approved access code (D-113) approves a new or waiting table at once. A disconnected table stays
         // disconnected (only Reconnect in the console undoes that), and an approved one already has what it needs.
         const presented = b.accessCode !== undefined && b.accessCode !== null && b.accessCode !== "";
         let codeStatus: CodeStatus | undefined;
@@ -575,7 +575,7 @@ export function startCloud(o: CloudOptions) {
         t.lastSeen = Date.now();
         if (b.metrics && typeof b.metrics === "object") t.metrics = b.metrics;
         // An approved table may present an access code too (typed on its board later): it then belongs to that code,
-        // which decides its repositories from now on (D-112). A code it had before is freed.
+        // which decides its repositories from now on (D-113). A code it had before is freed.
         let codeStatus: CodeStatus | undefined;
         if (b.accessCode !== undefined && b.accessCode !== null && b.accessCode !== "" && !codeBlocked(clientIp(req))) {
           const c = codeFor(b.accessCode);
@@ -610,7 +610,7 @@ export function startCloud(o: CloudOptions) {
         const data = await body(req, 50 * 1024 * 1024);
         const gameId = String(url.searchParams.get("gameId") ?? "");
         // Bounded in total, and on disk by the volume's free space: the oldest logs make room for the new one, and the
-        // reserve stays free for the database (D-113). Re-uploading the same id replaces it.
+        // reserve stays free for the database (D-114). Re-uploading the same id replaces it.
         if (existing) dropLog(match[1]);
         let total = 0;
         for (const l of logs.values()) total += l.meta.bytes;
@@ -676,7 +676,7 @@ export function startCloud(o: CloudOptions) {
               return {
                 ...t,
                 repos: reposFor(t as TableRecord),
-                // "code": the access code's scope decides, and the console shows the ticks read-only (D-112).
+                // "code": the access code's scope decides, and the console shows the ticks read-only (D-113).
                 reposFrom: c ? "code" : "table",
                 code: c ? { id: c.id, hint: c.hint, label: c.label, state: codeState(c), pastValidity: t.status === "approved" && isExpired(c) } : null,
                 online: online(t as TableRecord),
@@ -740,7 +740,7 @@ export function startCloud(o: CloudOptions) {
           return json(res, 200, { tableId: t.tableId, status: t.status });
         }
         if (m === "DELETE" && (match = p.match(/^\/admin\/api\/tables\/([\w-]+)$/))) {
-          // Remove a table for good (D-114): only one that is disconnected or still waiting, never one that is online.
+          // Remove a table for good (D-115): only one that is disconnected or still waiting, never one that is online.
           // Its access code is freed; its logs stay unless ?logs=1. If that PC says hello again, it is a new table.
           const t = tables.get(match[1]);
           if (!t) return json(res, 404, { error: "no such table" });
@@ -789,7 +789,7 @@ export function startCloud(o: CloudOptions) {
           return json(res, 200, { ok: true });
         }
         if (m === "POST" && p === "/admin/api/logs/delete") {
-          // Bulk delete (D-114): by kind and/or table; at least one filter, so "everything" is never one click.
+          // Bulk delete (D-115): by kind and/or table; at least one filter, so "everything" is never one click.
           const b = await jsonBody(req);
           const sim = b.simulation === true ? true : b.simulation === false ? false : undefined;
           const tableId = typeof b.tableId === "string" && b.tableId ? b.tableId : undefined;
@@ -837,7 +837,7 @@ export function startCloud(o: CloudOptions) {
           return json(res, 200, { ok: true });
         }
 
-        // ----- access codes (D-112) -----
+        // ----- access codes (D-113) -----
         if (m === "GET" && p === "/admin/api/codes") {
           return json(res, 200, [...codes.values()].sort((a, b) => b.createdAt - a.createdAt).map(codeView));
         }

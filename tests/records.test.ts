@@ -1,4 +1,4 @@
-// Deleting records from the console (D-114): tables, logs (one, or in bulk), and download tokens.
+// Deleting records from the console (D-115): tables, logs (one, or in bulk), and download tokens.
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { mkdtemp, rm } from "node:fs/promises";
 import { existsSync } from "node:fs";

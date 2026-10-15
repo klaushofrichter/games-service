@@ -19,7 +19,7 @@ export interface ServerOptions {
   allowRemoteBoard: boolean;
   /** Ask the cloud for an invite (remote play); absent when the table runs without the cloud. */
   createInvite?: () => Promise<{ token: string; url: string; expiresAt: string }>;
-  /** Set or clear the access code typed on the board (D-112); absent when the table runs without the cloud. */
+  /** Set or clear the access code typed on the board (D-113); absent when the table runs without the cloud. */
   setAccessCode?: (code: unknown) => Promise<AccessCodeStatus | null>;
 }
 
@@ -36,9 +36,10 @@ const REMOTE_DENIED = /^\/(join|simulation|logs|saves|invites|remote|qr|cloud)(\
 /**
  * Changes a remote client may make (an allowlist): seat layout and running games. Never turn the table's
  * board (remote boards face their own seat), remove or move players, add AI seats, change AI options,
- * save, or resume — those stay with the people at the table.
+ * save, or resume — those stay with the people at the table. "Play now" for an AI that is out of time (D-112) is a
+ * move of the running game, so remote players with board control may tap it too.
  */
-const REMOTE_ACTIONS = /^\/(layout|game\/(select|start|end|close))$/;
+const REMOTE_ACTIONS = /^\/(layout|game\/(select|start|end|close|play-now))$/;
 
 const MIME: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
@@ -178,7 +179,7 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
       return json(res, 201, await opts.createInvite());
     }
     if (m === "POST" && path === "/cloud/code") {
-      // The table's pre-approved access code (D-112), typed in the board's settings; "" removes it.
+      // The table's pre-approved access code (D-113), typed in the board's settings; "" removes it.
       if (!opts.setAccessCode) throw new TableError(409, "access codes need the Game Table service (CLOUD_URL)");
       await opts.setAccessCode(body.code ?? "");
       return json(res, 200, table.state());
@@ -217,6 +218,8 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
     if (m === "POST" && path === "/game/prefs") return (table.setPrefs(body.prefs), json(res, 200, table.state()));
     if (m === "POST" && path === "/game/close") return (table.close(), json(res, 200, table.state()));
     if (m === "POST" && path === "/game/resume") return (table.resumeGame(), json(res, 200, table.state()));
+    // An AI player is out of time (D-112): play the game's quick move for it instead of waiting.
+    if (m === "POST" && path === "/game/play-now") return (table.playNow(), json(res, 200, table.state()));
     if (m === "POST" && path === "/game/save") return json(res, 200, { saveId: await table.saveAndExit(), state: table.state() });
     if (m === "GET" && path === "/saves") return json(res, 200, await logs.listSaves());
     if (m === "GET" && path === "/game/board") {

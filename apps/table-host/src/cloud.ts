@@ -1,4 +1,4 @@
-// Table → cloud link: enrollment with a pairing code or a pre-approved access code (D-112), heartbeat with platform
+// Table → cloud link: enrollment with a pairing code or a pre-approved access code (D-113), heartbeat with platform
 // metrics, retention setting sync, and log upload. Outbound HTTPS only.
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -10,7 +10,7 @@ import type { RemoteGateway } from "./remote.ts";
 import type { BundleRef, ExtraGames } from "./extra-games.ts";
 import type { AccessCodeStatus } from "../../../packages/protocol/src/index.ts";
 
-/** The access code alphabet (D-026, D-112): no 0/O, no 1/I. */
+/** The access code alphabet (D-026, D-113): no 0/O, no 1/I. */
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 /** "abcd-efgh" or "ABCD EFGH" as ABCDEFGH; null if it can't be an access code. */
 export function normalizeAccessCode(v: unknown): string | null {
@@ -41,7 +41,7 @@ export interface CloudLinkOptions {
 
 export class CloudLink {
   private timer: NodeJS.Timeout | null = null;
-  /** table.json: the table's identity, its token once approved, and an access code typed on the board (D-112). */
+  /** table.json: the table's identity, its token once approved, and an access code typed on the board (D-113). */
   private identity: { tableId: string; tableToken: string | null; accessCode?: string | null } = { tableId: "", tableToken: null };
   /** What the service last said about the current code; null until it has answered. */
   private codeStatus: ServiceCodeStatus | null = null;
@@ -78,7 +78,7 @@ export class CloudLink {
     await this.tick();
   }
 
-  // ----- the access code (D-112) -----
+  // ----- the access code (D-113) -----
 
   /** The code in use: the one given at start wins over one typed on the board. */
   get accessCode(): { code: string; source: "start" | "board" } | null {
