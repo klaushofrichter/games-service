@@ -316,11 +316,12 @@ def endings(browser, board):
     api("POST", "/layout", {"seats": 2})
     decks = [join(browser, n) for n in ["Klaus", "Mira"]]
     # the phone: name on the left, the seat's compass badge on the right, no separate seat card
-    assert decks[0].inner_text(".who .badge") == "S" and decks[1].inner_text(".who .badge") == "N"
-    assert decks[0].locator(".seatcard").count() == 0
+    badges = [d.inner_text(".who .badge") for d in decks]
+    assert badges == ["S", "N"], f"seat badges {badges}"
+    assert decks[0].locator(".seatcard").count() == 0, "no separate seat card"
     extra = join(browser, "Paul")  # the 2-seat table is full
     extra.wait_for_selector("text=No seat yet")
-    assert extra.locator(".who .badge").count() == 0
+    assert extra.locator(".who .badge").count() == 0, "a player without a seat has no badge"
     extra.close()
     # sound off: a whole game plays without a single sound effect
     api("POST", "/display", {"sound": False})
@@ -352,8 +353,9 @@ def endings(browser, board):
     # D-108: the terms open in a window on the board (✕ and Close), not in a new tab
     pages = len(board.context.pages)
     board.click(".overlay [data-terms]")
-    board.locator(".overlay.terms .md p").first.wait_for()
-    assert "entertainment" in board.inner_text(".overlay.terms .md") and len(board.context.pages) == pages
+    # wait for the text itself: the window says "Loading…" in the same place first (that race failed on GitHub)
+    board.locator(".overlay.terms .md >> text=entertainment").wait_for()
+    assert len(board.context.pages) == pages, "the terms opened a new tab"
     shot(board, "terms")
     board.click(".overlay.terms .terms-close")
     board.wait_for_selector(".overlay.terms", state="detached")
@@ -484,7 +486,7 @@ def rules(browser, board):
     # D-108: the terms open in the same sheet on the phone, with ✕ top right, and the page stays where it is
     url = d.url
     d.click("footer a[data-terms]")
-    d.locator(".rules-modal .md p").first.wait_for()
+    d.locator(".rules-modal .md >> text=entertainment").wait_for()
     assert "Terms of service" in d.inner_text(".rules-modal .rules-head h2")
     assert "entertainment" in d.inner_text(".rules-modal .rules-body")
     assert d.url == url, "the terms must not navigate away from the deck"
