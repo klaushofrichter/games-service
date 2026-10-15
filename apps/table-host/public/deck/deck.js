@@ -133,16 +133,19 @@ top.addEventListener("click", (e) => {
   if (e.target.closest("[data-rules]")) void openRules();
 });
 
-async function openRules() {
-  const g = state?.game;
-  if (!g?.howToPlay || rulesOpen) return;
+/**
+ * A sheet over the phone (D-099, D-108): a title, ✕ top right, a scrolling body and a Close button. Closed by ✕, Close,
+ * the backdrop or Escape. Returns the body element, or null if a sheet is already open.
+ */
+function openSheet(eyebrow, title, label, back) {
+  if (rulesOpen) return null;
   const modal = document.createElement("div");
   modal.className = "rules-modal";
   modal.setAttribute("role", "dialog");
   modal.setAttribute("aria-modal", "true");
-  modal.setAttribute("aria-label", `How to play ${g.name}`);
-  modal.innerHTML = `<div class="rules-sheet"><div class="rules-head"><div><div class="eyebrow">How to play</div><h2>${esc(g.name)}</h2></div>
-      <button type="button" class="rules-close" data-close aria-label="Close the rules">✕</button></div>
+  modal.setAttribute("aria-label", label);
+  modal.innerHTML = `<div class="rules-sheet"><div class="rules-head"><div><div class="eyebrow">${esc(eyebrow)}</div><h2>${esc(title)}</h2></div>
+      <button type="button" class="rules-close" data-close aria-label="Close">✕</button></div>
     <div class="rules-body"><p class="muted">Loading…</p></div>
     <button type="button" class="big" data-close>Close</button></div>`;
   document.body.appendChild(modal);
@@ -153,7 +156,7 @@ async function openRules() {
     document.body.classList.remove("modal-open");
     document.removeEventListener("keydown", onKey);
     rulesOpen = null;
-    top.querySelector("[data-rules]")?.focus();
+    back?.focus();
   };
   const onKey = (e) => e.key === "Escape" && close();
   document.addEventListener("keydown", onKey);
@@ -161,6 +164,25 @@ async function openRules() {
     if (e.target === modal || e.target.closest("[data-close]")) close();
   });
   modal.querySelector(".rules-close").focus();
+  return modal;
+}
+
+async function fetchText(url) {
+  let md = rulesCache.get(url);
+  if (md === undefined) {
+    const r = await fetch(url);
+    if (!r.ok) throw new Error(String(r.status));
+    md = await r.text();
+    rulesCache.set(url, md);
+  }
+  return md;
+}
+
+async function openRules() {
+  const g = state?.game;
+  if (!g?.howToPlay) return;
+  const modal = openSheet("How to play", g.name, `How to play ${g.name}`, top.querySelector("[data-rules]"));
+  if (!modal) return;
   const shown = (g.settingsShown ?? []).filter((s) => s.value !== undefined);
   const settings = shown.length
     ? `<div class="rules-settings"><div class="eyebrow">At this table</div><table>${shown
@@ -168,13 +190,7 @@ async function openRules() {
         .join("")}</table></div>`
     : "";
   try {
-    let md = rulesCache.get(g.howToPlay);
-    if (md === undefined) {
-      const r = await fetch(g.howToPlay);
-      if (!r.ok) throw new Error(String(r.status));
-      md = await r.text();
-      rulesCache.set(g.howToPlay, md);
-    }
+    const md = await fetchText(g.howToPlay);
     const base = g.howToPlay.replace(/[^/]*$/, ""); // "/games/<id>/": images come from the game's own assets/
     const { title, html } = renderRules(md, base);
     if (title) modal.querySelector(".rules-head h2").innerHTML = title;
@@ -184,9 +200,25 @@ async function openRules() {
   }
 }
 
+// The terms of service in the same kind of sheet (D-108), not a page of their own: no "Back" that might go nowhere.
+document.querySelector("footer a[data-terms]")?.addEventListener("click", (e) => {
+  e.preventDefault();
+  void openTerms(e.currentTarget);
+});
+async function openTerms(back) {
+  const modal = openSheet("Game Table", "Terms of service", "Terms of service", back);
+  if (!modal) return;
+  try {
+    const { html } = renderRules(await fetchText("/shared/terms.md"), "/shared/");
+    modal.querySelector(".rules-body").innerHTML = `<div class="md">${html}</div>`;
+  } catch {
+    modal.querySelector(".rules-body").innerHTML = `<p class="muted">The terms could not be loaded. Try again in a moment.</p>`;
+  }
+}
+
 /**
  * The seat badge in the player's colour (D-101), the same colour as the frame of their plate on the board (a game's
- * colour choice, e.g. Pachisi's, or the seat's), with near-black or white letters, whichever contrasts more.
+ * own colour from the board's settings (D-106), else the seat's), with near-black or white letters, whichever contrasts more.
  */
 function seatBadgeHtml(p) {
   const color = playerColor({ players: state.players, prefs: state.game?.prefs ?? {} }, p.seat);

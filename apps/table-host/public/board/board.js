@@ -1,6 +1,7 @@
 // Board UI: lobby, seats around the edge, QR join, game surface and the lobby overlay.
 // Talks to the Table Host through the board control API (same API the tests and local AI agents use).
-import { ROT, W, H, audio, copyText, esc, seatName, seatPositions, claimServiceWorkerPage, openTableSocket } from "/shared/board-kit.js";
+import { renderRules } from "/shared/markdown.js";
+import { ROT, W, H, SEAT_COLORS, audio, copyText, esc, seatName, seatPositions, claimServiceWorkerPage, openTableSocket } from "/shared/board-kit.js";
 
 const KEY = window.TABLE_KEY;
 // A remote player's copy of the board (phase 1c): it runs inside the cloud's invite page, which carries
@@ -224,6 +225,7 @@ function renderSeats() {
     if (pl?.ready) el.classList.add("ready");
     if (pl && pl.id === selectedPlayer) el.classList.add("selected");
     if (allowed && !allowed.includes(p.edge)) el.classList.add("unused");
+    if (pl?.color) el.style.setProperty("--pc", pl.color); // the player's colour: card border and name dot (D-106)
     el.style.left = `${p.x}px`;
     el.style.top = `${p.y}px`;
     el.style.transform = `translate(-50%, -50%) rotate(${p.rot}deg)`;
@@ -235,7 +237,7 @@ function renderSeats() {
           ? `<span class="dot"></span>${pl.ready ? "Ready" : "Not ready"}`
           : pl.kind === "ai" ? `AI player${pl.aiOptions ? ` · ${esc(Object.values(pl.aiOptions).join(", "))}` : ""}` : pl.location === "remote" ? "Remote" : "";
     el.innerHTML = `<div class="num">${esc(seatName(state.seatEdges, seat))}</div>
-      <div class="name">${pl ? esc(pl.name) : "—"}</div><div class="status">${status}</div>`;
+      <div class="name">${pl ? `<span class="pdot" aria-hidden="true"></span>${esc(pl.name)}` : "—"}</div><div class="status">${status}</div>`;
     if (!playing && !REMOTE) el.addEventListener("click", () => onSeatTap(seat, pl)); // seating stays with the table
     seatsEl.appendChild(el);
   });
@@ -376,6 +378,15 @@ function openSettings() {
       if (f.type === "enum") return `<span class="seg">${f.values.map((x) => `<button class="${String(v) === x ? "on" : ""}" data-setting="${esc(f.key)}" data-value="${esc(x)}">${esc(x)}</button>`).join("")}</span>`;
       return `<span class="value">${esc(v)}</span>`;
     };
+    // Player colours (D-106): a table setting for every seated player, used in the lobby and by every game.
+    const playerColors = () => {
+      const seated = state.players.filter((p) => p.seat !== null).sort((a, b) => a.seat - b.seat);
+      if (!seated.length) return "";
+      return `<div class="group player-colors"><div class="eyebrow">Player colours</div>
+        ${seated.map((p) => `<div class="row"><span><span class="pdot" style="background:${esc(p.color ?? "")}"></span>${esc(p.name)}</span><span class="swatches">${SEAT_COLORS.map((c, i) =>
+          `<button class="swatch ${c === p.color ? "on" : ""}" style="--c:${c}" data-color-player="${esc(p.id)}" data-color="${c}" aria-label="${esc(p.name)}: colour ${i + 1}"></button>`).join("")}</span></div>`).join("")}
+        <div class="faint" style="font-size:.7em;margin-top:6px">Picking a colour someone else has swaps the two.</div></div>`;
+    };
     const gameSettings = fields.length
       ? `<div class="group game-rules"><div class="eyebrow">${esc(state.game.name)} · game settings</div>
           ${fields.map((f) => `<div class="row"><span>${esc(f.label ?? f.key)}</span>${setting(f)}</div>`).join("")}
@@ -385,6 +396,7 @@ function openSettings() {
       <div class="group"><div class="eyebrow">Display</div>
         <div class="row"><span>Sound effects</span><button data-sound class="${state.display?.sound !== false ? "on" : ""}" role="switch" aria-checked="${state.display?.sound !== false}">${state.display?.sound !== false ? "On" : "Off"}</button></div>
         <div class="row"><span>Fullscreen</span>${fs ? `<button data-fs class="${document.fullscreenElement ? "on" : ""}">${document.fullscreenElement ? "Leave fullscreen" : "Fullscreen"}</button>` : `<span class="faint">not available in this browser</span>`}</div></div>
+      ${playerColors()}
       ${gameSettings}
       ${items.length ? `<div class="group game-settings"><div class="eyebrow">${esc(state.game.name)}</div>${items.map((it, k) => `<div class="row"><span>${esc(it.label)}</span>${control(it, k)}</div>`).join("")}</div>` : ""}
       <div class="actions" style="display:flex;justify-content:flex-end;margin-top:20px"><button class="primary" data-close-overlay>Done</button></div></div>`;
@@ -407,6 +419,7 @@ function openSettings() {
       (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()).catch(() => toast("Fullscreen was refused by the browser"));
     }
     if (b.dataset.sound !== undefined) return void act("POST", "/display", { sound: state.display?.sound === false });
+    if (b.dataset.colorPlayer) return void act("POST", `/players/${encodeURIComponent(b.dataset.colorPlayer)}/color`, { color: b.dataset.color });
     if (b.dataset.setting) {
       const f = ((state.game && games.find((x) => x.id === state.game.id)?.settings) || []).find((x) => x.key === b.dataset.setting);
       if (!f) return;
@@ -748,6 +761,38 @@ center.addEventListener("click", async (e) => {
 
 lobbyBtn.addEventListener("click", openLobbyOverlay);
 
+/**
+ * The terms of service in a window on the board (D-108), over whatever is open, facing the lobby's edge; closed by ✕,
+ * Close, the backdrop or Escape. Not a new tab: a remote board lives in a frame, and a tab's "Back" went nowhere.
+ */
+async function openTerms() {
+  const o = document.createElement("div");
+  o.className = "overlay terms";
+  o.innerHTML = `<div class="panel" role="dialog" aria-modal="true" aria-label="Terms of service">
+    <div class="terms-head"><h2>Terms of service</h2><button class="terms-close" data-close-terms aria-label="Close">✕</button></div>
+    <div class="md"><p class="muted">Loading…</p></div>
+    <div class="actions" style="display:flex;justify-content:flex-end;margin-top:20px"><button class="primary" data-close-terms>Close</button></div></div>`;
+  faceFront(o.querySelector(".panel"));
+  overlayRoot.appendChild(o);
+  const close = () => {
+    o.remove();
+    document.removeEventListener("keydown", onKey);
+  };
+  const onKey = (e) => e.key === "Escape" && close();
+  document.addEventListener("keydown", onKey);
+  o.addEventListener("click", (e) => {
+    if (e.target === o || e.target.closest("[data-close-terms]")) close();
+  });
+  try {
+    const r = await fetch("/shared/terms.md");
+    if (!r.ok) throw new Error(String(r.status));
+    const { html } = renderRules(await r.text(), "/shared/");
+    o.querySelector(".md").innerHTML = html;
+  } catch {
+    o.querySelector(".md").innerHTML = `<p class="muted">The terms could not be loaded. Try again in a moment.</p>`;
+  }
+}
+
 function openLobbyOverlay() {
   const o = document.createElement("div");
   o.className = "overlay";
@@ -760,7 +805,7 @@ function openLobbyOverlay() {
       ${REMOTE ? "" : `<div class="group"><div class="eyebrow">View</div><div class="row"><span>Lobby and menus face</span>
         <span class="seg">${EDGE_ORDER.map((e) => `<button data-face="${e}" class="${state.frontEdge === e ? "on" : ""}">${e[0].toUpperCase() + e.slice(1)}</button>`).join("")}</span></div></div>`}
       <div class="group">${REMOTE ? "" : `<div class="row"><span>Remote players${state.remote?.players ? ` · ${state.remote.players} joined` : ""}</span><button data-invite>Invite…</button></div>`}
-        <div class="row"><span>Terms of service</span><a href="/deck/terms.html" target="_blank" style="color:var(--brass)">Open</a></div></div>
+        <div class="row"><span>Terms of service</span><button data-terms>Open</button></div></div>
       <div class="actions" style="display:flex;justify-content:space-between;margin-top:20px">
         <button class="danger" data-end>End game</button><button class="primary" data-close-overlay>Back to game</button></div></div>`;
     faceFront(o.querySelector(".panel"));
@@ -773,6 +818,7 @@ function openLobbyOverlay() {
     if (!b) return;
     if (b.dataset.face) act("POST", "/face", { edge: b.dataset.face });
     if (b.dataset.invite !== undefined) openInvite();
+    if (b.dataset.terms !== undefined) openTerms();
     if (b.dataset.remove) {
       const p = state.players.find((x) => x.id === b.dataset.remove);
       if (await confirmDialog(`Remove ${p?.name}?`, "This may end games that cannot continue without them.", "Remove")) act("DELETE", `/players/${b.dataset.remove}`);

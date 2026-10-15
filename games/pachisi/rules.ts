@@ -34,9 +34,24 @@ export interface State {
   over: boolean;
 }
 
-/** Give each seat a side of the board, matching where they sit (south seats get the bottom first). */
+/**
+ * Give each seat a side of the board, matching where they sit (south seats get the bottom first). Two players always
+ * get opposite sides (D-107): on neighbouring sides one player's start lies just ahead of the other's, which is unfair.
+ * Of the two opposite pairings (top/bottom, left/right) and who gets which end, the one closest to where they sit wins.
+ */
 export function assignSides(seats: SeatInfo[]): Record<number, number> {
   const prefs: Record<string, number[]> = { south: [2, 1, 3, 0], north: [0, 3, 1, 2], east: [1, 0, 2, 3], west: [3, 2, 0, 1] };
+  if (seats.length === 2) {
+    const [a, b] = [...seats].sort((x, y) => x.seat - y.seat);
+    const rank = (s: SeatInfo, side: number) => (prefs[s.edge ?? "south"] ?? prefs.south).indexOf(side);
+    let best = [2, 0];
+    let cost = Infinity;
+    for (const side of [2, 0, 1, 3]) {
+      const c = rank(a, side) + rank(b, (side + 2) % 4);
+      if (c < cost) [best, cost] = [[side, (side + 2) % 4], c];
+    }
+    return { [a.seat]: best[0], [b.seat]: best[1] };
+  }
   const used = new Set<number>();
   const out: Record<number, number> = {};
   for (const s of [...seats].sort((a, b) => a.seat - b.seat)) {

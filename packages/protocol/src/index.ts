@@ -120,6 +120,12 @@ export function allowedPlayerCounts(m: Manifest): number[] {
 
 export type Phase = "idle" | "loading" | "ready" | "active" | "paused" | "terminating" | "finished";
 
+/**
+ * Player colours (D-106): one per player, chosen in the board's settings and the same in every game. By default a player
+ * takes their seat's colour, `PLAYER_COLORS[seat % 8]`. Distinct for common colour-vision deficiencies on the felt.
+ */
+export const PLAYER_COLORS = ["#e8b04a", "#5fb7e8", "#e8735f", "#7fd18b", "#c38be8", "#e8e15f", "#5fe0c8", "#e88fbf"] as const;
+
 export interface PlayerInfo {
   id: string;
   name: string;
@@ -130,6 +136,8 @@ export interface PlayerInfo {
   ready: boolean;
   /** AI players: options chosen on the board (e.g. play style); manifest defaults fill the rest at start. */
   aiOptions?: Record<string, unknown>;
+  /** This player's colour while seated (D-106): their own choice, else their seat's; null without a seat. */
+  color?: string | null;
 }
 
 export interface GameSummary {

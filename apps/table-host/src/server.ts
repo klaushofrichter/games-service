@@ -196,6 +196,7 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
       table.setAiOptions(match[1], (body.options ?? {}) as Record<string, unknown>);
       return json(res, 200, table.state());
     }
+    if (m === "POST" && (match = path.match(/^\/players\/([\w-]+)\/color$/))) return (table.setColor(match[1], body.color), json(res, 200, table.state()));
     if (m === "DELETE" && (match = path.match(/^\/players\/([\w-]+)$/))) return (table.removePlayer(match[1], "evicted"), json(res, 200, table.state()));
     if (m === "POST" && path === "/game/select") {
       table.selectGame(String(body.gameId), (body.settings as Record<string, unknown>) ?? {});

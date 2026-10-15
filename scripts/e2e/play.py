@@ -96,24 +96,39 @@ def pachisi(browser, board):
     time.sleep(0.4)
     api("POST", "/game/start")
     decks[0].wait_for_selector(".pc-what")
-    # Settings (D-088): Pachisi adds the pieces (numbers or icons, D-102), then player colours. Klaus picks purple, then
-    # Mira picks purple too and they swap.
+    # Player colours are the board's own setting (D-106), the same in every game. Klaus picks purple, then Mira picks
+    # purple too and they swap. The board's cards and the phones follow.
     board.click("#settings-button")
-    board.wait_for_selector(".game-settings")
-    rows = board.locator(".game-settings .row")
-    rows.nth(1).locator(".swatch").nth(4).click()
+    board.wait_for_selector(".player-colors")
+    rows = board.locator(".player-colors .row")
+    assert rows.count() == 3, "one row per seated player"
+    rows.nth(0).locator(".swatch").nth(4).click()
     purple = "rgb(195, 139, 232)"
     wait_for = lambda page, sel, color: page.wait_for_function(
         "([s, c]) => [...document.querySelectorAll(s)].some((e) => getComputedStyle(e).backgroundColor === c)", arg=[sel, color], timeout=5000)
     wait_for(decks[0], ".pc-tokens .card > div:first-child", purple)  # Klaus's phone follows
-    klaus_before = rows.nth(1).locator(".swatch.on").get_attribute("style")
-    rows.nth(2).locator(".swatch").nth(4).click()
+    klaus_before = rows.nth(0).locator(".swatch.on").get_attribute("style")
+    rows.nth(1).locator(".swatch").nth(4).click()
     wait_for(decks[1], ".pc-tokens .card > div:first-child", purple)
-    board.wait_for_function("() => document.querySelectorAll('.game-settings .swatch.on').length === 3")
-    assert rows.nth(1).locator(".swatch.on").get_attribute("style") != klaus_before, "picking a taken colour swaps it"
-    # Pieces: icons instead of numbers, the same four on the board and on every phone, in the player's colour
-    assert "Numbers" in rows.nth(0).inner_text()
-    rows.nth(0).locator("button", has_text="Icons").click()
+    board.wait_for_function("() => document.querySelectorAll('.player-colors .swatch.on').length === 3")
+    assert rows.nth(0).locator(".swatch.on").get_attribute("style") != klaus_before, "picking a taken colour swaps it"
+    # on the board: each player's card has a border and a dot before the name in their colour
+    time.sleep(0.3)
+    plates = board.evaluate("""() => [...document.querySelectorAll('.kit-plate')].map((e) => [e.querySelector('.kit-name').textContent.trim(),
+      getComputedStyle(e).borderTopColor, getComputedStyle(e.querySelector('.kit-dot')).backgroundColor])""")
+    rgb = lambda h: f"rgb({int(h[1:3], 16)}, {int(h[3:5], 16)}, {int(h[5:7], 16)})"
+    want = {p["name"]: rgb(p["color"]) for p in api("GET", "/state")["players"]}
+    assert len(plates) == 3 and all(border == dot == want[name] for name, border, dot in plates), f"plates {plates}, colours {want}"
+    assert want["Mira"] == purple
+    # Pachisi's own setting: the pieces, numbers or icons (D-102); its colour rows are gone
+    game_rows = board.locator(".game-settings .row")
+    assert game_rows.count() == 1 and "Numbers" in game_rows.nth(0).inner_text(), "Pachisi no longer has its own colour rows"
+    # icons are the default (D-109); Numbers switches to 1-4 and Icons back
+    board.wait_for_function("() => document.querySelectorAll('.pc-token svg[data-icon]').length === 12")
+    game_rows.nth(0).locator("button", has_text="Numbers").click()
+    board.wait_for_function("() => document.querySelectorAll('.pc-token svg').length === 0 && document.querySelector('.pc-token').textContent.trim() === '1'")
+    decks[0].wait_for_function("() => document.querySelectorAll('.pc-piece svg').length === 0")
+    game_rows.nth(0).locator("button", has_text="Icons").click()
     board.wait_for_selector(".game-settings .seg button.on >> text=Icons")
     on = board.evaluate("() => { const b = document.querySelector('.game-settings .seg button.on'); const cs = getComputedStyle(b); return [cs.color, cs.backgroundColor]; }")
     assert on[0] != on[1], f"the chosen option's label is invisible: {on}"
@@ -334,6 +349,14 @@ def endings(browser, board):
     api("POST", "/game/start")
     board.wait_for_selector("#lobby-button:not([hidden])")
     board.click("#lobby-button")
+    # D-108: the terms open in a window on the board (✕ and Close), not in a new tab
+    pages = len(board.context.pages)
+    board.click(".overlay [data-terms]")
+    board.locator(".overlay.terms .md p").first.wait_for()
+    assert "entertainment" in board.inner_text(".overlay.terms .md") and len(board.context.pages) == pages
+    shot(board, "terms")
+    board.click(".overlay.terms .terms-close")
+    board.wait_for_selector(".overlay.terms", state="detached")
     board.click("[data-end]")
     board.click(".dialog [data-x=yes]")
     wait(lambda: api("GET", "/state")["phase"] == "finished", 5, "the game to end")
@@ -358,6 +381,21 @@ def dialogs(browser, board):
     decks[0].wait_for_function("(n) => document.querySelectorAll('.list .row .pdot').length === n", arg=len(want))
     dots = decks[0].evaluate("() => [...document.querySelectorAll('.list .row .pdot')].map((e) => getComputedStyle(e).backgroundColor)")
     assert dots == want, f"dots {dots}, expected {want}"
+    # D-106: the lobby's seat cards show the same colour as a border and a dot before the name
+    cards = board.evaluate("""() => [...document.querySelectorAll('#seats .seat.taken')].map((e) => [getComputedStyle(e).borderTopColor,
+      getComputedStyle(e.querySelector('.pdot')).backgroundColor])""")
+    assert sorted(c[0] for c in cards) == sorted(want) and all(a == b for a, b in cards), f"cards {cards}, colours {want}"
+    # colours are a board setting before any game is chosen too; the phone and the card follow
+    board.click("#settings-button")
+    board.wait_for_selector(".player-colors")
+    assert board.locator(".game-settings").count() == 0
+    board.locator(".player-colors .row").nth(0).locator(".swatch").nth(6).click()  # Klaus: teal
+    teal = rgb(hexes[6])
+    decks[0].wait_for_function("(c) => getComputedStyle(document.querySelector('.who .badge')).backgroundColor === c", arg=teal, timeout=5000)
+    board.wait_for_function("(c) => [...document.querySelectorAll('#seats .seat.taken')].some((e) => getComputedStyle(e).borderTopColor === c)", arg=teal, timeout=5000)
+    shot(board, "settings-colours-lobby")
+    board.click("[data-close-overlay]")
+    shot(board, "lobby-colours")
     pick_game(board, "roulette")
     board.wait_for_selector(".dialog.form")
     board.fill(".dialog [name=rounds]", "4")
@@ -443,6 +481,18 @@ def rules(browser, board):
             d.locator(".rules-modal .rules-close").click()
         d.wait_for_selector(".rules-modal", state="detached")
     api("POST", "/game/close", {})
+    # D-108: the terms open in the same sheet on the phone, with ✕ top right, and the page stays where it is
+    url = d.url
+    d.click("footer a[data-terms]")
+    d.locator(".rules-modal .md p").first.wait_for()
+    assert "Terms of service" in d.inner_text(".rules-modal .rules-head h2")
+    assert "entertainment" in d.inner_text(".rules-modal .rules-body")
+    assert d.url == url, "the terms must not navigate away from the deck"
+    close = d.locator(".rules-modal .rules-close").bounding_box()
+    assert close["x"] + close["width"] > 320 - 40 and close["y"] < 80, f"the ✕ belongs top right: {close}"
+    shot(d, "terms")
+    d.locator(".rules-modal .rules-close").click()
+    d.wait_for_selector(".rules-modal", state="detached")
     return [d]
 
 
