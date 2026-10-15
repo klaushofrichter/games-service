@@ -34,6 +34,7 @@
   .tile { border:1px solid var(--line); border-radius:12px; padding:14px 16px; }
   .tile .n { font-family:var(--display); font-size:30px; color:var(--brass); }
   .tile .l { color:var(--soft); font-size:13px; }
+  .tile.low { border-color:var(--ruby); } .tile.low .n { color:#f1a197; }
   table { width:100%; border-collapse:collapse; }
   th, td { text-align:left; padding:9px 8px; border-bottom:1px solid var(--line); vertical-align:middle; }
   th { color:var(--faint); font-weight:500; font-size:12px; letter-spacing:.08em; text-transform:uppercase; }
@@ -160,7 +161,7 @@ let token = (() => { try { return sessionStorage.getItem(KEY) || ""; } catch { r
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 const ago = (t) => { if (!t) return "never"; const s = Math.round((Date.now() - t) / 1000); return s < 60 ? `${s}s ago` : s < 3600 ? `${Math.round(s / 60)} min ago` : `${Math.round(s / 3600)} h ago`; };
-const size = (b) => (b > 1e6 ? `${(b / 1e6).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1e3))} kB`);
+const size = (b) => (b > 1e9 ? `${(b / 1e9).toFixed(1)} GB` : b > 1e6 ? `${(b / 1e6).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1e3))} kB`);
 
 async function api(method, path, body) {
   const headers = { "content-type": "application/json" };
@@ -233,7 +234,8 @@ async function refresh() {
     $("#metrics").innerHTML = [
       [m.tables, "tables"], [tables.filter((t) => t.online).length, "online now"], [m.gamesPlayed, "games played"],
       [m.gamesTerminated, "games ended early"], [mins >= 120 ? `${Math.round(mins / 60)} h` : `${mins} min`, "time played"], [m.simulations, "AI simulations"],
-    ].map(([n, l]) => `<div class="tile"><div class="n">${esc(n)}</div><div class="l">${l}</div></div>`).join("");
+    ].map(([n, l]) => `<div class="tile"><div class="n">${esc(n)}</div><div class="l">${l}</div></div>`).join("")
+      + storageTile(m.storage);
     $("#tables").innerHTML = tables.map((t) => `<tr class="${t.code?.pastValidity ? "flag" : ""}">
       <td><div>${esc(t.name)}</div><div class="mono faint">${esc(t.tableId)}</div></td>
       <td><span class="pill ${t.status}">${t.status}</span>${t.status === "pending" ? ` <span class="mono">${esc(t.pairingCode)}</span>` : ""}${t.code?.pastValidity ? ` <span class="pill past" title="Its access code has run out; disconnect it if it should stop">code past validity</span>` : ""}</td>
@@ -367,6 +369,14 @@ document.addEventListener("click", async (e) => {
     }
   } catch (err) { msg("#code-msg", err.message); }
 });
+
+/** The service's volume (D-113): how full it is, and what of it is logs. Red when free space nears the reserve. */
+function storageTile(s) {
+  if (!s) return `<div class="tile" title="DATA_DIR is not set: the service keeps its state in memory"><div class="n">memory</div><div class="l">storage · lost at restart</div></div>`;
+  const used = s.total - s.free;
+  const tip = `Database ${size(s.database)}, snapshot ${size(s.snapshot)}, logs ${size(s.logs)} (cap ${size(s.logCap)})${s.aside ? `, kept after recoveries ${size(s.aside)}` : ""}. The oldest logs make way before free space drops below ${size(s.reserve)}.`;
+  return `<div class="tile ${s.low ? "low" : ""}" title="${esc(tip)}"><div class="n">${Math.round((used / s.total) * 100)} %</div><div class="l">of ${s.total >= 2 ** 30 ? `${(s.total / 2 ** 30).toFixed(1)} GiB` : `${Math.round(s.total / 2 ** 20)} MiB`} used · ${s.logs ? `logs ${size(s.logs)}` : "no logs yet"}</div></div>`;
+}
 
 $("#signin-form").addEventListener("submit", async (e) => {
   e.preventDefault();

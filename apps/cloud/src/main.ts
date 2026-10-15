@@ -85,6 +85,8 @@ if (repoFile !== "none") {
   }
 }
 
+for (const k of ["LOG_STORAGE_MB", "DATA_LIMIT_MB"] as const) if (env[k] && !(Number(env[k]) >= 1)) fail(`${k} must be a number of megabytes, at least 1 (it is ${env[k]})`);
+
 const cloud = await startCloud({
   port: Number(env.PORT ?? 8081),
   adminToken,
@@ -101,6 +103,10 @@ const cloud = await startCloud({
   // GitHub's REST API; only the browser checks change it (scripts/e2e/extra.py serves a fake GitHub).
   githubApiUrl: env.GAME_REPO_API_URL || undefined,
   dataDir: env.DATA_DIR || undefined,
+  // Cap on stored game logs, in MB (default 256); the volume's free space limits them too (D-113).
+  maxLogBytes: env.LOG_STORAGE_MB ? Number(env.LOG_STORAGE_MB) * 1024 * 1024 : undefined,
+  // The service's whole budget in DATA_DIR, in MB (default 1024, the PVC's size): a local-path PVC has no quota itself.
+  dataLimitBytes: env.DATA_LIMIT_MB ? Number(env.DATA_LIMIT_MB) * 1024 * 1024 : undefined,
 });
 console.log(`[cloud] ${env.APP_VERSION || "dev"} listening on ${cloud.port}; admin sign-in: ${google ? `Google (${google.allowedEmails.length} allowed)` : "ADMIN_TOKEN only (development)"}`);
 for (const sig of ["SIGINT", "SIGTERM"] as const) process.on(sig, async () => (await cloud.close(), process.exit(0)));

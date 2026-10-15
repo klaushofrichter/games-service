@@ -157,6 +157,61 @@ describe("persistent store", () => {
     expect(readdirSync(join(dir, "logs")).sort()).toEqual(["log-b-1.zip"]);
   });
 
+  it("leaves the volume's reserve free: the oldest logs go first, and an upload that can't fit is refused", async () => {
+    // A fake 1 GB volume: reserve 153.6 MB (15 %). The free space follows what the logs take.
+    const total = 1_000_000_000;
+    const base0 = total - 156_000_000; // 156 MB free before any log: room for 6 MB of logs above the reserve
+    let logBytes = 0;
+    cloud = await startCloud({ port: 0, host: "127.0.0.1", adminToken: ADMIN, publicUrl: "https://games.skylar.technology", dataDir: dir, gameRepoRefreshMs: 0, statVolume: () => ({ total, free: total - base0 - logBytes }) });
+    port = cloud.port;
+    const code = (await admin("POST", "/admin/api/codes", { validity: "week" })).body;
+    const { tableToken } = await (await get(`${base()}/api/tables/hello`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ tableId: "t_volume_check_123", accessCode: code.code }) })).json();
+    const put = async (id: string, n: number) => {
+      const r = await get(`${base()}/api/tables/logs/${id}?gameId=x`, { method: "PUT", headers: { authorization: `Bearer ${tableToken}` }, body: Buffer.alloc(n) });
+      logBytes = ((await admin("GET", "/admin/api/logs")).body as any[]).reduce((a, l) => a + l.bytes, 0);
+      return r.status;
+    };
+    for (const id of ["log-1", "log-2", "log-3"]) expect(await put(id, 2_000_000)).toBe(201); // 6 MB
+    expect(await put("log-4", 2_000_000)).toBe(201); // 8 MB would cross the reserve: log-1 goes
+    expect(((await admin("GET", "/admin/api/logs")).body as any[]).map((l) => l.id).sort()).toEqual(["log-2", "log-3", "log-4"]);
+    expect(existsSync(join(dir, "logs", "log-1.zip"))).toBe(false);
+    expect(await put("log-big", 7_000_000)).toBe(507); // larger than all the room there is: refused, nothing dropped
+    const m = (await admin("GET", "/admin/api/metrics")).body.storage;
+    expect(m).toMatchObject({ total, reserve: 150_000_000, free: 150_000_000, logBytes: 6_000_000, low: true });
+  });
+
+  it("counts the budget (DATA_LIMIT_MB) from its own files, not from the disk, which a local-path volume does not limit", async () => {
+    // 105 MiB budget: 100 MiB reserve, so about 5 MiB for logs, however large the disk under the test is.
+    cloud = await startCloud({ port: 0, host: "127.0.0.1", adminToken: ADMIN, publicUrl: "https://games.skylar.technology", dataDir: dir, gameRepoRefreshMs: 0, dataLimitBytes: 105 * 1024 * 1024 });
+    port = cloud.port;
+    const code = (await admin("POST", "/admin/api/codes", { validity: "week" })).body;
+    const { tableToken } = await (await get(`${base()}/api/tables/hello`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ tableId: "t_budget_check_123", accessCode: code.code }) })).json();
+    const put = async (id: string) => (await get(`${base()}/api/tables/logs/${id}?gameId=x`, { method: "PUT", headers: { authorization: `Bearer ${tableToken}` }, body: Buffer.alloc(3_000_000) })).status;
+    expect(await put("log-1")).toBe(201);
+    expect(await put("log-2")).toBe(201); // 6 MB would not fit: log-1 goes
+    expect(((await admin("GET", "/admin/api/logs")).body as any[]).map((l) => l.id)).toEqual(["log-2"]);
+    const s = (await admin("GET", "/admin/api/metrics")).body.storage;
+    expect(s.total).toBe(105 * 1024 * 1024);
+    expect(s.logs).toBe(3_000_000);
+  });
+
+  it("keeps only the newest three databases set aside by recoveries", async () => {
+    for (const stamp of ["2026-10-01", "2026-10-02", "2026-10-03", "2026-10-04", "2026-10-05"]) {
+      writeFileSync(join(dir, `state.db.damaged-${stamp}T00-00-00-000Z`), "x");
+      writeFileSync(join(dir, `state.db.damaged-${stamp}T00-00-00-000Z-wal`), "x");
+    }
+    writeFileSync(join(dir, "state.db.replaced-2026-10-06T00-00-00-000Z"), "x");
+    const s = new Store({ dataDir: dir, snapshotMs: 0, log: () => {} });
+    s.close();
+    expect(readdirSync(dir).filter((f) => f.startsWith("state.db.")).sort()).toEqual([
+      "state.db.damaged-2026-10-04T00-00-00-000Z",
+      "state.db.damaged-2026-10-04T00-00-00-000Z-wal",
+      "state.db.damaged-2026-10-05T00-00-00-000Z",
+      "state.db.damaged-2026-10-05T00-00-00-000Z-wal",
+      "state.db.replaced-2026-10-06T00-00-00-000Z",
+    ]);
+  });
+
   it("without DATA_DIR keeps everything in memory, as before", async () => {
     const s = new Store();
     expect(s.persistent).toBe(false);

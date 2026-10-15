@@ -43,6 +43,11 @@ const MAX_PENDING = 500;
 const PENDING_TTL_MS = 10 * 60_000;
 /** Total bytes of stored logs; the oldest are dropped to make room for a new upload. */
 const MAX_LOG_BYTES = 256 * 1024 * 1024;
+/**
+ * Free space the service always leaves in its budget: the larger of 100 MB and 15 %. Logs are the only thing that grows;
+ * the oldest go before this reserve is touched, so the database, its snapshot and SQLite's write-ahead log have room.
+ */
+const reserveFor = (total: number) => Math.max(100 * 1024 * 1024, Math.round(total * 0.15));
 const MAX_CODES = 1000;
 /** Wrong access codes per client address and minute before hellos with a code are refused (a waiting table retries every 5 s). */
 const MAX_CODE_FAILURES = 30;
@@ -64,8 +69,15 @@ export interface CloudOptions {
    * service networks).
    */
   trustProxy?: boolean | string[];
-  /** Cap on the total size of stored logs (default 256 MB). */
+  /** Cap on the total size of stored logs (default 256 MB; LOG_STORAGE_MB). */
   maxLogBytes?: number;
+  /**
+   * The service's storage budget in DATA_DIR (DATA_LIMIT_MB, default 1 GiB: the PVC's size). It is counted from the
+   * service's own files, because a local-path volume has no quota of its own: statfs reports the node's whole disk.
+   */
+  dataLimitBytes?: number;
+  /** The budget's size and free space; tests pass a fake. */
+  statVolume?: () => { total: number; free: number } | null;
   /** Extra-game repositories every start lists ("owner/name" or "owner/name@ref"): deploy/game-repos.json and GAME_REPOS. */
   gameRepos?: string[];
   /** Read token for private extra-game repositories (GAME_REPO_TOKEN). */
@@ -285,6 +297,27 @@ export function startCloud(o: CloudOptions) {
     return [...new Set(v as string[])];
   };
   const maxLogBytes = o.maxLogBytes ?? MAX_LOG_BYTES;
+  const dataLimit = o.dataLimitBytes ?? 1024 * 1024 * 1024;
+  /** The budget: the smaller of DATA_LIMIT_MB and the disk, less what the service's files take (and never more than the disk has free). */
+  const statVolume =
+    o.statVolume ??
+    (() => {
+      const vol = store.volume();
+      const use = store.usage();
+      if (!vol || !use) return null;
+      const own = use.database + use.snapshot + use.logs + use.aside;
+      const total = Math.min(dataLimit, vol.total);
+      return { total, free: Math.max(0, Math.min(vol.free, total - own)) };
+    });
+  /** Storage for the console: the volume, the service's own files, and the log cap. Null without DATA_DIR. */
+  const storage = () => {
+    const vol = statVolume();
+    const use = store.usage();
+    if (!vol || !use) return null;
+    let logBytes = 0;
+    for (const l of logs.values()) logBytes += l.meta.bytes;
+    return { ...vol, reserve: reserveFor(vol.total), ...use, logCap: maxLogBytes, logBytes, low: vol.free < reserveFor(vol.total) * 1.5 };
+  };
   const lookups = new Map<string, { n: number; reset: number }>(); // invite lookup rate limit per IP
   const iceServers = o.iceServers ?? [{ urls: "stun:stun.l.google.com:19302" }];
   // Remote play signaling (D-020): tables hold a socket here; remote browsers get a session per invite.
@@ -562,15 +595,27 @@ export function startCloud(o: CloudOptions) {
         if (existing && existing.meta.tableId !== t.tableId) return json(res, 409, { error: "a log with this id belongs to another table" });
         const data = await body(req, 50 * 1024 * 1024);
         const gameId = String(url.searchParams.get("gameId") ?? "");
-        // Bounded in total too: the oldest logs make room for the new one.
-        logs.delete(match[1]);
+        // Bounded in total, and on disk by the volume's free space: the oldest logs make room for the new one, and the
+        // reserve stays free for the database (D-113). Re-uploading the same id replaces it.
+        if (existing) dropLog(match[1]);
         let total = 0;
         for (const l of logs.values()) total += l.meta.bytes;
+        const vol = statVolume();
+        let free = vol ? vol.free : Infinity;
+        const reserve = vol ? reserveFor(vol.total) : 0;
+        const fits = () => total + data.length <= maxLogBytes && free - data.length >= reserve;
+        // Larger than all the room there could be: refuse before dropping anything. The table keeps its copy.
+        if (data.length > maxLogBytes || free + total - data.length < reserve) {
+          console.warn(`[cloud] log ${match[1]} (${data.length} bytes) refused: not enough room on the volume`);
+          return json(res, 507, { error: "the service's storage is full; the table keeps its own copy" });
+        }
         for (const l of [...logs.values()].sort((a, b) => a.meta.uploadedAt - b.meta.uploadedAt)) {
-          if (total + data.length <= maxLogBytes) break;
+          if (fits()) break;
           dropLog(l.meta.id);
           total -= l.meta.bytes;
+          free += l.meta.bytes;
         }
+
         const meta: LogRecordMeta = { id: match[1], tableId: t.tableId, gameId, simulation: url.searchParams.get("simulation") === "1", bytes: data.length, uploadedAt: Date.now() };
         if (store.persistent) store.writeLog(meta.id, data); // the file first: a record never points at a missing file
         store.put("log", meta.id, meta);
@@ -694,7 +739,7 @@ export function startCloud(o: CloudOptions) {
         if (m === "GET" && p === "/admin/api/metrics") {
           const all = [...tables.values()];
           const sum = (k: string) => all.reduce((a, t) => a + (t.metrics[k] ?? 0), 0);
-          return json(res, 200, { tables: all.length, gamesPlayed: sum("gamesPlayed"), gamesTerminated: sum("gamesTerminated"), totalGameMs: sum("totalGameMs"), simulations: sum("simulations") });
+          return json(res, 200, { tables: all.length, gamesPlayed: sum("gamesPlayed"), gamesTerminated: sum("gamesTerminated"), totalGameMs: sum("totalGameMs"), simulations: sum("simulations"), storage: storage() });
         }
         if (m === "GET" && p === "/admin/api/settings") return json(res, 200, settings);
         if (m === "PUT" && p === "/admin/api/settings") {

@@ -31,7 +31,8 @@ page is the history. Leave it empty if there is nothing to add beyond the commit
 - **The service keeps its state** (D-113): with `DATA_DIR` (the PVC at `/data` in the cluster) paired tables, access
   codes, repository ticks, console-added repositories, logs, invites and the retention setting survive restarts and
   deploys, so tables no longer need approving again after a deploy. SQLite, with an hourly snapshot the service
-  starts from if its database is missing or damaged.
+  starts from if its database is missing or damaged. Storage stays within a budget (`DATA_LIMIT_MB`, 1 GiB): the
+  oldest logs make way, and the console's Overview shows how full it is.
 - The phones' *At the table* list shows each player's colour before their name.
 - Scrollbars in the console (e.g. Game logs), the invite page and the sign-in pages use the green felt colours instead of white.
 - Player colours are a board setting for every game (gear → Player colours), shown on the board as the card's border

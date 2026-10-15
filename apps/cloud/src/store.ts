@@ -13,8 +13,11 @@
 // snapshot: if state.db is missing, fails to open or fails SQLite's quick_check, the snapshot replaces it (the damaged
 // file is kept beside it). The marker file forces that, for a restore runbook that wants the snapshot regardless.
 import { DatabaseSync } from "node:sqlite";
-import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statfsSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+
+/** Damaged or replaced databases kept beside state.db after a recovery: the newest few, never an unbounded pile. */
+const KEEP_ASIDE = 3;
 
 /** Collections of JSON records; each record is a small object keyed by a string. */
 export type Kind = "table" | "log" | "invite" | "download" | "session" | "repo" | "code" | "setting";
@@ -65,6 +68,7 @@ export class Store {
     };
     if (this.persistent) {
       mkdirSync(join(this.dataDir!, "logs"), { recursive: true });
+      this.pruneAside();
       this.snapshot(); // a fresh, consistent copy right away, so a backup taken in the next hour has one
       const every = o.snapshotMs ?? 3600_000;
       if (every > 0) {
@@ -147,6 +151,48 @@ export class Store {
       }
     }
     return n;
+  }
+
+  /** Size and free space of the volume DATA_DIR is on (the PVC), or null in memory. */
+  volume(): { total: number; free: number } | null {
+    if (!this.persistent) return null;
+    try {
+      const s = statfsSync(this.dataDir!);
+      return { total: s.blocks * s.bsize, free: s.bavail * s.bsize };
+    } catch {
+      return null;
+    }
+  }
+
+  /** What the service's own files take on the volume, by part, in bytes. */
+  usage(): { database: number; snapshot: number; logs: number; aside: number } | null {
+    if (!this.persistent) return null;
+    const size = (p: string) => {
+      try {
+        return statSync(p).size;
+      } catch {
+        return 0;
+      }
+    };
+    const dir = this.dataDir!;
+    let logs = 0;
+    for (const f of readdirSync(join(dir, "logs"))) logs += size(join(dir, "logs", f));
+    let aside = 0;
+    for (const f of readdirSync(dir)) if (/^state\.db\.(damaged|replaced)-/.test(f)) aside += size(join(dir, f));
+    return {
+      database: ["", "-wal", "-shm"].reduce((a, x) => a + size(join(dir, `state.db${x}`)), 0),
+      snapshot: size(join(dir, "snapshots", "state.db")),
+      logs,
+      aside,
+    };
+  }
+
+  /** Keep the newest few damaged or replaced databases from recoveries (each with its -wal and -shm), delete older ones. */
+  private pruneAside() {
+    const dir = this.dataDir!;
+    const stamps = [...new Set(readdirSync(dir).map((f) => f.match(/^(state\.db\.(?:damaged|replaced)-[^.]*?)(?:-wal|-shm)?$/)?.[1]).filter((x): x is string => !!x))];
+    const byAge = stamps.sort((a, b) => a.slice(a.indexOf("-") + 1).localeCompare(b.slice(b.indexOf("-") + 1))).reverse();
+    for (const old of byAge.slice(KEEP_ASIDE)) for (const x of ["", "-wal", "-shm"]) rmSync(join(dir, old + x), { force: true });
   }
 
   /** Write snapshots/state.db: a consistent copy, through a temporary file so a reader never sees half of one. */
