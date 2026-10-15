@@ -5,7 +5,7 @@ import { extname, join, normalize } from "node:path";
 import { timingSafeEqual } from "node:crypto";
 import { WebSocketServer, type WebSocket } from "ws";
 import QRCode from "qrcode";
-import { envelope, PROTOCOL_VERSION, type Envelope } from "../../../packages/protocol/src/index.ts";
+import { envelope, PROTOCOL_VERSION, type AccessCodeStatus, type Envelope } from "../../../packages/protocol/src/index.ts";
 import type { GameEvent } from "../../../packages/sdk/src/index.ts";
 import { Table, TableError } from "./table.ts";
 import { runSimulation } from "./simulation.ts";
@@ -19,6 +19,8 @@ export interface ServerOptions {
   allowRemoteBoard: boolean;
   /** Ask the cloud for an invite (remote play); absent when the table runs without the cloud. */
   createInvite?: () => Promise<{ token: string; url: string; expiresAt: string }>;
+  /** Set or clear the access code typed on the board (D-112); absent when the table runs without the cloud. */
+  setAccessCode?: (code: unknown) => Promise<AccessCodeStatus | null>;
 }
 
 /** A request or socket that arrived over a remote player's WebRTC channel (see remote.ts). */
@@ -30,7 +32,7 @@ export const remoteOf = (req: IncomingMessage): RemoteContext | undefined => (re
 type Client = ({ ws: WebSocket; role: "board" } | { ws: WebSocket; role: "deck"; playerId: string } | { ws: WebSocket; role: "pending" }) & { remote?: boolean };
 
 /** Reads a remote client may make: lobby and game state, never logs, saves, simulations or local join codes. */
-const REMOTE_DENIED = /^\/(join|simulation|logs|saves|invites|remote|qr)(\/|$)/;
+const REMOTE_DENIED = /^\/(join|simulation|logs|saves|invites|remote|qr|cloud)(\/|$)/;
 /**
  * Changes a remote client may make (an allowlist): seat layout and running games. Never turn the table's
  * board (remote boards face their own seat), remove or move players, add AI seats, change AI options,
@@ -174,6 +176,12 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
       if (!opts.createInvite) throw new TableError(409, "remote play needs the Game Table service (CLOUD_URL)");
       if (table.cloud.status !== "online") throw new TableError(409, "the table is not connected to the service right now");
       return json(res, 201, await opts.createInvite());
+    }
+    if (m === "POST" && path === "/cloud/code") {
+      // The table's pre-approved access code (D-112), typed in the board's settings; "" removes it.
+      if (!opts.setAccessCode) throw new TableError(409, "access codes need the Game Table service (CLOUD_URL)");
+      await opts.setAccessCode(body.code ?? "");
+      return json(res, 200, table.state());
     }
     if (m === "GET" && path === "/qr") {
       const text = new URL(req.url ?? "/", "http://t").searchParams.get("text") ?? "";

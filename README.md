@@ -32,9 +32,12 @@ With Docker: `docker compose -f deploy/docker-compose.yml up --build` starts a c
 curl -X POST -H "Authorization: Bearer ${ADMIN_TOKEN:-change-me-dev-admin-token}" http://localhost:8081/admin/api/tables/pair/<CODE>
 ```
 
+Or skip the pairing code: create an access code in the console (*Access codes*) and start with
+`TABLE_CODE=ABCD-EFGH docker compose …`, or type it in the board's settings (*Access codes* below).
+
 ## A table on a Mac (development)
 
-`scripts/mac-table.sh` runs a Table Host on a Mac against the live service at `games.skylar.technology` (Node 26 needed). It opens the board in the browser, puts the Mac's WiFi address in the QR code, and keeps the table's identity and API key in `~/.gametable-mac`, so a restart is the same table. The first time, the board shows a pairing code: approve it in the console at `https://games.skylar.technology/admin`. Allow `node` to accept incoming connections when macOS asks, or phones cannot join. `CLOUD_URL= scripts/mac-table.sh` runs it without the service.
+`scripts/mac-table.sh` runs a Table Host on a Mac against the live service at `games.skylar.technology` (Node 26 needed). It opens the board in the browser, puts the Mac's WiFi address in the QR code, and keeps the table's identity and API key in `~/.gametable-mac`, so a restart is the same table. The first time, the board shows a pairing code: approve it in the console at `https://games.skylar.technology/admin`. Allow `node` to accept incoming connections when macOS asks, or phones cannot join. `scripts/mac-table.sh --code ABCD-EFGH` uses an access code from the console instead, so no approval is needed. `CLOUD_URL= scripts/mac-table.sh` runs it without the service.
 
 ## Layout
 
@@ -44,7 +47,7 @@ curl -X POST -H "Authorization: Bearer ${ADMIN_TOKEN:-change-me-dev-admin-token}
 | `packages/sdk` | `defineGame`, seeded RNG, the `GameContext` games receive, `count()` and `list()` for end-of-game texts, cards (`cards.ts`) |
 | `apps/table-host/src` | HTTP + WebSocket server, lobby (`table.ts`), game runtime and replay (`runtime.ts`), logs, simulation, cloud link, remote-play gateway (`remote.ts`, WebRTC) |
 | `apps/table-host/public` | Board and deck pages (plain HTML/CSS/JS); `shared/` has the board kit and the rules renderer (`markdown.js`) |
-| `apps/cloud/src` | Cloud service: pairing, heartbeat, metrics, log upload/download, download tokens, invites and WebRTC signaling |
+| `apps/cloud/src` | Cloud service: pairing, access codes (`access-codes.ts`), heartbeat, metrics, log upload/download, download tokens, invites and WebRTC signaling; its persistent state (`store.ts`, SQLite) |
 | `apps/cloud/public` | Admin portal (`/admin`) and the remote player's invite page (`/i/CODE`) with its service worker |
 | `games/roulette` | European roulette, 1–6 players, simultaneous betting, three AI styles |
 | `games/pachisi` | Ludo-style race with dice and captures, 2–4 players, two AI levels |
@@ -52,7 +55,7 @@ curl -X POST -H "Authorization: Bearer ${ADMIN_TOKEN:-change-me-dev-admin-token}
 | `games/coin-flip` | Guess heads or tails, 1–8 players, simultaneous, AI, players can join mid-game, optional time limit, per-player statistics |
 | `games/quartet` | Test game (hidden unless `SHOW_TEST_GAMES=1`): exactly 4 humans, no AI, sequential turns, ends if a player leaves |
 | `apps/cloud/src/game-repos.ts`, `apps/table-host/src/extra-games.ts`, `packages/protocol/src/bundle.ts` | Extra-game repositories: fetching and packing on the service, installing on tables, the bundle format |
-| `scripts/e2e/` | Browser end-to-end checks (Playwright): `run-all.sh` runs them all, `play.py` per game, `layout.py`, `admin.py` for the portal and sign-in, `remote.py` for remote play, `extra.py` for extra-game repositories; shared helpers in `common.py` |
+| `scripts/e2e/` | Browser end-to-end checks (Playwright): `run-all.sh` runs them all, `play.py` per game, `layout.py`, `admin.py` for the portal and sign-in, `codes.py` for access codes and a service restart, `remote.py` for remote play, `extra.py` for extra-game repositories; shared helpers in `common.py` |
 | `scripts/sync-secrets.sh` | Puts the values from your local `.env` into GitHub and the cluster, without printing them |
 | `scripts/release-notes.sh`, `release.sh` | The release step of the deploy |
 | `scripts/soak.ts` | AI-only soak run over every game and player count |
@@ -71,13 +74,14 @@ curl -X POST -H "Authorization: Bearer ${ADMIN_TOKEN:-change-me-dev-admin-token}
 | `TABLE_KEY` | random per run | Key for the board control API (`X-Table-Key`) |
 | `PUBLIC_URL` | `http://<lan-ip>:<port>` | Base of the join URL in the QR code |
 | `CLOUD_URL` | unset | Cloud service; unset = development mode without cloud |
+| `TABLE_CODE` (or `--code`) | unset | An access code from the console (D-112): the table is approved without a pairing code. Wins over a code typed on the board |
 | `REQUIRE_CLOUD` | 0 | `1` blocks new games while the cloud is unreachable (production) |
 | `GRACE_MS` | 60000 | How long a disconnected deck keeps its seat |
 | `AI_DELAY_MS` | 800 | Pause before an AI player acts |
 | `MAX_REMOTE_PLAYERS` | 4 | Remote seat limit (phase 1c) |
 | `ALLOW_REMOTE_BOARD` | 0 | Serve the board to non-loopback clients (development only) |
 | `SHOW_TEST_GAMES` | 0 | `1` lists the test game (`quartet`) in the game menu; the tests and `run-all.sh` turn it on |
-| `DATA_DIR`, `GAMES_DIR` | `<repo>/data`, `<repo>/games` | Logs, saves, the table's identity (`table.json`) and extra-game bundles (`extra-games/`); the built-in games |
+| `DATA_DIR`, `GAMES_DIR` | `<repo>/data`, `<repo>/games` | Logs, saves, the table's identity and a typed access code (`table.json`) and extra-game bundles (`extra-games/`); the built-in games |
 
 ## Board control API
 
@@ -95,9 +99,9 @@ curl -s -H "$K" -X POST $H/simulation -d '{"gameId":"coin-flip","players":4,"gam
 curl -s -H "$K" $H/logs/<id>.zip -o run.zip                # JSONL game logs
 ```
 
-Full list: `GET /state, /join, /games, /metrics, /game/board, /logs, /logs/{id}.zip` and `POST /join/new, /layout, /face, /rotate, /seats/move, /ai, /game/select, /game/settings, /game/prefs, /display, /game/start, /game/end, /game/close, /game/resume, /game/save, /simulation, /players/{id}/ai-options, /invites, /remote`, `GET /saves, /qr?text=URL`, `DELETE /players/{id}`.
+Full list: `GET /state, /join, /games, /metrics, /game/board, /logs, /logs/{id}.zip` and `POST /join/new, /layout, /face, /rotate, /seats/move, /ai, /game/select, /game/settings, /game/prefs, /display, /game/start, /game/end, /game/close, /game/resume, /game/save, /simulation, /players/{id}/ai-options, /invites, /remote, /cloud/code`, `GET /saves, /qr?text=URL`, `DELETE /players/{id}`.
 
-Remote players reach a subset over WebRTC (D-057): reads, except the join code, logs, saves, simulations, invites, the remote settings and QR codes; changes only `/layout` and `/game/select|start|end|close`.
+Remote players reach a subset over WebRTC (D-057): reads, except the join code, logs, saves, simulations, invites, the remote settings, QR codes and the access code; changes only `/layout` and `/game/select|start|end|close`.
 
 Decks speak JSON envelopes over `/ws`: `system.hello {joinToken, name}` or `{sessionToken}` (remote decks: `{name}`), then `lobby.ready {ready}` and `game.intent {name, payload}`. The host answers with `system.welcome {playerId, sessionToken}`, `lobby.state`, `game.view {seat, view, events, over, timers, now}` (this seat only), `system.ack | reject {reason} | error {message}`, and `system.removed {reason}` when the player is removed. The board says `system.hello {role: "board", key}` and gets `game.board` instead of `game.view`.
 
@@ -148,8 +152,28 @@ releases. The first is [`klaushofrichter/extra-games`](https://github.com/klaush
   `import { defineGame } from "@game-table/sdk"` (the host maps the name to its own SDK). See the extra-games README for
   how it tests against this repository.
 
-Ticking a repository trusts its code on that table PC (rules run in-process, D-035). The ticks are in memory, like
-pairings; they move to the persistent store (a PVC) with the rest of the service's state.
+Ticking a repository trusts its code on that table PC (rules run in-process, D-035). The ticks, and repositories added
+in the console, are kept by the service across restarts (D-113). A table approved with an access code gets the
+repositories of the code's scope instead of ticks.
+
+## Access codes
+
+An access code approves a table at once, without a pairing code (D-112). Create one in the console under *Access
+codes*: a label, a validity (one week, one month, one year or forever) and the games it brings (built-in only, all
+repositories, or chosen ones). The console shows the code, like `ABCD-EFGH`, once; the service keeps only a hash.
+
+- **On the table:** `TABLE_CODE=ABCD-EFGH` in the environment (the table PC's `.env`), `--code ABCD-EFGH` on the
+  command line (also `scripts/mac-table.sh --code …`), or *Access code* in the board's settings, which has a keypad.
+  A code given at start wins and can't be changed on the board. The board shows what the service said about it.
+- **One table per code:** the first table that uses a code keeps it; any other is refused (*in use*) and waits with
+  its pairing code. *Release* frees a code for a new table, for example after reinstalling the PC, and disconnects
+  the old one.
+- **Validity** counts only for that first use. A table connected past its code's validity keeps working and is
+  flagged in the console, to disconnect by hand if it should stop.
+- **Games:** the code's choice decides the table's extra-game repositories (*all* includes ones added later); edit it
+  on the code's row and the table follows within 15 seconds, between games.
+- **Revoke** or **Delete** disconnects the code's table; *Reconnect* on the table's row still brings it back. Codes
+  that ended more than a year ago disappear by themselves.
 
 ## Remote play
 
@@ -173,6 +197,7 @@ In the cluster these come from the `games-oauth` Secret (created by `scripts/syn
 | Variable | Meaning |
 | --- | --- |
 | `PUBLIC_URL` | `https://games.skylar.technology`; an https URL requires Google sign-in |
+| `DATA_DIR` | Where the state is kept (D-113): `state.db` (SQLite), `snapshots/state.db` (hourly and at shutdown) and `logs/`. In the cluster the PVC `games-cloud-data` at `/data`. Unset = memory only, lost at restart. A `RESTORE_FROM_SNAPSHOT` file there makes the next start use the snapshot |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | The service's own OAuth client, in Google Cloud project `skylar-technology` |
 | `GOOGLE_REDIRECT_URI` | Exactly `PUBLIC_URL/auth/google/callback`; the service refuses to start otherwise |
 | `ALLOWED_EMAILS` | Comma-separated admin allow-list, checked at sign-in and on every request |
@@ -180,7 +205,7 @@ In the cluster these come from the `games-oauth` Secret (created by `scripts/syn
 | `ADMIN_TOKEN` | Optional bearer token for scripts (`Authorization: Bearer …`, at least 16 characters); in local development it is the portal sign-in |
 | `TRUST_PROXY` | `1` = trust `X-Forwarded-For` from loopback and the k3s pod/service networks, or a CIDR list |
 | `PORT` | HTTP port (default 8081) |
-| `MAX_REPLICAS` | Must be `1` (set by the cluster manifest); the service warns at start otherwise, since its state is in one process |
+| `MAX_REPLICAS` | Must be `1` (set by the cluster manifest); the service warns at start otherwise, since one process owns the database and the tables' sockets |
 | `LOG_RETENTION_DAYS`, `ICE_SERVERS` | Log retention (default 90); STUN/TURN for remote play |
 | `GAME_REPO_TOKEN` | Read token for private extra-game repositories (D-097) |
 | `GAME_REPOS_FILE`, `GAME_REPOS` | The deploy-time repository list (default `deploy/game-repos.json`; `none` turns it off), and more repositories (`owner/name@ref`, comma-separated) for local development (D-098) |
@@ -205,13 +230,14 @@ feature branch → PR → main → (PR) → production → deploy
 ## Testing
 
 ```sh
-npm test                                   # rules, fuzzing, lobby, concurrency, API limits, platform, pause, cloud, sign-in, remote play, extra-game repositories, rules for players, seat names, SDK texts (Vitest)
+npm test                                   # rules, fuzzing, lobby, concurrency, API limits, platform, pause, cloud, sign-in, access codes, the persistent store, remote play, extra-game repositories, rules for players, seat names, SDK texts (Vitest)
 npm run typecheck                          # tsconfig.check.json: apps, packages, games, tests, scripts
 node scripts/soak.ts 100                   # 100 AI-only games per game and player count
 scripts/e2e/run-all.sh out/                # every browser check, as CI runs them (pip install -r scripts/e2e/requirements.txt && python -m playwright install chromium)
 # single checks; play.py and layout.py need a running host on port 8090 with TABLE_KEY=devkey
 python3 scripts/e2e/play.py roulette out/  # also: pachisi, holdem, coinflip, endings, dialogs, rules (every game's rules on a 320 px phone)
 python3 scripts/e2e/admin.py out/          # admin portal, sign-in and logout (starts its own cloud and host)
+python3 scripts/e2e/codes.py out/          # access codes: console, board keypad, a service restart, a second table refused (starts its own cloud and two hosts)
 python3 scripts/e2e/remote.py out/         # remote play in a second browser (starts its own cloud and host)
 python3 scripts/e2e/extra.py out/          # extra-game repositories: console, table, remote player (starts its own fake GitHub, cloud and host)
 python3 scripts/e2e/layout.py out/         # decks at 4 phone sizes x 3 games, the board at 5 screen sizes
@@ -220,8 +246,7 @@ python3 scripts/e2e/layout.py out/         # decks at 4 phone sizes x 3 games, t
 ## Known limits
 
 - Game rules run in-process; the isolated sandbox for third-party games comes later.
-- The cloud keeps its state in memory: one replica, and a restart (every deploy) forgets paired tables, invites and uploaded logs. A persistent store comes next.
+- The cloud keeps its state in SQLite on one volume (D-113), so it runs as exactly one replica.
 - Tables authenticate to the cloud with an issued bearer token, not yet a key pair or certificate.
-- The per-table extra-game ticks and console-added repositories are in memory too; the deploy-time list (`deploy/game-repos.json`) is back after every restart.
 - Host-side AI configuration (`ai.hostConfig`, e.g. API keys) is parsed but has no screen yet.
 - werift waits up to 5 s for STUN during connection setup when STUN is unreachable.

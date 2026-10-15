@@ -2,16 +2,26 @@
 # Run a Table Host on this Mac against the live Game Table service, for development and testing.
 #   scripts/mac-table.sh              start it, and open the board in the default browser
 #   scripts/mac-table.sh --no-open    start it without opening the board
-# Overrides (environment): TABLE_NAME, PORT, CLOUD_URL (empty = no cloud), PUBLIC_URL, SHOW_TEST_GAMES, DATA_DIR.
+#   scripts/mac-table.sh --code ABCD-EFGH    approved at once with an access code from the console (D-112)
+# Overrides (environment): TABLE_NAME, PORT, CLOUD_URL (empty = no cloud), PUBLIC_URL, SHOW_TEST_GAMES, DATA_DIR,
+# TABLE_CODE (an access code; the same as --code).
 #
 # The table's identity (tableId, and its token once approved) and its board API key live in DATA_DIR
-# (default ~/.gametable-mac), so a restart is the same table and needs no new approval. The cloud keeps
-# pairings in memory, though: after a deploy of games-cloud the board shows a pairing code again.
+# (default ~/.gametable-mac), so a restart is the same table and needs no new approval; the service keeps its
+# pairings across its own restarts too (D-113).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 OPEN=1
-[ "${1:-}" = "--no-open" ] && OPEN=0
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --no-open) OPEN=0 ;;
+    --code) [ $# -ge 2 ] || { echo "--code needs a value, e.g. --code ABCD-EFGH" >&2; exit 2; }; TABLE_CODE="$2"; shift ;;
+    --code=*) TABLE_CODE="${1#--code=}" ;;
+    *) echo "unknown option: $1 (use --no-open, --code ABCD-EFGH)" >&2; exit 2 ;;
+  esac
+  shift
+done
 
 major=$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0)
 if [ "$major" -lt 26 ]; then
@@ -49,6 +59,7 @@ export TABLE_NAME="${TABLE_NAME:-$default_name}"
 export CLOUD_URL="${CLOUD_URL-https://games.skylar.technology}"
 export SHOW_TEST_GAMES="${SHOW_TEST_GAMES:-0}"
 [ -n "${PUBLIC_URL:-}" ] && export PUBLIC_URL
+[ -n "${TABLE_CODE:-}" ] && export TABLE_CODE
 
 cat <<EOF
 Game Table host on this Mac
@@ -57,7 +68,8 @@ Game Table host on this Mac
   service:   ${CLOUD_URL:-none (development mode)}
   data:      $DATA_DIR   (API key: X-Table-Key from $KEY_FILE)
 If macOS asks whether "node" may accept incoming connections, allow it, or phones cannot join.
-If the board shows a pairing code, approve it at ${CLOUD_URL:-the service}/admin.
+If the board shows a pairing code, approve it at ${CLOUD_URL:-the service}/admin, or give the table an
+access code from the console: start with --code ABCD-EFGH, or type it in the board's settings.
 Stop with Ctrl-C.
 
 EOF

@@ -15,7 +15,7 @@ export interface GameRepo {
   /** Short id used in the console and in table assignments: the repository name, made unique. */
   id: string;
   /** "deploy": from deploy/game-repos.json (or GAME_REPOS), back after every restart and not removable in the console.
-   *  "console": added in the console, gone at the next restart. */
+   *  "console": added in the console; kept across restarts when the service has a DATA_DIR (D-113). */
   origin: "deploy" | "console";
   /** owner/name on GitHub. */
   repo: string;
@@ -134,7 +134,7 @@ export function parseRepoConfig(text: string): string[] {
   });
 }
 
-/** The console's list of repositories, kept in memory like the rest of the service's state (D-036). */
+/** The console's list of repositories. Console-added ones are saved by the server's store (D-113); bundles are fetched again at start. */
 export class GameRepoStore {
   readonly repos = new Map<string, GameRepo>();
   private readonly o: GameRepoOptions;
@@ -144,14 +144,15 @@ export class GameRepoStore {
     this.o = o;
   }
 
-  add(spec: string, origin: GameRepo["origin"] = "console"): GameRepo {
+  /** `keep` restores a repository from the persistent store with the id and date it had (D-113). */
+  add(spec: string, origin: GameRepo["origin"] = "console", keep?: { id: string; addedAt: number }): GameRepo {
     const { repo, ref } = parseRepoSpec(spec);
     for (const r of this.repos.values()) if (r.repo.toLowerCase() === repo.toLowerCase() && r.ref === ref) throw Object.assign(new Error(`${repo}@${ref} is already in the list`), { status: 409 });
     if (this.repos.size >= 50) throw Object.assign(new Error("at most 50 repositories"), { status: 409 });
     const base = repo.split("/")[1].toLowerCase().replace(/[^a-z0-9-]/g, "-").slice(0, 40) || "repo";
-    let id = base;
+    let id = keep && /^[a-z0-9-]{1,48}$/.test(keep.id) && !this.repos.has(keep.id) ? keep.id : base;
     for (let n = 2; this.repos.has(id); n++) id = `${base}-${n}`;
-    const r: GameRepo = { id, repo, ref, origin, addedAt: Date.now(), bundle: null, error: null, lastAttempt: null };
+    const r: GameRepo = { id, repo, ref, origin, addedAt: keep?.addedAt ?? Date.now(), bundle: null, error: null, lastAttempt: null };
     this.repos.set(id, r);
     return r;
   }

@@ -7,7 +7,9 @@ services:
     environment:
       ADMIN_TOKEN: ${ADMIN_TOKEN:-change-me-dev-admin-token}
       PUBLIC_URL: http://localhost:8081
+      DATA_DIR: /data # pairings, access codes and logs survive a restart (D-113)
     ports: ["8081:8081"]
+    volumes: ["cloud-data:/data"]
 
   table-host:
     build: { context: .., dockerfile: deploy/table-host.Dockerfile }
@@ -17,9 +19,11 @@ services:
       CLOUD_URL: http://cloud:8081
       PUBLIC_URL: ${PUBLIC_URL:-http://localhost:8080}
       ALLOW_REMOTE_BOARD: "1" # the board is opened from the host browser, not loopback inside the container
+      TABLE_CODE: ${TABLE_CODE:-} # an access code from the console approves the table without a pairing code (D-112)
     ports: ["8080:8080"]
     volumes: ["table-data:/data"]
     depends_on: [cloud]
 
 volumes:
   table-data:
+  cloud-data:
