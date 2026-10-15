@@ -59,7 +59,11 @@
   button.copy:hover, button.copy.done { color:var(--brass); }
   #signin { max-width:440px; margin:12vh auto; }
   .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:22px; }
-  @media (max-width: 800px) { .grid2 { grid-template-columns:1fr; } #tables td:nth-child(4), thead th:nth-child(4) { display:none; } }
+  @media (max-width: 800px) { .grid2 { grid-template-columns:1fr; } #tables td:nth-child(4), #logs td:nth-child(4), thead th:nth-child(4) { display:none; } }
+  .filters { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:10px; }
+  .filters select, .filters input { padding:6px 10px; font-size:14px; }
+  .pill.finished { border-color:var(--jade); color:var(--jade); } .pill.interrupted, .pill.bad { border-color:var(--ruby); color:#f1a197; } .pill.terminated, .pill.seatLeft { border-color:var(--brass); color:var(--brass); }
+  .sub { font-size:12px; }
   .checks { display:flex; gap:6px 16px; flex-wrap:wrap; }
   .checks label { display:inline-flex; gap:6px; align-items:center; white-space:nowrap; cursor:pointer; }
   .checks input { accent-color:var(--brass); width:16px; height:16px; padding:0; }
@@ -132,25 +136,40 @@
     <table><thead><tr><th>Repository</th><th>Games</th><th>Fetched</th><th></th></tr></thead><tbody id="repos"></tbody></table>
   </section>
 
+  <section style="margin-bottom:22px">
+    <h2>Game logs</h2>
+    <p class="muted">Every game's log, uploaded by its table when the game ends (also simulations, and games a table stopped in the middle of). Each zip has a README describing its format, for reading it yourself or with Claude.</p>
+    <div class="filters" id="log-filters">
+      <select id="lf-game" aria-label="Game"><option value="">All games</option></select>
+      <select id="lf-table" aria-label="Table"><option value="">All tables</option></select>
+      <select id="lf-kind" aria-label="Kind"><option value="">Games and simulations</option><option value="0">Games only</option><option value="1">Simulations only</option></select>
+      <label class="faint">from <input type="date" id="lf-from"></label>
+      <label class="faint">to <input type="date" id="lf-to"></label>
+      <span class="faint" id="logs-count"></span>
+      <span style="flex:1"></span>
+      <button class="danger" id="logs-delete-sims">Delete all simulation logs</button>
+    </div>
+    <div class="msg" id="logs-msg" style="margin-top:0"></div>
+    <div style="max-height:420px;overflow:auto"><table><thead><tr><th>Started</th><th>Game</th><th>Table</th><th>Players</th><th>Ended</th><th>Size</th><th></th></tr></thead><tbody id="logs"></tbody></table></div>
+  </section>
   <div class="grid2">
     <section>
-      <h2>Game logs</h2>
-      <div class="row" style="margin-bottom:10px"><button class="danger" id="logs-delete-sims">Delete all simulation logs</button><span class="faint" id="logs-count"></span></div>
-      <div class="msg" id="logs-msg" style="margin-top:0"></div>
-      <div style="max-height:360px;overflow:auto"><table><thead><tr><th>Log</th><th>Game</th><th>Size</th><th></th></tr></thead><tbody id="logs"></tbody></table></div>
-    </section>
-    <section>
       <h2>Download tokens</h2>
-      <p class="muted">A link that lets a development pipeline fetch logs without signing in.</p>
-      <form id="dl-form" class="row">
-        <input id="dl-label" placeholder="Label, e.g. training pipeline" maxlength="60" style="flex:1">
-        <input id="dl-game" placeholder="Game id (empty = all)" style="flex:1">
+      <p class="muted">A link that lets a development pipeline, or a Claude session, fetch logs without signing in. Leave a field empty for all.</p>
+      <form id="dl-form" class="row" style="flex-wrap:wrap">
+        <input id="dl-label" placeholder="Label, e.g. training pipeline" maxlength="60" style="flex:1 1 100%">
+        <input id="dl-game" placeholder="Game id" style="flex:1">
+        <select id="dl-table" aria-label="Table" style="flex:1"><option value="">All tables</option></select>
+        <label class="faint">from <input type="date" id="dl-from"></label>
+        <label class="faint">to <input type="date" id="dl-to"></label>
         <select id="dl-hours"><option value="24">1 day</option><option value="168">1 week</option><option value="720">30 days</option></select>
         <button class="primary">Create</button>
       </form>
       <div class="msg" id="dl-msg"></div>
       <table style="margin-top:8px"><tbody id="tokens"></tbody></table>
-      <h2 style="margin-top:22px">Log retention</h2>
+    </section>
+    <section>
+      <h2>Log retention</h2>
       <form id="ret-form" class="row"><input id="ret-days" type="number" min="1" max="3650" style="width:110px"> <span class="muted">days, on the service and on every table</span><button>Save</button></form>
       <div class="msg" id="ret-msg"></div>
     </section>
@@ -252,12 +271,14 @@ async function refresh() {
         ${t.status !== "revoked" ? `<button class="danger" data-revoke="${esc(t.tableId)}" data-name="${esc(t.name)}">Disconnect</button>`
           : `<button class="primary" data-reconnect="${esc(t.tableId)}">Reconnect</button> <button class="danger" data-table-delete="${esc(t.tableId)}" data-name="${esc(t.name)}" title="Remove this table from the list for good">Delete</button>`}</td></tr>`).join("")
       || `<tr><td colspan="6" class="faint">No tables yet. Start a table with CLOUD_URL pointing here; its board shows a pairing code.</td></tr>`;
-    $("#logs").innerHTML = logs.sort((a, b) => b.uploadedAt - a.uploadedAt).map((l) => `<tr>
-      <td><div class="mono">${esc(l.id)}</div><div class="faint" style="font-size:12px">${esc(l.tableName ?? "deleted table")} · ${ago(l.uploadedAt)}</div></td><td>${esc(l.gameId)}${l.simulation ? ` <span class="pill">sim</span>` : ""}</td><td>${size(l.bytes)}</td>
-      <td style="text-align:right;white-space:nowrap"><button data-log="${esc(l.id)}">Download</button> <button class="danger" data-log-delete="${esc(l.id)}" aria-label="Delete ${esc(l.id)}">Delete</button></td></tr>`).join("") || `<tr><td colspan="4" class="faint">No logs uploaded yet.</td></tr>`;
+    allLogs = logs;
+    tableNames = new Map(tables.map((t) => [t.tableId, t.name]));
+    fillSelect("#lf-table", tables.map((t) => [t.tableId, t.name]), "All tables");
+    fillSelect("#dl-table", tables.map((t) => [t.tableId, t.name]), "All tables");
+    fillSelect("#lf-game", [...new Map(logs.map((l) => [l.gameId, l.gameName || l.gameId]))].sort((a, b) => a[1].localeCompare(b[1])), "All games");
+    drawLogs();
     const sims = logs.filter((l) => l.simulation).length;
     $("#logs-delete-sims").disabled = !sims;
-    $("#logs-count").textContent = `${logs.length} log${logs.length === 1 ? "" : "s"}${sims ? `, ${sims} from simulations` : ""}`;
     drawTokens(tokenList);
   } catch (e) { if (signedIn()) msg("#pair-msg", e.message); }
 }
@@ -386,10 +407,65 @@ function storageTile(s) {
   return `<div class="tile ${s.low ? "low" : ""}" title="${esc(tip)}"><div class="n">${Math.round((used / s.total) * 100)} %</div><div class="l">of ${s.total >= 2 ** 30 ? `${(s.total / 2 ** 30).toFixed(1)} GiB` : `${Math.round(s.total / 2 ** 20)} MiB`} used · ${s.logs ? `logs ${size(s.logs)}` : "no logs yet"}</div></div>`;
 }
 
+// ----- game logs (D-116) -----
+let allLogs = [];
+let tableNames = new Map();
+/** Options of a filter select, keeping what was chosen. */
+function fillSelect(sel, pairs, all) {
+  const el = $(sel), keep = el.value;
+  el.innerHTML = `<option value="">${esc(all)}</option>` + pairs.map(([v, l]) => `<option value="${esc(v)}">${esc(l)}</option>`).join("");
+  el.value = pairs.some(([v]) => v === keep) ? keep : "";
+}
+const dur = (ms) => (ms == null ? "" : ms < 60000 ? `${Math.round(ms / 1000)} s` : ms < 7200000 ? `${Math.round(ms / 60000)} min` : `${(ms / 3600000).toFixed(1)} h`);
+const REASONS = { finished: "finished", terminated: "ended early", seatLeft: "player left", interrupted: "interrupted" };
+function logMatches(l) {
+  const g = $("#lf-game").value, t = $("#lf-table").value, k = $("#lf-kind").value, from = $("#lf-from").value, to = $("#lf-to").value;
+  const when = l.startedAt ? Date.parse(l.startedAt) : l.uploadedAt;
+  if (g && l.gameId !== g) return false;
+  if (t && l.tableId !== t) return false;
+  if (k && l.simulation !== (k === "1")) return false;
+  if (from && when < new Date(`${from}T00:00`).getTime()) return false;
+  if (to && when >= new Date(`${to}T00:00`).getTime() + 86400000) return false;
+  return true;
+}
+function drawLogs() {
+  const shown = allLogs.filter(logMatches).sort((a, b) => (b.startedAt ? Date.parse(b.startedAt) : b.uploadedAt) - (a.startedAt ? Date.parse(a.startedAt) : a.uploadedAt));
+  const filtered = shown.length !== allLogs.length;
+  $("#logs").innerHTML = shown.map((l) => {
+    const started = l.startedAt ? new Date(l.startedAt) : null;
+    const players = l.simulation
+      ? `${l.games ?? "?"} game${l.games === 1 ? "" : "s"}${l.players?.length ? `, ${l.players.length} AI players` : ""}`
+      : (l.players ?? []).map((p) => esc(p.name) + (p.location === "remote" ? ` <span class="faint">(remote)</span>` : "")).join(", ");
+    const ended = l.simulation && l.endReasons
+      ? Object.entries(l.endReasons).map(([r, n]) => `<span class="pill ${esc(r)}">${n} ${esc(REASONS[r] ?? r)}</span>`).join(" ")
+      : l.endReason ? `<span class="pill ${esc(l.endReason)}">${esc(REASONS[l.endReason] ?? l.endReason)}</span>` : "";
+    const flags = (l.verified === false ? ` <span class="pill bad" title="Replaying the log did not reach the state the game ended in: the rules are not deterministic, or the log is incomplete">does not replay</span>` : "")
+      + (l.errors ? ` <span class="pill bad" title="Exceptions thrown by the game's code; the log has them">${l.errors} error${l.errors === 1 ? "" : "s"}</span>` : "");
+    return `<tr>
+      <td style="white-space:nowrap">${started ? `<div>${esc(started.toLocaleDateString())} ${esc(started.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }))}</div>` : `<div class="faint">uploaded ${ago(l.uploadedAt)}</div>`}<div class="mono faint sub">${esc(l.id)}</div></td>
+      <td>${esc(l.gameName || l.gameId)}${l.simulation ? ` <span class="pill">sim</span>` : ""}${l.gameVersion ? `<div class="faint sub">${esc(l.gameVersion)}${l.gameSource ? " · extra" : ""}</div>` : ""}</td>
+      <td>${esc(tableNames.get(l.tableId) ?? l.tableName ?? "deleted table")}</td>
+      <td style="font-size:14px">${players}</td>
+      <td>${ended}${flags}${l.durationMs != null ? `<div class="faint sub">${esc(dur(l.durationMs))}</div>` : ""}</td>
+      <td>${size(l.bytes)}</td>
+      <td style="text-align:right;white-space:nowrap"><button data-log="${esc(l.id)}">Download</button> <button class="danger" data-log-delete="${esc(l.id)}" aria-label="Delete ${esc(l.id)}">Delete</button></td></tr>`;
+  }).join("") || `<tr><td colspan="7" class="faint">${filtered ? "No logs match these filters." : "No logs uploaded yet."}</td></tr>`;
+  const sims = allLogs.filter((l) => l.simulation).length;
+  $("#logs-count").textContent = filtered ? `${shown.length} of ${allLogs.length} logs` : `${allLogs.length} log${allLogs.length === 1 ? "" : "s"}${sims ? `, ${sims} from simulations` : ""}`;
+}
+$("#log-filters").addEventListener("input", drawLogs);
+
 // ----- deleting records (D-115) -----
+/** What a download token reaches: its game, table and dates (D-116). */
+function tokenScope(d) {
+  const parts = [d.gameId ? `game ${esc(d.gameId)}` : "all games"];
+  if (d.tableId) parts.push(`table ${esc(tableNames.get(d.tableId) ?? d.tableId)}`);
+  if (d.from || d.to) parts.push(`${d.from ? `from ${esc(d.from)}` : ""}${d.from && d.to ? " " : ""}${d.to ? `to ${esc(d.to)}` : ""}`);
+  return parts.join(", ");
+}
 function drawTokens(list) {
   $("#tokens").innerHTML = list.map((d) => `<tr>
-    <td><div>${esc(d.label) || `<span class="faint">no label</span>`}</div><div class="faint" style="font-size:12px">${d.gameId ? `game ${esc(d.gameId)}` : "all games"}${d.createdBy ? ` · by ${esc(d.createdBy)}` : ""}</div></td>
+    <td><div>${esc(d.label) || `<span class="faint">no label</span>`}</div><div class="faint" style="font-size:12px">${tokenScope(d)}${d.createdBy ? ` · by ${esc(d.createdBy)}` : ""}</div></td>
     <td class="faint" style="font-size:13px">until ${esc(new Date(d.expiresAt).toLocaleString())}</td>
     <td style="text-align:right"><button class="danger" data-token-revoke="${esc(d.id)}" data-label="${esc(d.label || (d.gameId ? `token for ${d.gameId}` : "token for all games"))}">Revoke</button></td></tr>`).join("")
     || `<tr><td class="faint">No active download tokens.</td></tr>`;
@@ -501,7 +577,10 @@ $("#dl-msg").addEventListener("click", async (e) => {
 $("#dl-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   try {
-    const r = await api("POST", "/admin/api/download-tokens", { label: $("#dl-label").value.trim(), gameId: $("#dl-game").value.trim() || undefined, expiresInHours: Number($("#dl-hours").value) });
+    const r = await api("POST", "/admin/api/download-tokens", {
+      label: $("#dl-label").value.trim(), gameId: $("#dl-game").value.trim() || undefined, tableId: $("#dl-table").value || undefined,
+      from: $("#dl-from").value || undefined, to: $("#dl-to").value || undefined, expiresInHours: Number($("#dl-hours").value),
+    });
     $("#dl-label").value = ""; refresh();
     $("#dl-msg").className = "msg ok";
     $("#dl-msg").innerHTML = `<div class="copyline"><span class="mono" id="dl-url">${esc(r.url)}</span><button type="button" class="copy" id="dl-copy" title="Copy link" aria-label="Copy link">${COPY_ICON}</button></div><div class="faint">Valid until ${esc(new Date(r.expiresAt).toLocaleString())}. Copy it now; it is not shown again.</div>`;

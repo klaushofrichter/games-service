@@ -9,6 +9,7 @@ import { envelope, PROTOCOL_VERSION, type AccessCodeStatus, type Envelope } from
 import type { GameEvent } from "../../../packages/sdk/src/index.ts";
 import { Table, TableError } from "./table.ts";
 import { runSimulation } from "./simulation.ts";
+import { verifyStoredLog } from "./game-log.ts";
 import type { LogStore } from "./logs.ts";
 
 export interface ServerOptions {
@@ -234,11 +235,18 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
         { players: Number(body.players), games: Number(body.games ?? 1), seed: Number(body.seed ?? Date.now()), settings: body.settings as Record<string, unknown>, aiOptions: body.aiOptions as Record<string, unknown> },
         logs,
         table.config.tableName,
+        { tableId: table.tableId, snapshotEvery: table.config.logSnapshotEvery },
       );
       table.metrics.simulations++;
+      table.logSaved(r.logId); // to the service, like a played game's (D-116)
       return json(res, 200, r);
     }
     if (m === "GET" && path === "/logs") return json(res, 200, await logs.list());
+    if (m === "POST" && (match = path.match(/^\/logs\/([\w-]+)\/verify$/))) {
+      // Replay every game of a stored log with the game as installed now (D-116).
+      const v = await verifyStoredLog(table.games, logs, match[1]);
+      return v ? json(res, 200, v) : json(res, 404, { error: "no such log" });
+    }
     if (m === "GET" && (match = path.match(/^\/logs\/([\w-]+)\.zip$/))) {
       const buf = await logs.read(match[1]);
       if (!buf) return json(res, 404, { error: "no such log" });

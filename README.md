@@ -45,7 +45,7 @@ Or skip the pairing code: create an access code in the console (*Access codes*) 
 | --- | --- |
 | `packages/protocol` | Message envelope, manifest schema (zod), seat layouts and edges, lobby types |
 | `packages/sdk` | `defineGame`, seeded RNG, the `GameContext` games receive, `count()` and `list()` for end-of-game texts, cards (`cards.ts`) |
-| `apps/table-host/src` | HTTP + WebSocket server, lobby (`table.ts`), game runtime and replay (`runtime.ts`), logs, simulation, cloud link, remote-play gateway (`remote.ts`, WebRTC) |
+| `apps/table-host/src` | HTTP + WebSocket server, lobby (`table.ts`), game runtime and replay (`runtime.ts`), game logs (`logs.ts`, `game-log.ts`, and `log-format.md`, the README in every log), simulation, cloud link, remote-play gateway (`remote.ts`, WebRTC) |
 | `apps/table-host/public` | Board and deck pages (plain HTML/CSS/JS); `shared/` has the board kit and the rules renderer (`markdown.js`) |
 | `apps/cloud/src` | Cloud service: pairing, access codes (`access-codes.ts`), heartbeat, metrics, log upload/download, download tokens, invites and WebRTC signaling; its persistent state (`store.ts`, SQLite) |
 | `apps/cloud/public` | Admin portal (`/admin`) and the remote player's invite page (`/i/CODE`) with its service worker |
@@ -55,7 +55,7 @@ Or skip the pairing code: create an access code in the console (*Access codes*) 
 | `games/coin-flip` | Guess heads or tails, 1–8 players, simultaneous, AI, players can join mid-game, optional time limit, per-player statistics |
 | `games/quartet` | Test game (hidden unless `SHOW_TEST_GAMES=1`): exactly 4 humans, no AI, sequential turns, ends if a player leaves |
 | `apps/cloud/src/game-repos.ts`, `apps/table-host/src/extra-games.ts`, `packages/protocol/src/bundle.ts` | Extra-game repositories: fetching and packing on the service, installing on tables, the bundle format |
-| `scripts/e2e/` | Browser end-to-end checks (Playwright): `run-all.sh` runs them all, `play.py` per game, `layout.py`, `admin.py` for the portal and sign-in, `codes.py` for access codes and a service restart, `remote.py` for remote play, `extra.py` for extra-game repositories; shared helpers in `common.py` |
+| `scripts/e2e/` | Browser end-to-end checks (Playwright): `run-all.sh` runs them all, `play.py` per game, `layout.py`, `admin.py` for the portal and sign-in, `codes.py` for access codes and a service restart, `remote.py` for remote play, `extra.py` for extra-game repositories, `logs.py` for game logs; shared helpers in `common.py` |
 | `scripts/sync-secrets.sh` | Puts the values from your local `.env` into GitHub and the cluster, without printing them |
 | `scripts/release-notes.sh`, `release.sh` | The release step of the deploy |
 | `scripts/soak.ts` | AI-only soak run over every game and player count |
@@ -80,6 +80,7 @@ Or skip the pairing code: create an access code in the console (*Access codes*) 
 | `AI_DELAY_MS` | 800 | Pause before an AI player acts |
 | `MAX_REMOTE_PLAYERS` | 4 | Remote seat limit (phase 1c) |
 | `ALLOW_REMOTE_BOARD` | 0 | Serve the board to non-loopback clients (development only) |
+| `LOG_SNAPSHOT_EVERY` | 0 | A snapshot of the whole game state in the log every N moves (D-116); 0: only the final state |
 | `SHOW_TEST_GAMES` | 0 | `1` lists the test game (`quartet`) in the game menu; the tests and `run-all.sh` turn it on |
 | `DATA_DIR`, `GAMES_DIR` | `<repo>/data`, `<repo>/games` | Logs, saves, the table's identity and a typed access code (`table.json`) and extra-game bundles (`extra-games/`); the built-in games |
 
@@ -99,7 +100,7 @@ curl -s -H "$K" -X POST $H/simulation -d '{"gameId":"coin-flip","players":4,"gam
 curl -s -H "$K" $H/logs/<id>.zip -o run.zip                # JSONL game logs
 ```
 
-Full list: `GET /state, /join, /games, /metrics, /game/board, /logs, /logs/{id}.zip` and `POST /join/new, /layout, /face, /rotate, /seats/move, /ai, /game/select, /game/settings, /game/prefs, /display, /game/start, /game/end, /game/close, /game/resume, /game/play-now, /game/save, /simulation, /players/{id}/ai-options, /invites, /remote, /cloud/code`, `GET /saves, /qr?text=URL`, `DELETE /players/{id}`.
+Full list: `GET /state, /join, /games, /metrics, /game/board, /logs, /logs/{id}.zip` and `POST /logs/{id}/verify, /join/new, /layout, /face, /rotate, /seats/move, /ai, /game/select, /game/settings, /game/prefs, /display, /game/start, /game/end, /game/close, /game/resume, /game/play-now, /game/save, /simulation, /players/{id}/ai-options, /invites, /remote, /cloud/code`, `GET /saves, /qr?text=URL`, `DELETE /players/{id}`.
 
 Remote players reach a subset over WebRTC (D-057): reads, except the join code, logs, saves, simulations, invites, the remote settings, QR codes and the access code; changes only `/layout` and `/game/select|start|end|close|play-now`.
 
@@ -194,6 +195,27 @@ A remote player gets an invite link (`https://games.skylar.technology/i/CODE`) f
 - The remote board turns so the remote player's own seat is at the bottom of their screen. On an east or west seat, *Use the full width* shows the board upright instead (their seat at the side), and *Put my seat at the bottom* turns it back; the choice stays in that browser (D-101).
 - `POST /api/v1/remote {"boardControl": false}` (or the checkbox in the invite dialog) makes the board read-only for remote players.
 
+## Game logs
+
+Every game is logged for analysis (D-008, D-116): to find out why a game or an AI misbehaved, by reading the log
+yourself or handing it to Claude.
+
+- **On the table, as the game goes:** every record is written to `DATA_DIR/logs/running/` while the game runs. When
+  the game ends, for whatever reason, the log is packed into one zip in `DATA_DIR/logs/`. A game the table stopped in
+  the middle of (switched off, crashed) is packed at the next start, marked *interrupted*. Simulations are packed at
+  the end of the run.
+- **To the service:** packed logs wait in a queue (`DATA_DIR/logs/outbox/`) and are uploaded when the table is
+  online, retried after every heartbeat until the service has them.
+- **In the zip:** `README.md` (the format, for a reader who has only the zip), `run.json` (game and version, table,
+  start and end, players, settings, how it ended, counts, verification), `game-001.jsonl` (every move, timer and seat
+  change, with refusals, events, AI timing and errors thrown by the rules) and `game-001.state.json` (the final
+  state). A simulation has one pair of files per game. `LOG_SNAPSHOT_EVERY` adds state snapshots.
+- **Verified:** every game is replayed when it ends, and `run.json` says whether it reached the same state; the
+  console flags logs that *do not replay*. `POST /api/v1/logs/{id}/verify` replays a stored log on the table.
+- **Console:** *Game logs* lists them with their metadata and filters by game, table, date and kind. A download token
+  can be limited the same way (game, table, from and to), so one link gives a pipeline or a Claude session exactly
+  the logs it should read: `GET /dl/<token>` lists them, `GET /dl/<token>/<id>.zip` fetches one.
+
 ## Cloud service configuration
 
 In the cluster these come from the `games-oauth` Secret (created by `scripts/sync-secrets.sh` from your `.env`) and the Deployment.
@@ -253,7 +275,7 @@ feature branch → PR → main → (PR) → production → deploy
 ## Testing
 
 ```sh
-npm test                                   # rules, fuzzing, lobby, concurrency, API limits, platform, pause, cloud, sign-in, access codes, the persistent store, remote play, extra-game repositories, rules for players, seat names, SDK texts (Vitest)
+npm test                                   # rules, fuzzing, lobby, concurrency, API limits, platform, pause, cloud, sign-in, access codes, the persistent store, remote play, extra-game repositories, rules for players, seat names, SDK texts, game logs (Vitest)
 npm run typecheck                          # tsconfig.check.json: apps, packages, games, tests, scripts
 node scripts/soak.ts 100                   # 100 AI-only games per game and player count
 scripts/e2e/run-all.sh out/                # every browser check, as CI runs them (pip install -r scripts/e2e/requirements.txt && python -m playwright install chromium)
@@ -262,6 +284,7 @@ python3 scripts/e2e/play.py roulette out/  # also: pachisi, holdem, coinflip, en
 python3 scripts/e2e/admin.py out/          # admin portal, sign-in and logout (starts its own cloud and host)
 python3 scripts/e2e/codes.py out/          # access codes: console, board keypad, a service restart, a second table refused (starts its own cloud and two hosts)
 python3 scripts/e2e/remote.py out/         # remote play in a second browser (starts its own cloud and host)
+python3 scripts/e2e/logs.py out/          # game logs: a simulation from the board, a game with a phone, a table stopped mid-game, the console (starts its own cloud and host)
 python3 scripts/e2e/extra.py out/          # extra-game repositories: console, table, remote player (starts its own fake GitHub, cloud and host)
 python3 scripts/e2e/layout.py out/         # decks at 4 phone sizes x 3 games, the board at 5 screen sizes
 ```

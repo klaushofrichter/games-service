@@ -976,7 +976,11 @@ function openSimulation() {
     out.textContent = "Running…";
     try {
       const r = await api("POST", "/simulation", body);
-      out.innerHTML = `Done: ${r.games.length} game(s). Log <code>${esc(r.logId)}</code> saved.`;
+      // How the games ended (D-116): a run of stalled games must not look like a good one.
+      const ends = Object.entries(r.endReasons ?? {}).map(([k, n]) => `${n} ${k === "terminated" ? "stopped" : k}`).join(", ");
+      out.innerHTML = `Done: ${r.games.length} game(s)${ends ? ` (${esc(ends)})` : ""}. Log <code>${esc(r.logId)}</code> saved${state?.cloud?.status === "online" ? " and queued for upload to the service" : ""}.`
+        + (r.verified === false ? `<br><span style="color:var(--ruby, #e07a6b)">Some games did not replay to the same end: the log says which.</span>` : "")
+        + (r.games.some((g) => g.reason !== "finished") ? `<br>Games that did not finish: ${esc(r.games.map((g, i) => (g.reason === "finished" ? null : `${i + 1}: ${g.summary?.text ?? g.reason}`)).filter(Boolean).slice(0, 3).join("; "))}` : "");
     } catch {
       out.textContent = "";
     }
