@@ -15,11 +15,22 @@ import type { GameSummary, Manifest } from "../../../packages/protocol/src/index
 
 export type LogRecord =
   | { t: "start"; at: number; gameId: string; version: string; seed: number; settings: Record<string, unknown>; seats: SeatInfo[]; aiOptions: Record<number, Record<string, unknown>>; simulation: boolean }
-  | { t: "intent"; at: number; seat: number; by: "human" | "ai" | "board"; intent: Intent; accepted: boolean; reason?: string; events?: GameEvent[] }
+  | { t: "intent"; at: number; seat: number; by: "human" | "ai" | "board"; intent: Intent; accepted: boolean; reason?: string; events?: GameEvent[]; ai?: AiMoveMeta }
   | { t: "timer"; at: number; id: string; events?: GameEvent[] }
   | { t: "seatJoined"; at: number; seat: SeatInfo; events?: GameEvent[] }
   | { t: "seatLeft"; at: number; seat: number; ended: boolean; events?: GameEvent[] }
   | { t: "end"; at: number; reason: "finished" | "terminated" | "seatLeft"; summary: GameSummary | null; stateHash: string };
+
+/**
+ * How an AI move came about (D-112), for analysis and training data; replay never looks at it. `ms`: thinking time;
+ * `fallback`: the game's quick move after "Play now" (or a failed AI); `worker`: the AI ran in a worker thread.
+ */
+export interface AiMoveMeta {
+  ms: number;
+  fallback?: boolean;
+  worker?: boolean;
+  error?: string;
+}
 
 export interface Clock {
   now(): number;
@@ -196,15 +207,16 @@ export class GameRuntime {
     for (const l of this.listeners) l("over", events);
   }
 
-  submit(seat: number, intent: Intent, by: "human" | "ai" | "board"): { ok: true } | { ok: false; reason: string } {
+  submit(seat: number, intent: Intent, by: "human" | "ai" | "board", ai?: AiMoveMeta): { ok: true } | { ok: false; reason: string } {
     if (this.over) return { ok: false, reason: "game is over" };
     const r = this.def.onIntent(this.state, seat, intent, this.ctx());
+    const meta = ai ? { ai } : {};
     if (isReject(r)) {
-      this.record({ t: "intent", at: this.clock.now(), seat, by, intent, accepted: false, reason: r.reject });
+      this.record({ t: "intent", at: this.clock.now(), seat, by, intent, accepted: false, reason: r.reject, ...meta });
       return { ok: false, reason: r.reject };
     }
     const events = this.apply(r);
-    this.record({ t: "intent", at: this.clock.now(), seat, by, intent, accepted: true, events });
+    this.record({ t: "intent", at: this.clock.now(), seat, by, intent, accepted: true, events, ...meta });
     this.afterStep(events);
     return { ok: true };
   }
@@ -253,12 +265,35 @@ export class GameRuntime {
     return Object.fromEntries(this.deadlines);
   }
 
+  /** This seat's AI move, for callers that need it at once (tests, simulations of synchronous AIs). */
   aiIntent(seat: number, aiRng: () => number): Intent | null {
+    const r = this.aiDecide(seat, aiRng);
+    if (r instanceof Promise) throw new Error(`${this.manifest.id}'s AI answers asynchronously; use aiDecide`);
+    return r;
+  }
+
+  /**
+   * Ask the game's AI for this seat's move, in this thread. It may answer with a promise (D-112); `signal` tells it the
+   * game moved on, `deadline` when the table expects the move.
+   */
+  aiDecide(seat: number, aiRng: () => number, signal: AbortSignal = NEVER, deadline = Number.MAX_SAFE_INTEGER): Intent | null | Promise<Intent | null> {
     if (!this.def.ai || this.over) return null;
-    const ctx = { random: aiRng, randomInt: (min: number, max: number) => min + Math.floor(aiRng() * (max - min + 1)) };
-    return this.def.ai(this.view(seat), seat, ctx, this.opts.aiOptions?.[seat] ?? {});
+    return this.def.ai(this.view(seat), seat, { ...rngCtx(aiRng), signal, deadline }, this.aiOptions(seat));
+  }
+
+  /** The game's quick move for an AI out of time (D-112), or null if the game has none. */
+  aiFallbackIntent(seat: number, aiRng: () => number): Intent | null {
+    if (!this.def.aiFallback || this.over) return null;
+    return this.def.aiFallback(this.view(seat), seat, rngCtx(aiRng), this.aiOptions(seat));
+  }
+
+  aiOptions(seat: number): Record<string, unknown> {
+    return this.opts.aiOptions?.[seat] ?? {};
   }
 }
+
+const NEVER = new AbortController().signal;
+const rngCtx = (rng: () => number) => ({ random: rng, randomInt: (min: number, max: number) => min + Math.floor(rng() * (max - min + 1)) });
 
 /** Rebuild a game from its log and return the final state hash. */
 export function replay(manifest: Manifest, def: GameDefinition<any>, log: LogRecord[]): string {

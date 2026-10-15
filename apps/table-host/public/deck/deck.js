@@ -116,7 +116,12 @@ function renderTop() {
   if (!me || !state || removed) return;
   const p = self();
   const inGame = gameMsg && (state.phase === "active" || state.phase === "paused");
-  const paused = state.phase === "paused" ? `<div class="banner">Game paused: the table lost its connection. It continues by itself when the connection is back.</div>` : "";
+  const pause = state.phase === "paused" ? state.pause : null;
+  const paused = !pause
+    ? ""
+    : pause.reason === "ai"
+      ? `<div class="banner">Waiting for ${esc(pause.ai?.name ?? "an AI player")}, who is still thinking. The board can make it move now.</div>`
+      : `<div class="banner">Game paused: the table lost its connection. It continues by itself when the connection is back.</div>`;
   top.innerHTML = `${paused}${banner ? `<div class="banner">${esc(banner)}</div>` : ""}
     <div class="who"><div><div class="eyebrow">${esc(state.tableName)}${inGame ? ` · ${esc(state.game?.name)}` : ""}</div><h1>${esc(p?.name ?? "")}</h1></div>
       <div class="who-side">${state.game?.howToPlay ? `<button type="button" class="rules-btn" data-rules aria-haspopup="dialog">Rules</button>` : ""}
@@ -318,6 +323,8 @@ function info() {
     now: gameMsg?.now ?? Date.now(),
     receivedAt: gameMsg?.receivedAt ?? Date.now(),
     over: gameMsg?.over ?? false,
+    // AI players thinking for more than a moment (D-112): { playerId, seat, since, deadline } in host time.
+    aiThinking: state.aiThinking ?? [],
   };
 }
 

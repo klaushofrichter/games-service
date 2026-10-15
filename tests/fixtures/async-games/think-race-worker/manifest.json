@@ -1,0 +1,23 @@
+{
+  "id": "think-race-worker",
+  "name": "Think Race (worker)",
+  "version": "1.0.0",
+  "sdk": "^0.1",
+  "description": "Test game for AI players that take their time (D-112): anyone adds 1 or 2 to a shared count at any time; whoever reaches the target wins.",
+  "players": { "min": 1, "max": 4 },
+  "turnModel": "simultaneous",
+  "seatLayouts": [2, 4],
+  "edges": ["north", "south", "east", "west"],
+  "settings": [{ "key": "target", "type": "int", "min": 1, "max": 100, "default": 6, "label": "Target" }],
+  "ai": {
+    "supported": true,
+    "timeoutSeconds": 2,
+    "worker": true,
+    "options": [
+      { "key": "thinkMs", "type": "int", "min": 0, "max": 60000, "default": 50, "label": "Thinking time (ms)" },
+      { "key": "behaviour", "type": "enum", "values": ["ok", "busy", "fail", "hang"], "default": "ok", "label": "Behaviour" }
+    ]
+  },
+  "simulation": { "supported": true, "headless": true },
+  "test": true
+}
