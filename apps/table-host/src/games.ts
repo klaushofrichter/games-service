@@ -10,6 +10,8 @@ export interface InstalledGame {
   manifest: Manifest;
   def: GameDefinition<any>;
   dir: string;
+  /** The rules module (rules.ts or rules.js); an AI in a worker thread loads it there (D-112). */
+  rulesFile?: string;
   /** Where an extra game came from (D-097): "owner/name@ref", its commit and bundle hash. Absent for built-in games. */
   source?: { repo: string; commit: string; hash: string };
   /** The game ships rules for players: how-to-play.md in its folder (D-099). */
@@ -30,7 +32,8 @@ export const SDK_SPECIFIERS: Record<string, string> = {
   "@game-table/sdk/cards": join(SDK_DIR, "cards.ts"),
 };
 let hooked = false;
-function registerSdkHook() {
+/** Also called by the AI worker thread (D-112): hooks registered with registerHooks apply to their own thread only. */
+export function registerSdkHook() {
   if (hooked) return;
   hooked = true;
   registerHooks({
@@ -57,7 +60,7 @@ export async function loadGames(dir: string, source?: InstalledGame["source"]): 
       const mod = await import(pathToFileURL(join(gameDir, rulesFile)).href);
       if (!mod.default || typeof mod.default.setup !== "function") throw new Error("rules must export default defineGame({...})");
       const howToPlay = (await readdir(gameDir)).includes(HOW_TO_PLAY);
-      games.set(manifest.id, { manifest, def: mod.default, dir: gameDir, howToPlay, ...(source ? { source } : {}) });
+      games.set(manifest.id, { manifest, def: mod.default, dir: gameDir, rulesFile: join(gameDir, rulesFile), howToPlay, ...(source ? { source } : {}) });
     } catch (err) {
       console.error(`[games] skipping ${entry}: ${(err as Error).message}`);
     }

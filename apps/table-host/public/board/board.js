@@ -625,7 +625,9 @@ function renderFinished() {
 function renderPause() {
   const p = state.phase === "paused" ? state.pause : null;
   pauseLayer.hidden = !p;
-  if (!p) return;
+  pauseLayer.classList.toggle("ai-wait", p?.reason === "ai");
+  if (!p) return void (pauseLayer.innerHTML = "");
+  if (p.reason === "ai") return renderAiWait(p);
   const online = state.cloud.status === "online" || state.cloud.status === "disabled";
   pauseLayer.innerHTML = `<div class="panel" style="transform:rotate(${ROT[viewEdge()]}deg)">
     ${online ? "" : `<div class="spinner"></div>`}
@@ -637,9 +639,30 @@ function renderPause() {
       <button class="danger" data-pause="end">End game</button></div></div>`;
 }
 
+/**
+ * An AI player is out of time (D-112): the game is paused and the board stays visible. A card near the AI's seat, facing
+ * the players, offers "Play now" (the game's quick move for it); otherwise the game goes on when the AI answers. Remote
+ * boards show the button only when they have board control.
+ */
+function renderAiWait(p) {
+  const who = state.players.find((x) => x.id === p.ai?.playerId);
+  const at = seatPositions(state.seatEdges)[p.ai?.seat] ?? { x: W / 2, y: H / 2 };
+  // From the seat a little toward the middle, so the card covers the seat's corner of the game, not the table's edge.
+  const x = at.x + (W / 2 - at.x) * 0.22;
+  const y = at.y + (H / 2 - at.y) * 0.42;
+  const control = !REMOTE || state.remote?.boardControl;
+  pauseLayer.innerHTML = `<div class="ai-wait-card" data-ai-wait="${esc(p.ai?.playerId ?? "")}" style="left:${x}px;top:${y}px;transform:translate(-50%,-50%) rotate(${ROT[gameEdge()]}deg)">
+    <div class="who"><span class="dot" style="background:${who?.color ?? "var(--brass)"}"></span>${esc(p.ai?.name ?? "AI player")}</div>
+    <div class="what"><span class="thinking-dots" aria-hidden="true"><i></i><i></i><i></i></span> is still thinking</div>
+    <p>The game is paused. ${control ? "Wait for it, or let it move now." : "It goes on as soon as the AI moves."}</p>
+    ${control ? `<div class="row"><button class="primary" data-pause="play-now">Play now</button>${REMOTE ? "" : `<button class="danger" data-pause="end">End game</button>`}</div>` : ""}
+  </div>`;
+}
+
 pauseLayer.addEventListener("click", async (e) => {
   const a = e.target.closest("button[data-pause]")?.dataset.pause;
   if (a === "resume") act("POST", "/game/resume");
+  if (a === "play-now") act("POST", "/game/play-now");
   if (a === "save" && (await confirmDialog("Save and exit?", "The game is saved on this table and ends for now. Resuming saved games comes in a later update.", "Save and exit"))) {
     const r = await api("POST", "/game/save").catch(() => null);
     if (r) toast(`Saved as ${r.saveId}`);
@@ -693,6 +716,8 @@ function gameInfo() {
     now: gameMsg?.now ?? Date.now(),
     receivedAt: gameMsg?.receivedAt ?? Date.now(),
     over: gameMsg?.over ?? false,
+    // AI players thinking for more than a moment (D-112): { playerId, seat, since, deadline } in host time.
+    aiThinking: state.aiThinking ?? [],
   };
 }
 
