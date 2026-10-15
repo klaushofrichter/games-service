@@ -5,9 +5,11 @@
 //
 // Layout of DATA_DIR (the PVC games-cloud-data, mounted at /data in the cluster):
 //   state.db (+ -wal, -shm)       the live database (WAL mode)
-//   snapshots/state.db            a consistent copy (VACUUM INTO), written hourly and at shutdown
+//   snapshots/state.db            a consistent copy (VACUUM INTO), written at start, hourly and at shutdown
+//   snapshots/state.prev.db       the snapshot as this process found it at start, before writing its own
 //   logs/<id>.zip                 uploaded game logs
-//   RESTORE_FROM_SNAPSHOT         optional marker: at the next start, replace state.db with the snapshot
+//   RESTORE_FROM_SNAPSHOT         optional marker: at the next start, replace state.db with the snapshot; containing
+//                                 the word "previous", with snapshots/state.prev.db instead
 //
 // A file-level backup (Velero) can copy state.db while it is being written, so a restore must be able to start from the
 // snapshot: if state.db is missing, fails to open or fails SQLite's quick_check, the snapshot replaces it (the damaged
@@ -69,6 +71,12 @@ export class Store {
     if (this.persistent) {
       mkdirSync(join(this.dataDir!, "logs"), { recursive: true });
       this.pruneAside();
+      // Keep the snapshot this start found, before writing a new one. After a Velero restore that is the consistent
+      // copy from the backup; if the service started once before anyone set RESTORE_FROM_SNAPSHOT, the new startup
+      // snapshot is a copy of the restored (possibly torn) state.db, and "previous" in the marker still reaches the
+      // good one (kube-setup review of D-114).
+      const snapDir = join(this.dataDir!, "snapshots");
+      if (existsSync(join(snapDir, "state.db"))) copyFileSync(join(snapDir, "state.db"), join(snapDir, "state.prev.db"));
       this.snapshot(); // a fresh, consistent copy right away, so a backup taken in the next hour has one
       const every = o.snapshotMs ?? 3600_000;
       if (every > 0) {
@@ -226,6 +234,7 @@ function openWithRecovery(dir: string, log: (m: string) => void): { db: Database
   const main = join(dir, "state.db");
   const snap = join(dir, "snapshots", "state.db");
   const marker = join(dir, "RESTORE_FROM_SNAPSHOT");
+  const prev = join(dir, "snapshots", "state.prev.db");
   const stamp = () => new Date().toISOString().replace(/[:.]/g, "-");
   const when = () => (existsSync(snap) ? new Date(statSync(snap).mtimeMs).toISOString() : "");
   /** Move the live files aside (never delete what might be the only copy) and put the snapshot in their place. */
@@ -236,13 +245,18 @@ function openWithRecovery(dir: string, log: (m: string) => void): { db: Database
   };
 
   if (existsSync(marker)) {
+    const wantPrev = /previous/i.test(readFileSync(marker, "utf8"));
     rmSync(marker, { force: true });
-    if (existsSync(snap)) {
-      fromSnapshot("replaced");
-      log(`RESTORE_FROM_SNAPSHOT: started from the snapshot of ${when()}; the previous state.db was kept beside it`);
-      return { db: openChecked(main), opened: { how: "snapshot", detail: "marker" } };
+    const source = wantPrev ? prev : snap;
+    if (existsSync(source)) {
+      const at = new Date(statSync(source).mtimeMs).toISOString();
+      const aside = `${main}.replaced-${stamp()}`;
+      for (const suffix of ["", "-wal", "-shm"]) if (existsSync(main + suffix)) renameSync(main + suffix, aside + suffix);
+      copyFileSync(source, main);
+      log(`RESTORE_FROM_SNAPSHOT: started from ${wantPrev ? "snapshots/state.prev.db" : "the snapshot"} of ${at}; the previous state.db was kept beside it`);
+      return { db: openChecked(main), opened: { how: "snapshot", detail: wantPrev ? "marker-previous" : "marker" } };
     }
-    log("RESTORE_FROM_SNAPSHOT is set but there is no snapshot; starting from state.db");
+    log(`RESTORE_FROM_SNAPSHOT is set but there is no ${wantPrev ? "snapshots/state.prev.db" : "snapshot"}; starting from state.db`);
   }
 
   if (!existsSync(main)) {

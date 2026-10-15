@@ -1,7 +1,7 @@
 // The service's persistent store (D-113): state in DATA_DIR survives a restart, a damaged database is replaced by the
 // snapshot, and no usable secret is ever written to disk.
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -132,6 +132,30 @@ describe("persistent store", () => {
     expect(((await admin("GET", "/admin/api/codes")).body as any[]).map((c) => c.label)).toEqual(["in the snapshot"]);
     expect(existsSync(join(dir, "RESTORE_FROM_SNAPSHOT"))).toBe(false);
     expect(readdirSync(dir).some((f) => f.startsWith("state.db.replaced-"))).toBe(true);
+  });
+
+  it("after a restore that started once before the marker was set, \"previous\" reaches the backup's snapshot", async () => {
+    const codes = (st: Store) => st.all<{ label: string }>("code").map((c) => c.value.label).sort();
+    // What a backup holds: a consistent snapshot (one code) and a live state.db that went on changing (two codes).
+    let st = new Store({ dataDir: dir, snapshotMs: 0, log: () => {} });
+    st.put("code", "a", { label: "in the snapshot" });
+    st.snapshot();
+    st.put("code", "b", { label: "only in state.db" });
+    const backupSnapshot = readFileSync(join(dir, "snapshots/state.db"));
+    // Crash-like stop: keep the snapshot as it was (close() would write a new one).
+    st.close();
+    writeFileSync(join(dir, "snapshots/state.db"), backupSnapshot);
+    mkdirSync(join(dir, ".velero"), { recursive: true }); // Velero's own directory after a restore: ignored
+    // The restored pod starts once without the marker: it opens state.db and writes its own startup snapshot.
+    st = new Store({ dataDir: dir, snapshotMs: 0, log: () => {} });
+    expect(codes(st)).toEqual(["in the snapshot", "only in state.db"]);
+    st.close();
+    // The backup's snapshot is not lost: it is state.prev.db, and "previous" in the marker brings it back.
+    writeFileSync(join(dir, "RESTORE_FROM_SNAPSHOT"), "previous\n");
+    st = new Store({ dataDir: dir, snapshotMs: 0, log: () => {} });
+    expect(st.opened).toEqual({ how: "snapshot", detail: "marker-previous" });
+    expect(codes(st)).toEqual(["in the snapshot"]);
+    st.close();
   });
 
   it("starts empty, keeping the damaged file, when there is no snapshot to fall back on", async () => {

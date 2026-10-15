@@ -9,49 +9,67 @@ table shows a pairing code (or uses an access code you create anew), and the con
 disconnected table, *Delete* on a log or *Delete all simulation logs*, *Revoke* on a download token, *Delete* on an
 access code.
 
-Who runs it: someone with `kubectl` and `velero` on the cluster (Klaus or kube-setup's on-node session). It takes about
-five minutes, and the service is down for one or two of them.
+Who runs it: someone with `kubectl` on the cluster (Klaus or kube-setup's on-node session). It takes about five
+minutes; the service is down for one or two of them. Reviewed against the cluster by kube-setup on 15 Oct 2026 (the
+reset pod passes admission in a server-side dry run).
 
 ## What is where
 
 | Thing | Value |
 | --- | --- |
-| Namespace / Deployment | `games` / `games-cloud` (one replica, `Recreate`) |
-| Volume | PVC `games-cloud-data` (`local-path`, PV set to *Retain*), mounted at `/data`, `DATA_DIR=/data` |
-| Files | `state.db` (+ `-wal`, `-shm`), `snapshots/state.db`, `logs/*.zip`, and up to three `state.db.damaged-*` / `state.db.replaced-*` from recoveries |
-| Backups | Velero schedule `daily-full-backup` (08:30 UTC, kept 30 days) |
+| Namespace / Deployment | `games` / `games-cloud` (one replica, `Recreate`, label `app=games-cloud`) |
+| Volume | PVC `games-cloud-data` (`local-path`, PV *Retain*), mounted at `/data`, `DATA_DIR=/data` |
+| Files | `state.db` (+ `-wal`, `-shm`), `snapshots/state.db` and `state.prev.db`, `logs/*.zip`, up to three `state.db.damaged-*` / `state.db.replaced-*` from recoveries, and `.velero/` after a restore |
+| Backups | Velero `Schedule` `daily-full-backup` (`30 8 * * *` UTC, TTL 720h = 30 days), repository `games-default-kopia` |
+
+**Rule: Velero backs the volume up only while a games-cloud pod is running.** The volume is opted in through the pod's
+annotation (`backup.velero.io/backup-volumes: data`); the cluster does not set `defaultVolumesToFsBackup`. A backup
+taken while the service is scaled to 0 (including the 08:30 UTC daily one) contains no `/data`. So back up *before*
+scaling down, never after.
 
 ## Steps
 
-Stop at the first unexpected result.
+Stop at the first unexpected result. The commands use `kubectl` with Velero's objects in namespace `velero`; there is
+no `velero` CLI on the kube-setup Mac.
 
-**0. Take a backup first**, so the reset can be undone (see `cloud-state-restore.md`):
+**0. Back up first, while the service runs**, so the reset can be undone (`cloud-state-restore.md`, case B):
 
 ```bash
-velero backup create games-before-reset-$(date -u +%Y%m%d%H%M) --include-namespaces games --wait
-velero backup describe games-before-reset-<that name> --details | grep -E 'Phase|data'   # Phase: Completed, PodVolumeBackup data Completed
+B=games-before-reset-$(date -u +%Y%m%d%H%M)
+kubectl create -f - <<EOF
+apiVersion: velero.io/v1
+kind: Backup
+metadata: { name: $B, namespace: velero }
+spec: { includedNamespaces: [games], ttl: 720h0m0s }
+EOF
+until [[ "$(kubectl -n velero get backup $B -o jsonpath='{.status.phase}')" =~ ^(Completed|PartiallyFailed|Failed)$ ]]; do sleep 5; done
+kubectl -n velero get backup $B -o jsonpath='{.status.phase}{"\n"}'                       # Completed
+kubectl -n velero get podvolumebackups -l velero.io/backup-name=$B                        # one for "data", Completed
 ```
 
-**1. Stop the service**, so nothing writes while the files go:
+**1. Stop the service**, so nothing writes while the files go. Note its image first, for step 2:
 
 ```bash
+IMG=$(kubectl -n games get deploy games-cloud -o jsonpath='{.spec.template.spec.containers[0].image}'); echo $IMG
 kubectl -n games scale deploy/games-cloud --replicas=0
 kubectl -n games wait --for=delete pod -l app=games-cloud --timeout=120s
 ```
 
-**2. Empty the volume** with a short-lived pod that mounts it (the service image itself, as uid 1000, with no capabilities):
+**2. Empty the volume** with a short-lived pod that mounts it: the Deployment's own pinned image, as uid 1000, no
+capabilities, read-only root. It needs no network.
 
 ```bash
-kubectl -n games run games-reset --rm -i --restart=Never --image=ghcr.io/klaushofrichter/games-cloud:latest \
-  --overrides='{"spec":{"securityContext":{"runAsUser":1000,"runAsGroup":1000,"fsGroup":1000,"runAsNonRoot":true,"seccompProfile":{"type":"RuntimeDefault"}},
-    "containers":[{"name":"games-reset","image":"ghcr.io/klaushofrichter/games-cloud:latest","command":["sh","-c","ls -la /data && find /data -mindepth 1 -delete && echo EMPTY && ls -la /data"],
-    "securityContext":{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]}},
+kubectl -n games run games-reset --rm -i --restart=Never --image="$IMG" --overrides="$(cat <<EOF
+{"spec":{"securityContext":{"runAsUser":1000,"runAsGroup":1000,"fsGroup":1000,"runAsNonRoot":true,"seccompProfile":{"type":"RuntimeDefault"}},
+  "containers":[{"name":"games-reset","image":"$IMG","command":["sh","-c","ls -la /data && find /data -mindepth 1 -delete && echo EMPTY && ls -la /data"],
+    "securityContext":{"allowPrivilegeEscalation":false,"readOnlyRootFilesystem":true,"capabilities":{"drop":["ALL"]}},
     "volumeMounts":[{"name":"data","mountPath":"/data"}]}],
-    "volumes":[{"name":"data","persistentVolumeClaim":{"claimName":"games-cloud-data"}}]}}'
+  "volumes":[{"name":"data","persistentVolumeClaim":{"claimName":"games-cloud-data"}}]}}
+EOF
+)"
 ```
 
-Expect a listing of the files, then `EMPTY` and an empty listing. If the NetworkPolicy keeps the pod from pulling or
-starting, ask kube-setup; the pod needs no network at all.
+Expect a listing of the files, then `EMPTY` and an empty listing (`.velero/` from an earlier restore goes too).
 
 **3. Start the service again:**
 
@@ -64,6 +82,5 @@ curl -s https://games.skylar.technology/health
 
 **4. Afterwards:** tables show a pairing code within 30 seconds; approve them in the console, or create access codes
 and give them to the tables. Tables keep their own copies of game logs until their retention ends; they are not
-uploaded again.
-
-The next deploy keeps `replicas: 1` from the manifest, so a forgotten step 3 is undone by the next release too.
+uploaded again. The next deploy keeps `replicas: 1` from the manifest, so a forgotten step 3 is undone by the next
+release too.
