@@ -22,9 +22,10 @@ import { HOW_TO_PLAY, settingsWithDefaults, sourceMeta, type InstalledGame } fro
 
 /** The URL a deck fetches a game's rules from (D-099), or null. */
 const howToPlayUrl = (g: InstalledGame) => (g.howToPlay ? `/games/${g.manifest.id}/${HOW_TO_PLAY}` : null);
-import { GameRuntime, realClock, type AiMoveMeta } from "./runtime.ts";
+import { GameRuntime, realClock, type AiMoveMeta, type LogRecord } from "./runtime.ts";
+import { baseMeta, countRecords, rebuild, verifyGame, verifySummary } from "./game-log.ts";
 import { AiCancelled, AiWorker, aiMove, isPromise, usesWorker } from "./ai.ts";
-import type { LogStore } from "./logs.ts";
+import type { LogStore, PlayerMeta, RunningLog } from "./logs.ts";
 
 export class TableError extends Error {
   readonly status: number;
@@ -43,6 +44,8 @@ export interface TableConfig {
   requireCloud: boolean; // phase 1a dev mode may run without the cloud
   maxRemotePlayers: number;
   showTestGames: boolean; // stub games used by the automated tests
+  /** A snapshot of the whole state in the log every N inputs (D-116); 0: none. */
+  logSnapshotEvery?: number;
 }
 
 interface Player extends PlayerInfo {
@@ -81,6 +84,10 @@ export class Table extends EventEmitter {
   private joinToken = "";
   private joinTokenExpires = 0;
   private gameStartedAt = 0;
+  /** The running game's log as it is written to disk (D-116), and its run.json so far. */
+  private runningLog: { log: RunningLog; meta: ReturnType<typeof baseMeta> } | null = null;
+  /** The table's identity at the service, set by the cloud link; null without the service. */
+  tableId: string | null = null;
   cloud: CloudStatus = { status: "disabled" };
   readonly metrics = { gamesPlayed: 0, gamesTerminated: 0, totalGameMs: 0, simulations: 0 };
 
@@ -767,10 +774,11 @@ export class Table extends EventEmitter {
     const seats = this.seated().map((p) => this.seatInfo(p));
     const aiOptions: Record<number, Record<string, unknown>> = {};
     for (const p of this.seated()) if (p.kind === "ai") aiOptions[p.seat!] = aiDefaults(game.manifest, p.aiOptions);
-    const rt = new GameRuntime(game.manifest, game.def, randomInt(2 ** 31), settings, seats, realClock, { aiOptions });
+    const rt = new GameRuntime(game.manifest, game.def, randomInt(2 ** 31), settings, seats, realClock, { aiOptions, snapshotEvery: this.config.logSnapshotEvery });
     this.runtime = rt;
     this.runningGame = game;
     this.gameStartedAt = Date.now();
+    this.beginLog(rt, game, settings, aiOptions);
     this.phase = "active";
     rt.onChange((kind, events) => {
       if (kind === "over") void this.onGameOver(events);
@@ -816,12 +824,23 @@ export class Table extends EventEmitter {
     this.metrics.totalGameMs += ms;
     this.emit("game", events);
     this.changed();
-    const id = logId(rt.manifest.id);
-    if (this.closed) return;
-    const saving = this.logs.save(
-      { id, tableName: this.config.tableName, gameId: rt.manifest.id, gameVersion: rt.manifest.version, simulation: false, startedAt: new Date(this.gameStartedAt).toISOString(), endedAt: new Date().toISOString(), games: 1, format: "gametable-log/1", ...(this.runningGame ? sourceMeta(this.runningGame) : {}) },
-      [rt.log],
-    );
+    const running = this.runningLog;
+    this.runningLog = null;
+    // A table shutting down leaves the running file; the next start closes it as interrupted.
+    if (this.closed || !running) return;
+    const end = rt.log.at(-1) as Extract<LogRecord, { t: "end" }>;
+    const game = this.runningGame;
+    const meta = {
+      ...running.meta,
+      endedAt: new Date().toISOString(),
+      durationMs: ms,
+      endReason: end.reason,
+      result: rt.summary?.text ?? null,
+      counts: { ...countRecords(rt.log), errors: rt.errors },
+      verify: game ? verifySummary([verifyGame(game, rt.log)]) : { checked: 0, ok: 0, failed: [], skipped: "game not installed" },
+    };
+    const id = running.log.id;
+    const saving = this.logs.finish(running.log, meta, rt.log, rt.state);
     this.pendingSaves.add(saving);
     try {
       await saving;
@@ -1062,6 +1081,71 @@ export class Table extends EventEmitter {
   private closed = false;
   private pendingSaves = new Set<Promise<unknown>>();
 
+  private playersMeta(aiOptions: Record<number, Record<string, unknown>>): PlayerMeta[] {
+    return this.seated()
+      .map((p) => ({ seat: p.seat!, name: p.name, kind: p.kind, location: p.kind === "ai" ? null : p.location, ...(p.kind === "ai" ? { aiOptions: aiOptions[p.seat!] ?? {} } : {}) }))
+      .sort((a, b) => a.seat - b.seat);
+  }
+
+  /** Write the game's log to disk from its first record (D-116). A disk problem must not stop the game. */
+  private beginLog(rt: GameRuntime, game: InstalledGame, settings: Record<string, unknown>, aiOptions: Record<number, Record<string, unknown>>) {
+    const meta = baseMeta({ id: logId(game.manifest.id), game, tableName: this.config.tableName, tableId: this.tableId, simulation: false, startedAt: this.gameStartedAt, settings, players: this.playersMeta(aiOptions) });
+    try {
+      const log = this.logs.begin(meta);
+      for (const r of rt.log) log.append(r);
+      rt.onRecord((r) => {
+        try {
+          log.append(r);
+        } catch (err) {
+          console.error(`[table] could not write the game log: ${(err as Error).message}`);
+        }
+      });
+      this.runningLog = { log, meta };
+    } catch (err) {
+      console.error(`[table] could not start the game log: ${(err as Error).message}`);
+      // Still packed at the end from memory, just not protected against a stop in the middle.
+      this.runningLog = { log: { id: meta.id, dir: "", close() {} } as unknown as RunningLog, meta };
+    }
+  }
+
+  /**
+   * Games the table stopped in the middle of (switched off, crashed): close their logs as "interrupted", with the
+   * state rebuilt by replay when the game is installed, and queue them for the service (D-116). Run at start.
+   */
+  async recoverInterrupted(): Promise<string[]> {
+    const ids: string[] = [];
+    for (const { dir, meta, records } of await this.logs.interrupted()) {
+      const game = this.games.get(meta.gameId);
+      const same = game && game.manifest.version === meta.gameVersion ? game : undefined;
+      const rebuilt = records[0]?.t === "start" ? rebuild(same, records) : null;
+      const lastAt = records.at(-1)?.at;
+      const endedAt = typeof lastAt === "number" && lastAt > 1e12 ? lastAt : Date.parse(meta.startedAt) || Date.now();
+      const log: LogRecord[] = [...records, { t: "end", at: endedAt, reason: "interrupted", summary: null, stateHash: rebuilt?.hash ?? null }];
+      const full = {
+        ...meta,
+        endedAt: new Date(endedAt).toISOString(),
+        durationMs: Math.max(0, endedAt - Date.parse(meta.startedAt)),
+        endReason: "interrupted",
+        result: "The table stopped during the game.",
+        counts: countRecords(records),
+        verify: { checked: 0, ok: 0, failed: [], skipped: rebuilt ? "interrupted: the state was rebuilt by replay, there is no end state to compare with" : "interrupted, and the game could not be replayed on this table" },
+      };
+      try {
+        await this.logs.saveInterrupted(dir, full, log, rebuilt?.state);
+        ids.push(meta.id);
+        this.emit("logSaved", meta.id);
+      } catch (err) {
+        console.error(`[table] could not close the log of interrupted game ${meta.id}: ${(err as Error).message}`);
+      }
+    }
+    return ids;
+  }
+
+  /** A log was packed outside a game (a simulation): announce it for upload. */
+  logSaved(id: string) {
+    this.emit("logSaved", id);
+  }
+
   /** Wait for game logs that are still being written. */
   async flush() {
     await Promise.allSettled([...this.pendingSaves]);
@@ -1069,6 +1153,7 @@ export class Table extends EventEmitter {
 
   shutdown() {
     this.closed = true;
+    this.runningLog?.log.close();
     clearInterval(this.joinTimer);
     this.stopAllAi(true);
     for (const p of this.players.values()) if (p.graceTimer) clearTimeout(p.graceTimer);

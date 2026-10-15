@@ -15,11 +15,34 @@ import type { GameSummary, Manifest } from "../../../packages/protocol/src/index
 
 export type LogRecord =
   | { t: "start"; at: number; gameId: string; version: string; seed: number; settings: Record<string, unknown>; seats: SeatInfo[]; aiOptions: Record<number, Record<string, unknown>>; simulation: boolean }
-  | { t: "intent"; at: number; seat: number; by: "human" | "ai" | "board"; intent: Intent; accepted: boolean; reason?: string; events?: GameEvent[]; ai?: AiMoveMeta }
-  | { t: "timer"; at: number; id: string; events?: GameEvent[] }
-  | { t: "seatJoined"; at: number; seat: SeatInfo; events?: GameEvent[] }
-  | { t: "seatLeft"; at: number; seat: number; ended: boolean; events?: GameEvent[] }
-  | { t: "end"; at: number; reason: "finished" | "terminated" | "seatLeft"; summary: GameSummary | null; stateHash: string };
+  | { t: "intent"; at: number; seat: number; by: "human" | "ai" | "board"; intent: Intent; accepted: boolean; reason?: string; events?: GameEvent[]; ai?: AiMoveMeta; error?: LoggedError }
+  | { t: "timer"; at: number; id: string; events?: GameEvent[]; error?: LoggedError }
+  | { t: "seatJoined"; at: number; seat: SeatInfo; events?: GameEvent[]; error?: LoggedError }
+  | { t: "seatLeft"; at: number; seat: number; ended: boolean; events?: GameEvent[]; error?: LoggedError }
+  // Not inputs: replay skips them (D-116). An error outside the input steps (a view, the end check); a copy of the state.
+  | { t: "error"; at: number; where: string; seat?: number; error: LoggedError }
+  | { t: "snapshot"; at: number; inputs: number; state: unknown }
+  // "interrupted": the table stopped during the game; the log was closed at its next start (no summary, and a hash
+  // only if the game could be replayed then).
+  | { t: "end"; at: number; reason: EndReason; summary: GameSummary | null; stateHash: string | null };
+
+export type EndReason = "finished" | "terminated" | "seatLeft" | "interrupted";
+
+/** An exception thrown by the game's code, as recorded in its log (D-116). */
+export interface LoggedError {
+  message: string;
+  stack?: string;
+}
+
+export function loggedError(e: unknown): LoggedError {
+  const err = e as { message?: unknown; stack?: unknown } | null;
+  const message = typeof err?.message === "string" ? err.message : String(e);
+  const stack = typeof err?.stack === "string" ? err.stack.split("\n").slice(0, 20).join("\n") : undefined;
+  return stack ? { message, stack } : { message };
+}
+
+/** At most this many `error` records per game; a view that throws on every update would otherwise fill the log. */
+const MAX_ERROR_RECORDS = 20;
 
 /**
  * How an AI move came about (D-112), for analysis and training data; replay never looks at it. `ms`: thinking time;
@@ -77,6 +100,14 @@ export function stateHash(state: unknown): string {
 
 type Listener = (kind: "changed" | "over", events: GameEvent[]) => void;
 
+export interface RuntimeOptions {
+  simulation?: boolean;
+  aiOptions?: Record<number, Record<string, unknown>>;
+  replay?: boolean;
+  /** Add a `snapshot` record with the whole state after every N inputs (D-116); 0 or unset: none. */
+  snapshotEvery?: number;
+}
+
 export class GameRuntime {
   state: unknown;
   readonly log: LogRecord[] = [];
@@ -88,6 +119,12 @@ export class GameRuntime {
   /** While paused: remaining time of each timer, re-armed on resume. */
   private paused: Map<string, number> | null = null;
   private listeners: Listener[] = [];
+  private recordListeners: ((r: LogRecord) => void)[] = [];
+  /** Inputs that changed the game (accepted intents, timers, seats), for snapshots and the log's counts. */
+  inputs = 0;
+  /** Exceptions thrown by the game's code in this game, recorded or not. */
+  errors = 0;
+  private errorRecords = 0;
 
   readonly manifest: Manifest;
   readonly def: GameDefinition<any>;
@@ -95,7 +132,7 @@ export class GameRuntime {
   readonly settings: Record<string, unknown>;
   seats: SeatInfo[];
   readonly clock: Clock;
-  readonly opts: { simulation?: boolean; aiOptions?: Record<number, Record<string, unknown>>; replay?: boolean };
+  readonly opts: RuntimeOptions;
 
   constructor(
     manifest: Manifest,
@@ -104,7 +141,7 @@ export class GameRuntime {
     settings: Record<string, unknown>,
     seats: SeatInfo[],
     clock: Clock = realClock,
-    opts: { simulation?: boolean; aiOptions?: Record<number, Record<string, unknown>>; replay?: boolean } = {},
+    opts: RuntimeOptions = {},
   ) {
     this.manifest = manifest;
     this.def = def;
@@ -132,8 +169,29 @@ export class GameRuntime {
     };
   }
 
+  /** Every record as it is logged (D-116): the table writes them to disk as the game goes. */
+  onRecord(l: (r: LogRecord) => void) {
+    this.recordListeners.push(l);
+  }
+
   private record(r: LogRecord) {
     this.log.push(r);
+    for (const l of this.recordListeners) l(r);
+  }
+
+  /** An exception outside the input steps, e.g. in a view (D-116). Recorded for the first few, counted always. */
+  private recordError(where: string, e: unknown, seat?: number) {
+    this.errors++;
+    if (this.errorRecords >= MAX_ERROR_RECORDS || this.opts.replay) return;
+    this.errorRecords++;
+    this.record({ t: "error", at: this.clock.now(), where, ...(seat === undefined ? {} : { seat }), error: loggedError(e) });
+  }
+
+  /** After an input that changed the game: a snapshot every N inputs, if asked for. */
+  private inputDone() {
+    this.inputs++;
+    const every = this.opts.snapshotEvery ?? 0;
+    if (every > 0 && !this.opts.replay && this.inputs % every === 0) this.record({ t: "snapshot", at: this.clock.now(), inputs: this.inputs, state: this.state });
   }
 
   private setTimer(id: string, ms: number) {
@@ -189,7 +247,13 @@ export class GameRuntime {
 
   private afterStep(events: GameEvent[]) {
     if (this.over) return;
-    const summary = this.def.isOver(this.state);
+    let summary: GameSummary | null;
+    try {
+      summary = this.def.isOver(this.state);
+    } catch (e) {
+      this.recordError("isOver", e);
+      throw e;
+    }
     if (summary) {
       // The step's own events (the last flip, the winning move) still go out with the game-over (D-092).
       this.finish("finished", summary, events);
@@ -198,7 +262,7 @@ export class GameRuntime {
     for (const l of this.listeners) l("changed", events);
   }
 
-  finish(reason: "finished" | "terminated" | "seatLeft", summary: GameSummary | null, events: GameEvent[] = []) {
+  finish(reason: Exclude<EndReason, "interrupted">, summary: GameSummary | null, events: GameEvent[] = []) {
     if (this.over) return;
     this.over = true;
     this.summary = summary;
@@ -209,30 +273,55 @@ export class GameRuntime {
 
   submit(seat: number, intent: Intent, by: "human" | "ai" | "board", ai?: AiMoveMeta): { ok: true } | { ok: false; reason: string } {
     if (this.over) return { ok: false, reason: "game is over" };
-    const r = this.def.onIntent(this.state, seat, intent, this.ctx());
     const meta = ai ? { ai } : {};
+    let r: StepResult<unknown>;
+    try {
+      r = this.def.onIntent(this.state, seat, intent, this.ctx());
+    } catch (e) {
+      // The input is logged with the error, so a replay meets the same exception at the same point (D-116).
+      this.errors++;
+      this.record({ t: "intent", at: this.clock.now(), seat, by, intent, accepted: false, ...meta, error: loggedError(e) });
+      throw e;
+    }
     if (isReject(r)) {
       this.record({ t: "intent", at: this.clock.now(), seat, by, intent, accepted: false, reason: r.reject, ...meta });
       return { ok: false, reason: r.reject };
     }
     const events = this.apply(r);
     this.record({ t: "intent", at: this.clock.now(), seat, by, intent, accepted: true, events, ...meta });
+    this.inputDone();
     this.afterStep(events);
     return { ok: true };
   }
 
   fireTimer(id: string) {
     if (this.over || !this.def.onTimer) return;
-    const events = this.apply(this.def.onTimer(this.state, id, this.ctx()));
+    let events: GameEvent[];
+    try {
+      events = this.apply(this.def.onTimer(this.state, id, this.ctx()));
+    } catch (e) {
+      this.errors++;
+      this.record({ t: "timer", at: this.clock.now(), id, error: loggedError(e) });
+      throw e;
+    }
     this.record({ t: "timer", at: this.clock.now(), id, events });
+    this.inputDone();
     this.afterStep(events);
   }
 
   seatJoined(seat: SeatInfo) {
     if (this.over) return;
     this.seats = [...this.seats.filter((s) => s.seat !== seat.seat), seat].sort((a, b) => a.seat - b.seat);
-    const events = this.def.onSeatJoined ? this.apply(this.def.onSeatJoined(this.state, seat, this.ctx())) : [];
+    let events: GameEvent[];
+    try {
+      events = this.def.onSeatJoined ? this.apply(this.def.onSeatJoined(this.state, seat, this.ctx())) : [];
+    } catch (e) {
+      this.errors++;
+      this.record({ t: "seatJoined", at: this.clock.now(), seat, error: loggedError(e) });
+      throw e;
+    }
     this.record({ t: "seatJoined", at: this.clock.now(), seat, events });
+    this.inputDone();
     this.afterStep(events);
   }
 
@@ -240,24 +329,43 @@ export class GameRuntime {
   seatLeft(seat: number): boolean {
     if (this.over) return true;
     this.seats = this.seats.filter((s) => s.seat !== seat);
-    const r = this.def.onSeatLeft ? this.def.onSeatLeft(this.state, seat, this.ctx()) : "end";
+    let r: StepResult<unknown> | "end";
+    try {
+      r = this.def.onSeatLeft ? this.def.onSeatLeft(this.state, seat, this.ctx()) : "end";
+    } catch (e) {
+      this.errors++;
+      this.record({ t: "seatLeft", at: this.clock.now(), seat, ended: false, error: loggedError(e) });
+      throw e;
+    }
     if (r === "end") {
       this.record({ t: "seatLeft", at: this.clock.now(), seat, ended: true });
+      this.inputDone();
       this.finish("seatLeft", { text: "The game ended because a player left.", highlights: { leftSeat: seat } });
       return true;
     }
     const events = this.apply(r);
     this.record({ t: "seatLeft", at: this.clock.now(), seat, ended: false, events });
+    this.inputDone();
     this.afterStep(events);
     return this.over;
   }
 
   view(seat: number) {
-    return this.def.view(this.state, seat);
+    try {
+      return this.def.view(this.state, seat);
+    } catch (e) {
+      this.recordError("view", e, seat);
+      throw e;
+    }
   }
 
   boardView() {
-    return this.def.boardView(this.state);
+    try {
+      return this.def.boardView(this.state);
+    } catch (e) {
+      this.recordError("boardView", e);
+      throw e;
+    }
   }
 
   /** Pending timers as absolute deadlines (clock time), for countdowns on board and decks. */
@@ -297,26 +405,30 @@ const rngCtx = (rng: () => number) => ({ random: rng, randomInt: (min: number, m
 
 /** Rebuild a game from its log and return the final state hash. */
 export function replay(manifest: Manifest, def: GameDefinition<any>, log: LogRecord[]): string {
+  return replayLog(manifest, def, log).hash;
+}
+
+/**
+ * Rebuild a game from its log: its state and that state's hash. Inputs the game threw on (D-116) are fed again and
+ * throw again; that is part of the game, so replay goes on. Error and snapshot records are not inputs.
+ */
+export function replayLog(manifest: Manifest, def: GameDefinition<any>, log: LogRecord[]): { state: unknown; hash: string } {
   const start = log[0];
   if (!start || start.t !== "start") throw new Error("log must begin with a start record");
   const rt = new GameRuntime(manifest, def, start.seed, start.settings, start.seats, new VirtualClock(), { replay: true, aiOptions: start.aiOptions });
-  for (const r of log.slice(1)) {
-    switch (r.t) {
-      case "intent":
-        rt.submit(r.seat, r.intent, r.by); // rejected ones too: a rule may draw randomness before rejecting
-        break;
-      case "timer":
-        rt.fireTimer(r.id);
-        break;
-      case "seatJoined":
-        rt.seatJoined(r.seat);
-        break;
-      case "seatLeft":
-        rt.seatLeft(r.seat);
-        break;
-      case "end":
-        return stateHash(rt.state);
+  const step = (f: () => unknown) => {
+    try {
+      f();
+    } catch {
+      // the same exception the game threw when it was played
     }
+  };
+  for (const r of log.slice(1)) {
+    if (r.t === "end") break;
+    if (r.t === "intent") step(() => rt.submit(r.seat, r.intent, r.by)); // rejected ones too: a rule may draw randomness before rejecting
+    else if (r.t === "timer") step(() => rt.fireTimer(r.id));
+    else if (r.t === "seatJoined") step(() => rt.seatJoined(r.seat));
+    else if (r.t === "seatLeft") step(() => rt.seatLeft(r.seat));
   }
-  return stateHash(rt.state);
+  return { state: rt.state, hash: stateHash(rt.state) };
 }

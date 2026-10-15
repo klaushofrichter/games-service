@@ -12,6 +12,7 @@ import { WebSocketServer, type WebSocket } from "ws";
 import { createAdminAuth, esc, HTML_HEADERS, randomToken, same, sendPage, type GoogleAuthOptions } from "./auth.ts";
 import { GameRepoStore, type GameRepo } from "./game-repos.ts";
 import { Store } from "./store.ts";
+import { filterFrom, matches, readRunMeta, type LogFilter, type LogRecordMeta } from "./log-meta.ts";
 import { check, codeState, expiryFor, formatCode, hashCode, isExpired, newCode, newCodeId, normalizeCode, parseScope, stale, VALIDITIES, type AccessCode, type CodeScope, type CodeStatus, type Validity } from "./access-codes.ts";
 
 const ADMIN_PAGE = fileURLToPath(new URL("../public/admin.html", import.meta.url));
@@ -118,20 +119,16 @@ interface StoredTable extends Omit<TableRecord, "repos" | "pairingCode" | "lastH
 interface DownloadToken {
   id: string;
   gameId: string | null;
+  /** The token's other bounds (D-116): one table, and games started from / to a day. */
+  tableId?: string | null;
+  from?: string | null;
+  to?: string | null;
   label: string;
   expiresAt: number;
   createdAt: number;
   createdBy: string;
 }
 
-interface LogRecordMeta {
-  id: string;
-  tableId: string;
-  gameId: string;
-  simulation: boolean;
-  bytes: number;
-  uploadedAt: number;
-}
 
 export function startCloud(o: CloudOptions) {
   const store = new Store({ dataDir: o.dataDir, snapshotMs: o.snapshotMs });
@@ -204,7 +201,7 @@ export function startCloud(o: CloudOptions) {
   // Tokens saved before D-115 have only gameId and expiresAt.
   for (const { key, value } of store.all<Partial<DownloadToken> & { expiresAt: number }>("download")) {
     if (value.expiresAt < now0) store.delete("download", key);
-    else downloadTokens.set(key, { gameId: value.gameId ?? null, label: value.label ?? "", createdAt: value.createdAt ?? 0, createdBy: value.createdBy ?? "", expiresAt: value.expiresAt, id: value.id ?? `d_${key.slice(0, 12)}` });
+    else downloadTokens.set(key, { gameId: value.gameId ?? null, tableId: value.tableId ?? null, from: value.from ?? null, to: value.to ?? null, label: value.label ?? "", createdAt: value.createdAt ?? 0, createdBy: value.createdBy ?? "", expiresAt: value.expiresAt, id: value.id ?? `d_${key.slice(0, 12)}` });
   }
   if (store.persistent) {
     const n = (k: Parameters<typeof store.all>[0]) => store.all(k).length;
@@ -630,7 +627,17 @@ export function startCloud(o: CloudOptions) {
           free += l.meta.bytes;
         }
 
-        const meta: LogRecordMeta = { id: match[1], tableId: t.tableId, gameId, simulation: url.searchParams.get("simulation") === "1", bytes: data.length, uploadedAt: Date.now() };
+        // What the log says about itself (D-116); logs in the old format have only the query's game and kind.
+        const run = await readRunMeta(data);
+        const meta: LogRecordMeta = {
+          ...run,
+          id: match[1],
+          tableId: t.tableId,
+          gameId: run.gameId ?? gameId,
+          simulation: run.simulation ?? url.searchParams.get("simulation") === "1",
+          bytes: data.length,
+          uploadedAt: Date.now(),
+        };
         if (store.persistent) store.writeLog(meta.id, data); // the file first: a record never points at a missing file
         store.put("log", meta.id, meta);
         logs.set(meta.id, { meta, data: store.persistent ? null : data });
@@ -782,7 +789,11 @@ export function startCloud(o: CloudOptions) {
           prune();
           return json(res, 200, settings);
         }
-        if (m === "GET" && p === "/admin/api/logs") return json(res, 200, [...logs.values()].map((l) => ({ ...l.meta, tableName: tables.get(l.meta.tableId)?.name ?? null })));
+        if (m === "GET" && p === "/admin/api/logs") {
+          // Filters (D-116): gameId, tableId, from and to (dates the games started), simulation (1 or 0).
+          const f = filterFrom((k) => url.searchParams.get(k));
+          return json(res, 200, [...logs.values()].filter((l) => matches(l.meta, f)).map((l) => ({ ...l.meta, tableName: tables.get(l.meta.tableId)?.name ?? l.meta.tableName ?? null })));
+        }
         if (m === "DELETE" && (match = p.match(/^\/admin\/api\/logs\/([\w-]+)$/))) {
           if (!logs.has(match[1])) return json(res, 404, { error: "no such log" });
           dropLog(match[1]);
@@ -812,9 +823,13 @@ export function startCloud(o: CloudOptions) {
           const b = await jsonBody(req);
           const token = randomToken();
           const exp = expiry(lifetime(b.expiresInHours, 24, 24 * 90) * 3600_000);
+          const scope = filterFrom((k) => (b[k] === undefined || b[k] === null ? null : String(b[k]).trim())); // 400 on a bad date
           const d: DownloadToken = {
             id: `d_${randomBytes(6).toString("hex")}`,
-            gameId: b.gameId ? String(b.gameId) : null,
+            gameId: scope.gameId ?? null,
+            tableId: scope.tableId ?? null,
+            from: scope.from ?? null,
+            to: scope.to ?? null,
             label: String(b.label ?? "").trim().slice(0, 60),
             expiresAt: exp.at,
             createdAt: Date.now(),
@@ -914,7 +929,8 @@ export function startCloud(o: CloudOptions) {
       if (m === "GET" && (match = p.match(/^\/dl\/([\w-]+)(?:\/([\w-]+)\.zip)?$/))) {
         const d = downloadTokens.get(tokenKey(match[1]));
         if (!d || d.expiresAt < Date.now()) return json(res, 404, { error: "token not found or expired" });
-        const visible = [...logs.values()].filter((l) => !d.gameId || l.meta.gameId === d.gameId);
+        const scope: LogFilter = { gameId: d.gameId ?? undefined, tableId: d.tableId ?? undefined, from: d.from ?? undefined, to: d.to ?? undefined };
+        const visible = [...logs.values()].filter((l) => matches(l.meta, scope));
         if (!match[2]) return json(res, 200, visible.map((l) => l.meta));
         const l = visible.find((x) => x.meta.id === match![2]);
         const data = l && logData(l.meta.id);

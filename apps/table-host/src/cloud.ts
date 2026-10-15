@@ -74,7 +74,9 @@ export class CloudLink {
       console.warn("[table-host] TABLE_CODE / --code is not an access code (8 characters from A–Z and 2–9, e.g. ABCD-EFGH); ignoring it");
       this.o.accessCode = undefined;
     }
-    this.table.on("logSaved", (id: string) => void this.upload(id));
+    this.table.tableId = this.identity.tableId;
+    // Logs go to the service from a queue on disk (D-116): now, and after every heartbeat until the service has them.
+    this.table.on("logSaved", () => void this.flushUploads());
     await this.tick();
   }
 
@@ -273,6 +275,7 @@ export class CloudLink {
       if (code && "accessCode" in present) this.noteCode(b.code, code);
       this.publish({ status: "online" });
       this.openSocket();
+      void this.flushUploads();
     } catch {
       this.publish({ status: "offline" });
     }
@@ -288,20 +291,57 @@ export class CloudLink {
     if (shorter) void this.logs.prune().catch(() => {}); // a shorter period applies now, not at the next restart
   }
 
-  async upload(id: string) {
-    if (!this.identity.tableToken) return;
+  private flushing = false;
+  private flushAgain = false;
+
+  /**
+   * Upload the queued logs, oldest first, one at a time. A log leaves the queue when the service has it, or when the
+   * service can never take it (400, 409, 413); otherwise it stays for the next heartbeat (D-116).
+   */
+  async flushUploads() {
+    if (this.flushing) return void (this.flushAgain = true);
+    this.flushing = true;
+    try {
+      do {
+        this.flushAgain = false;
+        for (const id of await this.logs.pendingUploads()) {
+          if (this.stopped || !this.identity.tableToken) return;
+          const r = await this.upload(id);
+          if (r === "retry") return;
+        }
+      } while (this.flushAgain);
+    } finally {
+      this.flushing = false;
+    }
+  }
+
+  async upload(id: string): Promise<"done" | "retry"> {
     const data = await this.logs.read(id);
-    if (!data) return;
+    if (!data) {
+      await this.logs.uploaded(id); // gone (retention): nothing to send
+      return "done";
+    }
     const gameId = id.split("-").slice(1, -1).join("-").replace(/-sim$/, "");
     try {
-      await fetch(`${this.o.cloudUrl}/api/tables/logs/${id}?gameId=${encodeURIComponent(gameId)}&simulation=${id.includes("-sim-") ? 1 : 0}`, {
+      const r = await fetch(`${this.o.cloudUrl}/api/tables/logs/${id}?gameId=${encodeURIComponent(gameId)}&simulation=${id.includes("-sim-") ? 1 : 0}`, {
         method: "PUT",
         headers: { authorization: `Bearer ${this.identity.tableToken}`, "content-type": "application/zip" },
         body: new Uint8Array(data),
         signal: AbortSignal.timeout(60_000),
       });
+      await r.arrayBuffer().catch(() => {});
+      if (r.ok) {
+        await this.logs.uploaded(id);
+        return "done";
+      }
+      if ([400, 409, 413].includes(r.status)) {
+        console.warn(`[table-host] the service refused log ${id} (${r.status}); it stays on this table only`);
+        await this.logs.uploaded(id);
+        return "done";
+      }
+      return "retry"; // 401, 507 (storage full), 5xx: later
     } catch {
-      // Upload is retried by a later phase's sync job; the local copy stays for the retention period.
+      return "retry"; // offline: the next heartbeat tries again
     }
   }
 }

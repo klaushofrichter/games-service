@@ -6,6 +6,14 @@ page is the history. Leave it empty if there is nothing to add beyond the commit
 
 ## [Unreleased]
 
+- Game logs for analysis: every game's log, simulations included, now reaches the service. A table writes the log
+  as the game is played and uploads it when the game ends, retrying until the service has it; a game the table stopped
+  in the middle of is uploaded after the next start, marked interrupted. Each log carries its metadata (game, table,
+  players, when, how it ended), a README describing the format, the final state and any errors the rules threw, and
+  is checked by replaying it. The console lists logs with that metadata and filters, and download tokens can be
+  limited to a game, a table and dates. The board's simulation dialog says how the games ended.
+- Access codes approve a table without a pairing code, and the service keeps its state on a persistent volume, so
+  tables, codes and logs survive a deploy.
 - First deployment to the cluster: the cloud service at https://games.skylar.technology with Google sign-in for
   administrators, and the table-host image for table PCs.
 - Extra-game repositories: the console lists GitHub repositories with games (private ones too, with

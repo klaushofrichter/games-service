@@ -29,6 +29,7 @@ const host = await startHost({
   maxRemotePlayers: num(env.MAX_REMOTE_PLAYERS),
   cloudUrl: env.CLOUD_URL,
   showTestGames: env.SHOW_TEST_GAMES === "1",
+  logSnapshotEvery: num(env.LOG_SNAPSHOT_EVERY),
   accessCode,
 });
 

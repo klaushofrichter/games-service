@@ -50,6 +50,7 @@ export async function startHost(o: HostOptions = {}) {
     requireCloud: o.requireCloud ?? false,
     maxRemotePlayers: o.maxRemotePlayers ?? 4,
     showTestGames: o.showTestGames ?? true,
+    logSnapshotEvery: o.logSnapshotEvery ?? 0,
   };
   const table = new Table(config, games, logs);
   const server = await startServer(table, logs, {
@@ -75,8 +76,10 @@ export async function startHost(o: HostOptions = {}) {
     const link = cloud;
     cloud.extras = new ExtraGames(table, dataDir, (hash) => link.downloadBundle(hash));
     await cloud.extras.restore();
-    await cloud.start();
   }
+  // Games the table stopped in the middle of last time (D-116): after the extra games are back, so they can be replayed.
+  await table.recoverInterrupted();
+  await cloud?.start();
   const close = async () => {
     clearInterval(pruneTimer);
     cloud?.stop();

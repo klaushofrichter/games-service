@@ -364,7 +364,7 @@ describe("ready flow and play", () => {
     expect(logs).toHaveLength(1);
     const zip = (await t.api("GET", `/logs/${logs[0].id}.zip`)).body as Buffer;
     const { meta, games } = await LogStore.unzip(zip);
-    expect(meta).toMatchObject({ gameId: "coin-flip", simulation: false, format: "gametable-log/1" });
+    expect(meta).toMatchObject({ gameId: "coin-flip", simulation: false, format: "gametable-log/2" });
     const g = t.host.table.games.get("coin-flip")!;
     const end = games[0].at(-1) as any;
     expect(end.t).toBe("end");
