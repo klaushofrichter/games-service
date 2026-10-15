@@ -666,9 +666,9 @@ import { parseRepoConfig } from "../apps/cloud/src/game-repos.ts";
 import { spawn } from "node:child_process";
 
 describe("the deploy-time repository list", () => {
-  it("deploy/game-repos.json is valid and lists extra-games on its production branch", async () => {
+  it("deploy/game-repos.json is valid and lists extra-games and loopy-game on their production branches", async () => {
     const text = await readFile(new URL("../deploy/game-repos.json", import.meta.url), "utf8");
-    expect(parseRepoConfig(text)).toEqual(["klaushofrichter/extra-games@production"]);
+    expect(parseRepoConfig(text)).toEqual(["klaushofrichter/extra-games@production", "klaushofrichter/loopy-game@production"]);
   });
 
   it("parses entries with and without a branch, and refuses anything malformed", () => {
@@ -729,6 +729,7 @@ describe("the deploy-time repository list", () => {
     const r = await runMain({ GAME_REPOS: "someone/more-games" });
     expect(r.repos?.map((x) => [x.repo, x.ref, x.origin])).toEqual([
       ["klaushofrichter/extra-games", "production", "deploy"],
+      ["klaushofrichter/loopy-game", "production", "deploy"],
       ["someone/more-games", "main", "deploy"],
     ]);
   }, 20000);
