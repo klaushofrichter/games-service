@@ -225,11 +225,14 @@ describe("remote play", { timeout: 60_000 }, () => {
     const t = await pairedHost();
     const peer = await RemotePeer.connect((await t.ok("POST", "/invites")).token);
     expect((await peer.json("POST", "/api/v1/layout", { seats: 6 })).status).toBe(200);
+    // "Play now" for an AI out of time (D-112) is open to remote boards with control: here nobody is waited for (409)
+    expect((await peer.json("POST", "/api/v1/game/play-now")).status).toBe(409);
     await t.ok("POST", "/remote", { boardControl: false });
     expect(t.host.table.state().remote.boardControl).toBe(false);
     const denied = await peer.json("POST", "/api/v1/layout", { seats: 4 });
     expect(denied.status).toBe(403);
     expect(denied.body.error).toMatch(/switched off/);
+    expect((await peer.json("POST", "/api/v1/game/play-now")).status).toBe(403);
     expect((await peer.json("GET", "/api/v1/state")).status).toBe(200); // reading still works
     // and remote players can't switch it back on themselves
     expect((await peer.request("POST", "/api/v1/remote", { boardControl: true })).status).toBe(403);

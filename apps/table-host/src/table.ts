@@ -22,7 +22,8 @@ import { HOW_TO_PLAY, settingsWithDefaults, sourceMeta, type InstalledGame } fro
 
 /** The URL a deck fetches a game's rules from (D-099), or null. */
 const howToPlayUrl = (g: InstalledGame) => (g.howToPlay ? `/games/${g.manifest.id}/${HOW_TO_PLAY}` : null);
-import { GameRuntime, realClock } from "./runtime.ts";
+import { GameRuntime, realClock, type AiMoveMeta } from "./runtime.ts";
+import { AiCancelled, AiWorker, aiMove, isPromise, usesWorker } from "./ai.ts";
 import type { LogStore } from "./logs.ts";
 
 export class TableError extends Error {
@@ -141,6 +142,9 @@ export class Table extends EventEmitter {
       joinUrl: this.currentJoin().url,
       cloud: this.cloud,
       pause: this.pause,
+      aiThinking: [...this.aiMoves.entries()]
+        .filter(([, m]) => m.shown)
+        .map(([playerId, m]) => ({ playerId, seat: m.seat, since: m.startedAt, deadline: m.deadline })),
       display: { sound: this.sound },
       remote: { boardControl: this.remoteBoardControl, maxPlayers: this.config.maxRemotePlayers, players: this.humans().filter((p) => p.location === "remote").length },
     };
@@ -160,7 +164,7 @@ export class Table extends EventEmitter {
     const wasOnline = this.cloud.status === "online";
     this.cloud = c;
     // D-015: losing the service pauses a running game; it resumes by itself when the link returns.
-    if (wasOnline && !this.cloudOnline && this.phase === "active") this.pauseGame("cloud");
+    if (wasOnline && !this.cloudOnline && (this.phase === "active" || this.pause?.reason === "ai")) this.pauseGame("cloud");
     else if (this.cloudOnline && this.phase === "paused" && this.pause?.reason === "cloud") this.resumeGame();
     this.changed();
   }
@@ -168,10 +172,9 @@ export class Table extends EventEmitter {
   pause: LobbyState["pause"] = null;
 
   pauseGame(reason: "cloud") {
-    if (this.phase !== "active" || !this.runtime) return;
+    if ((this.phase !== "active" && this.pause?.reason !== "ai") || !this.runtime) return;
     this.runtime.pause();
-    for (const t of this.aiTimers.values()) clearTimeout(t);
-    this.aiTimers.clear();
+    this.stopAllAi(); // AI players start again from the current view when the game resumes
     this.phase = "paused";
     this.pause = { reason, since: Date.now(), canSave: !!this.selected?.game.manifest.saveGame };
     this.emit("game", [{ name: "paused", data: { reason } }]);
@@ -180,6 +183,7 @@ export class Table extends EventEmitter {
   /** Resume a paused game (automatic when the cloud returns, or from the board once it is back). */
   resumeGame() {
     if (this.phase !== "paused" || !this.runtime) throw new TableError(409, "the game is not paused");
+    if (this.pause?.reason === "ai") throw new TableError(409, `waiting for ${this.pause.ai?.name ?? "an AI player"}; tap Play now to move for it`);
     if (!this.cloudOnline) throw new TableError(409, "still offline; the game resumes by itself when the connection returns");
     this.runtime.resume();
     this.phase = "active";
@@ -800,6 +804,7 @@ export class Table extends EventEmitter {
   private async onGameOver(events: GameEvent[] = []) {
     const rt = this.runtime!;
     const terminated = rt.log.at(-1)?.t === "end" && (rt.log.at(-1) as { reason: string }).reason === "terminated";
+    this.stopAllAi(true);
     this.phase = "finished";
     this.pause = null;
     // Extra games that changed while this one ran take effect now (D-097); the log below still names the code it ran.
@@ -829,13 +834,13 @@ export class Table extends EventEmitter {
     this.emit("logSaved", id);
   }
 
-  intent(playerId: string, intent: Intent) {
+  intent(playerId: string, intent: Intent, ai?: AiMoveMeta) {
     const p = this.mustPlayer(playerId);
     if (this.phase === "paused") throw new TableError(409, "the game is paused");
     if (this.phase !== "active" || !this.runtime) throw new TableError(409, "no game is running");
     if (p.seat === null || !this.runtime.seats.some((s) => s.seat === p.seat)) throw new TableError(409, "you are not playing in this game");
     if (!intent || typeof intent.name !== "string") throw new TableError(400, "intent needs a name");
-    const r = this.runtime.submit(p.seat, { name: intent.name, payload: intent.payload }, p.kind === "ai" ? "ai" : "human");
+    const r = this.runtime.submit(p.seat, { name: intent.name, payload: intent.payload }, p.kind === "ai" ? "ai" : "human", p.kind === "ai" ? ai : undefined);
     return r;
   }
 
@@ -856,36 +861,191 @@ export class Table extends EventEmitter {
     return this.runtime.submit(p.seat, { name: intent.name, payload: intent.payload }, "board");
   }
 
-  private aiTimers = new Map<string, NodeJS.Timeout>(); // one pending move per AI player
+  /**
+   * One move in the making per AI player (D-043, D-112): the pause before it starts, then, for an AI that answers
+   * later, its abort controller, start, deadline, and whether the board shows it as thinking.
+   */
+  private aiMoves = new Map<string, AiMoveState>();
   private aiRngs = new Map<string, () => number>();
+  /** AI players' worker threads (manifest `ai.worker`), kept between moves so the rules load once per game. */
+  private aiWorkers = new Map<string, AiWorker>();
+  /** After this long an AI that answers later shows as thinking (`aiThinking`); quicker moves never flicker. */
+  static AI_SHOW_THINKING_MS = 800;
 
   /**
    * Give every AI player a chance to act after any change to the game (an intent, a timer, a player
-   * joining or leaving). Each AI has at most one pending move, replaced on every change, so it always
-   * decides from the latest view. A rejected AI move is retried once after a pause.
+   * joining or leaving). Each AI has at most one move in the making, replaced on every change, so it always
+   * decides from the latest view: a slower AI's stale answer is dropped (its worker thread stopped). A rejected
+   * AI move is retried once after a pause.
    */
   private scheduleAi(retryMs?: number) {
     if (this.phase !== "active" || !this.runtime) return;
+    this.stopAllAi();
     for (const p of this.players.values()) {
       if (p.kind !== "ai" || p.seat === null) continue;
-      const old = this.aiTimers.get(p.id);
-      if (old) clearTimeout(old);
-      const t = setTimeout(() => {
-        this.aiTimers.delete(p.id);
-        if (this.phase !== "active" || !this.runtime || !this.players.has(p.id) || this.runtime.over) return;
-        let rng = this.aiRngs.get(p.id);
-        if (!rng) this.aiRngs.set(p.id, (rng = createRng(p.aiSeed ?? 1)));
-        const intent = this.runtime.aiIntent(p.seat!, rng);
-        if (!intent) return;
-        try {
-          const r = this.intent(p.id, intent);
-          if (!r.ok && retryMs === undefined) this.scheduleAi(this.config.aiDelayMs * 4 + 200);
-        } catch {
-          // the game moved on (ended, seat gone): nothing to do
-        }
-      }, retryMs ?? this.config.aiDelayMs);
-      this.aiTimers.set(p.id, t);
+      const mv: AiMoveState = { seat: p.seat, startedAt: 0, deadline: 0, shown: false };
+      mv.timer = setTimeout(() => this.thinkAi(p, mv, retryMs !== undefined), retryMs ?? this.config.aiDelayMs);
+      this.aiMoves.set(p.id, mv);
     }
+  }
+
+  private thinkAi(p: Player, mv: AiMoveState, retried: boolean) {
+    mv.timer = undefined;
+    const rt = this.runtime;
+    const game = this.runningGame;
+    if (this.aiMoves.get(p.id) !== mv || this.phase !== "active" || !rt || !game || !this.players.has(p.id) || rt.over || p.seat === null) return;
+    const rng = this.aiRng(p);
+    const budget = game.manifest.ai.timeoutSeconds * 1000;
+    mv.startedAt = Date.now();
+    mv.deadline = mv.startedAt + budget;
+    mv.controller = new AbortController();
+    const worker = usesWorker(game) ? this.aiWorker(p.id, game) : null;
+    let answer: ReturnType<typeof aiMove>;
+    try {
+      answer = aiMove(game, rt, p.seat, rng, mv.controller.signal, mv.deadline, worker);
+    } catch (e) {
+      this.aiFailed(p, mv, e);
+      return;
+    }
+    if (!isPromise<Intent | null>(answer)) {
+      this.aiMoves.delete(p.id);
+      if (answer) this.submitAi(p, answer, undefined, retried);
+      return;
+    }
+    // Answers later: show it as thinking after a moment, pause the game when its time is up.
+    mv.showTimer = setTimeout(() => {
+      if (this.aiMoves.get(p.id) !== mv) return;
+      mv.shown = true;
+      this.changed();
+    }, Table.AI_SHOW_THINKING_MS);
+    mv.overdueTimer = setTimeout(() => this.aiOverdue(p, mv), budget);
+    answer.then(
+      (intent) => {
+        if (this.aiMoves.get(p.id) !== mv) return; // the game moved on: a newer move replaced this one
+        const meta: AiMoveMeta = { ms: Date.now() - mv.startedAt, ...(worker ? { worker: true } : {}) };
+        const waitedFor = this.pause?.reason === "ai" && this.pause.ai?.playerId === p.id;
+        this.endAiMove(p.id, mv);
+        if (intent) this.submitAi(p, intent, meta, retried);
+        else if (waitedFor) this.scheduleAi(); // the others were stopped for the pause
+        this.changed();
+      },
+      (e) => {
+        if (e instanceof AiCancelled || this.aiMoves.get(p.id) !== mv) return;
+        this.aiFailed(p, mv, e);
+      },
+    );
+  }
+
+  /** An AI move ended (answered, failed or replaced): its timers go, and a pause waiting for it ends. */
+  private endAiMove(playerId: string, mv: AiMoveState) {
+    clearTimeout(mv.timer);
+    clearTimeout(mv.showTimer);
+    clearTimeout(mv.overdueTimer);
+    if (this.aiMoves.get(playerId) === mv) this.aiMoves.delete(playerId);
+    if (this.pause?.reason === "ai" && this.pause.ai?.playerId === playerId) this.resumeAfterAi();
+  }
+
+  /** Back from an AI pause (D-112): the game's timers run again. */
+  private resumeAfterAi() {
+    if (!this.runtime) return;
+    this.runtime.resume();
+    this.phase = "active";
+    this.pause = null;
+    this.emit("game", [{ name: "resumed" }]);
+  }
+
+  /** The AI threw or its worker failed: play the game's quick move instead, so the table never waits on a broken AI. */
+  private aiFailed(p: Player, mv: AiMoveState, e: unknown) {
+    const error = (e as Error)?.message ?? String(e);
+    console.error(`[table] ${p.name}'s AI failed: ${error}`);
+    this.endAiMove(p.id, mv);
+    const rt = this.runtime;
+    if (!rt || p.seat === null || this.phase !== "active") return;
+    const fallback = rt.aiFallbackIntent(p.seat, this.aiRng(p));
+    if (fallback) this.submitAi(p, fallback, { ms: mv.startedAt ? Date.now() - mv.startedAt : 0, fallback: true, ...this.workerMeta(), error }, true);
+    else this.changed();
+  }
+
+  /** Time is up (D-112): the game pauses while the AI keeps thinking; the board offers "Play now" for it. */
+  private aiOverdue(p: Player, mv: AiMoveState) {
+    if (this.aiMoves.get(p.id) !== mv || this.phase !== "active" || !this.runtime) return;
+    this.runtime.pause();
+    // Other AI players start again from the current view after the pause; this one keeps thinking.
+    for (const [id, other] of [...this.aiMoves]) if (id !== p.id) this.cancelAiMove(id, other);
+    this.phase = "paused";
+    this.pause = { reason: "ai", since: Date.now(), canSave: !!this.selected?.game.manifest.saveGame, ai: { playerId: p.id, name: p.name, seat: mv.seat, since: mv.startedAt } };
+    this.emit("game", [{ name: "paused", data: { reason: "ai", playerId: p.id } }]);
+    this.changed();
+  }
+
+  /**
+   * "Play now" on the board (D-112): stop waiting for the AI the game paused for and play the game's quick move for it
+   * (or, if the game has none, ask the AI again with a fresh budget).
+   */
+  playNow() {
+    if (this.phase !== "paused" || this.pause?.reason !== "ai" || !this.runtime) throw new TableError(409, "no AI player is being waited for");
+    const p = this.players.get(this.pause.ai!.playerId);
+    const mv = p ? this.aiMoves.get(p.id) : undefined;
+    if (p && mv) this.cancelAiMove(p.id, mv);
+    this.resumeAfterAi();
+    const fallback = p && p.seat !== null ? this.runtime.aiFallbackIntent(p.seat, this.aiRng(p)) : null;
+    if (p && fallback) this.submitAi(p, fallback, { ms: mv?.startedAt ? Date.now() - mv.startedAt : 0, fallback: true, ...this.workerMeta() }, true);
+    if ((this.phase as string) === "active" && !(p && fallback)) this.scheduleAi();
+    this.changed();
+  }
+
+  private submitAi(p: Player, intent: Intent, meta: AiMoveMeta | undefined, retried: boolean) {
+    try {
+      const r = this.intent(p.id, intent, meta);
+      if (!r.ok && !retried) this.scheduleAi(this.config.aiDelayMs * 4 + 200);
+    } catch {
+      // the game moved on (ended, paused, seat gone): nothing to do
+    }
+  }
+
+  /** Stop one AI move: its timers, its signal, and its worker thread if it was busy with it. */
+  private cancelAiMove(playerId: string, mv: AiMoveState) {
+    mv.controller?.abort();
+    const w = this.aiWorkers.get(playerId);
+    if (w?.busy) w.cancel();
+    const shown = mv.shown;
+    clearTimeout(mv.timer);
+    clearTimeout(mv.showTimer);
+    clearTimeout(mv.overdueTimer);
+    if (this.aiMoves.get(playerId) === mv) this.aiMoves.delete(playerId);
+    if (shown) this.stateDirty = true;
+  }
+
+  private stateDirty = false;
+
+  /** Stop every AI move; at the end of a game also their worker threads. */
+  private stopAllAi(endWorkers = false) {
+    for (const [id, mv] of [...this.aiMoves]) this.cancelAiMove(id, mv);
+    if (endWorkers) {
+      for (const w of this.aiWorkers.values()) w.terminate();
+      this.aiWorkers.clear();
+    }
+    if (this.stateDirty) {
+      this.stateDirty = false;
+      queueMicrotask(() => this.changed()); // a thinking marker went away
+    }
+  }
+
+  /** Marks a move of an AI that runs in a worker thread, also when its fallback was played. */
+  private workerMeta(): { worker?: true } {
+    return this.runningGame && usesWorker(this.runningGame) ? { worker: true } : {};
+  }
+
+  private aiRng(p: Player) {
+    let rng = this.aiRngs.get(p.id);
+    if (!rng) this.aiRngs.set(p.id, (rng = createRng(p.aiSeed ?? 1)));
+    return rng;
+  }
+
+  private aiWorker(playerId: string, game: InstalledGame) {
+    let w = this.aiWorkers.get(playerId);
+    if (!w) this.aiWorkers.set(playerId, (w = new AiWorker(game.rulesFile!)));
+    return w;
   }
 
   views(): { playerId: string; seat: number; view: unknown }[] {
@@ -910,10 +1070,22 @@ export class Table extends EventEmitter {
   shutdown() {
     this.closed = true;
     clearInterval(this.joinTimer);
-    for (const t of this.aiTimers.values()) clearTimeout(t);
+    this.stopAllAi(true);
     for (const p of this.players.values()) if (p.graceTimer) clearTimeout(p.graceTimer);
     this.runtime?.clearAllTimers();
   }
+}
+
+interface AiMoveState {
+  seat: number;
+  timer?: NodeJS.Timeout;
+  controller?: AbortController;
+  startedAt: number;
+  deadline: number;
+  showTimer?: NodeJS.Timeout;
+  overdueTimer?: NodeJS.Timeout;
+  /** Shown as thinking on the board (`aiThinking`). */
+  shown: boolean;
 }
 
 /** AI player names (D-081): short, so "Name (AI)" fits a seat plate; half female, half male. */
