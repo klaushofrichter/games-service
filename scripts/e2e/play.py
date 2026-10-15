@@ -515,4 +515,10 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        # On GitHub, an annotation carries the reason to the PR page; the job log itself may be out of reach.
+        if os.environ.get("GITHUB_ACTIONS"):
+            print(f"::error file=scripts/e2e/play.py::{GAME}: {type(e).__name__}: {str(e)[:900]}".replace("\n", " "))
+        raise
