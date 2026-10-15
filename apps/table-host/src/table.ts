@@ -160,7 +160,7 @@ export class Table extends EventEmitter {
   }
 
   setCloud(c: CloudStatus) {
-    if (c.status === this.cloud.status && c.pairingCode === this.cloud.pairingCode) return;
+    if (c.status === this.cloud.status && c.pairingCode === this.cloud.pairingCode && JSON.stringify(c.code ?? null) === JSON.stringify(this.cloud.code ?? null)) return;
     const wasOnline = this.cloud.status === "online";
     this.cloud = c;
     // D-015: losing the service pauses a running game; it resumes by itself when the link returns.

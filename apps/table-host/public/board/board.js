@@ -399,6 +399,7 @@ function openSettings() {
       ${playerColors()}
       ${gameSettings}
       ${items.length ? `<div class="group game-settings"><div class="eyebrow">${esc(state.game.name)}</div>${items.map((it, k) => `<div class="row"><span>${esc(it.label)}</span>${control(it, k)}</div>`).join("")}</div>` : ""}
+      ${serviceSettings()}
       <div class="actions" style="display:flex;justify-content:flex-end;margin-top:20px"><button class="primary" data-close-overlay>Done</button></div></div>`;
     faceFront(o.querySelector(".panel"));
   };
@@ -419,6 +420,7 @@ function openSettings() {
       (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()).catch(() => toast("Fullscreen was refused by the browser"));
     }
     if (b.dataset.sound !== undefined) return void act("POST", "/display", { sound: state.display?.sound === false });
+    if (b.dataset.accessCode !== undefined) return openCodePad();
     if (b.dataset.colorPlayer) return void act("POST", `/players/${encodeURIComponent(b.dataset.colorPlayer)}/color`, { color: b.dataset.color });
     if (b.dataset.setting) {
       const f = ((state.game && games.find((x) => x.id === state.game.id)?.settings) || []).find((x) => x.key === b.dataset.setting);
@@ -439,6 +441,91 @@ function openSettings() {
     else if (it.type === "button") it.onChange?.();
     else it.onChange?.(it.type === "swatches" ? it.options[Number(b.dataset.val)] : it.options[Number(b.dataset.val)].value);
   });
+  overlayRoot.appendChild(o);
+}
+
+// ---------- the table's access code (D-113) ----------
+const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+const CODE_STATUS = { waiting: "checking…", accepted: "accepted", unknown: "not recognised", expired: "expired", revoked: "revoked", "in-use": "used by another table" };
+const CODE_HELP = {
+  none: "A code from the Game Table console approves this table at once, without a pairing code.",
+  waiting: "Asking the service about this code…",
+  accepted: "The service approved this table with this code.",
+  unknown: "The service does not know this code. Check it, or ask an admin for a new one.",
+  expired: "This code has run out. Ask an admin for a new one, or approve the table with its pairing code.",
+  revoked: "An admin revoked this code.",
+  "in-use": "Another table already uses this code. An admin can release it in the console.",
+};
+const codeMask = (hint) => `${hint}••-••••`;
+
+/** The settings group for the table's access code: on the table's own board only, and only with the service. */
+function serviceSettings() {
+  const c = state.cloud;
+  if (REMOTE || !c || c.status === "disabled") return "";
+  const code = c.code;
+  const value = code ? `<span class="code-value"><span class="mono">${esc(codeMask(code.hint))}</span> <span class="code-status ${esc(code.status)}">${esc(CODE_STATUS[code.status] ?? code.status)}</span></span>` : `<span class="faint">none</span>`;
+  const button = code?.source === "start" ? `<span class="faint">set at start</span>` : `<button data-access-code>${code ? "Change" : "Enter code"}</button>`;
+  const help = code?.source === "start" && code.status === "accepted" ? "Given when the table started (TABLE_CODE or --code); the service approved this table with it." : CODE_HELP[code?.status ?? "none"];
+  return `<div class="group service"><div class="eyebrow">Game Table service</div>
+    <div class="row"><span>Access code</span><span class="code-cell">${value}${button}</span></div>
+    <div class="faint code-help" style="font-size:.7em;margin-top:6px">${esc(help)}</div></div>`;
+}
+
+/** A keypad for the code: the board is a touchscreen without a keyboard (a keyboard works too). */
+let codePad = null;
+function openCodePad() {
+  if (codePad) return;
+  const o = (codePad = document.createElement("div"));
+  o.className = "overlay code-pad";
+  let typed = "";
+  const fromBoard = state.cloud.code?.source === "board";
+  const draw = () => {
+    const slots = Array.from({ length: 8 }, (_, i) => `<span class="slot ${i === typed.length ? "next" : ""}">${esc(typed[i] ?? "")}</span>${i === 3 ? `<span class="dash">-</span>` : ""}`).join("");
+    o.innerHTML = `<div class="panel"><h2>Access code</h2>
+      <p class="faint" style="margin:0 0 14px;font-size:.8em">From the Game Table console. It approves this table without a pairing code.</p>
+      <div class="slots" aria-live="polite" aria-label="Code typed so far">${slots}</div>
+      <div class="keys">${[...CODE_ALPHABET].map((k) => `<button data-key="${k}" ${typed.length >= 8 ? "disabled" : ""}>${k}</button>`).join("")}
+        <button class="wide" data-back aria-label="Delete the last character" ${typed ? "" : "disabled"}>⌫</button><button class="wide" data-clear ${typed ? "" : "disabled"}>Clear</button></div>
+      <div class="actions">${fromBoard ? `<button class="danger" data-remove>Remove code</button>` : ""}<span style="flex:1"></span>
+        <button data-cancel>Cancel</button><button class="primary" data-save ${typed.length === 8 ? "" : "disabled"}>Use this code</button></div></div>`;
+    faceFront(o.querySelector(".panel"));
+  };
+  const close = () => {
+    document.removeEventListener("keydown", onKey, true);
+    o.remove();
+    codePad = null;
+  };
+  const save = async (code) => {
+    try {
+      await api("POST", "/cloud/code", { code });
+      close(); // the settings behind show the code and what the service says about it
+    } catch {}
+  };
+  const press = (k) => {
+    if (k === "back") typed = typed.slice(0, -1);
+    else if (k === "clear") typed = "";
+    else if (typed.length < 8 && CODE_ALPHABET.includes(k)) typed += k;
+    draw();
+  };
+  const onKey = (e) => {
+    if (e.key === "Escape") return (e.stopPropagation(), close());
+    if (e.key === "Enter" && typed.length === 8) return void save(typed);
+    if (e.key === "Backspace") return (e.preventDefault(), press("back"));
+    const k = e.key.toUpperCase();
+    if (k.length === 1 && CODE_ALPHABET.includes(k)) press(k);
+  };
+  o.addEventListener("click", (e) => {
+    const b = e.target.closest("button");
+    if (e.target === o || b?.dataset.cancel !== undefined) return close();
+    if (!b) return;
+    if (b.dataset.key) press(b.dataset.key);
+    else if (b.dataset.back !== undefined) press("back");
+    else if (b.dataset.clear !== undefined) press("clear");
+    else if (b.dataset.save !== undefined) save(typed);
+    else if (b.dataset.remove !== undefined) save("");
+  });
+  document.addEventListener("keydown", onKey, true);
+  draw();
   overlayRoot.appendChild(o);
 }
 
@@ -480,9 +567,15 @@ function render() {
 
 function cloudNotice() {
   const c = state.cloud;
-  if (c.status === "pending") return `<div class="cloud">Waiting for an admin to approve this table · pairing code <b>${esc(c.pairingCode)}</b></div>`;
+  // With an access code that the service did not accept, the board says why, beside the pairing code (D-113).
+  const codeNote = c.code && c.code.status !== "accepted" && c.code.status !== "waiting" ? ` · access code <span style="white-space:nowrap">${esc(codeMask(c.code.hint))}</span>: ${esc(CODE_STATUS[c.code.status] ?? c.code.status)}` : "";
+  if (c.status === "pending")
+    return `<div class="cloud">Waiting for an admin to approve this table · pairing code <b>${esc(c.pairingCode ?? "…")}</b>${codeNote || (c.code ? "" : " · or enter an access code in the settings")}</div>`;
   if (c.status === "offline") return `<div class="cloud">The table is offline · new games start when the connection returns</div>`;
-  if (c.status === "revoked") return `<div class="cloud">This table was disconnected by an admin. It reconnects by itself once an admin presses Reconnect in the console.</div>`;
+  if (c.status === "revoked")
+    return c.code?.status === "revoked"
+      ? `<div class="cloud">This table's access code was revoked, so it is disconnected. An admin can reconnect it in the console.</div>`
+      : `<div class="cloud">This table was disconnected by an admin. It reconnects by itself once an admin presses Reconnect in the console.</div>`;
   return "";
 }
 

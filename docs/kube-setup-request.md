@@ -25,11 +25,11 @@ Node 26, listens on **8081**, image `ghcr.io/klaushofrichter/games-cloud`, numer
   their socket for hours. cams-admin solved the same problem with a Deployment and its own Ingress.
 - **One replica, `strategy: Recreate`.** State is in memory for now (pairings, invites, uploaded logs), and the
   signaling sockets belong to one process. Do not scale it out: a second pod would not see the first one's tables.
-- **No volume yet.** Restarting the pod forgets every paired table (they show a new pairing code and must be
-  approved again in the portal). A persistent store (likely SQLite on a PVC with Litestream to S3, as cams-admin
-  does) is the next piece of work on the games-service side and will come as a separate request. It will also hold
-  the extra-game repository list and which tables get which repositories (D-098); until then the list is baked into
-  the image (`deploy/game-repos.json`).
+- **Volume (done 15 Oct 2026, kube-setup `afc7bbe`).** PVC `games-cloud-data` (1Gi, `local-path`, PV set to
+  Retain) at `/data`, `DATA_DIR=/data`, pod `fsGroup: 1000`, backed up by Velero's daily file-system backup (30 days).
+  The service keeps its state there as SQLite (D-114): tables, access codes, repository ticks, console repositories,
+  logs, invites. It writes a consistent snapshot to `/data/snapshots/state.db` hourly and at shutdown, and starts from
+  it when `state.db` is missing or damaged; to force that after a restore, create `/data/RESTORE_FROM_SNAPSHOT`.
 - **Ingress timeouts:** Traefik passes WebSocket upgrades on a normal Ingress. Tables send a ping every 30 s and
   reconnect if cut, so the defaults are fine; if Traefik's idle timeout is below 60 s, raise it for this host.
 
