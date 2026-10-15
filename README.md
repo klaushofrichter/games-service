@@ -138,7 +138,8 @@ releases. The first is [`klaushofrichter/extra-games`](https://github.com/klaush
   repositories are back after every restart (D-098); change it by PR. In the console they are marked *deploy config*.
 - **Console, *Game repositories*:** you can also add `owner/name` and a branch there, until the next restart. The service
   fetches each repository's `games/` folder as one bundle and lists its games; *Refresh* fetches again (it also does
-  every hour). A private repository needs `GAME_REPO_TOKEN`, a fine-grained token with Contents: read on it.
+  every hour). A private repository needs `GAME_REPO_TOKEN`, a fine-grained token with Contents: read on it; with several
+  private repositories (extra-games, loopy-game) the one token must cover each of them (D-110).
 - **Per table:** tick a repository when approving the table's pairing code, or later on its row. The table installs the
   games within 15 seconds, between games, and its board marks them *extra*. Remote players see them too: their board
   comes from the table.
