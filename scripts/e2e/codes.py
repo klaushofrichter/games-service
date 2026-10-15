@@ -6,9 +6,9 @@ and is approved without a pairing code; the service restarts on the same DATA_DI
 table started with TABLE_CODE is refused because the code is in use and says so on its board; Edit, Release and
 Delete work in the console. Starts its own cloud service and two table hosts.
 """
-import os, re, sys, tempfile
+import os, re, sys, tempfile, urllib.request
 from playwright.sync_api import sync_playwright
-from common import api, errors, start_cloud, start_table, wait, watch
+from common import api, call, errors, start_cloud, start_table, wait, watch
 
 OUT = sys.argv[1] if len(sys.argv) > 1 else "e2e-out"
 os.makedirs(OUT, exist_ok=True)
@@ -144,6 +144,35 @@ try:
         board.click("button[data-access-code]")
         board.click("button[data-remove]")
         wait(lambda: state(TABLE_A)["cloud"].get("code") is None, 10, "the code to be removed")
+
+        # Deleting records (D-114). A log from table B (still disconnected), a download token, then: delete the log,
+        # revoke the token, delete table B with its logs.
+        tok = call(CLOUD, "POST", "/admin/api/codes", {"validity": "week"}, {"authorization": f"Bearer {ADMIN}"})
+        t = call(CLOUD, "POST", "/api/tables/hello", {"tableId": "t_e2e_log_owner_1", "name": "Log owner", "accessCode": tok["code"]})
+        for lid, sim in (("log-e2e-1", 0), ("log-e2e-sim", 1)):
+            req = urllib.request.Request(f"{CLOUD}/api/tables/logs/{lid}?gameId=coin-flip&simulation={sim}", data=b"zip", method="PUT",
+                                         headers={"authorization": f"Bearer {t['tableToken']}"})
+            urllib.request.urlopen(req).read()
+        console.reload()
+        console.fill("#dl-label", "e2e pipeline")
+        console.click("#dl-form button.primary")
+        console.wait_for_selector("#tokens :text('e2e pipeline')")
+        console.once("dialog", lambda d: d.accept())
+        console.click("button[data-token-revoke]")
+        console.wait_for_selector("#tokens :text('No active download tokens')")
+        console.wait_for_selector("#logs :text('log-e2e-sim')")
+        console.once("dialog", lambda d: d.accept())
+        console.click("#logs-delete-sims")
+        console.wait_for_selector("#logs-msg:has-text('Deleted 1 simulation log')")
+        console.once("dialog", lambda d: d.accept())
+        console.click("button[data-log-delete='log-e2e-1']")
+        console.wait_for_selector("#logs :text('No logs uploaded yet')")
+        # Table B (disconnected by the delete above): Delete is offered, confirmed twice (the table, then its logs).
+        answers = iter([True, False])
+        console.on("dialog", lambda d: d.accept() if next(answers) else d.dismiss())
+        console.click("button[data-table-delete]")
+        console.wait_for_selector("#pair-msg:has-text('Deleted')")
+        console.screenshot(path=os.path.join(OUT, "codes-records.png"), full_page=True)
         br.close()
 finally:
     for proc in (b_host, a, cloud):

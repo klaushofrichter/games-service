@@ -60,7 +60,7 @@ Or skip the pairing code: create an access code in the console (*Access codes*) 
 | `scripts/release-notes.sh`, `release.sh` | The release step of the deploy |
 | `scripts/soak.ts` | AI-only soak run over every game and player count |
 | `scripts/mac-table.sh` | A Table Host on a Mac against the live service (see above) |
-| `docs/` | Decision log; the request to the kube-setup session for the cluster side |
+| `docs/` | Decision log; the request to the kube-setup session for the cluster side; `runbooks/` for resetting and restoring the service's state |
 | `tests/` | Vitest suites that drive a real host through the board control API and fake decks |
 | `deploy/` | Dockerfiles, docker-compose, the table PC kit |
 | `.github/` | The three workflows, Dependabot, the CodeQL gate and its accepted-findings list |
@@ -211,6 +211,24 @@ In the cluster these come from the `games-oauth` Secret (created by `scripts/syn
 | `GAME_REPO_TOKEN` | Read token for private extra-game repositories (D-097) |
 | `GAME_REPOS_FILE`, `GAME_REPOS` | The deploy-time repository list (default `deploy/game-repos.json`; `none` turns it off), and more repositories (`owner/name@ref`, comma-separated) for local development (D-098) |
 | `APP_VERSION` | Stamped into the image by the deploy (`YYYY.MM.DD.N`); `/health` (`{status, version}`, on the Table Host also `protocol`) reports it; `main` for main builds, `dev` when unset |
+
+## The service's data
+
+The service keeps its state on the PVC `games-cloud-data` at `/data` (D-113; `DATA_DIR` above), within a 1 GiB budget.
+Single records are removed in the console (D-114):
+
+- **Tables:** *Disconnect*, then *Delete* removes a table for good and frees its access code, optionally with its logs.
+  If that PC connects again, it shows a new pairing code.
+- **Game logs:** *Delete* on a log, or *Delete all simulation logs*. Retention (90 days) and the budget remove old ones
+  by themselves.
+- **Download tokens:** listed by label and expiry (never the token itself) with *Revoke*.
+- **Access codes** and **console-added repositories:** *Delete* and *Remove* on their rows.
+
+Everything at once, and going back to a backup, are runbooks for someone with cluster access:
+
+- [`docs/runbooks/cloud-state-reset.md`](docs/runbooks/cloud-state-reset.md): empty the state and start over.
+- [`docs/runbooks/cloud-state-restore.md`](docs/runbooks/cloud-state-restore.md): recover from the hourly snapshot
+  (usually automatic), or restore the volume from Velero's daily backup (30 days).
 
 ## Branches, CI and deployment
 

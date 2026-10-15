@@ -4,7 +4,7 @@
 // repository ticks, logs and invites survive restarts. One process owns the database and the table sockets, so the
 // service still runs as exactly one replica (D-071).
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { createHash, randomInt } from "node:crypto";
+import { createHash, randomBytes, randomInt } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { BlockList, isIPv4, isIPv6 } from "node:net";
@@ -115,6 +115,15 @@ interface StoredTable extends Omit<TableRecord, "repos" | "pairingCode" | "lastH
   repos: string[];
 }
 
+interface DownloadToken {
+  id: string;
+  gameId: string | null;
+  label: string;
+  expiresAt: number;
+  createdAt: number;
+  createdBy: string;
+}
+
 interface LogRecordMeta {
   id: string;
   tableId: string;
@@ -133,7 +142,8 @@ export function startCloud(o: CloudOptions) {
   /** Uploaded logs; the bytes are in memory only without DATA_DIR, else in DATA_DIR/logs. */
   const logs = new Map<string, { meta: LogRecordMeta; data: Buffer | null }>();
   const invites = new Map<string, { tableId: string; expiresAt: number; used: boolean }>(); // by sha256(code)
-  const downloadTokens = new Map<string, { gameId: string | null; expiresAt: number }>(); // by sha256(token)
+  /** Download tokens by sha256(token); `id` names one in the console without revealing it (D-114). */
+  const downloadTokens = new Map<string, DownloadToken>();
   const codes = new Map<string, AccessCode>(); // by id
   const codeByHash = new Map<string, string>(); // code hash -> id
   const settings = { logRetentionDays: o.logRetentionDays ?? 90 };
@@ -191,7 +201,11 @@ export function startCloud(o: CloudOptions) {
   }
   if (store.removeOrphanLogs(new Set(logs.keys()))) console.log("[cloud] removed log files that no record mentions");
   for (const { key, value } of store.all<{ tableId: string; expiresAt: number; used: boolean }>("invite")) value.expiresAt < now0 ? store.delete("invite", key) : invites.set(key, value);
-  for (const { key, value } of store.all<{ gameId: string | null; expiresAt: number }>("download")) value.expiresAt < now0 ? store.delete("download", key) : downloadTokens.set(key, value);
+  // Tokens saved before D-114 have only gameId and expiresAt.
+  for (const { key, value } of store.all<Partial<DownloadToken> & { expiresAt: number }>("download")) {
+    if (value.expiresAt < now0) store.delete("download", key);
+    else downloadTokens.set(key, { gameId: value.gameId ?? null, label: value.label ?? "", createdAt: value.createdAt ?? 0, createdBy: value.createdBy ?? "", expiresAt: value.expiresAt, id: value.id ?? `d_${key.slice(0, 12)}` });
+  }
   if (store.persistent) {
     const n = (k: Parameters<typeof store.all>[0]) => store.all(k).length;
     console.log(`[cloud] state ${store.opened.how} in ${store.dataDir}: ${tables.size} tables, ${codes.size} access codes, ${logs.size} logs, ${n("repo")} console repositories`);
@@ -725,6 +739,23 @@ export function startCloud(o: CloudOptions) {
           disconnect(t);
           return json(res, 200, { tableId: t.tableId, status: t.status });
         }
+        if (m === "DELETE" && (match = p.match(/^\/admin\/api\/tables\/([\w-]+)$/))) {
+          // Remove a table for good (D-114): only one that is disconnected or still waiting, never one that is online.
+          // Its access code is freed; its logs stay unless ?logs=1. If that PC says hello again, it is a new table.
+          const t = tables.get(match[1]);
+          if (!t) return json(res, 404, { error: "no such table" });
+          if (t.status === "approved") return json(res, 409, { error: "disconnect the table first" });
+          const c = codeOf(t);
+          if (c && c.tableId === t.tableId) (Object.assign(c, { tableId: null, boundAt: null }), saveCode(c));
+          for (const x of codes.values()) if (x.tableId === t.tableId) (Object.assign(x, { tableId: null, boundAt: null }), saveCode(x));
+          for (const [k, i] of invites) if (i.tableId === t.tableId) (invites.delete(k), store.delete("invite", k));
+          for (const [k, r] of remoteSessions) if (r.tableId === t.tableId) (r.ws?.close(4002, "table deleted"), remoteSessions.delete(k), store.delete("session", k));
+          let logsDeleted = 0;
+          if (url.searchParams.get("logs") === "1") for (const l of [...logs.values()]) if (l.meta.tableId === t.tableId) (dropLog(l.meta.id), logsDeleted++);
+          tables.delete(t.tableId);
+          store.delete("table", t.tableId);
+          return json(res, 200, { ok: true, logsDeleted });
+        }
         if (m === "POST" && (match = p.match(/^\/admin\/api\/tables\/([\w-]+)\/reconnect$/))) {
           // Undo a disconnect: the same table, approved again. It picks up a new token at its next hello (D-085).
           const t = tables.get(match[1]);
@@ -751,7 +782,27 @@ export function startCloud(o: CloudOptions) {
           prune();
           return json(res, 200, settings);
         }
-        if (m === "GET" && p === "/admin/api/logs") return json(res, 200, [...logs.values()].map((l) => l.meta));
+        if (m === "GET" && p === "/admin/api/logs") return json(res, 200, [...logs.values()].map((l) => ({ ...l.meta, tableName: tables.get(l.meta.tableId)?.name ?? null })));
+        if (m === "DELETE" && (match = p.match(/^\/admin\/api\/logs\/([\w-]+)$/))) {
+          if (!logs.has(match[1])) return json(res, 404, { error: "no such log" });
+          dropLog(match[1]);
+          return json(res, 200, { ok: true });
+        }
+        if (m === "POST" && p === "/admin/api/logs/delete") {
+          // Bulk delete (D-114): by kind and/or table; at least one filter, so "everything" is never one click.
+          const b = await jsonBody(req);
+          const sim = b.simulation === true ? true : b.simulation === false ? false : undefined;
+          const tableId = typeof b.tableId === "string" && b.tableId ? b.tableId : undefined;
+          if (sim === undefined && !tableId) return json(res, 400, { error: "give simulation (true/false) and/or tableId" });
+          let deleted = 0;
+          for (const l of [...logs.values()]) {
+            if (sim !== undefined && l.meta.simulation !== sim) continue;
+            if (tableId && l.meta.tableId !== tableId) continue;
+            dropLog(l.meta.id);
+            deleted++;
+          }
+          return json(res, 200, { deleted });
+        }
         if (m === "GET" && (match = p.match(/^\/admin\/api\/logs\/([\w-]+)\.zip$/))) {
           const data = logData(match[1]);
           if (!data) return json(res, 404, { error: "no such log" });
@@ -761,10 +812,29 @@ export function startCloud(o: CloudOptions) {
           const b = await jsonBody(req);
           const token = randomToken();
           const exp = expiry(lifetime(b.expiresInHours, 24, 24 * 90) * 3600_000);
-          const d = { gameId: b.gameId ? String(b.gameId) : null, expiresAt: exp.at };
+          const d: DownloadToken = {
+            id: `d_${randomBytes(6).toString("hex")}`,
+            gameId: b.gameId ? String(b.gameId) : null,
+            label: String(b.label ?? "").trim().slice(0, 60),
+            expiresAt: exp.at,
+            createdAt: Date.now(),
+            createdBy: who.via === "google" ? who.email : "admin token",
+          };
           downloadTokens.set(tokenKey(token), d);
           store.put("download", tokenKey(token), d);
-          return json(res, 201, { token, url: `${o.publicUrl}/dl/${token}`, expiresAt: exp.iso });
+          return json(res, 201, { id: d.id, token, url: `${o.publicUrl}/dl/${token}`, expiresAt: exp.iso });
+        }
+        if (m === "GET" && p === "/admin/api/download-tokens") {
+          // The active tokens, never the tokens themselves (only their hashes are kept).
+          const now = Date.now();
+          return json(res, 200, [...downloadTokens.values()].filter((d) => d.expiresAt > now).sort((a, b) => b.createdAt - a.createdAt));
+        }
+        if (m === "DELETE" && (match = p.match(/^\/admin\/api\/download-tokens\/(d_[0-9a-f]{12})$/))) {
+          const k = [...downloadTokens].find(([, d]) => d.id === match![1])?.[0];
+          if (!k) return json(res, 404, { error: "no such download token" });
+          downloadTokens.delete(k);
+          store.delete("download", k);
+          return json(res, 200, { ok: true });
         }
 
         // ----- access codes (D-112) -----
