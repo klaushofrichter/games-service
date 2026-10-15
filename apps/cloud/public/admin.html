@@ -10,6 +10,14 @@
     --display:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif; --text:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif; --mono:ui-monospace,SFMono-Regular,Menlo,monospace; }
   * { box-sizing: border-box; }
   body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.45 var(--text); }
+  /* Scrollbars in the felt colours, not the browser's white (D-105): a green thumb on a track the colour of what it
+     scrolls over, the page or a panel such as Game logs. scrollbar-color is inherited; ::-webkit-* for older Safari. */
+  html { color-scheme: dark; scrollbar-color: #2f6457 var(--bg); }
+  section { scrollbar-color: #2f6457 var(--panel); }
+  ::-webkit-scrollbar { width: 10px; height: 10px; background: var(--bg); }
+  section ::-webkit-scrollbar { background: var(--panel); }
+  ::-webkit-scrollbar-thumb { background: #2f6457; border-radius: 6px; border: 2px solid transparent; background-clip: padding-box; }
+  ::-webkit-scrollbar-corner { background: transparent; }
   header { display:flex; align-items:center; gap:16px; padding:18px 28px; border-bottom:1px solid var(--line); }
   header h1 { font-family:var(--display); font-size:24px; margin:0; font-weight:600; }
   header .brand { display:flex; align-items:center; gap:12px; color:inherit; text-decoration:none; }

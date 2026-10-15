@@ -92,6 +92,15 @@ try:
         page.click("#ret-form button")
         page.wait_for_selector("#ret-msg.ok")
         page.screenshot(path=os.path.join(OUT, "admin-approved.png"), full_page=True)
+        # D-105: scrollbars in the felt colours, not white. Fill the Game logs box past its height so it scrolls.
+        box = page.locator("#logs").locator("xpath=ancestor::div[1]")
+        page.evaluate("""() => { const t = document.getElementById('logs');
+          t.innerHTML = Array.from({ length: 30 }, (_, k) => `<tr><td>log ${k}</td><td>-</td><td>-</td><td></td></tr>`).join(''); }""")
+        assert box.evaluate("(e) => e.scrollHeight > e.clientHeight"), "the Game logs box should scroll"
+        colors = box.evaluate("(e) => getComputedStyle(e).scrollbarColor")
+        assert colors == "rgb(47, 100, 87) rgb(15, 42, 36)", f"Game logs scrollbar colours: {colors}"
+        assert page.evaluate("() => getComputedStyle(document.documentElement).colorScheme") == "dark"
+        box.screenshot(path=os.path.join(OUT, "admin-logs-scrollbar.png"))
 
         # Logout really logs out: a 200 page with a Sign in link, the cookie gone, /admin closed again.
         page.click("#signout")
