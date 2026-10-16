@@ -14,7 +14,7 @@ import { readdir, readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { loadGames, type InstalledGame } from "../apps/table-host/src/games.ts";
 import { LogStore, type RunMeta } from "../apps/table-host/src/logs.ts";
-import { buildMoves, PROBLEM_KINDS, stateAt, type MoveList, type MoveRow } from "../apps/table-host/src/moves.ts";
+import { buildMoves, isProblem, packedList, stateAt, type MoveList, type MoveRow } from "../apps/table-host/src/moves.ts";
 import type { LogRecord } from "../apps/table-host/src/runtime.ts";
 
 const USAGE = `usage: node scripts/game-log.ts <log.zip|folder> [info | moves [N[-M]] | move N | line L | state N [--before]]
@@ -92,9 +92,7 @@ async function main() {
   if (!records) throw new Error(`the log has ${log.games.length} game(s); there is no game ${o.game}`);
   const r = await rules(log.meta, o.gameDirs);
   const packed = log.moves[o.game - 1];
-  const list: MoveList = packed
-    ? { rows: packed, moves: packed.reduce((a, x) => Math.max(a, x.n ?? 0), 0), described: packed.some((x) => x.flags.includes("described")) }
-    : buildMoves(records, r.game);
+  const list: MoveList = packed ? packedList(packed) : buildMoves(records, r.game);
   const columns = r.game?.manifest.viewer.columns.length ? r.game.manifest.viewer.columns : [...new Set(list.rows.flatMap((x) => Object.keys(x.columns ?? {})))].map((key) => ({ key, label: key }));
   const start = records[0]?.at ?? 0;
   const out = (v: unknown) => console.log(JSON.stringify(v, null, 2));
@@ -121,7 +119,7 @@ async function main() {
   }
 
   if (o.cmd === "moves") {
-    let rows = list.rows.filter((x) => (o.seat === undefined || x.seat === o.seat) && (!o.movesOnly || x.kind === "move") && (!o.problems || x.flags.some((f) => ["rejected", "error", "fallback"].includes(f)) || PROBLEM_KINDS.has(x.kind)));
+    let rows = list.rows.filter((x) => (o.seat === undefined || x.seat === o.seat) && (!o.movesOnly || x.kind === "move") && (!o.problems || isProblem(x)));
     if (o.args[0]) {
       const [a, b] = o.args[0].split("-").map(Number);
       const firstLine = list.rows.find((x) => x.n === a)?.line ?? Infinity;

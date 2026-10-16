@@ -3,7 +3,7 @@
 // the same endpoints (GET /api/v1/history…).
 import type { InstalledGame } from "./games.ts";
 import type { LogStore, RunMeta } from "./logs.ts";
-import { buildMoves, pageMoves, stateAt, type MoveList, type MoveQuery, type MoveRow } from "./moves.ts";
+import { buildMoves, packedList, pageMoves, stateAt, type MoveList, type MoveQuery, type MoveRow } from "./moves.ts";
 import type { LogRecord } from "./runtime.ts";
 
 /** A log in the viewer's list. */
@@ -72,7 +72,7 @@ export class History {
     const key = `${id}#${game}`;
     let list: MoveList | undefined;
     const packed = log.moves[game - 1];
-    if (packed) list = { rows: packed, moves: packed.reduce((a, r) => Math.max(a, r.n ?? 0), 0), described: packed.some((r) => r.flags.includes("described")) };
+    if (packed) list = packedList(packed);
     else {
       list = this.built.get(key);
       if (!list) {

@@ -5,11 +5,11 @@ import { extname, join, normalize } from "node:path";
 import { timingSafeEqual } from "node:crypto";
 import { WebSocketServer, type WebSocket } from "ws";
 import QRCode from "qrcode";
-import { envelope, PROTOCOL_VERSION, type AccessCodeStatus, type Envelope } from "../../../packages/protocol/src/index.ts";
+import { envelope, type AccessCodeStatus, type Envelope } from "../../../packages/protocol/src/index.ts";
 import type { GameEvent } from "../../../packages/sdk/src/index.ts";
 import { Table, TableError } from "./table.ts";
 import { runSimulation } from "./simulation.ts";
-import { verifyStoredLog } from "./game-log.ts";
+import { platformMeta, verifyStoredLog } from "./game-log.ts";
 import { History } from "./history.ts";
 import type { LogStore } from "./logs.ts";
 
@@ -86,7 +86,15 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
   const forClient = (remote: boolean | undefined, state: ReturnType<Table["state"]>) => (remote ? { ...state, joinUrl: "" } : state);
 
   table.on("state", (state) => {
-    for (const c of clients) if (c.role !== "pending") send(c.ws, envelope("lobby", "state", forClient(c.remote, state), { stateRev: state.stateRev }));
+    // Serialised once per kind of client (at the table, remote), not once per client.
+    const text = new Map<boolean, string>();
+    for (const c of clients) {
+      if (c.role === "pending") continue;
+      const remote = !!c.remote;
+      let t = text.get(remote);
+      if (t === undefined) text.set(remote, (t = JSON.stringify(envelope("lobby", "state", forClient(remote, state), { stateRev: state.stateRev }))));
+      sendText(c.ws, t);
+    }
   });
 
   /** The running game to these clients: the public board view to boards, each player's own view to their deck. */
@@ -160,7 +168,7 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
     }
   };
 
-  const api = async (req: IncomingMessage, res: ServerResponse, path: string) => {
+  const api = async (req: IncomingMessage, res: ServerResponse, path: string, qs: URLSearchParams) => {
     const remote = remoteOf(req);
     const m = req.method ?? "GET";
     if (remote) {
@@ -193,7 +201,7 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
       return json(res, 200, table.state());
     }
     if (m === "GET" && path === "/qr") {
-      const text = new URL(req.url ?? "/", "http://t").searchParams.get("text") ?? "";
+      const text = qs.get("text") ?? "";
       if (!/^https?:\/\/[\w.:/-]+$/.test(text) || text.length > 200) throw new TableError(400, "text must be a URL");
       return await qrSvg(res, text);
     }
@@ -255,7 +263,6 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
       return info ? json(res, 200, info) : json(res, 404, { error: "no such log" });
     }
     if (m === "GET" && (match = path.match(/^\/history\/([\w-]+)\/(\d{1,4})\/moves$/))) {
-      const qs = new URL(req.url ?? "/", "http://t").searchParams;
       const num = (k: string) => (qs.has(k) && qs.get(k) !== "" && Number.isFinite(Number(qs.get(k))) ? Number(qs.get(k)) : undefined);
       const page = await history.page(match[1], Number(match[2]), {
         offset: num("offset"),
@@ -299,8 +306,8 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
     const path = url.pathname;
     try {
       // {status, version}: the version is stamped at build time (APP_VERSION) and reads "dev" outside a release build.
-      if (path === "/health") return json(res, 200, { status: "ok", version: process.env.APP_VERSION || "dev", protocol: PROTOCOL_VERSION });
-      if (path.startsWith("/api/v1/")) return await api(req, res, path.slice("/api/v1".length));
+      if (path === "/health") return json(res, 200, { status: "ok", ...platformMeta() });
+      if (path.startsWith("/api/v1/")) return await api(req, res, path.slice("/api/v1".length), url.searchParams);
       if (path === "/") {
         res.writeHead(302, { location: boardAllowed(req) ? "/board/" : "/deck/" });
         return res.end();

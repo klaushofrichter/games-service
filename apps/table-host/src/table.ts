@@ -18,7 +18,7 @@ import {
   type CloudStatus,
 } from "../../../packages/protocol/src/index.ts";
 import { createRng, type GameEvent, type Intent, type SeatInfo } from "../../../packages/sdk/src/index.ts";
-import { HOW_TO_PLAY, settingsWithDefaults, sourceMeta, type InstalledGame } from "./games.ts";
+import { HOW_TO_PLAY, settingsWithDefaults, type InstalledGame } from "./games.ts";
 
 /** The URL a deck fetches a game's rules from (D-099), or null. */
 const howToPlayUrl = (g: InstalledGame) => (g.howToPlay ? `/games/${g.manifest.id}/${HOW_TO_PLAY}` : null);
@@ -321,7 +321,6 @@ export class Table extends EventEmitter {
     return { token: this.joinToken, url: `${this.config.publicUrl}/j/${this.joinToken}` };
   }
 
-  /** Remote boards may act unless switched off at the table or by the running game's manifest (D-006). */
   /**
    * Developer setting (D-118): games may start, and go on, without a player at the table (remote players and AIs, or
    * AIs only). In memory only, so every start of the Table Host turns it off unless ALLOW_NO_LOCAL_PLAYER=1.
@@ -354,6 +353,7 @@ export class Table extends EventEmitter {
     this.changed();
   }
 
+  /** Remote boards may act unless switched off at the table or by the running game's manifest (D-006). */
   remoteControlAllowed(): boolean {
     if (!this.remoteBoardControl) return false;
     const m = this.selected?.game.manifest;
@@ -580,7 +580,7 @@ export class Table extends EventEmitter {
    * nobody has. The colour a player ends up with is kept for them. Players without a seat have none.
    */
   colors(): Map<string, string> {
-    const seated = this.seated().sort((a, b) => a.seat! - b.seat!);
+    const seated = this.seated();
     const out = new Map<string, string>();
     const used = new Set<string>();
     for (const p of seated) {
@@ -991,8 +991,7 @@ export class Table extends EventEmitter {
     if (this.phase !== "active" || !this.runtime) throw new TableError(409, "no game is running");
     if (p.seat === null || !this.runtime.seats.some((s) => s.seat === p.seat)) throw new TableError(409, "you are not playing in this game");
     if (!intent || typeof intent.name !== "string") throw new TableError(400, "intent needs a name");
-    const r = this.runtime.submit(p.seat, { name: intent.name, payload: intent.payload }, p.kind === "ai" ? "ai" : "human", p.kind === "ai" ? ai : undefined);
-    return r;
+    return this.runtime.submit(p.seat, { name: intent.name, payload: intent.payload }, p.kind === "ai" ? "ai" : "human", p.kind === "ai" ? ai : undefined);
   }
 
   /**
@@ -1089,10 +1088,7 @@ export class Table extends EventEmitter {
 
   /** An AI move ended (answered, failed or replaced): its timers go, and a pause waiting for it ends. */
   private endAiMove(playerId: string, mv: AiMoveState) {
-    clearTimeout(mv.timer);
-    clearTimeout(mv.showTimer);
-    clearTimeout(mv.overdueTimer);
-    if (this.aiMoves.get(playerId) === mv) this.aiMoves.delete(playerId);
+    this.dropAiMove(playerId, mv);
     if (this.pause?.reason === "ai" && this.pause.ai?.playerId === playerId) this.resumeAfterAi("ai");
   }
 
@@ -1159,12 +1155,16 @@ export class Table extends EventEmitter {
     mv.controller?.abort();
     const w = this.aiWorkers.get(playerId);
     if (w?.busy) w.cancel();
-    const shown = mv.shown;
+    this.dropAiMove(playerId, mv);
+    if (mv.shown) this.stateDirty = true;
+  }
+
+  /** An AI move's timers go, and it is no longer the player's move in the making. */
+  private dropAiMove(playerId: string, mv: AiMoveState) {
     clearTimeout(mv.timer);
     clearTimeout(mv.showTimer);
     clearTimeout(mv.overdueTimer);
     if (this.aiMoves.get(playerId) === mv) this.aiMoves.delete(playerId);
-    if (shown) this.stateDirty = true;
   }
 
   private stateDirty = false;
@@ -1214,9 +1214,7 @@ export class Table extends EventEmitter {
   private pendingSaves = new Set<Promise<unknown>>();
 
   private playersMeta(aiOptions: Record<number, Record<string, unknown>>): PlayerMeta[] {
-    return this.seated()
-      .map((p) => ({ seat: p.seat!, name: p.name, kind: p.kind, location: p.kind === "ai" ? null : p.location, ...(p.kind === "ai" ? { aiOptions: aiOptions[p.seat!] ?? {} } : {}) }))
-      .sort((a, b) => a.seat - b.seat);
+    return this.seated().map((p) => ({ seat: p.seat!, name: p.name, kind: p.kind, location: p.kind === "ai" ? null : p.location, ...(p.kind === "ai" ? { aiOptions: aiOptions[p.seat!] ?? {} } : {}) }));
   }
 
   /** Write the game's log to disk from its first record (D-116). A disk problem must not stop the game. */
