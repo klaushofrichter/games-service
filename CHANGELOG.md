@@ -6,6 +6,8 @@ page is the history. Leave it empty if there is nothing to add beyond the commit
 
 ## [Unreleased]
 
+- A player's colour stays with them when they move to another seat (D-117); before, the default colour changed
+  with the seat.
 - Board, Up next screen: each player's chip is framed in their colour, with a ring that fills once they are ready;
   a player whose phone dropped shows no dot on a red background. Tapping a chip offers **Remove**, online or not.
 - Board lobby: a selected player's card shows its thicker border in the player's colour instead of brass.
