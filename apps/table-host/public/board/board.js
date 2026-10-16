@@ -129,6 +129,12 @@ function cannotRemove(p) {
   return true;
 }
 
+/** Removing this player ends the running game (D-119): the game's reason, said before the board asks. */
+function endsGame(p) {
+  const why = p && state.needed?.[p.id];
+  return why ? `This ends the game: ${why}` : null;
+}
+
 /** The AI player's window: how it plays in the chosen game, and Remove (D-103), which works with or without a game. */
 async function configureAi(playerId) {
   const p = state.players.find((x) => x.id === playerId);
@@ -809,9 +815,10 @@ function renderFinished() {
 function renderPause() {
   const p = state.phase === "paused" ? state.pause : null;
   pauseLayer.hidden = !p;
-  pauseLayer.classList.toggle("ai-wait", p?.reason === "ai");
+  pauseLayer.classList.toggle("ai-wait", p?.reason === "ai" || p?.reason === "player");
   if (!p) return void (pauseLayer.innerHTML = "");
   if (p.reason === "ai") return renderAiWait(p);
+  if (p.reason === "player") return renderPlayerWait(p);
   const online = state.cloud.status === "online" || state.cloud.status === "disabled";
   pauseLayer.innerHTML = `<div class="panel" style="transform:rotate(${ROT[viewEdge()]}deg)">
     ${online ? "" : `<div class="spinner"></div>`}
@@ -840,6 +847,31 @@ function renderAiWait(p) {
     <div class="what"><span class="thinking-dots" aria-hidden="true"><i></i><i></i><i></i></span> is still thinking</div>
     <p>The game is paused. ${control ? "Wait for it, or let it move now." : "It goes on as soon as the AI moves."}</p>
     ${control ? `<div class="row"><button class="primary" data-pause="play-now">Play now</button>${REMOTE ? "" : `<button class="danger" data-pause="end">End game</button>`}</div>` : ""}
+  </div>`;
+}
+
+/**
+ * The game can't go on without a player whose phone is away (D-119): paused, their seat held, the game visible. A card
+ * near their seat says the game's reason; it goes on by itself when they are back, or the table ends the game.
+ */
+function renderPlayerWait(p) {
+  const list = p.players ?? [];
+  const first = list[0];
+  const at = seatPositions(state.seatEdges)[first?.seat] ?? { x: W / 2, y: H / 2 };
+  const x = at.x + (W / 2 - at.x) * 0.22;
+  const y = at.y + (H / 2 - at.y) * 0.42;
+  const control = !REMOTE || state.remote?.boardControl;
+  const names = list.map((w) => {
+    const who = state.players.find((x) => x.id === w.playerId);
+    return `<span class="dot" style="background:${who?.color ?? "var(--brass)"}"></span>${esc(w.name)}`;
+  }).join(" · ");
+  const reasons = [...new Set(list.map((w) => w.text).filter(Boolean))];
+  pauseLayer.innerHTML = `<div class="ai-wait-card player-wait" data-player-wait="${esc(list.map((w) => w.playerId).join(" "))}" style="left:${x}px;top:${y}px;transform:translate(-50%,-50%) rotate(${ROT[gameEdge()]}deg)">
+    <div class="who">${names || "A player"}</div>
+    <div class="what"><span class="thinking-dots" aria-hidden="true"><i></i><i></i><i></i></span> ${list.length > 1 ? "are" : "is"} away</div>
+    ${reasons.map((r) => `<p>${esc(r)}</p>`).join("")}
+    <p>The game is paused and goes on as soon as ${list.length > 1 ? "they are" : `${esc(first?.name ?? "they")} is`} back.</p>
+    ${control ? `<div class="row"><button class="danger" data-pause="end">End game</button></div>` : ""}
   </div>`;
 }
 
@@ -959,7 +991,7 @@ center.addEventListener("click", async (e) => {
     const p = state.players.find((x) => x.id === d.chip);
     if (!p) return;
     if (cannotRemove(p)) return;
-    const why = p.kind === "ai" ? "The AI player leaves its seat." : p.connected ? "Their phone is disconnected and must scan the QR code again to rejoin." : "Their phone is offline; the seat is freed now instead of after the waiting time.";
+    const why = endsGame(p) ?? (p.kind === "ai" ? "The AI player leaves its seat." : p.connected ? "Their phone is disconnected and must scan the QR code again to rejoin." : "Their phone is offline; the seat is freed now instead of after the waiting time.");
     if (await confirmDialog(`Remove ${p.name}?`, why, "Remove")) {
       if (selectedPlayer === p.id) selectedPlayer = null;
       act("DELETE", `/players/${p.id}`);
@@ -967,7 +999,7 @@ center.addEventListener("click", async (e) => {
   } else if (d.remove) {
     const p = state.players.find((x) => x.id === d.remove);
     if (cannotRemove(p)) return;
-    if (await confirmDialog(`Remove ${p?.name}?`, p?.kind === "ai" ? "The AI player leaves its seat." : "Their phone is disconnected and must scan the QR code again to rejoin.", "Remove")) {
+    if (await confirmDialog(`Remove ${p?.name}?`, endsGame(p) ?? (p?.kind === "ai" ? "The AI player leaves its seat." : "Their phone is disconnected and must scan the QR code again to rejoin."), "Remove")) {
       selectedPlayer = null;
       act("DELETE", `/players/${d.remove}`);
     }
@@ -1042,7 +1074,7 @@ function openLobbyOverlay() {
     if (b.dataset.remove) {
       const p = state.players.find((x) => x.id === b.dataset.remove);
       if (cannotRemove(p)) return;
-      if (await confirmDialog(`Remove ${p?.name}?`, "This may end games that cannot continue without them.", "Remove")) act("DELETE", `/players/${b.dataset.remove}`);
+      if (await confirmDialog(`Remove ${p?.name}?`, endsGame(p) ?? "The game goes on without them.", "Remove")) act("DELETE", `/players/${b.dataset.remove}`);
     }
     if (b.dataset.end !== undefined && (await confirmDialog("End this game?", "The game stops for everyone and the result is recorded as ended.", "End game"))) {
       await act("POST", "/game/end");

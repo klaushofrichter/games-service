@@ -51,7 +51,9 @@ simulation). Seats are numbers from 0; the `start` record maps them to players, 
 - `seatJoined`: a player took a seat during the game (`seat` as in `start`). `seatLeft`: a player left (`seat`);
   `ended` says whether the game ended because of it.
 - `error`: an exception in the game's code outside a move, e.g. while drawing a player's view (`where`: `view`,
-  `boardView`, `isOver`; `seat` if it was one player's view). Only the first 20 are recorded; `counts.errors` has all.
+  `boardView`, `isOver`, `canContinueWithout`; `seat` if it was one player's view). Only the first 20 are recorded; `counts.errors` has all.
+- `disconnected`: a player's phone went away (`seat`); `waiting` is the game's text when it could not go on without
+  them (the game was paused until they were back). `reconnected`: the phone came back. Not inputs; replay skips them.
 - `snapshot`: the complete state after `inputs` accepted inputs (only if the table was set to take snapshots).
 - `end`: `reason` as above, `summary` (`text` and `highlights`, the game's own result; null when interrupted) and
   `stateHash` (a fingerprint of the final state; null if it could not be rebuilt).

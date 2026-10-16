@@ -49,6 +49,11 @@ export interface AiContext {
 
 export type StepResult<S> = { state: S; events?: GameEvent[] } | { reject: string };
 
+/** onSeatLeft's way of ending the game with its own reason (D-119). */
+export interface SeatLeftEnd {
+  end: { text: string; highlights?: Record<string, unknown> };
+}
+
 export interface GameDefinition<S = unknown> {
   setup(ctx: GameContext, settings: Record<string, unknown>): S;
   onIntent(state: S, seat: number, intent: Intent, ctx: GameContext): StepResult<S>;
@@ -60,8 +65,19 @@ export interface GameDefinition<S = unknown> {
   isOver(state: S): GameSummary | null;
   onTimer?(state: S, id: string, ctx: GameContext): StepResult<S>;
   onSeatJoined?(state: S, seat: SeatInfo, ctx: GameContext): StepResult<S>;
-  /** A seat left for good. Return "end" to end the game. */
-  onSeatLeft?(state: S, seat: number, ctx: GameContext): StepResult<S> | "end";
+  /**
+   * A seat left for good. Return "end" to end the game, or `{ end: { text } }` to end it with the game's own reason
+   * (D-119), e.g. "Team North–South was broken." Otherwise the new state.
+   */
+  onSeatLeft?(state: S, seat: number, ctx: GameContext): StepResult<S> | "end" | SeatLeftEnd;
+  /**
+   * Can the game go on without this seat (D-119)? Asked when its player's phone goes away and before the player is
+   * removed. `true`: go on (a disconnected player then leaves after the waiting time, and onSeatLeft follows).
+   * `{ wait: text }`: the game needs this player: while they are away the game pauses, their seat is held, and the
+   * board says the text and offers to end the game; removing them ends it with the text. Must not change the state
+   * (it is a question, asked again during replay). Without it, games go on.
+   */
+  canContinueWithout?(state: S, seat: number): true | { wait: string };
   /**
    * AI player: pick an intent from this seat's view, or null to wait. May answer later (a promise), for a search or
    * a call to a language model (D-112); the table keeps running meanwhile. With `ai.worker` in the manifest it runs
