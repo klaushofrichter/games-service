@@ -408,6 +408,11 @@ def dialogs(browser, board):
     assert st["phase"] == "ready" and st["game"]["settings"]["rounds"] == 4, st
     seat = next(p["seat"] for p in st["players"] if p["id"] == ai)
     board.locator(".seat").nth(seat).click()
+    # The selected card's thicker border is in the player's colour, not brass.
+    colour = next(p["color"] for p in st["players"] if p["id"] == ai)
+    board.wait_for_selector("#seats .seat.selected")
+    ring = board.eval_on_selector("#seats .seat.selected", "(e) => getComputedStyle(e).boxShadow")
+    assert rgb(colour) in ring and "4px" in ring, f"selected card: {ring}, colour {colour}"
     board.click(f"[data-config='{ai}']")
     board.wait_for_selector(".dialog.form select[name=style]")
     board.select_option(".dialog select[name=style]", "aggressive")
@@ -442,6 +447,34 @@ def dialogs(browser, board):
     board.click(".dialog.form [data-x=remove]")
     board.click(".dialog:not(.form) [data-x=yes]")
     wait(lambda: all(p["id"] != ai2 for p in api("GET", "/state")["players"]), 5, "the second AI player to leave")
+    # The Up next chips: frame and dot in each player's colour, a ring until ready; offline, no dot and a red
+    # background; tapping a chip offers Remove, online or not.
+    api("POST", "/game/select", {"gameId": "roulette", "settings": {}})
+    mira = join(browser, "Mira")
+    board.wait_for_selector(".ready-list .chip.player:has-text('Mira')")
+    for p in api("GET", "/state")["players"]:
+        if p["seat"] is None:
+            continue
+        chip = board.locator(f".ready-list [data-chip='{p['id']}']")
+        frame, dot = chip.evaluate("(e) => [getComputedStyle(e).borderTopColor, getComputedStyle(e.querySelector('.dot')).boxShadow]")
+        assert frame == rgb(p["color"]) and rgb(p["color"]) in dot, f"{p['name']}: frame {frame}, dot {dot}, colour {p['color']}"
+    mira.context.close()  # Mira's phone drops: her seat is held for the grace period
+    board.wait_for_selector(".ready-list .chip.player.away:has-text('Mira')")
+    away = board.locator(".ready-list .chip.player.away")
+    assert away.locator(".dot").count() == 0, "an offline chip has no dot"
+    assert away.evaluate("(e) => getComputedStyle(e).backgroundColor") == "rgba(210, 87, 74, 0.38)"
+    shot(board, "ready-chips-offline")
+    away.click()
+    board.wait_for_selector(".dialog:has-text('Remove Mira?')")
+    board.click(".dialog [data-x=yes]")
+    wait(lambda: all(p["name"] != "Mira" for p in api("GET", "/state")["players"]), 5, "Mira to be removed")
+    # an online player too
+    klaus = next(p for p in api("GET", "/state")["players"] if p["name"] == "Klaus")
+    board.click(f".ready-list [data-chip='{klaus['id']}']")
+    board.click(".dialog [data-x=no]")  # Cancel keeps him
+    time.sleep(0.3)
+    assert any(p["name"] == "Klaus" for p in api("GET", "/state")["players"])
+    api("POST", "/game/close")
     return decks
 
 

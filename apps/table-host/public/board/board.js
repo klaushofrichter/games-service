@@ -740,6 +740,21 @@ function playersLabel(p) {
   return contiguous ? `${p[0]}–${p.at(-1)} players` : `${p.join(", ")} players`;
 }
 
+/**
+ * A seated player's chip on the Up next screen, in their colour (D-106): a filled dot once they are ready, a ring
+ * before. Offline (their phone dropped; the seat is held for the grace period): no dot, a red background. On the
+ * table's own board the chip is a button that offers to remove the player, online or not.
+ */
+function playerChip(p) {
+  const state_ = !p.connected ? "offline" : p.ready ? "ready" : "not ready";
+  const cls = `chip player ${p.connected ? (p.ready ? "ready" : "") : "away"}`;
+  const inner = `${p.connected ? `<span class="dot" aria-hidden="true"></span>` : ""}${esc(p.name)}`;
+  const style = p.color ? ` style="--pc:${esc(p.color)}"` : "";
+  return REMOTE
+    ? `<span class="${cls}"${style} title="${esc(p.name)}: ${state_}">${inner}</span>`
+    : `<button type="button" class="${cls}"${style} data-chip="${esc(p.id)}" title="${esc(p.name)}: ${state_}. Tap to remove" aria-label="${esc(p.name)}, ${state_}. Remove…">${inner}</button>`;
+}
+
 function renderReady() {
   const humans = state.players.filter((p) => p.kind === "human" && p.seat !== null);
   const needs = state.game.needs ?? [];
@@ -750,7 +765,7 @@ function renderReady() {
   center.innerHTML = `<section class="main waiting">
       <div><div class="eyebrow">Up next · ${playersLabel(state.game.players)} · ${seated} seated</div><h1>${esc(state.game.name)}</h1>
       <div class="sub">${needs.length ? `${esc(needs.map((n, i) => (i ? n : n[0].toUpperCase() + n.slice(1))).join(" · "))}. Scan the code to join${g?.ai ? " or add an AI player" : ""}.` : "Everyone taps <b>Ready</b> on their phone."}</div></div>
-      <div class="ready-list">${state.players.filter((p) => p.seat !== null).map((p) => `<span class="chip ${p.ready ? "ok" : ""}"><span class="dot" style="background:${p.ready ? "var(--jade)" : ""}"></span>${esc(p.name)}</span>`).join("")}</div>
+      <div class="ready-list">${state.players.filter((p) => p.seat !== null).map(playerChip).join("")}</div>
       ${REMOTE ? "" : `<div class="toolbar">${seatButtons()}${roomForAi ? `<div class="right"><button data-add-ai>+ AI player</button></div>` : ""}</div>`}
       <div class="toolbar"><button class="primary" data-start ${all ? "" : "disabled"}>Start game</button><button data-close>Change game</button>
       ${REMOTE ? "" : (() => { const sel = state.players.find((p) => p.id === selectedPlayer); return sel?.kind === "ai" ? `<button data-config="${sel.id}">Configure ${esc(sel.name)}</button>` : state.players.some((p) => p.kind === "ai") ? `<span class="faint" style="font-size:.7em">Tap an AI seat to configure it</span>` : ""; })()}
@@ -923,7 +938,16 @@ center.addEventListener("click", async (e) => {
   else if (d.layout) act("POST", "/layout", { seats: Number(d.layout) });
   else if (d.rotate) act("POST", "/rotate", { degrees: Number(d.rotate) });
   else if ("addAi" in d) act("POST", "/ai", {});
-  else if (d.remove) {
+  else if (d.chip) {
+    // The player's chip on the Up next screen: remove them, online or not.
+    const p = state.players.find((x) => x.id === d.chip);
+    if (!p) return;
+    const why = p.kind === "ai" ? "The AI player leaves its seat." : p.connected ? "Their phone is disconnected and must scan the QR code again to rejoin." : "Their phone is offline; the seat is freed now instead of after the waiting time.";
+    if (await confirmDialog(`Remove ${p.name}?`, why, "Remove")) {
+      if (selectedPlayer === p.id) selectedPlayer = null;
+      act("DELETE", `/players/${p.id}`);
+    }
+  } else if (d.remove) {
     const p = state.players.find((x) => x.id === d.remove);
     if (await confirmDialog(`Remove ${p?.name}?`, p?.kind === "ai" ? "The AI player leaves its seat." : "Their phone is disconnected and must scan the QR code again to rejoin.", "Remove")) {
       selectedPlayer = null;
