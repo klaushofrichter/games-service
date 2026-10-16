@@ -94,9 +94,11 @@ try:
         assert board.is_enabled("button[data-save]")
         board.click("button[data-save]")
         wait(lambda: state(TABLE_A)["cloud"]["status"] == "online", 20, "table A to be approved by its code")
-        assert state(TABLE_A)["cloud"]["code"] == {"hint": code[:2], "source": "board", "status": "accepted"}
+        wait(lambda: "expiresAt" in state(TABLE_A)["cloud"]["code"], 20, "the code's validity to reach the table")
+        c = state(TABLE_A)["cloud"]["code"]
+        assert {k: c[k] for k in ("hint", "source", "status")} == {"hint": code[:2], "source": "board", "status": "accepted"}, c
         # The keypad closes; the settings behind it show the code as accepted.
-        board.wait_for_selector(".overlay.settings .service .code-status.accepted")
+        board.wait_for_selector(".overlay.settings .service .code-status.accepted:has-text('valid for 7 days')")
         board.screenshot(path=os.path.join(OUT, "codes-board-accepted.png"))
         board.click(".overlay.settings button[data-close-overlay]")
 
@@ -112,6 +114,11 @@ try:
         console.click("button[data-edit-save]")
         console.wait_for_selector("#code-msg.ok")
         console.wait_for_selector("[data-code-row]:has-text('Living room table'):has-text('forever')")
+        # The board hears the new validity at its next heartbeat.
+        wait(lambda: state(TABLE_A)["cloud"]["code"].get("expiresAt", 0) is None, 30, "the board to hear 'forever'")
+        board.click("#settings-button")
+        board.wait_for_selector(".overlay.settings .service .code-status.accepted:has-text('valid forever')")
+        board.click(".overlay.settings button[data-close-overlay]")
 
         # The service restarts (a deploy): with its DATA_DIR, the table carries on and the code is still listed.
         cloud.terminate()

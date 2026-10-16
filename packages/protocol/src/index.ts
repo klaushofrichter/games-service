@@ -219,6 +219,12 @@ export interface AccessCodeStatus {
   hint: string;
   source: "start" | "board";
   status: "waiting" | "accepted" | "unknown" | "expired" | "revoked" | "in-use";
+  /**
+   * While accepted: when the code's validity ends, on the table's clock (ms), or null for forever; absent while the
+   * service has not said. Past it, the table keeps working (validity counts only for the first use) and the board
+   * shows the code as expired.
+   */
+  expiresAt?: number | null;
 }
 
 export interface GameAvailability {

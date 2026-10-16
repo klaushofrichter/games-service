@@ -405,12 +405,15 @@ function openSettings() {
   };
   const close = () => {
     unsub();
+    clearInterval(tick);
     document.removeEventListener("fullscreenchange", draw);
     o.remove();
     settingsOverlay = null;
   };
   draw();
   const unsub = onState(draw);
+  // The code's "valid for …" counts down while the settings are open (down to minutes).
+  const tick = setInterval(() => state?.cloud?.code?.expiresAt && draw(), 30_000);
   document.addEventListener("fullscreenchange", draw);
   o.addEventListener("click", (e) => {
     const b = e.target.closest("button");
@@ -457,15 +460,45 @@ const CODE_HELP = {
   "in-use": "Another table already uses this code. An admin can release it in the console.",
 };
 const codeMask = (hint) => `${hint}••-••••`;
+/**
+ * "valid forever", "valid for 12 weeks", … "valid for 30 minutes"; null when the code has run out. Rounded down, with a
+ * minute's slack so a new one-week code reads "7 days", not "6 days".
+ */
+function validityText(expiresAt, now = Date.now()) {
+  if (expiresAt === null) return "valid forever";
+  const ms = expiresAt - now;
+  if (ms <= 0) return null;
+  const x = ms + 60_000; // the slack, for hours and up; minutes are counted exactly
+  const n = (unit) => Math.floor(x / unit);
+  const say = (k, word) => `valid for ${k} ${word}${k === 1 ? "" : "s"}`;
+  if (x >= 14 * 86400_000) return say(n(7 * 86400_000), "week");
+  if (x >= 86400_000) return say(n(86400_000), "day");
+  if (x >= 3600_000) return say(n(3600_000), "hour");
+  return say(Math.max(1, Math.floor(ms / 60_000)), "minute");
+}
+/** The badge after the masked code: the service's answer, or, once accepted, how long the code is valid. */
+function codeBadge(code) {
+  if (code.status === "accepted" && code.expiresAt !== undefined) {
+    const text = validityText(code.expiresAt);
+    // Past its validity the table keeps working (validity counts only for the first use); an admin may disconnect it.
+    return text ? `<span class="code-status accepted" title="Accepted by the service">${esc(text)}</span>` : `<span class="code-status expired" title="Past its validity: the table keeps working until an admin disconnects it">expired</span>`;
+  }
+  return `<span class="code-status ${esc(code.status)}">${esc(CODE_STATUS[code.status] ?? code.status)}</span>`;
+}
 
 /** The settings group for the table's access code: on the table's own board only, and only with the service. */
 function serviceSettings() {
   const c = state.cloud;
   if (REMOTE || !c || c.status === "disabled") return "";
   const code = c.code;
-  const value = code ? `<span class="code-value"><span class="mono">${esc(codeMask(code.hint))}</span> <span class="code-status ${esc(code.status)}">${esc(CODE_STATUS[code.status] ?? code.status)}</span></span>` : `<span class="faint">none</span>`;
+  const value = code ? `<span class="code-value"><span class="mono">${esc(codeMask(code.hint))}</span> ${codeBadge(code)}</span>` : `<span class="faint">none</span>`;
   const button = code?.source === "start" ? `<span class="faint">set at start</span>` : `<button data-access-code>${code ? "Change" : "Enter code"}</button>`;
-  const help = code?.source === "start" && code.status === "accepted" ? "Given when the table started (TABLE_CODE or --code); the service approved this table with it." : CODE_HELP[code?.status ?? "none"];
+  const pastValidity = code?.status === "accepted" && code.expiresAt != null && code.expiresAt <= Date.now();
+  const help = pastValidity
+    ? "This code's validity has ended. The table keeps working, but an admin may disconnect it; ask for a new code to be safe."
+    : code?.source === "start" && code.status === "accepted"
+      ? "Given when the table started (TABLE_CODE or --code); the service approved this table with it."
+      : CODE_HELP[code?.status ?? "none"];
   return `<div class="group service"><div class="eyebrow">Game Table service</div>
     <div class="row"><span>Access code</span><span class="code-cell">${value}${button}</span></div>
     <div class="faint code-help" style="font-size:.7em;margin-top:6px">${esc(help)}</div></div>`;
