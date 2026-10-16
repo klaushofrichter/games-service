@@ -38,6 +38,7 @@ try:
         board.wait_for_selector(".toast:has-text('last player at the table')")
         assert any(pl["name"] == "Ann" for pl in a("GET", "/state")["players"]), "Ann must stay"
         assert board.locator(".dialog").count() == 0, "no Remove dialog for the last player at the table"
+        board.wait_for_selector(".toast", state="detached")
 
         # On: Settings › Developer; the gear shows DEV.
         board.click("#settings-button")
@@ -55,6 +56,7 @@ try:
         phone.close()
         a("POST", "/ai", {})
         board.wait_for_selector("[data-start]:not([disabled])")
+        assert "AI players only (developer setting)" in board.inner_text(".main.waiting .sub"), board.inner_text(".main.waiting .sub")
         board.click("[data-start]")
         wait(lambda: a("GET", "/state")["phase"] in ("active", "finished"), 10, "the AI game to start")
         wait(lambda: a("GET", "/state")["phase"] == "finished", 30, "the AI game to finish")

@@ -780,7 +780,7 @@ function renderReady() {
   const roomForAi = g?.ai && seated < Math.max(...state.game.players);
   center.innerHTML = `<section class="main waiting">
       <div><div class="eyebrow">Up next · ${playersLabel(state.game.players)} · ${seated} seated</div><h1>${esc(state.game.name)}</h1>
-      <div class="sub">${needs.length ? `${esc(needs.map((n, i) => (i ? n : n[0].toUpperCase() + n.slice(1))).join(" · "))}. Scan the code to join${g?.ai ? " or add an AI player" : ""}.` : "Everyone taps <b>Ready</b> on their phone."}</div></div>
+      <div class="sub">${needs.length ? `${esc(needs.map((n, i) => (i ? n : n[0].toUpperCase() + n.slice(1))).join(" · "))}. Scan the code to join${g?.ai ? " or add an AI player" : ""}.` : !humans.length ? "AI players only (developer setting): <b>Start game</b> plays it on the board." : !state.players.some((p) => p.seat !== null && p.kind === "human" && p.location === "local") && state.developer?.allowNoLocalPlayer ? "No player at the table (developer setting). Everyone taps <b>Ready</b> on their phone." : "Everyone taps <b>Ready</b> on their phone."}</div></div>
       <div class="ready-list">${state.players.filter((p) => p.seat !== null).map(playerChip).join("")}</div>
       ${REMOTE ? "" : `<div class="toolbar">${seatButtons()}${roomForAi ? `<div class="right"><button data-add-ai>+ AI player</button></div>` : ""}</div>`}
       <div class="toolbar"><button class="primary" data-start ${all ? "" : "disabled"}>Start game</button><button data-close>Change game</button>
