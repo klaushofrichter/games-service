@@ -52,7 +52,8 @@ try:
         assert re.fullmatch(r"[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4}", code), code
         console.click("#code-copy")
         console.wait_for_selector("#code-copy.done")
-        assert console.evaluate("() => navigator.clipboard.readText()") == code, "copy button"
+        # Copied without the dash (tables ignore it either way).
+        assert console.evaluate("() => navigator.clipboard.readText()") == code.replace("-", ""), "copy button"
         console.wait_for_selector(f"[data-code-row] .codehint:has-text('{code[:2]}')")
         assert code not in console.inner_text("#codes"), "the list must not show the code"
         console.screenshot(path=os.path.join(OUT, "codes-created.png"), full_page=True)
@@ -73,8 +74,24 @@ try:
         board.click("button[data-back]")
         for ch in code.replace("-", "")[2:]:
             board.click(f".code-pad button[data-key='{ch}']")
-        assert board.inner_text(".code-pad .slots").replace("\n", "").replace("-", "") == code.replace("-", "")
+        slots = lambda: board.inner_text(".code-pad .slots").replace("\n", "").replace("-", "")
+        assert slots() == code.replace("-", "")
         board.screenshot(path=os.path.join(OUT, "codes-keypad.png"))
+        # Pasting: Ctrl/⌘+V (with the dash) and the Paste button (without), and something that is not a code.
+        ctx.grant_permissions(["clipboard-read", "clipboard-write"], origin=TABLE_A)
+        board.click("button[data-clear]")
+        board.evaluate("(t) => navigator.clipboard.writeText(t)", code.lower())
+        board.keyboard.press("ControlOrMeta+V")
+        board.wait_for_function("(c) => document.querySelector('.code-pad .slots').innerText.replace(/[\\n-]/g, '') === c", arg=code.replace("-", ""))
+        board.click("button[data-clear]")
+        board.evaluate("(t) => navigator.clipboard.writeText(t)", "not a code!")
+        board.click("button[data-paste]")
+        board.wait_for_selector(".toast:has-text('not an access code')")
+        assert slots() == "", "a wrong paste leaves the slots empty"
+        board.evaluate("(t) => navigator.clipboard.writeText(t)", code.replace("-", ""))
+        board.click("button[data-paste]")
+        board.wait_for_function("(c) => document.querySelector('.code-pad .slots').innerText.replace(/[\\n-]/g, '') === c", arg=code.replace("-", ""))
+        assert board.is_enabled("button[data-save]")
         board.click("button[data-save]")
         wait(lambda: state(TABLE_A)["cloud"]["status"] == "online", 20, "table A to be approved by its code")
         assert state(TABLE_A)["cloud"]["code"] == {"hint": code[:2], "source": "board", "status": "accepted"}

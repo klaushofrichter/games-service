@@ -363,7 +363,8 @@ $("#code-form").addEventListener("submit", async (e) => {
 });
 $("#code-msg").addEventListener("click", async (e) => {
   const b = e.target.closest("#code-copy"); if (!b) return;
-  const text = $("#code-new").textContent;
+  // Shown as ABCD-EFGH for reading; copied without the dash, which tables ignore anyway.
+  const text = $("#code-new").textContent.replace(/-/g, "");
   try {
     await navigator.clipboard.writeText(text);
     b.innerHTML = DONE_ICON; b.classList.add("done"); b.title = "Copied";
