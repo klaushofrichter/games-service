@@ -88,7 +88,7 @@ function captureSound(ctx, t, out) {
 }
 
 const CELL = 70; // grid cell size in px; the board is 11 × 11 cells
-const FINISH = 44;
+export const FINISH = 44;
 const startCell = (side) => side * 10 + 6;
 const cellOf = (side, p) => (p >= 0 && p < 40 ? (startCell(side) + p) % 40 : null);
 function trackXY(idx) {
@@ -99,7 +99,7 @@ function trackXY(idx) {
 }
 const homeXY = (side, j) => [[5, 1 + j], [9 - j, 5], [5, 9 - j], [1 + j, 5]][side];
 const QUAD = [[6, 1], [6, 6], [1, 6], [1, 1]]; // base quadrant (top-left cell) per side
-const PIPS = { 1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] };
+export const PIPS = { 1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] };
 
 /** Pixel center of a token, in board coordinates. */
 function tokenXY(side, p, i) {
@@ -275,7 +275,7 @@ export function mount(root, ctx = {}) {
       place(v);
       const rolled = events.find((e) => e.name === "rolled");
       showDie(v.die ?? rolled?.data.die ?? null, !!rolled);
-      sounds(events, v);
+      sounds(events);
 
       const name = (seat) => v.players.find((p) => p.seat === seat)?.name ?? "?";
       for (const e of events) {

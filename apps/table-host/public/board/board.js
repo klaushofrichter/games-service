@@ -152,17 +152,22 @@ async function configureAi(playerId) {
 }
 
 // ---------- orientation ----------
-// The table's board faces `frontEdge` (turned with the rotate buttons). A remote player's copy instead
+// The table's board faces `frontEdge` (turned with the corner buttons, D-080). A remote player's copy instead
 // turns the whole surface so their own seat is at the bottom of their screen, and faces text to it.
 // Their deck (same origin) records which player they are.
-function myEdge() {
+/** The seat of this remote board's own player, or null (no player yet, no seat, or the table's own board). */
+function remoteSeat() {
   if (!REMOTE || !state) return null;
   let id = null;
   try {
     id = localStorage.getItem(`gametable.remote.${REMOTE_INV}.player`);
   } catch {}
   const p = id && state.players.find((x) => x.id === id);
-  return p && p.seat !== null ? state.seatEdges[p.seat] ?? null : null;
+  return p && p.seat !== null ? p.seat : null;
+}
+function myEdge() {
+  const seat = remoteSeat();
+  return seat === null ? null : state.seatEdges[seat] ?? null;
 }
 /**
  * A remote player on an east or west seat sees the board turned a quarter so their seat is at the bottom, which leaves a
@@ -349,6 +354,8 @@ settingsBtn.addEventListener("click", () => openSettings());
  * setPrefs(patch) stores display choices for this game on the table; board and decks get them as info.prefs.
  */
 let settingsOverlay = null;
+/** The chosen game's settings fields from its manifest (D-090), or none. */
+const gameFields = () => (state.game && games.find((x) => x.id === state.game.id)?.settings) || [];
 function openSettings() {
   if (settingsOverlay) return;
   const o = (settingsOverlay = document.createElement("div"));
@@ -383,7 +390,7 @@ function openSettings() {
     }
     const fs = document.fullscreenEnabled;
     // The chosen game's own settings from its manifest (D-090): editable until it starts, then shown read-only.
-    const fields = (state.game && games.find((x) => x.id === state.game.id)?.settings) || [];
+    const fields = gameFields();
     const editable = state.phase === "ready";
     const cur = state.game?.settings ?? {};
     const setting = (f) => {
@@ -450,7 +457,7 @@ function openSettings() {
     if (b.dataset.viewer !== undefined) return (close(), openGameLogs());
     if (b.dataset.colorPlayer) return void act("POST", `/players/${encodeURIComponent(b.dataset.colorPlayer)}/color`, { color: b.dataset.color });
     if (b.dataset.setting) {
-      const f = ((state.game && games.find((x) => x.id === state.game.id)?.settings) || []).find((x) => x.key === b.dataset.setting);
+      const f = gameFields().find((x) => x.key === b.dataset.setting);
       if (!f) return;
       const v = state.game.settings?.[f.key] ?? f.default;
       let next = v;
@@ -833,6 +840,12 @@ function renderPause() {
       <button class="danger" data-pause="end">End game</button></div></div>`;
 }
 
+/** Where a waiting card goes: from the seat a little toward the middle, so it covers the seat's corner of the game, not the table's edge. */
+function nearSeat(seat) {
+  const at = seatPositions(state.seatEdges)[seat] ?? { x: W / 2, y: H / 2 };
+  return { x: at.x + (W / 2 - at.x) * 0.22, y: at.y + (H / 2 - at.y) * 0.42 };
+}
+
 /**
  * An AI player is out of time (D-112): the game is paused and the board stays visible. A card near the AI's seat, facing
  * the players, offers "Play now" (the game's quick move for it); otherwise the game goes on when the AI answers. Remote
@@ -840,10 +853,7 @@ function renderPause() {
  */
 function renderAiWait(p) {
   const who = state.players.find((x) => x.id === p.ai?.playerId);
-  const at = seatPositions(state.seatEdges)[p.ai?.seat] ?? { x: W / 2, y: H / 2 };
-  // From the seat a little toward the middle, so the card covers the seat's corner of the game, not the table's edge.
-  const x = at.x + (W / 2 - at.x) * 0.22;
-  const y = at.y + (H / 2 - at.y) * 0.42;
+  const { x, y } = nearSeat(p.ai?.seat);
   const control = !REMOTE || state.remote?.boardControl;
   pauseLayer.innerHTML = `<div class="ai-wait-card" data-ai-wait="${esc(p.ai?.playerId ?? "")}" style="left:${x}px;top:${y}px;transform:translate(-50%,-50%) rotate(${ROT[gameEdge()]}deg)">
     <div class="who"><span class="dot" style="background:${who?.color ?? "var(--brass)"}"></span>${esc(p.ai?.name ?? "AI player")}</div>
@@ -860,9 +870,7 @@ function renderAiWait(p) {
 function renderPlayerWait(p) {
   const list = p.players ?? [];
   const first = list[0];
-  const at = seatPositions(state.seatEdges)[first?.seat] ?? { x: W / 2, y: H / 2 };
-  const x = at.x + (W / 2 - at.x) * 0.22;
-  const y = at.y + (H / 2 - at.y) * 0.42;
+  const { x, y } = nearSeat(first?.seat);
   const control = !REMOTE || state.remote?.boardControl;
   const names = list.map((w) => {
     const who = state.players.find((x) => x.id === w.playerId);
@@ -900,12 +908,8 @@ let game = null; // { key, inst, loading }
 function controlSeats() {
   if (!state) return [];
   if (REMOTE) {
-    let id = null;
-    try {
-      id = localStorage.getItem(`gametable.remote.${REMOTE_INV}.player`);
-    } catch {}
-    const p = id && state.players.find((x) => x.id === id);
-    return p && p.seat !== null ? [p.seat] : [];
+    const seat = remoteSeat();
+    return seat === null ? [] : [seat];
   }
   return state.players.filter((p) => p.kind === "human" && p.location === "local" && p.seat !== null).map((p) => p.seat);
 }
@@ -987,7 +991,6 @@ center.addEventListener("click", async (e) => {
   else if (d.pageTo) ((gamePage = Number(d.pageTo)), render());
   else if (d.config) configureAi(d.config);
   else if (d.layout) act("POST", "/layout", { seats: Number(d.layout) });
-  else if (d.rotate) act("POST", "/rotate", { degrees: Number(d.rotate) });
   else if ("addAi" in d) act("POST", "/ai", {});
   else if (d.chip) {
     // The player's chip on the Up next screen: remove them, online or not.

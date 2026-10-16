@@ -84,7 +84,6 @@ html, body { overflow: hidden; }
 .tile:disabled { opacity: 0.55; }
 
 .toolbar { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; align-items: center; }
-.toolbar .spacer { flex: 1; }
 /* Player management sits on the right; when the row is full it wraps as a group, still right-aligned. */
 .toolbar .right { margin-left: auto; display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end; align-items: center; }
 .toolbar.selected { margin-top: 10px; }
