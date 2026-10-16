@@ -46,6 +46,8 @@ export interface TableConfig {
   showTestGames: boolean; // stub games used by the automated tests
   /** A snapshot of the whole state in the log every N inputs (D-116); 0: none. */
   logSnapshotEvery?: number;
+  /** The developer setting's value at start (ALLOW_NO_LOCAL_PLAYER, D-118); the board can change it until a restart. */
+  allowNoLocalPlayer?: boolean;
 }
 
 interface Player extends PlayerInfo {
@@ -53,7 +55,9 @@ interface Player extends PlayerInfo {
   remoteSession?: string; // the cloud session a remote player came through: one player per invite
   graceTimer?: NodeJS.Timeout;
   aiSeed?: number;
-  chosenColor?: string; // picked in the board's settings (D-106); otherwise the seat's colour
+  chosenColor?: string; // picked in the board's settings (D-106)
+  /** The colour the player got when first seated (their seat's, else a free one); it moves with them (D-117). */
+  keptColor?: string;
 }
 
 // Join tokens avoid look-alike characters so they can be read out loud.
@@ -98,6 +102,7 @@ export class Table extends EventEmitter {
   constructor(config: TableConfig, games: Map<string, InstalledGame>, logs: LogStore) {
     super();
     this.config = config;
+    this.allowNoLocalPlayer = !!config.allowNoLocalPlayer;
     this.games = games;
     this.logs = logs;
     this.rotateJoinToken();
@@ -149,10 +154,12 @@ export class Table extends EventEmitter {
       joinUrl: this.currentJoin().url,
       cloud: this.cloud,
       pause: this.pause,
+      needed: this.neededPlayers(),
       aiThinking: [...this.aiMoves.entries()]
         .filter(([, m]) => m.shown)
         .map(([playerId, m]) => ({ playerId, seat: m.seat, since: m.startedAt, deadline: m.deadline })),
       display: { sound: this.sound },
+      developer: { allowNoLocalPlayer: this.allowNoLocalPlayer, protectedPlayer: this.protectedPlayer()?.id ?? null },
       remote: { boardControl: this.remoteBoardControl, maxPlayers: this.config.maxRemotePlayers, players: this.humans().filter((p) => p.location === "remote").length },
     };
   }
@@ -178,6 +185,61 @@ export class Table extends EventEmitter {
 
   pause: LobbyState["pause"] = null;
 
+  /**
+   * Players the running game can't go on without whose phones are away (D-119): their seats are held with no time
+   * limit, and the game is paused until they are back, or someone ends the game, or removes them (which ends it).
+   */
+  private waitingFor = new Map<string, { seat: number; text: string; since: number }>();
+
+  private playerPause(): NonNullable<LobbyState["pause"]> {
+    const players = [...this.waitingFor].map(([playerId, w]) => ({ playerId, name: this.players.get(playerId)?.name ?? "a player", seat: w.seat, since: w.since, text: w.text }));
+    const since = this.pause?.reason === "player" ? this.pause.since : Date.now();
+    return { reason: "player", since, canSave: !!this.selected?.game.manifest.saveGame, players };
+  }
+
+  /** Pause for the players the game waits for, or go on when the last one is back (D-119). */
+  private syncPlayerPause() {
+    const rt = this.runtime;
+    if (!rt || rt.over || (this.phase !== "active" && this.phase !== "paused")) return;
+    if (this.waitingFor.size) {
+      if (this.phase === "active") {
+        rt.pause();
+        this.stopAllAi(); // they start again from the current view when the game goes on
+        this.phase = "paused";
+        this.pause = this.playerPause();
+        this.emit("game", [{ name: "paused", data: { reason: "player" } }]);
+      } else if (this.pause?.reason === "ai") {
+        this.stopAllAi(); // a missing player matters more than a slow AI; it thinks again afterwards
+        this.pause = this.playerPause();
+      } else if (this.pause?.reason === "player") this.pause = this.playerPause();
+      // Paused for the cloud: that pause stays; resumeGame comes back here when the link returns.
+      return;
+    }
+    if (this.phase !== "paused" || this.pause?.reason !== "player") return;
+    if (!this.cloudOnline) {
+      this.pause = { reason: "cloud", since: Date.now(), canSave: !!this.selected?.game.manifest.saveGame };
+      return;
+    }
+    rt.resume();
+    this.phase = "active";
+    this.pause = null;
+    this.emit("game", [{ name: "resumed" }]);
+    this.scheduleAi();
+  }
+
+  /** During a game: the seated players it can't go on without, with its reason (D-119). */
+  private neededPlayers(): Record<string, string> {
+    const rt = this.runtime;
+    if (!rt || rt.over || (this.phase !== "active" && this.phase !== "paused")) return {};
+    const out: Record<string, string> = {};
+    for (const p of this.players.values()) {
+      if (p.seat === null || !rt.seats.some((s) => s.seat === p.seat)) continue;
+      const r = rt.canContinueWithout(p.seat);
+      if (r !== true) out[p.id] = r.wait;
+    }
+    return out;
+  }
+
   pauseGame(reason: "cloud") {
     if ((this.phase !== "active" && this.pause?.reason !== "ai") || !this.runtime) return;
     this.runtime.pause();
@@ -191,7 +253,14 @@ export class Table extends EventEmitter {
   resumeGame() {
     if (this.phase !== "paused" || !this.runtime) throw new TableError(409, "the game is not paused");
     if (this.pause?.reason === "ai") throw new TableError(409, `waiting for ${this.pause.ai?.name ?? "an AI player"}; tap Play now to move for it`);
+    if (this.pause?.reason === "player") throw new TableError(409, `waiting for ${this.pause.players?.map((p) => p.name).join(" and ") || "a player"} to come back`);
     if (!this.cloudOnline) throw new TableError(409, "still offline; the game resumes by itself when the connection returns");
+    if (this.waitingFor.size) {
+      // Back online, but someone the game needs is still away (D-119): wait for them instead.
+      this.pause = this.playerPause();
+      this.changed();
+      return;
+    }
     this.runtime.resume();
     this.phase = "active";
     this.pause = null;
@@ -249,6 +318,31 @@ export class Table extends EventEmitter {
   }
 
   /** Remote boards may act unless switched off at the table or by the running game's manifest (D-006). */
+  /**
+   * Developer setting (D-118): games may start, and go on, without a player at the table (remote players and AIs, or
+   * AIs only). In memory only, so every start of the Table Host turns it off unless ALLOW_NO_LOCAL_PLAYER=1.
+   */
+  allowNoLocalPlayer = false;
+
+  setDeveloper(d: unknown) {
+    const v = (d as { allowNoLocalPlayer?: unknown } | null)?.allowNoLocalPlayer;
+    if (typeof v !== "boolean") throw new TableError(400, "allowNoLocalPlayer must be true or false");
+    if (v === this.allowNoLocalPlayer) return;
+    this.allowNoLocalPlayer = v;
+    if (this.phase === "ready") this.revalidateSelection();
+    this.changed();
+  }
+
+  /**
+   * The player the board may not remove (D-118): the last human seated at the table while a game is chosen or
+   * running, unless the developer setting allows games without one. A phone that goes away still leaves.
+   */
+  protectedPlayer(): Player | null {
+    if (this.allowNoLocalPlayer || !["ready", "active", "paused"].includes(this.phase)) return null;
+    const local = this.seated().filter((p) => p.kind === "human" && p.location === "local");
+    return local.length === 1 ? local[0] : null;
+  }
+
   remoteBoardControl = true;
 
   setRemoteBoardControl(on: boolean) {
@@ -301,9 +395,18 @@ export class Table extends EventEmitter {
     if (!p) throw new TableError(403, "session expired; scan the QR code to join again");
     if (p.graceTimer) clearTimeout(p.graceTimer);
     p.graceTimer = undefined;
+    const wasAway = !p.connected;
     p.connected = true;
+    if (wasAway && this.inRunningGame(p)) this.runtime!.noteConnection(p.seat!, true);
+    if (this.waitingFor.delete(p.id)) this.syncPlayerPause(); // the game goes on when everyone it needs is back
     this.changed();
     return p;
+  }
+
+  /** The player has a seat in the game that is running. */
+  private inRunningGame(p: Player): boolean {
+    const rt = this.runtime;
+    return !!rt && !rt.over && (this.phase === "active" || this.phase === "paused") && p.seat !== null && rt.seats.some((s) => s.seat === p.seat);
   }
 
   disconnected(playerId: string) {
@@ -311,7 +414,14 @@ export class Table extends EventEmitter {
     const p = this.players.get(playerId);
     if (!p || p.kind !== "human" || !p.connected) return;
     p.connected = false;
-    p.graceTimer = setTimeout(() => this.removePlayer(playerId, "left"), this.config.graceMs);
+    // A game that can't go on without this player waits for them (D-119): the seat is held, with no time limit.
+    const inGame = this.inRunningGame(p);
+    const need = inGame ? this.runtime!.canContinueWithout(p.seat!) : true;
+    if (inGame) this.runtime!.noteConnection(p.seat!, false, need === true ? undefined : need.wait);
+    if (need !== true) {
+      this.waitingFor.set(p.id, { seat: p.seat!, text: need.wait, since: Date.now() });
+      this.syncPlayerPause();
+    } else p.graceTimer = setTimeout(() => this.removePlayer(playerId, "left"), this.config.graceMs);
     this.changed();
   }
 
@@ -411,6 +521,7 @@ export class Table extends EventEmitter {
     const m = this.selected?.game.manifest;
     if (m && !m.edges.includes(edges[seat])) throw new TableError(409, `${m.name} has no seats on the ${edges[seat]} edge`);
     const other = [...this.players.values()].find((x) => x.seat === seat && x.id !== playerId);
+    this.colors(); // fix everyone's colour before the move, so it travels with them (D-117)
     if (other) other.seat = p.seat; // swap
     p.seat = seat;
     this.changed();
@@ -460,8 +571,9 @@ export class Table extends EventEmitter {
   }
 
   /**
-   * Every seated player's colour (D-106), all different: a player's own choice first (in seat order), then their seat's
-   * colour, else the first one nobody has. Players without a seat have none.
+   * Every seated player's colour (D-106), all different: a player's own choice first (in seat order), then the colour
+   * they got when first seated (D-117: it follows them when they move), then their seat's colour, else the first one
+   * nobody has. The colour a player ends up with is kept for them. Players without a seat have none.
    */
   colors(): Map<string, string> {
     const seated = this.seated().sort((a, b) => a.seat! - b.seat!);
@@ -474,18 +586,24 @@ export class Table extends EventEmitter {
       }
     }
     for (const p of seated) {
+      if (out.has(p.id) || !p.keptColor || used.has(p.keptColor)) continue;
+      out.set(p.id, p.keptColor);
+      used.add(p.keptColor);
+    }
+    for (const p of seated) {
       if (out.has(p.id)) continue;
       const own = PLAYER_COLORS[p.seat! % PLAYER_COLORS.length];
       const c = used.has(own) ? PLAYER_COLORS.find((x) => !used.has(x)) ?? own : own;
       out.set(p.id, c);
       used.add(c);
     }
+    for (const p of seated) p.keptColor = out.get(p.id);
     return out;
   }
 
   private playerInfos(): PlayerInfo[] {
     const colors = this.colors();
-    return [...this.players.values()].map(({ sessionToken, graceTimer, aiSeed, remoteSession, chosenColor, ...info }) => ({ ...info, color: colors.get(info.id) ?? null }));
+    return [...this.players.values()].map(({ sessionToken, graceTimer, aiSeed, remoteSession, chosenColor, keptColor, ...info }) => ({ ...info, color: colors.get(info.id) ?? null }));
   }
 
   /**
@@ -508,11 +626,15 @@ export class Table extends EventEmitter {
   /** Evict a human (revokes the session) or remove an AI. */
   removePlayer(playerId: string, reason: "evicted" | "left" = "evicted") {
     const p = this.mustPlayer(playerId);
+    if (reason === "evicted" && this.protectedPlayer()?.id === p.id)
+      throw new TableError(409, `${p.name} is the last player at the table; a game needs one (the developer setting in the board's settings allows games without)`);
     if (p.graceTimer) clearTimeout(p.graceTimer);
     this.players.delete(playerId);
+    this.waitingFor.delete(playerId);
     this.emit("removed", playerId, reason);
     if ((this.phase === "active" || this.phase === "paused") && this.runtime && p.seat !== null) {
-      this.runtime.seatLeft(p.seat); // may end the game -> onGameOver
+      // may end the game -> onGameOver; a game that needed them ends with its reason (D-119)
+      if (!this.runtime.seatLeft(p.seat)) this.syncPlayerPause();
     }
     if (this.phase === "ready") this.revalidateSelection();
     this.changed();
@@ -658,7 +780,7 @@ export class Table extends EventEmitter {
         needs.push(counts.length === 1 ? `needs exactly ${counts[0]} players, ${more} more` : `needs ${more} more player${more === 1 ? "" : "s"}`);
       }
     }
-    if (!seated.some((p) => p.kind === "human" && p.location === "local")) needs.push("needs at least one player at the table");
+    if (!this.allowNoLocalPlayer && !seated.some((p) => p.kind === "human" && p.location === "local")) needs.push("needs at least one player at the table");
     return needs;
   }
 
@@ -815,6 +937,12 @@ export class Table extends EventEmitter {
     this.stopAllAi(true);
     this.phase = "finished";
     this.pause = null;
+    // Seats held for players who are still away (D-119) are released the usual way now.
+    for (const id of this.waitingFor.keys()) {
+      const p = this.players.get(id);
+      if (p && !p.connected && !p.graceTimer) p.graceTimer = setTimeout(() => this.removePlayer(id, "left"), this.config.graceMs);
+    }
+    this.waitingFor.clear();
     // Extra games that changed while this one ran take effect now (D-097); the log below still names the code it ran.
     if (this.pendingExtra) queueMicrotask(() => this.applyPendingExtra());
     this.summary = rt.summary;
@@ -1089,7 +1217,7 @@ export class Table extends EventEmitter {
 
   /** Write the game's log to disk from its first record (D-116). A disk problem must not stop the game. */
   private beginLog(rt: GameRuntime, game: InstalledGame, settings: Record<string, unknown>, aiOptions: Record<number, Record<string, unknown>>) {
-    const meta = baseMeta({ id: logId(game.manifest.id), game, tableName: this.config.tableName, tableId: this.tableId, simulation: false, startedAt: this.gameStartedAt, settings, players: this.playersMeta(aiOptions) });
+    const meta = baseMeta({ id: logId(game.manifest.id), game, tableName: this.config.tableName, tableId: this.tableId, simulation: false, startedAt: this.gameStartedAt, settings, players: this.playersMeta(aiOptions), developer: { allowNoLocalPlayer: this.allowNoLocalPlayer } });
     try {
       const log = this.logs.begin(meta);
       for (const r of rt.log) log.append(r);

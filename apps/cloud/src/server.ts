@@ -298,7 +298,16 @@ export function startCloud(o: CloudOptions) {
   const labelFrom = (v: unknown) => String(v ?? "").trim().slice(0, 60);
 
   /** What the table should run besides its built-in games: its repositories' current bundles. */
-  const tableConfig = (t: TableRecord) => ({ ...settings, gameBundles: gameRepos.forTable(reposFor(t)) });
+  const tableConfig = (t: TableRecord) => ({ ...settings, gameBundles: gameRepos.forTable(reposFor(t)), accessCode: codeValidity(t) });
+  /**
+   * The validity of the code that approved this table, for its board (D-112): its hint, and the time left in ms
+   * (null = forever, 0 or less = past its validity, while the table keeps working). Relative, so the table's clock
+   * does not matter. Null when no code speaks for the table.
+   */
+  const codeValidity = (t: TableRecord) => {
+    const c = codeOf(t);
+    return c ? { hint: c.hint, expiresInMs: c.expiresAt === null ? null : c.expiresAt - Date.now() } : null;
+  };
   /** Repository ids from a request body, each one known: unknown ids are an error, not silently dropped. */
   const repoIds = (v: unknown): string[] => {
     if (v === undefined) return [];

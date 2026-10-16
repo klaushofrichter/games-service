@@ -30,6 +30,7 @@ const host = await startHost({
   cloudUrl: env.CLOUD_URL,
   showTestGames: env.SHOW_TEST_GAMES === "1",
   logSnapshotEvery: num(env.LOG_SNAPSHOT_EVERY),
+  allowNoLocalPlayer: env.ALLOW_NO_LOCAL_PLAYER === "1",
   accessCode,
 });
 

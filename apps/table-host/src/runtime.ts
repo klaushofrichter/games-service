@@ -22,6 +22,9 @@ export type LogRecord =
   // Not inputs: replay skips them (D-116). An error outside the input steps (a view, the end check); a copy of the state.
   | { t: "error"; at: number; where: string; seat?: number; error: LoggedError }
   | { t: "snapshot"; at: number; inputs: number; state: unknown }
+  // Not inputs either (D-119): a player's phone went away or came back; `waiting`: the game can't go on without them.
+  | { t: "disconnected"; at: number; seat: number; waiting?: string }
+  | { t: "reconnected"; at: number; seat: number }
   // "interrupted": the table stopped during the game; the log was closed at its next start (no summary, and a hash
   // only if the game could be replayed then).
   | { t: "end"; at: number; reason: EndReason; summary: GameSummary | null; stateHash: string | null };
@@ -325,11 +328,43 @@ export class GameRuntime {
     this.afterStep(events);
   }
 
+  /**
+   * Can the game go on without this seat (D-119)? true when the game doesn't say otherwise, or when its answer throws
+   * (recorded): a broken question must not hold a table.
+   */
+  canContinueWithout(seat: number): true | { wait: string } {
+    if (this.over || !this.def.canContinueWithout) return true;
+    try {
+      const r = this.def.canContinueWithout(this.state, seat);
+      if (r && typeof r === "object" && typeof (r as { wait?: unknown }).wait === "string") return { wait: (r as { wait: string }).wait.slice(0, 300) };
+      return true;
+    } catch (e) {
+      this.recordError("canContinueWithout", e, seat);
+      return true;
+    }
+  }
+
+  /** A player's phone went away or came back (D-119): for the log only, replay skips these. */
+  noteConnection(seat: number, connected: boolean, waiting?: string) {
+    if (this.over) return;
+    this.record(connected ? { t: "reconnected", at: this.clock.now(), seat } : { t: "disconnected", at: this.clock.now(), seat, ...(waiting ? { waiting } : {}) });
+  }
+
   /** Returns true if the game ended because of it. */
   seatLeft(seat: number): boolean {
     if (this.over) return true;
+    // A game that can't go on without this seat ends with its own reason (D-119). Asked before the seat goes, so a
+    // replay asks the same question of the same state.
+    const needed = this.canContinueWithout(seat);
+    if (needed !== true) {
+      this.seats = this.seats.filter((s) => s.seat !== seat);
+      this.record({ t: "seatLeft", at: this.clock.now(), seat, ended: true });
+      this.inputDone();
+      this.finish("seatLeft", { text: needed.wait, highlights: { leftSeat: seat } });
+      return true;
+    }
     this.seats = this.seats.filter((s) => s.seat !== seat);
-    let r: StepResult<unknown> | "end";
+    let r: StepResult<unknown> | "end" | { end: { text: string; highlights?: Record<string, unknown> } };
     try {
       r = this.def.onSeatLeft ? this.def.onSeatLeft(this.state, seat, this.ctx()) : "end";
     } catch (e) {
@@ -337,10 +372,11 @@ export class GameRuntime {
       this.record({ t: "seatLeft", at: this.clock.now(), seat, ended: false, error: loggedError(e) });
       throw e;
     }
-    if (r === "end") {
+    if (r === "end" || (r && typeof r === "object" && "end" in r)) {
+      const own = typeof r === "object" && typeof r.end?.text === "string" ? r.end : null;
       this.record({ t: "seatLeft", at: this.clock.now(), seat, ended: true });
       this.inputDone();
-      this.finish("seatLeft", { text: "The game ended because a player left.", highlights: { leftSeat: seat } });
+      this.finish("seatLeft", { text: own ? own.text : "The game ended because a player left.", highlights: { leftSeat: seat, ...(own?.highlights ?? {}) } });
       return true;
     }
     const events = this.apply(r);

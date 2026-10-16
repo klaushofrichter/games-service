@@ -121,6 +121,8 @@ function renderTop() {
     ? ""
     : pause.reason === "ai"
       ? `<div class="banner">Waiting for ${esc(pause.ai?.name ?? "an AI player")}, who is still thinking. The board can make it move now.</div>`
+      : pause.reason === "player"
+      ? `<div class="banner">Waiting for ${esc((pause.players ?? []).map((w) => w.name).join(" and ") || "a player")} to come back. ${esc((pause.players ?? [])[0]?.text ?? "")}</div>`
       : `<div class="banner">Game paused: the table lost its connection. It continues by itself when the connection is back.</div>`;
   top.innerHTML = `${paused}${banner ? `<div class="banner">${esc(banner)}</div>` : ""}
     <div class="who"><div><div class="eyebrow">${esc(state.tableName)}${inGame ? ` · ${esc(state.game?.name)}` : ""}</div><h1>${esc(p?.name ?? "")}</h1></div>

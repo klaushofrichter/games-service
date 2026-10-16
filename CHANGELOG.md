@@ -6,6 +6,22 @@ page is the history. Leave it empty if there is nothing to add beyond the commit
 
 ## [Unreleased]
 
+- Players lost during a game: a game that can't go on without a player now waits while their phone is away, with a
+  card at their seat on the board (the game's reason and End game), and goes on when they are back. Removing such a
+  player ends the game with its reason, and the board says so first. Games can give their own reason when a player
+  leaves. Today's games go on as before.
+- A player's colour stays with them when they move to another seat (D-117); before, the default colour changed
+  with the seat.
+- A developer setting in the board's Settings, *Games without a player at the table*: off at every start, it allows
+  games with remote and AI players only, or AI players only, for testing. While it is off, the board no longer removes
+  the last player at the table once a game is chosen or running. The gear shows DEV while it is on.
+- Board, Up next screen: each player's chip is framed in their colour, with a ring that fills once they are ready;
+  a player whose phone dropped shows no dot on a red background. Tapping a chip offers **Remove**, online or not.
+- Board lobby: a selected player's card shows its thicker border in the player's colour instead of brass.
+- The board's access code badge shows how long the code is valid (*valid forever*, *valid for 12 weeks*, … *valid
+  for 30 minutes*), and *expired* in red once it has run out, while the table keeps working.
+- The board's access code keypad takes a pasted code (Ctrl/⌘+V, or its **Paste** button), with or without the
+  dash; the console now copies a new code without the dash.
 - Game logs for analysis: every game's log, simulations included, now reaches the service. A table writes the log
   as the game is played and uploads it when the game ends, retrying until the service has it; a game the table stopped
   in the middle of is uploaded after the next start, marked interrupted. Each log carries its metadata (game, table,

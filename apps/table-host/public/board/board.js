@@ -119,6 +119,22 @@ async function chooseGame(id) {
   if (settings) act("POST", "/game/select", { gameId: id, settings });
 }
 
+/**
+ * The last player at the table can't be removed while a game is chosen or running (D-118), unless the developer
+ * setting allows games without one: say so instead of asking. The table refuses it too.
+ */
+function cannotRemove(p) {
+  if (!p || state.developer?.protectedPlayer !== p.id) return false;
+  toast(`${p.name} is the last player at the table, and a game needs one. The developer setting in Settings allows games without.`);
+  return true;
+}
+
+/** Removing this player ends the running game (D-119): the game's reason, said before the board asks. */
+function endsGame(p) {
+  const why = p && state.needed?.[p.id];
+  return why ? `This ends the game: ${why}` : null;
+}
+
 /** The AI player's window: how it plays in the chosen game, and Remove (D-103), which works with or without a game. */
 async function configureAi(playerId) {
   const p = state.players.find((x) => x.id === playerId);
@@ -297,7 +313,8 @@ function placeSettings(playing) {
   const front = playing ? gameEdge() : viewEdge();
   let [corner, other] = FRONT_CORNERS[front];
   if (playing && LOBBY_CORNER[state.game?.lobbyButton ?? "bottom-right"] === corner) corner = other;
-  settingsBtn.className = `${corner} along-${front === "south" || front === "north" ? "x" : "y"}`;
+  // The developer setting (D-118) marks the gear while it is on, so nobody forgets it.
+  settingsBtn.className = `${corner} along-${front === "south" || front === "north" ? "x" : "y"}${state.developer?.allowNoLocalPlayer ? " dev" : ""}`;
   settingsBtn.querySelector("svg").style.transform = `rotate(${ROT[front]}deg)`;
   placeFlip(playing, front, corner);
 }
@@ -400,17 +417,23 @@ function openSettings() {
       ${gameSettings}
       ${items.length ? `<div class="group game-settings"><div class="eyebrow">${esc(state.game.name)}</div>${items.map((it, k) => `<div class="row"><span>${esc(it.label)}</span>${control(it, k)}</div>`).join("")}</div>` : ""}
       ${serviceSettings()}
+      <div class="group developer"><div class="eyebrow">Developer</div>
+        <div class="row"><span>Games without a player at the table</span><button data-dev-no-local class="${state.developer?.allowNoLocalPlayer ? "on" : ""}" role="switch" aria-checked="${!!state.developer?.allowNoLocalPlayer}">${state.developer?.allowNoLocalPlayer ? "On" : "Off"}</button></div>
+        <div class="faint" style="font-size:.7em;margin-top:6px">For testing: games with remote and AI players only, or AI players only. Off again when the table restarts.</div></div>
       <div class="actions" style="display:flex;justify-content:flex-end;margin-top:20px"><button class="primary" data-close-overlay>Done</button></div></div>`;
     faceFront(o.querySelector(".panel"));
   };
   const close = () => {
     unsub();
+    clearInterval(tick);
     document.removeEventListener("fullscreenchange", draw);
     o.remove();
     settingsOverlay = null;
   };
   draw();
   const unsub = onState(draw);
+  // The code's "valid for …" counts down while the settings are open (down to minutes).
+  const tick = setInterval(() => state?.cloud?.code?.expiresAt && draw(), 30_000);
   document.addEventListener("fullscreenchange", draw);
   o.addEventListener("click", (e) => {
     const b = e.target.closest("button");
@@ -420,6 +443,7 @@ function openSettings() {
       (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()).catch(() => toast("Fullscreen was refused by the browser"));
     }
     if (b.dataset.sound !== undefined) return void act("POST", "/display", { sound: state.display?.sound === false });
+    if (b.dataset.devNoLocal !== undefined) return void act("POST", "/developer", { allowNoLocalPlayer: !state.developer?.allowNoLocalPlayer });
     if (b.dataset.accessCode !== undefined) return openCodePad();
     if (b.dataset.colorPlayer) return void act("POST", `/players/${encodeURIComponent(b.dataset.colorPlayer)}/color`, { color: b.dataset.color });
     if (b.dataset.setting) {
@@ -457,21 +481,54 @@ const CODE_HELP = {
   "in-use": "Another table already uses this code. An admin can release it in the console.",
 };
 const codeMask = (hint) => `${hint}••-••••`;
+/**
+ * "valid forever", "valid for 12 weeks", … "valid for 30 minutes"; null when the code has run out. Rounded down, with a
+ * minute's slack so a new one-week code reads "7 days", not "6 days".
+ */
+function validityText(expiresAt, now = Date.now()) {
+  if (expiresAt === null) return "valid forever";
+  const ms = expiresAt - now;
+  if (ms <= 0) return null;
+  const x = ms + 60_000; // the slack, for hours and up; minutes are counted exactly
+  const n = (unit) => Math.floor(x / unit);
+  const say = (k, word) => `valid for ${k} ${word}${k === 1 ? "" : "s"}`;
+  if (x >= 14 * 86400_000) return say(n(7 * 86400_000), "week");
+  if (x >= 86400_000) return say(n(86400_000), "day");
+  if (x >= 3600_000) return say(n(3600_000), "hour");
+  return say(Math.max(1, Math.floor(ms / 60_000)), "minute");
+}
+/** The badge after the masked code: the service's answer, or, once accepted, how long the code is valid. */
+function codeBadge(code) {
+  if (code.status === "accepted" && code.expiresAt !== undefined) {
+    const text = validityText(code.expiresAt);
+    // Past its validity the table keeps working (validity counts only for the first use); an admin may disconnect it.
+    return text ? `<span class="code-status accepted" title="Accepted by the service">${esc(text)}</span>` : `<span class="code-status expired" title="Past its validity: the table keeps working until an admin disconnects it">expired</span>`;
+  }
+  return `<span class="code-status ${esc(code.status)}">${esc(CODE_STATUS[code.status] ?? code.status)}</span>`;
+}
 
 /** The settings group for the table's access code: on the table's own board only, and only with the service. */
 function serviceSettings() {
   const c = state.cloud;
   if (REMOTE || !c || c.status === "disabled") return "";
   const code = c.code;
-  const value = code ? `<span class="code-value"><span class="mono">${esc(codeMask(code.hint))}</span> <span class="code-status ${esc(code.status)}">${esc(CODE_STATUS[code.status] ?? code.status)}</span></span>` : `<span class="faint">none</span>`;
+  const value = code ? `<span class="code-value"><span class="mono">${esc(codeMask(code.hint))}</span> ${codeBadge(code)}</span>` : `<span class="faint">none</span>`;
   const button = code?.source === "start" ? `<span class="faint">set at start</span>` : `<button data-access-code>${code ? "Change" : "Enter code"}</button>`;
-  const help = code?.source === "start" && code.status === "accepted" ? "Given when the table started (TABLE_CODE or --code); the service approved this table with it." : CODE_HELP[code?.status ?? "none"];
+  const pastValidity = code?.status === "accepted" && code.expiresAt != null && code.expiresAt <= Date.now();
+  const help = pastValidity
+    ? "This code's validity has ended. The table keeps working, but an admin may disconnect it; ask for a new code to be safe."
+    : code?.source === "start" && code.status === "accepted"
+      ? "Given when the table started (TABLE_CODE or --code); the service approved this table with it."
+      : CODE_HELP[code?.status ?? "none"];
   return `<div class="group service"><div class="eyebrow">Game Table service</div>
     <div class="row"><span>Access code</span><span class="code-cell">${value}${button}</span></div>
     <div class="faint code-help" style="font-size:.7em;margin-top:6px">${esc(help)}</div></div>`;
 }
 
-/** A keypad for the code: the board is a touchscreen without a keyboard (a keyboard works too). */
+/**
+ * A keypad for the code: the board is a touchscreen without a keyboard. A keyboard works too, and so does pasting
+ * (Ctrl/⌘+V or the Paste button), with or without the dash the console shows.
+ */
 let codePad = null;
 function openCodePad() {
   if (codePad) return;
@@ -485,13 +542,14 @@ function openCodePad() {
       <p class="faint" style="margin:0 0 14px;font-size:.8em">From the Game Table console. It approves this table without a pairing code.</p>
       <div class="slots" aria-live="polite" aria-label="Code typed so far">${slots}</div>
       <div class="keys">${[...CODE_ALPHABET].map((k) => `<button data-key="${k}" ${typed.length >= 8 ? "disabled" : ""}>${k}</button>`).join("")}
-        <button class="wide" data-back aria-label="Delete the last character" ${typed ? "" : "disabled"}>⌫</button><button class="wide" data-clear ${typed ? "" : "disabled"}>Clear</button></div>
+        <button class="third" data-paste>Paste</button><button class="third" data-back aria-label="Delete the last character" ${typed ? "" : "disabled"}>⌫</button><button class="third" data-clear ${typed ? "" : "disabled"}>Clear</button></div>
       <div class="actions">${fromBoard ? `<button class="danger" data-remove>Remove code</button>` : ""}<span style="flex:1"></span>
         <button data-cancel>Cancel</button><button class="primary" data-save ${typed.length === 8 ? "" : "disabled"}>Use this code</button></div></div>`;
     faceFront(o.querySelector(".panel"));
   };
   const close = () => {
     document.removeEventListener("keydown", onKey, true);
+    document.removeEventListener("paste", onPaste, true);
     o.remove();
     codePad = null;
   };
@@ -507,7 +565,28 @@ function openCodePad() {
     else if (typed.length < 8 && CODE_ALPHABET.includes(k)) typed += k;
     draw();
   };
+  /** Fill in a pasted code: upper case, spaces and dashes ignored; anything else means it is not a code. */
+  const fill = (text) => {
+    const s = String(text ?? "").toUpperCase().replace(/[\s-]/g, "");
+    if (!s) return toast("The clipboard is empty");
+    if (s.length > 8 || ![...s].every((c) => CODE_ALPHABET.includes(c))) return toast("That is not an access code (8 characters, like ABCD-EFGH)");
+    typed = s;
+    draw();
+  };
+  const onPaste = (e) => {
+    e.preventDefault();
+    fill(e.clipboardData?.getData("text"));
+  };
+  const pasteButton = async () => {
+    try {
+      fill(await navigator.clipboard.readText());
+    } catch {
+      toast("The browser did not allow reading the clipboard: press Ctrl+V (⌘V on a Mac), or type the code");
+    }
+  };
   const onKey = (e) => {
+    // Shortcuts (Ctrl/⌘+V and the like) are not letters: let the browser handle them, and the paste event fills in.
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
     if (e.key === "Escape") return (e.stopPropagation(), close());
     if (e.key === "Enter" && typed.length === 8) return void save(typed);
     if (e.key === "Backspace") return (e.preventDefault(), press("back"));
@@ -521,10 +600,12 @@ function openCodePad() {
     if (b.dataset.key) press(b.dataset.key);
     else if (b.dataset.back !== undefined) press("back");
     else if (b.dataset.clear !== undefined) press("clear");
+    else if (b.dataset.paste !== undefined) pasteButton();
     else if (b.dataset.save !== undefined) save(typed);
     else if (b.dataset.remove !== undefined) save("");
   });
   document.addEventListener("keydown", onKey, true);
+  document.addEventListener("paste", onPaste, true);
   draw();
   overlayRoot.appendChild(o);
 }
@@ -680,17 +761,33 @@ function playersLabel(p) {
   return contiguous ? `${p[0]}–${p.at(-1)} players` : `${p.join(", ")} players`;
 }
 
+/**
+ * A seated player's chip on the Up next screen, in their colour (D-106): a filled dot once they are ready, a ring
+ * before. Offline (their phone dropped; the seat is held for the grace period): no dot, a red background. On the
+ * table's own board the chip is a button that offers to remove the player, online or not.
+ */
+function playerChip(p) {
+  const state_ = !p.connected ? "offline" : p.ready ? "ready" : "not ready";
+  const cls = `chip player ${p.connected ? (p.ready ? "ready" : "") : "away"}`;
+  const inner = `${p.connected ? `<span class="dot" aria-hidden="true"></span>` : ""}${esc(p.name)}`;
+  const style = p.color ? ` style="--pc:${esc(p.color)}"` : "";
+  return REMOTE
+    ? `<span class="${cls}"${style} title="${esc(p.name)}: ${state_}">${inner}</span>`
+    : `<button type="button" class="${cls}"${style} data-chip="${esc(p.id)}" title="${esc(p.name)}: ${state_}. Tap to remove" aria-label="${esc(p.name)}, ${state_}. Remove…">${inner}</button>`;
+}
+
 function renderReady() {
   const humans = state.players.filter((p) => p.kind === "human" && p.seat !== null);
   const needs = state.game.needs ?? [];
-  const all = needs.length === 0 && humans.length > 0 && humans.every((p) => p.ready && p.connected);
+  // AI players only (the developer setting, D-118): nobody needs to tap Ready.
+  const all = needs.length === 0 && (humans.length > 0 || state.developer?.allowNoLocalPlayer) && humans.every((p) => p.ready && p.connected);
   const seated = state.players.filter((p) => p.seat !== null).length;
   const g = games.find((x) => x.id === state.game.id);
   const roomForAi = g?.ai && seated < Math.max(...state.game.players);
   center.innerHTML = `<section class="main waiting">
       <div><div class="eyebrow">Up next · ${playersLabel(state.game.players)} · ${seated} seated</div><h1>${esc(state.game.name)}</h1>
-      <div class="sub">${needs.length ? `${esc(needs.map((n, i) => (i ? n : n[0].toUpperCase() + n.slice(1))).join(" · "))}. Scan the code to join${g?.ai ? " or add an AI player" : ""}.` : "Everyone taps <b>Ready</b> on their phone."}</div></div>
-      <div class="ready-list">${state.players.filter((p) => p.seat !== null).map((p) => `<span class="chip ${p.ready ? "ok" : ""}"><span class="dot" style="background:${p.ready ? "var(--jade)" : ""}"></span>${esc(p.name)}</span>`).join("")}</div>
+      <div class="sub">${needs.length ? `${esc(needs.map((n, i) => (i ? n : n[0].toUpperCase() + n.slice(1))).join(" · "))}. Scan the code to join${g?.ai ? " or add an AI player" : ""}.` : !humans.length ? "AI players only (developer setting): <b>Start game</b> plays it on the board." : !state.players.some((p) => p.seat !== null && p.kind === "human" && p.location === "local") && state.developer?.allowNoLocalPlayer ? "No player at the table (developer setting). Everyone taps <b>Ready</b> on their phone." : "Everyone taps <b>Ready</b> on their phone."}</div></div>
+      <div class="ready-list">${state.players.filter((p) => p.seat !== null).map(playerChip).join("")}</div>
       ${REMOTE ? "" : `<div class="toolbar">${seatButtons()}${roomForAi ? `<div class="right"><button data-add-ai>+ AI player</button></div>` : ""}</div>`}
       <div class="toolbar"><button class="primary" data-start ${all ? "" : "disabled"}>Start game</button><button data-close>Change game</button>
       ${REMOTE ? "" : (() => { const sel = state.players.find((p) => p.id === selectedPlayer); return sel?.kind === "ai" ? `<button data-config="${sel.id}">Configure ${esc(sel.name)}</button>` : state.players.some((p) => p.kind === "ai") ? `<span class="faint" style="font-size:.7em">Tap an AI seat to configure it</span>` : ""; })()}
@@ -718,9 +815,10 @@ function renderFinished() {
 function renderPause() {
   const p = state.phase === "paused" ? state.pause : null;
   pauseLayer.hidden = !p;
-  pauseLayer.classList.toggle("ai-wait", p?.reason === "ai");
+  pauseLayer.classList.toggle("ai-wait", p?.reason === "ai" || p?.reason === "player");
   if (!p) return void (pauseLayer.innerHTML = "");
   if (p.reason === "ai") return renderAiWait(p);
+  if (p.reason === "player") return renderPlayerWait(p);
   const online = state.cloud.status === "online" || state.cloud.status === "disabled";
   pauseLayer.innerHTML = `<div class="panel" style="transform:rotate(${ROT[viewEdge()]}deg)">
     ${online ? "" : `<div class="spinner"></div>`}
@@ -749,6 +847,31 @@ function renderAiWait(p) {
     <div class="what"><span class="thinking-dots" aria-hidden="true"><i></i><i></i><i></i></span> is still thinking</div>
     <p>The game is paused. ${control ? "Wait for it, or let it move now." : "It goes on as soon as the AI moves."}</p>
     ${control ? `<div class="row"><button class="primary" data-pause="play-now">Play now</button>${REMOTE ? "" : `<button class="danger" data-pause="end">End game</button>`}</div>` : ""}
+  </div>`;
+}
+
+/**
+ * The game can't go on without a player whose phone is away (D-119): paused, their seat held, the game visible. A card
+ * near their seat says the game's reason; it goes on by itself when they are back, or the table ends the game.
+ */
+function renderPlayerWait(p) {
+  const list = p.players ?? [];
+  const first = list[0];
+  const at = seatPositions(state.seatEdges)[first?.seat] ?? { x: W / 2, y: H / 2 };
+  const x = at.x + (W / 2 - at.x) * 0.22;
+  const y = at.y + (H / 2 - at.y) * 0.42;
+  const control = !REMOTE || state.remote?.boardControl;
+  const names = list.map((w) => {
+    const who = state.players.find((x) => x.id === w.playerId);
+    return `<span class="dot" style="background:${who?.color ?? "var(--brass)"}"></span>${esc(w.name)}`;
+  }).join(" · ");
+  const reasons = [...new Set(list.map((w) => w.text).filter(Boolean))];
+  pauseLayer.innerHTML = `<div class="ai-wait-card player-wait" data-player-wait="${esc(list.map((w) => w.playerId).join(" "))}" style="left:${x}px;top:${y}px;transform:translate(-50%,-50%) rotate(${ROT[gameEdge()]}deg)">
+    <div class="who">${names || "A player"}</div>
+    <div class="what"><span class="thinking-dots" aria-hidden="true"><i></i><i></i><i></i></span> ${list.length > 1 ? "are" : "is"} away</div>
+    ${reasons.map((r) => `<p>${esc(r)}</p>`).join("")}
+    <p>The game is paused and goes on as soon as ${list.length > 1 ? "they are" : `${esc(first?.name ?? "they")} is`} back.</p>
+    ${control ? `<div class="row"><button class="danger" data-pause="end">End game</button></div>` : ""}
   </div>`;
 }
 
@@ -863,9 +986,20 @@ center.addEventListener("click", async (e) => {
   else if (d.layout) act("POST", "/layout", { seats: Number(d.layout) });
   else if (d.rotate) act("POST", "/rotate", { degrees: Number(d.rotate) });
   else if ("addAi" in d) act("POST", "/ai", {});
-  else if (d.remove) {
+  else if (d.chip) {
+    // The player's chip on the Up next screen: remove them, online or not.
+    const p = state.players.find((x) => x.id === d.chip);
+    if (!p) return;
+    if (cannotRemove(p)) return;
+    const why = endsGame(p) ?? (p.kind === "ai" ? "The AI player leaves its seat." : p.connected ? "Their phone is disconnected and must scan the QR code again to rejoin." : "Their phone is offline; the seat is freed now instead of after the waiting time.");
+    if (await confirmDialog(`Remove ${p.name}?`, why, "Remove")) {
+      if (selectedPlayer === p.id) selectedPlayer = null;
+      act("DELETE", `/players/${p.id}`);
+    }
+  } else if (d.remove) {
     const p = state.players.find((x) => x.id === d.remove);
-    if (await confirmDialog(`Remove ${p?.name}?`, p?.kind === "ai" ? "The AI player leaves its seat." : "Their phone is disconnected and must scan the QR code again to rejoin.", "Remove")) {
+    if (cannotRemove(p)) return;
+    if (await confirmDialog(`Remove ${p?.name}?`, endsGame(p) ?? (p?.kind === "ai" ? "The AI player leaves its seat." : "Their phone is disconnected and must scan the QR code again to rejoin."), "Remove")) {
       selectedPlayer = null;
       act("DELETE", `/players/${d.remove}`);
     }
@@ -939,7 +1073,8 @@ function openLobbyOverlay() {
     if (b.dataset.terms !== undefined) openTerms();
     if (b.dataset.remove) {
       const p = state.players.find((x) => x.id === b.dataset.remove);
-      if (await confirmDialog(`Remove ${p?.name}?`, "This may end games that cannot continue without them.", "Remove")) act("DELETE", `/players/${b.dataset.remove}`);
+      if (cannotRemove(p)) return;
+      if (await confirmDialog(`Remove ${p?.name}?`, endsGame(p) ?? "The game goes on without them.", "Remove")) act("DELETE", `/players/${b.dataset.remove}`);
     }
     if (b.dataset.end !== undefined && (await confirmDialog("End this game?", "The game stops for everyone and the result is recorded as ended.", "End game"))) {
       await act("POST", "/game/end");

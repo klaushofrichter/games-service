@@ -21,6 +21,8 @@ happened in a game, why a rule misbehaved, or why an AI made a move.
 - `startedAt`, `endedAt` (ISO 8601, UTC), `durationMs`, `timeZone` of the table (for local times of day).
 - `settings`: the game's settings, as the rules received them. `seed`: the simulation's seed (each game's own seed is
   in its `start` record).
+- `developer`: present only when a developer setting was on when the game started, e.g. `allowNoLocalPlayer` (the game
+  could start without a player at the table: remote and AI players only, or AI players only).
 - `players`: `seat`, `name`, `kind` (`human` or `ai`), `location` (`local` at the table, `remote` over the internet,
   null for AI players) and `aiOptions` (AI players' play style and similar).
 - `endReason` (one game) or `endReasons` (a simulation: how many games ended each way): `finished` (the game ended by
@@ -49,7 +51,9 @@ simulation). Seats are numbers from 0; the `start` record maps them to players, 
 - `seatJoined`: a player took a seat during the game (`seat` as in `start`). `seatLeft`: a player left (`seat`);
   `ended` says whether the game ended because of it.
 - `error`: an exception in the game's code outside a move, e.g. while drawing a player's view (`where`: `view`,
-  `boardView`, `isOver`; `seat` if it was one player's view). Only the first 20 are recorded; `counts.errors` has all.
+  `boardView`, `isOver`, `canContinueWithout`; `seat` if it was one player's view). Only the first 20 are recorded; `counts.errors` has all.
+- `disconnected`: a player's phone went away (`seat`); `waiting` is the game's text when it could not go on without
+  them (the game was paused until they were back). `reconnected`: the phone came back. Not inputs; replay skips them.
 - `snapshot`: the complete state after `inputs` accepted inputs (only if the table was set to take snapshots).
 - `end`: `reason` as above, `summary` (`text` and `highlights`, the game's own result; null when interrupted) and
   `stateHash` (a fingerprint of the final state; null if it could not be rebuilt).

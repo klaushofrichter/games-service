@@ -75,6 +75,35 @@ describe("player colours on the table (D-106)", () => {
     }
   });
 
+  it("keeps the default colour with the player when they move or swap seats (D-117)", async () => {
+    const t = await testHost();
+    try {
+      await t.ok("POST", "/layout", { seats: 4 });
+      const ann = await t.joinDeck("Ann");
+      const ben = await t.joinDeck("Ben");
+      const ids = Object.fromEntries(t.host.table.state().players.map((p) => [p.name, p.id]));
+      const before = { Ann: colorOf(t, "Ann"), Ben: colorOf(t, "Ben") };
+      expect(before.Ann).not.toBe(before.Ben);
+      const free = [0, 1, 2, 3].find((s) => !t.host.table.state().players.some((p) => p.seat === s))!;
+      await t.ok("POST", "/seats/move", { playerId: ids.Ann, seat: free }); // to an empty seat
+      expect(colorOf(t, "Ann")).toBe(before.Ann);
+      const benSeat = t.host.table.state().players.find((p) => p.name === "Ben")!.seat!;
+      await t.ok("POST", "/seats/move", { playerId: ids.Ann, seat: benSeat }); // swap with Ben
+      expect(colorOf(t, "Ann")).toBe(before.Ann);
+      expect(colorOf(t, "Ben")).toBe(before.Ben);
+      // a new player sitting where Ann started does not take Ann's colour
+      const cleo = await t.joinDeck("Cleo");
+      await until(() => t.host.table.state().players.find((p) => p.name === "Cleo")?.seat !== null);
+      expect(new Set([colorOf(t, "Ann"), colorOf(t, "Ben"), colorOf(t, "Cleo")]).size).toBe(3);
+      expect(colorOf(t, "Ann")).toBe(before.Ann);
+      ann.close();
+      ben.close();
+      cleo.close();
+    } finally {
+      await t.close();
+    }
+  });
+
   it("keeps a chosen colour when the player moves seat or a game starts, and frees it when they leave", async () => {
     const t = await testHost();
     try {

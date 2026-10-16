@@ -31,6 +31,8 @@ run python3 scripts/e2e/remote.py "$OUT"
 run python3 scripts/e2e/extra.py "$OUT"
 run python3 scripts/e2e/ai_wait.py "$OUT"
 run python3 scripts/e2e/logs.py "$OUT"
+run python3 scripts/e2e/developer.py "$OUT"
+run python3 scripts/e2e/seat_loss.py "$OUT"
 
 if ((${#failed[@]})); then
   printf '::error::e2e failed: %s\n' "${failed[@]}"
