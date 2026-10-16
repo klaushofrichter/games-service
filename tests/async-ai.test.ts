@@ -39,6 +39,8 @@ async function race(gameId: string, ai: Record<string, unknown>, target = 3, o: 
 }
 
 const log = () => t.host.table.runtime!.log;
+/** The pause and resume records (D-120), without their times. */
+const pauses = () => log().filter((r) => r.t === "pause" || r.t === "resume").map(({ at: _, ...r }) => r);
 const aiMoves = () => log().filter((r): r is Extract<LogRecord, { t: "intent" }> => r.t === "intent" && r.by === "ai");
 
 describe("AI players that take their time (D-112)", { timeout: 30_000 }, () => {
@@ -93,6 +95,9 @@ describe("AI players that take their time (D-112)", { timeout: 30_000 }, () => {
     expect(m.ai!.ms).toBeGreaterThanOrEqual(1900);
     expect(aborts()).toBeGreaterThan(before); // the slow move was stopped
     expect((await t.api("POST", "/game/play-now")).status).toBe(409); // nobody is waited for now
+    // the log says why the game stood still and how it went on (D-120)
+    const aiSeat = t.host.table.player(aiId)!.seat;
+    expect(pauses()).toEqual([{ t: "pause", reason: "ai", seat: aiSeat }, { t: "resume", reason: "playNow" }]);
     // the AI thinks again about its next move (and will run out of time again)
     await a.waitState((x) => x.phase === "paused");
     await t.ok("POST", "/game/end");
@@ -105,6 +110,7 @@ describe("AI players that take their time (D-112)", { timeout: 30_000 }, () => {
     const [m] = aiMoves();
     expect(m.ai!.fallback).toBeUndefined();
     expect(m.ai!.ms).toBeGreaterThanOrEqual(2400);
+    expect(pauses()).toEqual([{ t: "pause", reason: "ai", seat: expect.any(Number) }, { t: "resume", reason: "ai" }]);
   });
 
   it("drops a stale answer when the game moves on while the AI thinks", async () => {
@@ -133,6 +139,7 @@ describe("AI players that take their time (D-112)", { timeout: 30_000 }, () => {
     t.host.table.setCloud({ status: "online" });
     await a.waitState((x) => x.phase === "active");
     await a.waitState((x) => x.pause?.reason === "ai"); // a fresh move, a fresh budget
+    expect(pauses().slice(0, 3).map((r) => `${r.t} ${r.reason}`)).toEqual(["pause ai", "pause cloud", "resume cloud"]);
     await t.ok("POST", "/game/end");
   });
 });

@@ -2,6 +2,7 @@
 // Talks to the Table Host through the board control API (same API the tests and local AI agents use).
 import { renderRules } from "/shared/markdown.js";
 import { ROT, W, H, SEAT_COLORS, audio, copyText, esc, seatName, seatPositions, claimServiceWorkerPage, openTableSocket } from "/shared/board-kit.js";
+import { openViewer } from "/board/viewer.js";
 
 const KEY = window.TABLE_KEY;
 // A remote player's copy of the board (phase 1c): it runs inside the cloud's invite page, which carries
@@ -416,6 +417,7 @@ function openSettings() {
       ${playerColors()}
       ${gameSettings}
       ${items.length ? `<div class="group game-settings"><div class="eyebrow">${esc(state.game.name)}</div>${items.map((it, k) => `<div class="row"><span>${esc(it.label)}</span>${control(it, k)}</div>`).join("")}</div>` : ""}
+      <div class="group"><div class="eyebrow">Game logs</div><div class="row"><span>Finished games on this table, move by move</span><button data-viewer>Open…</button></div></div>
       ${serviceSettings()}
       <div class="group developer"><div class="eyebrow">Developer</div>
         <div class="row"><span>Games without a player at the table</span><button data-dev-no-local class="${state.developer?.allowNoLocalPlayer ? "on" : ""}" role="switch" aria-checked="${!!state.developer?.allowNoLocalPlayer}">${state.developer?.allowNoLocalPlayer ? "On" : "Off"}</button></div>
@@ -445,6 +447,7 @@ function openSettings() {
     if (b.dataset.sound !== undefined) return void act("POST", "/display", { sound: state.display?.sound === false });
     if (b.dataset.devNoLocal !== undefined) return void act("POST", "/developer", { allowNoLocalPlayer: !state.developer?.allowNoLocalPlayer });
     if (b.dataset.accessCode !== undefined) return openCodePad();
+    if (b.dataset.viewer !== undefined) return (close(), openGameLogs());
     if (b.dataset.colorPlayer) return void act("POST", `/players/${encodeURIComponent(b.dataset.colorPlayer)}/color`, { color: b.dataset.color });
     if (b.dataset.setting) {
       const f = ((state.game && games.find((x) => x.id === state.game.id)?.settings) || []).find((x) => x.key === b.dataset.setting);
@@ -704,7 +707,7 @@ function toolbar() {
   // Left: the table's seat layout. Right: managing players (D-086).
   return `<div class="toolbar">
     ${seatButtons()}
-    ${REMOTE ? "" : `<div class="right"><button data-add-ai>+ AI player</button><button data-invite>Invite…</button><button data-sim>Simulation…</button></div>`}
+    ${REMOTE ? (state.remote?.boardControl ? `<div class="right"><button data-logs>Game logs…</button></div>` : "") : `<div class="right"><button data-add-ai>+ AI player</button><button data-invite>Invite…</button><button data-sim>Simulation…</button><button data-logs>Game logs…</button></div>`}
   </div>
   ${REMOTE || !sel ? "" : `<div class="toolbar selected"><div class="right"><span class="faint">${esc(sel.name)}</span>
     ${sel.kind === "ai" ? `<button data-config="${sel.id}">Configure</button>` : ""}
@@ -1007,6 +1010,7 @@ center.addEventListener("click", async (e) => {
   else if ("close" in d) act("POST", "/game/close");
   else if ("again" in d) act("POST", "/game/select", { gameId: state.game.id, settings: state.game.settings });
   else if ("sim" in d) openSimulation();
+  else if ("logs" in d) openGameLogs();
   else if ("invite" in d) openInvite();
   else if ("newCode" in d && (await confirmDialog("New join code?", "The current QR code stops working. Players already at the table stay in.", "New code"))) act("POST", "/join/new");
 });
@@ -1083,6 +1087,12 @@ function openLobbyOverlay() {
     }
   });
   overlayRoot.appendChild(o);
+}
+
+// ---------- the Game Viewer (D-120) ----------
+/** Finished games, move by move: from the settings and the lobby, and for remote players with board control. */
+function openGameLogs() {
+  openViewer({ api, overlayRoot, toast, face: (el) => (faceFront(el), viewEdge() === "east" || viewEdge() === "west") });
 }
 
 function openSimulation() {

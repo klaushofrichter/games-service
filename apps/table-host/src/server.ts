@@ -10,6 +10,7 @@ import type { GameEvent } from "../../../packages/sdk/src/index.ts";
 import { Table, TableError } from "./table.ts";
 import { runSimulation } from "./simulation.ts";
 import { verifyStoredLog } from "./game-log.ts";
+import { History } from "./history.ts";
 import type { LogStore } from "./logs.ts";
 
 export interface ServerOptions {
@@ -60,6 +61,7 @@ const ASSET_HEADERS = { "x-content-type-options": "nosniff", "content-security-p
 
 export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
   const clients = new Set<Client & { alive?: boolean }>();
+  const history = new History(logs, () => table.games);
 
   const keyOk = (k: unknown) => {
     if (typeof k !== "string") return false;
@@ -163,7 +165,11 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
     const m = req.method ?? "GET";
     if (remote) {
       // Remote boards are authorised by their invite (checked by the cloud), not by the table key.
-      if (REMOTE_DENIED.test(path)) return json(res, 403, { error: "not available to remote players" });
+      // The Game Viewer (D-120): finished games, read-only, for remote players the table gives board control.
+      if (/^\/history(\/|$)/.test(path)) {
+        if (m !== "GET") return json(res, 405, { error: "the game viewer is read-only" });
+        if (!table.remoteControlAllowed()) return json(res, 403, { error: "board control is switched off for remote players" });
+      } else if (REMOTE_DENIED.test(path)) return json(res, 403, { error: "not available to remote players" });
       if (m !== "GET") {
         if (!REMOTE_ACTIONS.test(path)) return json(res, 403, { error: "only players at the table can do that" });
         if (!table.remoteControlAllowed()) return json(res, 403, { error: "board control is switched off for remote players" });
@@ -241,6 +247,31 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
       table.metrics.simulations++;
       table.logSaved(r.logId); // to the service, like a played game's (D-116)
       return json(res, 200, r);
+    }
+    // The Game Viewer (D-120): finished games and their moves, read-only.
+    if (m === "GET" && path === "/history") return json(res, 200, await history.list());
+    if (m === "GET" && (match = path.match(/^\/history\/([\w-]+)$/))) {
+      const info = await history.info(match[1]);
+      return info ? json(res, 200, info) : json(res, 404, { error: "no such log" });
+    }
+    if (m === "GET" && (match = path.match(/^\/history\/([\w-]+)\/(\d{1,4})\/moves$/))) {
+      const qs = new URL(req.url ?? "/", "http://t").searchParams;
+      const num = (k: string) => (qs.has(k) && qs.get(k) !== "" && Number.isFinite(Number(qs.get(k))) ? Number(qs.get(k)) : undefined);
+      const page = await history.page(match[1], Number(match[2]), {
+        offset: num("offset"),
+        limit: num("limit"),
+        seat: num("seat"),
+        move: num("move"),
+        movesOnly: qs.get("movesOnly") === "1",
+        problems: qs.get("problems") === "1",
+        q: qs.get("q")?.slice(0, 80) || undefined,
+      });
+      return page ? json(res, 200, page) : json(res, 404, { error: "no such log or game" });
+    }
+    if (m === "GET" && (match = path.match(/^\/history\/([\w-]+)\/(\d{1,4})\/(moves|lines)\/(\d{1,7})$/))) {
+      const n = Number(match[4]);
+      const step = await history.step(match[1], Number(match[2]), match[3] === "moves" ? { move: n } : { line: n });
+      return step ? json(res, 200, step) : json(res, 404, { error: `no ${match[3] === "moves" ? "move" : "line"} ${n} in this game` });
     }
     if (m === "GET" && path === "/logs") return json(res, 200, await logs.list());
     if (m === "POST" && (match = path.match(/^\/logs\/([\w-]+)\/verify$/))) {

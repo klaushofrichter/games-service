@@ -6,6 +6,16 @@ page is the history. Leave it empty if there is nothing to add beyond the commit
 
 ## [Unreleased]
 
+- **Game Viewer** on the board (D-120): *Game logs* in the settings and the lobby lists the finished games on this
+  table. A game opens as a table of its moves, numbered, with the time, the player and what happened in the game's
+  own words (Coin Flip and Pachisi describe theirs), filters for a player, moves only and problems, *Move #* to jump to
+  a move, and each move in full with the state before and after and a reference to copy for a developer or Claude
+  ("…-pachisi-9908 #74"). Remote players with board control can open it too.
+- Game logs now say when a game stood still and why (the service lost, an AI over its time, a player away, Play now),
+  and each finished game's zip has a readable move list (`game-001.moves.jsonl`). `scripts/game-log.ts` reads a log
+  zip from the command line: an overview, a range of moves, one move in full.
+- SDK: games may describe their steps for the viewer and the logs with `describe(step)`, with extra columns in the
+  manifest (`viewer.columns`).
 - Players lost during a game: a game that can't go on without a player now waits while their phone is away, with a
   card at their seat on the board (the game's reason and End game), and goes on when they are back. Removing such a
   player ends the game with its reason, and the board says so first. Games can give their own reason when a player

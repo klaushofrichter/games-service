@@ -198,9 +198,9 @@ describe("the log on the table", () => {
       return list.length ? list : null;
     });
     const z = await unzip((await t.api("GET", `/logs/${l.id}.zip`)).body);
-    expect(z.names).toEqual(["README.md", "game-001.jsonl", "game-001.state.json", "run.json"]);
+    expect(z.names).toEqual(["README.md", "game-001.jsonl", "game-001.moves.jsonl", "game-001.state.json", "run.json"]); // the move list since D-120
     const readme = (await z.text("README.md"))!;
-    for (const word of ["run.json", "start", "intent", "timer", "seatJoined", "seatLeft", "error", "snapshot", "end", "state.json"]) expect(readme).toContain(word);
+    for (const word of ["run.json", "start", "intent", "timer", "seatJoined", "seatLeft", "error", "snapshot", "end", "state.json", "pause", "resume", "moves.jsonl"]) expect(readme).toContain(word);
     const run = await z.json("run.json");
     expect(run).toMatchObject({ format: "gametable-log/2", kind: "game", gameId: "coin-flip", gameName: "Coin Flip", games: 1, endReason: "finished", verify: { checked: 1, ok: 1 }, counts: { errors: 0 } });
     expect(run.settings).toMatchObject({ rounds: 1 });

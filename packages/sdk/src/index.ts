@@ -54,6 +54,42 @@ export interface SeatLeftEnd {
   end: { text: string; highlights?: Record<string, unknown> };
 }
 
+/**
+ * One step of a game as the Game Viewer and log readers see it (D-120): a player's move (`intent`, refused ones too), a
+ * timer, or a player joining or leaving, with the game's state before and after it. Only for finished games, so it may
+ * reveal everything. `names` maps seats to player names.
+ */
+export interface StepInfo<S = unknown> {
+  kind: "intent" | "timer" | "seatJoined" | "seatLeft";
+  /** The seat that moved, joined or left; null for a timer. */
+  seat: number | null;
+  intent?: Intent;
+  by?: "human" | "ai" | "board";
+  timer?: string;
+  accepted: boolean;
+  /** Why the rules refused the move. */
+  reason?: string;
+  events: GameEvent[];
+  before: S;
+  after: S;
+  names: Record<number, string>;
+}
+
+/** What a game says about one step (D-120). Everything but `text` is optional. */
+export interface StepDescription {
+  /** One line, e.g. "Ann plays a Seven: 4 steps for marble 3, 3 for marble 1". Without the player's name. */
+  text: string;
+  /** Values for the columns the manifest declares in `viewer.columns`, by key. */
+  columns?: Record<string, string | number | boolean | null>;
+  /** More for the detail view: label → value (text, numbers or small objects). */
+  details?: Record<string, unknown>;
+  /**
+   * What happened within this step for other seats or by the rules alone: forced moves played automatically, a seat
+   * the AI took over, a timer's automatic move. `auto` marks a move nobody chose.
+   */
+  steps?: { seat?: number | null; text: string; auto?: boolean }[];
+}
+
 export interface GameDefinition<S = unknown> {
   setup(ctx: GameContext, settings: Record<string, unknown>): S;
   onIntent(state: S, seat: number, intent: Intent, ctx: GameContext): StepResult<S>;
@@ -89,6 +125,11 @@ export interface GameDefinition<S = unknown> {
    * fast. Without it, "Play now" asks the AI again.
    */
   aiFallback?(view: unknown, seat: number, ctx: Pick<GameContext, "random" | "randomInt">, options: Record<string, unknown>): Intent | null;
+  /**
+   * Describe one step for the Game Viewer, the move list in the log and LLMs reading it (D-120). Pure, like the rules;
+   * return null to leave a step to the platform's generic line. Called after the game, never while it runs.
+   */
+  describe?(step: StepInfo<S>): StepDescription | null;
 }
 
 export function defineGame<S>(def: GameDefinition<S>): GameDefinition<S> {

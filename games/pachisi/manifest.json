@@ -27,5 +27,13 @@
   "boardIntents": ["move"],
   "lobbyButton": "bottom-right",
   "deck": { "minWidth": 320, "orientation": "portrait" },
+  "viewer": {
+    "columns": [
+      { "key": "turn", "label": "Turn" },
+      { "key": "die", "label": "Die" },
+      { "key": "token", "label": "Token" },
+      { "key": "captures", "label": "Captures" }
+    ]
+  },
   "permissions": []
 }

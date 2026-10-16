@@ -54,5 +54,13 @@
   },
   "remoteBoardControl": true,
   "lobbyButton": "bottom-right",
+  "viewer": {
+    "columns": [
+      { "key": "round", "label": "Round" },
+      { "key": "guess", "label": "Guess" },
+      { "key": "coin", "label": "Coin" },
+      { "key": "score", "label": "Score" }
+    ]
+  },
   "permissions": []
 }

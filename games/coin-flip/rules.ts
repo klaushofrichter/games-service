@@ -1,4 +1,4 @@
-import { count, defineGame, list, type GameContext } from "../../packages/sdk/src/index.ts";
+import { count, defineGame, list, type GameContext, type StepDescription, type StepInfo } from "../../packages/sdk/src/index.ts";
 
 type Guess = "heads" | "tails";
 
@@ -48,6 +48,43 @@ function stats(state: State, seat: number) {
 
 function allGuessed(state: State) {
   return state.active.length > 0 && state.active.every((s) => state.guesses[s] !== undefined);
+}
+
+/**
+ * The Game Viewer's line for a step (D-120). A flip happens in the step that completes the round: the last guess, a
+ * player leaving, or the round timer. It shows as an automatic sub-step: nobody chose the coin.
+ */
+function describeStep(step: StepInfo<State>): StepDescription | null {
+  const { before, after } = step;
+  const flipped = after.history.length > before.history.length;
+  const round = Math.min(before.round, before.rounds);
+  const flip = (): NonNullable<StepDescription["steps"]>[number] => {
+    const right = before.active.filter((s) => after.lastGuesses[s] === after.lastFlip).map((s) => after.names[s]);
+    const missed = before.active.filter((s) => after.lastGuesses[s] === null).map((s) => after.names[s]);
+    return {
+      text: `Coin: ${after.lastFlip} · ${right.length ? `${list(right)} ${right.length === 1 ? "scores" : "score"}` : "nobody scores"}${missed.length ? ` · no guess from ${list(missed)}` : ""}`,
+      auto: true,
+    };
+  };
+  const scores = (seat: number | null) => (seat === null ? null : (after.scores[seat] ?? 0));
+  if (step.kind === "intent") {
+    const g = String(step.intent?.payload ?? "");
+    return {
+      text: step.accepted ? `guesses ${g}` : `tries to guess ${g || "nothing"}`,
+      columns: { round, guess: step.accepted ? g : null, coin: flipped ? after.lastFlip : null, score: scores(step.seat) },
+      ...(flipped ? { steps: [flip()], details: { picks: Object.fromEntries(before.active.map((s) => [after.names[s], after.lastGuesses[s] ?? "none"])) } } : {}),
+    };
+  }
+  if (step.kind === "timer" && flipped) {
+    return {
+      text: `Time is up in round ${round}`,
+      columns: { round, guess: null, coin: after.lastFlip, score: null },
+      steps: [flip()],
+      details: { picks: Object.fromEntries(before.active.map((s) => [after.names[s], after.lastGuesses[s] ?? "none"])) },
+    };
+  }
+  if (step.kind === "seatLeft" && flipped) return { text: `${step.names[step.seat!] ?? "A player"} left; everyone else had guessed`, columns: { round, coin: after.lastFlip }, steps: [flip()] };
+  return null;
 }
 
 export default defineGame<State>({
@@ -166,6 +203,8 @@ export default defineGame<State>({
       },
     };
   },
+
+  describe: describeStep,
 
   ai(view, _seat, ctx) {
     const v = view as { myGuess: string | null; done: boolean };
