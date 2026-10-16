@@ -15,6 +15,8 @@ const numberCell = (n) => {
   const row = 2 - ((n - 1) % 3);
   return { x: LEFT + ZW + col * CW, y: ROWS_Y(row), w: CW, h: CH };
 };
+/** The layout cell a bet sits on, as the rect's data-key: "straight:17", "dozen:2", "red". */
+const cellKey = (bet) => (bet.type === "straight" || bet.target ? `${bet.type}:${bet.target}` : bet.type);
 const DOZ_Y = TOP + 3 * CH, DOZ_H = 70, EVEN_Y = DOZ_Y + DOZ_H, EVEN_H = 70;
 function cellFor(bet) {
   switch (bet.type) {
@@ -97,7 +99,7 @@ function buildLayout() {
   const add = (bet, cls, label, labelCls = "lbl") => {
     const c = cellFor(bet);
     const r = svg("rect", { x: c.x, y: c.y, width: c.w, height: c.h, rx: 6, class: `rl-cell ${cls}` }, cells);
-    r.dataset.key = bet.type === "straight" || bet.target ? `${bet.type}:${bet.target}` : bet.type;
+    r.dataset.key = cellKey(bet);
     if (label) {
       const y = labelCls === "num" ? c.y + c.h / 2 : c.y + 24; // outside labels sit high so chips can sit below
       const t = svg("text", { x: c.x + c.w / 2, y, "text-anchor": "middle", "dominant-baseline": "middle", class: labelCls }, s);
@@ -159,8 +161,7 @@ export function mount(root) {
     layout.chips.innerHTML = "";
     const perCell = {};
     for (const b of v.bets) {
-      const key = b.type === "straight" || b.target ? `${b.type}:${b.target}` : b.type;
-      (perCell[key] ??= []).push(b);
+      (perCell[cellKey(b)] ??= []).push(b);
     }
     for (const list of Object.values(perCell)) {
       list.forEach((b, k) => {

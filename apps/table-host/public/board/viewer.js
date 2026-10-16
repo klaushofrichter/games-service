@@ -62,13 +62,18 @@ export function openViewer({ api, overlayRoot, face, toast }) {
       : `<div class="empty faint">No finished games yet. Logs appear here when a game ends.</div>`}`;
   }
 
+  /** A move's automatic follow-ups ("↳ Coin: heads · …"), in the moves table and on the step page. */
+  function subSteps(steps) {
+    return (steps ?? []).map((s) => `<div class="sub">↳ ${s.player ? `<b>${esc(s.player)}</b> ` : ""}${esc(s.text)}${s.auto ? ` <span class="flag auto">automatic</span>` : ""}</div>`).join("");
+  }
+
   function cell(val) {
     return val === null || val === undefined || val === "" ? `<span class="faint">·</span>` : esc(String(val));
   }
 
   function moveRow(r, cols, start, sim) {
     const cls = [r.kind, ...r.flags].join(" ");
-    const steps = (r.steps ?? []).map((s) => `<div class="sub">↳ ${s.player ? `<b>${esc(s.player)}</b> ` : ""}${esc(s.text)}${s.auto ? ` <span class="flag auto">automatic</span>` : ""}</div>`).join("");
+    const steps = subSteps(r.steps);
     const flags = [
       r.flags.includes("rejected") ? `<span class="flag rej">refused</span>` : "",
       r.flags.includes("error") ? `<span class="flag err">error</span>` : "",
@@ -135,7 +140,7 @@ export function openViewer({ api, overlayRoot, face, toast }) {
     panel.innerHTML = `${head(r.n !== null ? `Move ${r.n}` : `Line ${r.line}`, "Moves")}
       <div class="step">
         <div class="what big">${r.player ? `<b>${esc(r.player)}</b> ` : ""}${esc(r.text)}</div>
-        ${(r.steps ?? []).map((x) => `<div class="sub">↳ ${x.player ? `<b>${esc(x.player)}</b> ` : ""}${esc(x.text)}${x.auto ? ` <span class="flag auto">automatic</span>` : ""}</div>`).join("")}
+        ${subSteps(r.steps)}
         <div class="refrow"><code>${esc(s.reference)}</code><button data-copyref>Copy reference</button></div>
         <dl class="facts">${facts.map(([k, x]) => `<dt>${esc(k)}</dt><dd>${esc(x)}</dd>`).join("")}</dl>
         ${r.details ? jsonBlock("Details from the game", r.details, true) : ""}
