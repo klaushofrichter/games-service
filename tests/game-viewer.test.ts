@@ -146,24 +146,30 @@ afterEach(async () => {
   t = undefined;
 });
 
-/** A coin-flip game on a real table: Ann (phone) and an AI, two rounds, the service lost and back in between. */
+/**
+ * A coin-flip game on a real table: Ann and Bob (phones), two rounds, the service lost and back in between. Two people
+ * rather than an AI, so the order is fixed: Ann's second tap comes before Bob's guess and is always refused.
+ */
 async function playOnTable() {
   t = await testHost();
   t.host.table.setCloud({ status: "online" });
   const a = await t.joinDeck("Ann");
-  await t.ok("POST", "/ai", {});
+  const b = await t.joinDeck("Bob");
   await t.ok("POST", "/game/select", { gameId: "coin-flip", settings: { rounds: 2, roundSeconds: 0 } });
   await a.request("lobby", "ready", { ready: true });
+  await b.request("lobby", "ready", { ready: true });
   await t.ok("POST", "/game/start");
   await a.waitView((v) => v.view.round === 1);
   await a.request("game", "intent", { name: "guess", payload: "heads" });
-  await a.request("game", "intent", { name: "guess", payload: "tails" }); // refused
+  expect((await a.request("game", "intent", { name: "guess", payload: "tails" })).type).toBe("reject"); // already guessed
   t.host.table.setCloud({ status: "offline" });
   await a.waitState((s) => s.phase === "paused");
   t.host.table.setCloud({ status: "online" });
   await a.waitState((s) => s.phase === "active");
+  await b.request("game", "intent", { name: "guess", payload: "tails" });
   await a.waitView((v) => v.view.round === 2 && !v.view.myGuess);
   await a.request("game", "intent", { name: "guess", payload: "tails" });
+  await b.request("game", "intent", { name: "guess", payload: "heads" });
   await a.waitState((s) => s.phase === "finished");
   await t.host.table.flush();
   const [log] = await t.ok("GET", "/history");
@@ -188,7 +194,7 @@ describe("the Game Viewer on the table (D-120)", { timeout: 30_000 }, () => {
   it("lists finished games and serves pages and single steps with the state before and after", async () => {
     const { id } = await playOnTable();
     const [entry] = await t!.ok("GET", "/history");
-    expect(entry).toMatchObject({ id, gameId: "coin-flip", gameName: "Coin Flip", kind: "game", endReason: "finished", players: [{ name: "Ann" }, { kind: "ai" }] });
+    expect(entry).toMatchObject({ id, gameId: "coin-flip", gameName: "Coin Flip", kind: "game", endReason: "finished", players: [{ name: "Ann" }, { name: "Bob" }] });
     const info = await t!.ok("GET", `/history/${id}`);
     expect(info).toMatchObject({ rulesInstalled: true, columns: coin.manifest.viewer.columns, gameList: [{ game: 1, described: true, endReason: "finished" }] });
     const moves = info.gameList[0].moves;
