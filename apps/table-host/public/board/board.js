@@ -58,6 +58,40 @@ function faceFront(el) {
   return el;
 }
 
+/**
+ * Fill an overlay that redraws on every lobby state. In a game of AI players that is several times a second: rebuilding
+ * an unchanged panel reset its scroll position (Done scrolled out of reach) and could lose a tap that started on a
+ * button that was replaced before the finger lifted. So it is rebuilt only when its content changes, and keeps its
+ * scroll position when it is.
+ */
+function setPanel(o, html) {
+  if (o.dataset.html !== html) {
+    const top = o.querySelector(".panel")?.scrollTop ?? 0;
+    o.innerHTML = html;
+    o.dataset.html = html;
+    const panel = o.querySelector(".panel");
+    if (panel) panel.scrollTop = top;
+  }
+  const panel = o.querySelector(".panel");
+  if (panel) faceFront(panel);
+}
+
+// Escape closes the topmost dialog or overlay, as a tap beside it does (each one decides what that means: a
+// confirmation is cancelled, the settings close; their changes are already applied). Their own Escape handlers, where
+// they have one, are not needed as well.
+document.addEventListener(
+  "keydown",
+  (e) => {
+    if (e.key !== "Escape") return;
+    const top = overlayRoot.lastElementChild;
+    if (!top) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    top.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  },
+  true,
+);
+
 function confirmDialog(title, text, okLabel = "Confirm") {
   return new Promise((resolve) => {
     const d = document.createElement("div");
@@ -417,7 +451,7 @@ function openSettings() {
           ${fields.map((f) => `<div class="row"><span>${esc(f.label ?? f.key)}</span>${setting(f)}</div>`).join("")}
           ${editable ? "" : `<div class="faint" style="font-size:.7em;margin-top:6px">These can be changed before the game starts.</div>`}</div>`
       : "";
-    o.innerHTML = `<div class="panel"><h2>Settings</h2>
+    setPanel(o, `<div class="panel"><h2>Settings</h2>
       <div class="group"><div class="eyebrow">Display</div>
         <div class="row"><span>Sound effects</span><button data-sound class="${state.display?.sound !== false ? "on" : ""}" role="switch" aria-checked="${state.display?.sound !== false}">${state.display?.sound !== false ? "On" : "Off"}</button></div>
         <div class="row"><span>Fullscreen</span>${fs ? `<button data-fs class="${document.fullscreenElement ? "on" : ""}">${document.fullscreenElement ? "Leave fullscreen" : "Fullscreen"}</button>` : `<span class="faint">not available in this browser</span>`}</div></div>
@@ -429,8 +463,7 @@ function openSettings() {
       <div class="group developer"><div class="eyebrow">Developer</div>
         <div class="row"><span>Games without a player at the table</span><button data-dev-no-local class="${state.developer?.allowNoLocalPlayer ? "on" : ""}" role="switch" aria-checked="${!!state.developer?.allowNoLocalPlayer}">${state.developer?.allowNoLocalPlayer ? "On" : "Off"}</button></div>
         <div class="faint" style="font-size:.7em;margin-top:6px">For testing: games with remote and AI players only, or AI players only. Off again when the table restarts.</div></div>
-      <div class="actions" style="display:flex;justify-content:flex-end;margin-top:20px"><button class="primary" data-close-overlay>Done</button></div></div>`;
-    faceFront(o.querySelector(".panel"));
+      <div class="actions settings-actions"><button class="primary" data-close-overlay>Done</button></div></div>`);
   };
   const close = () => {
     unsub();
@@ -1056,7 +1089,7 @@ function openLobbyOverlay() {
   const o = document.createElement("div");
   o.className = "overlay";
   const draw = () => {
-    o.innerHTML = `<div class="panel"><h2>Lobby</h2>
+    setPanel(o, `<div class="panel"><h2>Lobby</h2>
       <div class="group"><div class="eyebrow">Players</div>${state.players
         .map((p) => `<div class="row"><span>${esc(p.name)} <span class="faint">· ${p.seat === null ? "no seat" : `${esc(seatName(state.seatEdges, p.seat))} seat`}${p.connected ? "" : " · reconnecting"}</span></span>
           ${REMOTE ? "" : `<button class="danger" data-remove="${p.id}">Remove</button>`}</div>`)
@@ -1066,8 +1099,7 @@ function openLobbyOverlay() {
       <div class="group">${REMOTE ? "" : `<div class="row"><span>Remote players${state.remote?.players ? ` · ${state.remote.players} joined` : ""}</span><button data-invite>Invite…</button></div>`}
         <div class="row"><span>Terms of service</span><button data-terms>Open</button></div></div>
       <div class="actions" style="display:flex;justify-content:space-between;margin-top:20px">
-        <button class="danger" data-end>End game</button><button class="primary" data-close-overlay>Back to game</button></div></div>`;
-    faceFront(o.querySelector(".panel"));
+        <button class="danger" data-end>End game</button><button class="primary" data-close-overlay>Back to game</button></div></div>`);
   };
   draw();
   const unsub = onState(draw);

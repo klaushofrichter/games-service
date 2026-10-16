@@ -410,6 +410,17 @@ def dialogs(browser, board):
     shot(board, "settings-colours-lobby")
     board.click("[data-close-overlay]")
     shot(board, "lobby-colours")
+    # The settings stay put while the table changes around them: a state change they do not show leaves the panel as it
+    # is (it used to be rebuilt on every state, losing its scroll position), and Escape closes them (D-122).
+    board.click("#settings-button")
+    board.wait_for_selector(".overlay.settings .panel")
+    board.evaluate("document.querySelector('.overlay.settings .panel').__mark = 1")
+    api("POST", "/face", {"edge": "west"})
+    board.wait_for_function("document.querySelector('.overlay.settings .panel').style.transform.includes('90deg')", timeout=5000)
+    assert board.evaluate("document.querySelector('.overlay.settings .panel').__mark") == 1, "the settings panel was rebuilt"
+    api("POST", "/face", {"edge": "south"})
+    board.keyboard.press("Escape")
+    board.wait_for_selector(".overlay.settings", state="detached")
     pick_game(board, "roulette")
     board.wait_for_selector(".dialog.form")
     board.fill(".dialog [name=rounds]", "4")
