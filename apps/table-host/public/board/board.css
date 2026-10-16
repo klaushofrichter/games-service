@@ -215,6 +215,12 @@ pre.raw { font-family: var(--mono); font-size: 0.7em; color: var(--ink-soft); ba
 }
 #settings-button:hover { opacity: 1; color: var(--brass); border-color: var(--brass-deep); }
 #settings-button svg { transition: transform .3s; }
+/* Developer setting on (D-118): a small tag on the gear. */
+#settings-button.dev { opacity: 1; color: var(--brass); border-color: var(--brass-deep); }
+#settings-button.dev::after {
+  content: "DEV"; position: absolute; top: -9px; right: -14px; padding: 1px 6px; border-radius: 8px;
+  font: 700 11px/1.4 system-ui, sans-serif; letter-spacing: .06em; color: #10251f; background: var(--brass);
+}
 #settings-button.along-x.bl { left: 102px; bottom: 32px; }
 #settings-button.along-x.br { right: 102px; bottom: 32px; }
 #settings-button.along-x.tl { left: 102px; top: 32px; }

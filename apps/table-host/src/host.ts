@@ -51,6 +51,7 @@ export async function startHost(o: HostOptions = {}) {
     maxRemotePlayers: o.maxRemotePlayers ?? 4,
     showTestGames: o.showTestGames ?? true,
     logSnapshotEvery: o.logSnapshotEvery ?? 0,
+    allowNoLocalPlayer: o.allowNoLocalPlayer ?? false,
   };
   const table = new Table(config, games, logs);
   const server = await startServer(table, logs, {

@@ -164,6 +164,7 @@ describe("remote play", { timeout: 60_000 }, () => {
     for (const p of ["/api/v1/join", "/api/v1/logs", "/api/v1/saves", "/api/v1/qr?text=https://x.y/"]) expect((await peer.request("GET", p)).status).toBe(403);
     expect((await peer.request("POST", "/api/v1/invites")).status).toBe(403);
     expect((await peer.request("POST", "/api/v1/simulation", { gameId: "roulette" })).status).toBe(403);
+    expect((await peer.request("POST", "/api/v1/developer", { allowNoLocalPlayer: true })).status).toBe(403); // D-118: the table's own board only
     expect((await peer.request("GET", "/admin")).status).toBe(404); // nothing outside the board and deck
 
     // the remote deck takes a seat with just a name

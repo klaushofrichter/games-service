@@ -80,6 +80,7 @@ Or skip the pairing code: create an access code in the console (*Access codes*) 
 | `AI_DELAY_MS` | 800 | Pause before an AI player acts |
 | `MAX_REMOTE_PLAYERS` | 4 | Remote seat limit (phase 1c) |
 | `ALLOW_REMOTE_BOARD` | 0 | Serve the board to non-loopback clients (development only) |
+| `ALLOW_NO_LOCAL_PLAYER` | 0 | `1` starts with the developer setting *Games without a player at the table* on (D-118); the board's Settings turn it on or off until the next restart |
 | `LOG_SNAPSHOT_EVERY` | 0 | A snapshot of the whole game state in the log every N moves (D-116); 0: only the final state |
 | `SHOW_TEST_GAMES` | 0 | `1` lists the test game (`quartet`) in the game menu; the tests and `run-all.sh` turn it on |
 | `DATA_DIR`, `GAMES_DIR` | `<repo>/data`, `<repo>/games` | Logs, saves, the table's identity and a typed access code (`table.json`) and extra-game bundles (`extra-games/`); the built-in games |
@@ -284,6 +285,7 @@ python3 scripts/e2e/play.py roulette out/  # also: pachisi, holdem, coinflip, en
 python3 scripts/e2e/admin.py out/          # admin portal, sign-in and logout (starts its own cloud and host)
 python3 scripts/e2e/codes.py out/          # access codes: console, board keypad, a service restart, a second table refused (starts its own cloud and two hosts)
 python3 scripts/e2e/remote.py out/         # remote play in a second browser (starts its own cloud and host)
+python3 scripts/e2e/developer.py out/     # the developer setting: the last player at the table, DEV on the gear, a game of AIs only (starts its own host)
 python3 scripts/e2e/logs.py out/          # game logs: a simulation from the board, a game with a phone, a table stopped mid-game, the console (starts its own cloud and host)
 python3 scripts/e2e/extra.py out/          # extra-game repositories: console, table, remote player (starts its own fake GitHub, cloud and host)
 python3 scripts/e2e/layout.py out/         # decks at 4 phone sizes x 3 games, the board at 5 screen sizes

@@ -26,6 +26,8 @@ export function baseMeta(o: {
   startedAt: number;
   settings: Record<string, unknown>;
   players: PlayerMeta[];
+  /** Developer settings in force when the game started (D-118); only those that are on. */
+  developer?: { allowNoLocalPlayer?: boolean };
   games?: number;
   seed?: number;
 }): RunMeta {
@@ -49,6 +51,7 @@ export function baseMeta(o: {
     ...(o.seed === undefined ? {} : { seed: o.seed }),
     settings: o.settings,
     players: o.players,
+    ...(o.developer && Object.values(o.developer).some(Boolean) ? { developer: o.developer } : {}),
   };
 }
 

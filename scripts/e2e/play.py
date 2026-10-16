@@ -468,12 +468,21 @@ def dialogs(browser, board):
     board.wait_for_selector(".dialog:has-text('Remove Mira?')")
     board.click(".dialog [data-x=yes]")
     wait(lambda: all(p["name"] != "Mira" for p in api("GET", "/state")["players"]), 5, "Mira to be removed")
-    # an online player too
+    # Klaus is now the last player at the table, with a game chosen (D-118): the board says he can't be removed
+    # instead of asking.
     klaus = next(p for p in api("GET", "/state")["players"] if p["name"] == "Klaus")
     board.click(f".ready-list [data-chip='{klaus['id']}']")
-    board.click(".dialog [data-x=no]")  # Cancel keeps him
-    time.sleep(0.3)
+    board.wait_for_selector(".toast:has-text('Klaus is the last player at the table')")
+    assert board.locator(".dialog").count() == 0, "no Remove dialog for the last player at the table"
     assert any(p["name"] == "Klaus" for p in api("GET", "/state")["players"])
+    # An online player can be removed while someone else is at the table: Cancel keeps him.
+    second = join(browser, "Lea")
+    lea = next(p for p in api("GET", "/state")["players"] if p["name"] == "Lea")
+    board.click(f".ready-list [data-chip='{lea['id']}']")
+    board.click(".dialog [data-x=no]")
+    time.sleep(0.3)
+    assert any(p["name"] == "Lea" for p in api("GET", "/state")["players"])
+    second.context.close()
     api("POST", "/game/close")
     return decks
 
