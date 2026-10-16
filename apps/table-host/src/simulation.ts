@@ -1,7 +1,7 @@
 // Headless AI-only simulation: runs games with virtual time and packages one log zip per run.
 import { createRng, type SeatInfo } from "../../../packages/sdk/src/index.ts";
 import { allowedPlayerCounts, seatEdges, type SeatLayout } from "../../../packages/protocol/src/index.ts";
-import { settingsWithDefaults, sourceMeta, type InstalledGame } from "./games.ts";
+import { settingsWithDefaults, type InstalledGame } from "./games.ts";
 import { GameRuntime, VirtualClock, type AiMoveMeta, type LogRecord } from "./runtime.ts";
 import { AiWorker, aiMove, isPromise, usesWorker } from "./ai.ts";
 import type { Intent } from "../../../packages/sdk/src/index.ts";
