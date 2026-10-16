@@ -44,6 +44,9 @@ def roulette(browser, board):
     for d in decks:
         d.click("#ready")
     time.sleep(0.4)
+    # Mira picks a colour that is not her seat's: her chips must show it (lobby colours, D-106).
+    mira = next(p for p in api("GET", "/state")["players"] if p["name"] == "Mira")
+    api("POST", f"/players/{mira['id']}/color", {"color": "#c38be8"})
     api("POST", "/game/start")
     decks[0].wait_for_selector(".rd-balance")
     d0, d1, d2 = decks
@@ -51,6 +54,15 @@ def roulette(browser, board):
     d1.click("[data-chip='50']"); d1.click("[data-type=dozen][data-target='2']"); d1.click("[data-type=odd]")
     d2.click("[data-chip='25']"); d2.click("[data-type=straight][data-target='0']"); d2.click("[data-type=column][data-target='3']")
     time.sleep(0.8)
+    # Every chip on its own cell, not stacked in the layout's corner; each in its player's colour.
+    faces = board.locator(".rl-chip circle.face")
+    spots = {(round(b["x"]), round(b["y"])) for b in (faces.nth(k).bounding_box() for k in range(faces.count()))}
+    assert faces.count() >= 6 and len(spots) == faces.count(), spots
+    colors = {p["name"]: p["color"] for p in api("GET", "/state")["players"]}
+    for amount, who in (("100", "Klaus"), ("50", "Mira"), ("25", "Jonas")):
+        fill = board.locator(f".rl-chip:has(text:text-is('{amount}')) circle.face").first.get_attribute("fill")
+        assert fill == colors[who], (who, fill, colors[who])
+    assert colors["Mira"] == "#c38be8", colors
     shot(board, "board-betting")
     shot(d0, "deck-betting")
     for d in decks:
