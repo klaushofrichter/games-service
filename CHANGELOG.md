@@ -6,6 +6,10 @@ page is the history. Leave it empty if there is nothing to add beyond the commit
 
 ## [Unreleased]
 
+- Players lost during a game: a game that can't go on without a player now waits while their phone is away, with a
+  card at their seat on the board (the game's reason and End game), and goes on when they are back. Removing such a
+  player ends the game with its reason, and the board says so first. Games can give their own reason when a player
+  leaves. Today's games go on as before.
 - A player's colour stays with them when they move to another seat (D-117); before, the default colour changed
   with the seat.
 - A developer setting in the board's Settings, *Games without a player at the table*: off at every start, it allows

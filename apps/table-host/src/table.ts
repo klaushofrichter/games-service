@@ -154,6 +154,7 @@ export class Table extends EventEmitter {
       joinUrl: this.currentJoin().url,
       cloud: this.cloud,
       pause: this.pause,
+      needed: this.neededPlayers(),
       aiThinking: [...this.aiMoves.entries()]
         .filter(([, m]) => m.shown)
         .map(([playerId, m]) => ({ playerId, seat: m.seat, since: m.startedAt, deadline: m.deadline })),
@@ -184,6 +185,61 @@ export class Table extends EventEmitter {
 
   pause: LobbyState["pause"] = null;
 
+  /**
+   * Players the running game can't go on without whose phones are away (D-119): their seats are held with no time
+   * limit, and the game is paused until they are back, or someone ends the game, or removes them (which ends it).
+   */
+  private waitingFor = new Map<string, { seat: number; text: string; since: number }>();
+
+  private playerPause(): NonNullable<LobbyState["pause"]> {
+    const players = [...this.waitingFor].map(([playerId, w]) => ({ playerId, name: this.players.get(playerId)?.name ?? "a player", seat: w.seat, since: w.since, text: w.text }));
+    const since = this.pause?.reason === "player" ? this.pause.since : Date.now();
+    return { reason: "player", since, canSave: !!this.selected?.game.manifest.saveGame, players };
+  }
+
+  /** Pause for the players the game waits for, or go on when the last one is back (D-119). */
+  private syncPlayerPause() {
+    const rt = this.runtime;
+    if (!rt || rt.over || (this.phase !== "active" && this.phase !== "paused")) return;
+    if (this.waitingFor.size) {
+      if (this.phase === "active") {
+        rt.pause();
+        this.stopAllAi(); // they start again from the current view when the game goes on
+        this.phase = "paused";
+        this.pause = this.playerPause();
+        this.emit("game", [{ name: "paused", data: { reason: "player" } }]);
+      } else if (this.pause?.reason === "ai") {
+        this.stopAllAi(); // a missing player matters more than a slow AI; it thinks again afterwards
+        this.pause = this.playerPause();
+      } else if (this.pause?.reason === "player") this.pause = this.playerPause();
+      // Paused for the cloud: that pause stays; resumeGame comes back here when the link returns.
+      return;
+    }
+    if (this.phase !== "paused" || this.pause?.reason !== "player") return;
+    if (!this.cloudOnline) {
+      this.pause = { reason: "cloud", since: Date.now(), canSave: !!this.selected?.game.manifest.saveGame };
+      return;
+    }
+    rt.resume();
+    this.phase = "active";
+    this.pause = null;
+    this.emit("game", [{ name: "resumed" }]);
+    this.scheduleAi();
+  }
+
+  /** During a game: the seated players it can't go on without, with its reason (D-119). */
+  private neededPlayers(): Record<string, string> {
+    const rt = this.runtime;
+    if (!rt || rt.over || (this.phase !== "active" && this.phase !== "paused")) return {};
+    const out: Record<string, string> = {};
+    for (const p of this.players.values()) {
+      if (p.seat === null || !rt.seats.some((s) => s.seat === p.seat)) continue;
+      const r = rt.canContinueWithout(p.seat);
+      if (r !== true) out[p.id] = r.wait;
+    }
+    return out;
+  }
+
   pauseGame(reason: "cloud") {
     if ((this.phase !== "active" && this.pause?.reason !== "ai") || !this.runtime) return;
     this.runtime.pause();
@@ -197,7 +253,14 @@ export class Table extends EventEmitter {
   resumeGame() {
     if (this.phase !== "paused" || !this.runtime) throw new TableError(409, "the game is not paused");
     if (this.pause?.reason === "ai") throw new TableError(409, `waiting for ${this.pause.ai?.name ?? "an AI player"}; tap Play now to move for it`);
+    if (this.pause?.reason === "player") throw new TableError(409, `waiting for ${this.pause.players?.map((p) => p.name).join(" and ") || "a player"} to come back`);
     if (!this.cloudOnline) throw new TableError(409, "still offline; the game resumes by itself when the connection returns");
+    if (this.waitingFor.size) {
+      // Back online, but someone the game needs is still away (D-119): wait for them instead.
+      this.pause = this.playerPause();
+      this.changed();
+      return;
+    }
     this.runtime.resume();
     this.phase = "active";
     this.pause = null;
@@ -332,9 +395,18 @@ export class Table extends EventEmitter {
     if (!p) throw new TableError(403, "session expired; scan the QR code to join again");
     if (p.graceTimer) clearTimeout(p.graceTimer);
     p.graceTimer = undefined;
+    const wasAway = !p.connected;
     p.connected = true;
+    if (wasAway && this.inRunningGame(p)) this.runtime!.noteConnection(p.seat!, true);
+    if (this.waitingFor.delete(p.id)) this.syncPlayerPause(); // the game goes on when everyone it needs is back
     this.changed();
     return p;
+  }
+
+  /** The player has a seat in the game that is running. */
+  private inRunningGame(p: Player): boolean {
+    const rt = this.runtime;
+    return !!rt && !rt.over && (this.phase === "active" || this.phase === "paused") && p.seat !== null && rt.seats.some((s) => s.seat === p.seat);
   }
 
   disconnected(playerId: string) {
@@ -342,7 +414,14 @@ export class Table extends EventEmitter {
     const p = this.players.get(playerId);
     if (!p || p.kind !== "human" || !p.connected) return;
     p.connected = false;
-    p.graceTimer = setTimeout(() => this.removePlayer(playerId, "left"), this.config.graceMs);
+    // A game that can't go on without this player waits for them (D-119): the seat is held, with no time limit.
+    const inGame = this.inRunningGame(p);
+    const need = inGame ? this.runtime!.canContinueWithout(p.seat!) : true;
+    if (inGame) this.runtime!.noteConnection(p.seat!, false, need === true ? undefined : need.wait);
+    if (need !== true) {
+      this.waitingFor.set(p.id, { seat: p.seat!, text: need.wait, since: Date.now() });
+      this.syncPlayerPause();
+    } else p.graceTimer = setTimeout(() => this.removePlayer(playerId, "left"), this.config.graceMs);
     this.changed();
   }
 
@@ -551,9 +630,11 @@ export class Table extends EventEmitter {
       throw new TableError(409, `${p.name} is the last player at the table; a game needs one (the developer setting in the board's settings allows games without)`);
     if (p.graceTimer) clearTimeout(p.graceTimer);
     this.players.delete(playerId);
+    this.waitingFor.delete(playerId);
     this.emit("removed", playerId, reason);
     if ((this.phase === "active" || this.phase === "paused") && this.runtime && p.seat !== null) {
-      this.runtime.seatLeft(p.seat); // may end the game -> onGameOver
+      // may end the game -> onGameOver; a game that needed them ends with its reason (D-119)
+      if (!this.runtime.seatLeft(p.seat)) this.syncPlayerPause();
     }
     if (this.phase === "ready") this.revalidateSelection();
     this.changed();
@@ -856,6 +937,12 @@ export class Table extends EventEmitter {
     this.stopAllAi(true);
     this.phase = "finished";
     this.pause = null;
+    // Seats held for players who are still away (D-119) are released the usual way now.
+    for (const id of this.waitingFor.keys()) {
+      const p = this.players.get(id);
+      if (p && !p.connected && !p.graceTimer) p.graceTimer = setTimeout(() => this.removePlayer(id, "left"), this.config.graceMs);
+    }
+    this.waitingFor.clear();
     // Extra games that changed while this one ran take effect now (D-097); the log below still names the code it ran.
     if (this.pendingExtra) queueMicrotask(() => this.applyPendingExtra());
     this.summary = rt.summary;

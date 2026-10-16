@@ -1,0 +1,21 @@
+{
+  "id": "partners",
+  "name": "Partners",
+  "version": "1.0.0",
+  "sdk": "^0.1",
+  "description": "Test game for players lost during a game (D-119): seats score points for their team. In \"teams\" mode the game can't go on without a full team, so it waits for a player whose phone is away; in \"free\" mode it goes on, and ends with its own reason below two players.",
+  "players": { "min": 2, "max": 4 },
+  "turnModel": "simultaneous",
+  "seatLayouts": [2, 4],
+  "edges": ["north", "south", "east", "west"],
+  "settings": [
+    { "key": "mode", "type": "enum", "values": ["teams", "free"], "default": "teams", "label": "Mode" },
+    { "key": "target", "type": "int", "min": 1, "max": 1000, "default": 100, "label": "Target" }
+  ],
+  "ai": {
+    "supported": true,
+    "options": [{ "key": "behaviour", "type": "enum", "values": ["idle", "play"], "default": "idle", "label": "Behaviour" }]
+  },
+  "simulation": { "supported": true, "headless": true },
+  "test": true
+}

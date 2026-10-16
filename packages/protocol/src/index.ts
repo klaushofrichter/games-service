@@ -192,7 +192,19 @@ export interface LobbyState {
    * Why the running game is paused and what the board may offer. "ai": an AI player is past its time for a move
    * (D-112); the board offers "Play now" for it (`ai`), and the game goes on by itself if the AI answers first.
    */
-  pause: { reason: "cloud" | "ai"; since: number; canSave: boolean; ai?: { playerId: string; name: string; seat: number; since: number } } | null;
+  pause: {
+    reason: "cloud" | "ai" | "player";
+    since: number;
+    canSave: boolean;
+    ai?: { playerId: string; name: string; seat: number; since: number };
+    /** "player" (D-119): the players the game can't go on without, whose phones are away, and the game's reason. */
+    players?: { playerId: string; name: string; seat: number; since: number; text: string }[];
+  } | null;
+  /**
+   * During a game (D-119): players the game can't go on without, with the game's reason. Removing one ends the game;
+   * the board says so before it asks.
+   */
+  needed: Record<string, string>;
   /**
    * AI players thinking about a move for more than a moment (D-112): their seat, since when, and the time they may
    * take (host clock, `deadline`). Games may show it; the board shows "Play now" once a deadline has passed.
