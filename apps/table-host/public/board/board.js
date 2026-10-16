@@ -471,7 +471,10 @@ function serviceSettings() {
     <div class="faint code-help" style="font-size:.7em;margin-top:6px">${esc(help)}</div></div>`;
 }
 
-/** A keypad for the code: the board is a touchscreen without a keyboard (a keyboard works too). */
+/**
+ * A keypad for the code: the board is a touchscreen without a keyboard. A keyboard works too, and so does pasting
+ * (Ctrl/⌘+V or the Paste button), with or without the dash the console shows.
+ */
 let codePad = null;
 function openCodePad() {
   if (codePad) return;
@@ -485,13 +488,14 @@ function openCodePad() {
       <p class="faint" style="margin:0 0 14px;font-size:.8em">From the Game Table console. It approves this table without a pairing code.</p>
       <div class="slots" aria-live="polite" aria-label="Code typed so far">${slots}</div>
       <div class="keys">${[...CODE_ALPHABET].map((k) => `<button data-key="${k}" ${typed.length >= 8 ? "disabled" : ""}>${k}</button>`).join("")}
-        <button class="wide" data-back aria-label="Delete the last character" ${typed ? "" : "disabled"}>⌫</button><button class="wide" data-clear ${typed ? "" : "disabled"}>Clear</button></div>
+        <button class="third" data-paste>Paste</button><button class="third" data-back aria-label="Delete the last character" ${typed ? "" : "disabled"}>⌫</button><button class="third" data-clear ${typed ? "" : "disabled"}>Clear</button></div>
       <div class="actions">${fromBoard ? `<button class="danger" data-remove>Remove code</button>` : ""}<span style="flex:1"></span>
         <button data-cancel>Cancel</button><button class="primary" data-save ${typed.length === 8 ? "" : "disabled"}>Use this code</button></div></div>`;
     faceFront(o.querySelector(".panel"));
   };
   const close = () => {
     document.removeEventListener("keydown", onKey, true);
+    document.removeEventListener("paste", onPaste, true);
     o.remove();
     codePad = null;
   };
@@ -507,7 +511,28 @@ function openCodePad() {
     else if (typed.length < 8 && CODE_ALPHABET.includes(k)) typed += k;
     draw();
   };
+  /** Fill in a pasted code: upper case, spaces and dashes ignored; anything else means it is not a code. */
+  const fill = (text) => {
+    const s = String(text ?? "").toUpperCase().replace(/[\s-]/g, "");
+    if (!s) return toast("The clipboard is empty");
+    if (s.length > 8 || ![...s].every((c) => CODE_ALPHABET.includes(c))) return toast("That is not an access code (8 characters, like ABCD-EFGH)");
+    typed = s;
+    draw();
+  };
+  const onPaste = (e) => {
+    e.preventDefault();
+    fill(e.clipboardData?.getData("text"));
+  };
+  const pasteButton = async () => {
+    try {
+      fill(await navigator.clipboard.readText());
+    } catch {
+      toast("The browser did not allow reading the clipboard: press Ctrl+V (⌘V on a Mac), or type the code");
+    }
+  };
   const onKey = (e) => {
+    // Shortcuts (Ctrl/⌘+V and the like) are not letters: let the browser handle them, and the paste event fills in.
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
     if (e.key === "Escape") return (e.stopPropagation(), close());
     if (e.key === "Enter" && typed.length === 8) return void save(typed);
     if (e.key === "Backspace") return (e.preventDefault(), press("back"));
@@ -521,10 +546,12 @@ function openCodePad() {
     if (b.dataset.key) press(b.dataset.key);
     else if (b.dataset.back !== undefined) press("back");
     else if (b.dataset.clear !== undefined) press("clear");
+    else if (b.dataset.paste !== undefined) pasteButton();
     else if (b.dataset.save !== undefined) save(typed);
     else if (b.dataset.remove !== undefined) save("");
   });
   document.addEventListener("keydown", onKey, true);
+  document.addEventListener("paste", onPaste, true);
   draw();
   overlayRoot.appendChild(o);
 }

@@ -6,6 +6,8 @@ page is the history. Leave it empty if there is nothing to add beyond the commit
 
 ## [Unreleased]
 
+- The board's access code keypad takes a pasted code (Ctrl/⌘+V, or its **Paste** button), with or without the
+  dash; the console now copies a new code without the dash.
 - Game logs for analysis: every game's log, simulations included, now reaches the service. A table writes the log
   as the game is played and uploads it when the game ends, retrying until the service has it; a game the table stopped
   in the middle of is uploaded after the next start, marked interrupted. Each log carries its metadata (game, table,

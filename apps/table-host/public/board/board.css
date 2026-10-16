@@ -262,8 +262,9 @@ button.copy:hover, button.copy.done { color: var(--brass); border-color: var(--b
   border: 1px solid var(--felt-line); border-radius: 12px; background: var(--felt-deep); }
 .code-pad .slot.next { border-color: var(--brass-deep); box-shadow: 0 0 0 2px rgba(214, 169, 74, .25); }
 .code-pad .dash { font: 600 30px var(--mono); color: var(--ink-soft); }
-.code-pad .keys { display: grid; grid-template-columns: repeat(8, 1fr); gap: 8px; }
+.code-pad .keys { display: grid; grid-template-columns: repeat(24, 1fr); gap: 8px; }
 .code-pad .keys button { height: 58px; padding: 0; font: 600 22px var(--mono); border-radius: 12px; }
-.code-pad .keys button.wide { grid-column: span 4; font-family: inherit; font-size: 18px; }
+.code-pad .keys button { grid-column: span 3; }
+.code-pad .keys button.third { grid-column: span 8; font-family: inherit; font-size: 18px; }
 .code-pad .keys button:disabled { opacity: .35; }
 .code-pad .actions { display: flex; gap: 12px; align-items: center; margin-top: 22px; }
