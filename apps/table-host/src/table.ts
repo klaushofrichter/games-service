@@ -53,7 +53,9 @@ interface Player extends PlayerInfo {
   remoteSession?: string; // the cloud session a remote player came through: one player per invite
   graceTimer?: NodeJS.Timeout;
   aiSeed?: number;
-  chosenColor?: string; // picked in the board's settings (D-106); otherwise the seat's colour
+  chosenColor?: string; // picked in the board's settings (D-106)
+  /** The colour the player got when first seated (their seat's, else a free one); it moves with them (D-117). */
+  keptColor?: string;
 }
 
 // Join tokens avoid look-alike characters so they can be read out loud.
@@ -411,6 +413,7 @@ export class Table extends EventEmitter {
     const m = this.selected?.game.manifest;
     if (m && !m.edges.includes(edges[seat])) throw new TableError(409, `${m.name} has no seats on the ${edges[seat]} edge`);
     const other = [...this.players.values()].find((x) => x.seat === seat && x.id !== playerId);
+    this.colors(); // fix everyone's colour before the move, so it travels with them (D-117)
     if (other) other.seat = p.seat; // swap
     p.seat = seat;
     this.changed();
@@ -460,8 +463,9 @@ export class Table extends EventEmitter {
   }
 
   /**
-   * Every seated player's colour (D-106), all different: a player's own choice first (in seat order), then their seat's
-   * colour, else the first one nobody has. Players without a seat have none.
+   * Every seated player's colour (D-106), all different: a player's own choice first (in seat order), then the colour
+   * they got when first seated (D-117: it follows them when they move), then their seat's colour, else the first one
+   * nobody has. The colour a player ends up with is kept for them. Players without a seat have none.
    */
   colors(): Map<string, string> {
     const seated = this.seated().sort((a, b) => a.seat! - b.seat!);
@@ -474,18 +478,24 @@ export class Table extends EventEmitter {
       }
     }
     for (const p of seated) {
+      if (out.has(p.id) || !p.keptColor || used.has(p.keptColor)) continue;
+      out.set(p.id, p.keptColor);
+      used.add(p.keptColor);
+    }
+    for (const p of seated) {
       if (out.has(p.id)) continue;
       const own = PLAYER_COLORS[p.seat! % PLAYER_COLORS.length];
       const c = used.has(own) ? PLAYER_COLORS.find((x) => !used.has(x)) ?? own : own;
       out.set(p.id, c);
       used.add(c);
     }
+    for (const p of seated) p.keptColor = out.get(p.id);
     return out;
   }
 
   private playerInfos(): PlayerInfo[] {
     const colors = this.colors();
-    return [...this.players.values()].map(({ sessionToken, graceTimer, aiSeed, remoteSession, chosenColor, ...info }) => ({ ...info, color: colors.get(info.id) ?? null }));
+    return [...this.players.values()].map(({ sessionToken, graceTimer, aiSeed, remoteSession, chosenColor, keptColor, ...info }) => ({ ...info, color: colors.get(info.id) ?? null }));
   }
 
   /**
