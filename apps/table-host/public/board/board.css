@@ -84,7 +84,6 @@ html, body { overflow: hidden; }
 .tile:disabled { opacity: 0.55; }
 
 .toolbar { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; align-items: center; }
-.toolbar .spacer { flex: 1; }
 /* Player management sits on the right; when the row is full it wraps as a group, still right-aligned. */
 .toolbar .right { margin-left: auto; display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end; align-items: center; }
 .toolbar.selected { margin-top: 10px; }
@@ -283,3 +282,68 @@ button.copy:hover, button.copy.done { color: var(--brass); border-color: var(--b
 .code-pad .keys button.third { grid-column: span 8; font-family: inherit; font-size: 18px; }
 .code-pad .keys button:disabled { opacity: .35; }
 .code-pad .actions { display: flex; gap: 12px; align-items: center; margin-top: 22px; }
+
+/* ---------- Game Viewer (D-120): finished games, move by move ---------- */
+/* Centred on the screen by its own centre, so turning it toward an edge (faceFront) keeps it in place. */
+.overlay.viewer { display: block; }
+.overlay .panel.viewer-panel {
+  --w: min(1560px, 96vw); --h: 92vh;
+  position: absolute; left: 50%; top: 50%; width: var(--w); height: var(--h); margin: calc(var(--h) / -2) 0 0 calc(var(--w) / -2);
+  max-height: none; display: flex; flex-direction: column; padding: 22px 28px 18px; overflow: hidden; box-sizing: border-box;
+}
+/* Turned 90° toward an east or west edge: the panel's width runs along the screen's height. */
+.overlay .panel.viewer-panel.sideways { --w: 94vh; --h: 94vw; }
+.viewer-panel .vhead { display: flex; align-items: center; gap: 14px; flex: none; }
+.viewer-panel .vhead h2 { margin: 0; flex: 1; font-size: 1.5em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.viewer-panel button.ghost { background: transparent; border-color: transparent; color: var(--ink-soft); }
+.viewer-panel button.ghost:hover { color: var(--ink); border-color: var(--felt-line); }
+.viewer-panel .intro { margin: 6px 0 14px; font-size: .8em; }
+.viewer-panel .vsub { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; font-size: .78em; color: var(--ink-soft); margin: 4px 0 10px; }
+.viewer-panel .vsub .ref { margin-left: auto; font-family: var(--mono); font-size: .9em; }
+.viewer-panel .game-pick { align-items: center; }
+.viewer-panel .game-pick span { padding: 0 10px; }
+.viewer-panel .note { font-size: .72em; margin: 0 0 8px; }
+.viewer-panel .filters { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 10px; font-size: .78em; flex: none; }
+.viewer-panel .filters > button.on { background: var(--brass); color: #1b1407; border-color: var(--brass); }
+.viewer-panel .filters .seats { max-width: 60%; overflow-x: auto; }
+.viewer-panel .goto { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+.viewer-panel .goto label { flex-direction: row; align-items: center; gap: 8px; font-size: 1em; color: var(--ink-soft); }
+.viewer-panel .goto input { width: 5.5em; padding: 6px 10px; }
+.viewer-panel .scroll { flex: 1; min-height: 0; overflow: auto; border: 1px solid var(--felt-line); border-radius: 12px; }
+.viewer-panel .empty { flex: 1; display: grid; place-items: center; font-size: .9em; }
+.vtable { width: 100%; border-collapse: collapse; font-size: .8em; }
+.vtable th { position: sticky; top: 0; background: var(--felt-deep); text-align: left; font-weight: 500; font-size: .82em; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-faint); padding: 8px 10px; z-index: 1; }
+.vtable td { padding: 10px 12px; border-top: 1px solid var(--felt-line); vertical-align: top; }
+.vtable .num { text-align: right; font-variant-numeric: tabular-nums; }
+.vtable td.n { font-family: var(--mono); color: var(--brass); }
+.vtable td.time { font-family: var(--mono); color: var(--ink-soft); white-space: nowrap; }
+.vtable td.who { white-space: nowrap; max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
+.vtable td.col { white-space: nowrap; color: var(--ink-soft); }
+.vtable td.what { width: 100%; }
+.vtable .by { font-size: .8em; }
+.vtable tbody tr[data-line], .vtable tbody tr[data-log] { cursor: pointer; }
+.vtable tbody tr[data-line]:hover, .vtable tbody tr[data-log]:hover, .vtable tbody tr:focus-visible { background: rgba(214, 169, 74, 0.08); outline: none; }
+.vtable tr.timer td.what, .vtable tr.pause td.what, .vtable tr.resume td.what, .vtable tr.start td.what, .vtable tr.end td.what, .vtable tr.seatJoined td.what, .vtable tr.seatLeft td.what, .vtable tr.disconnected td.what, .vtable tr.reconnected td.what { color: var(--ink-soft); font-style: italic; }
+.vtable tr.gap td { color: var(--brass); font-style: italic; background: rgba(214, 169, 74, 0.06); }
+.vtable tr.rejected td.what, .vtable tr.error td.what { color: #f0a597; }
+.vtable .sub { font-size: .92em; color: var(--ink-soft); margin-top: 4px; }
+.vtable tr.target td { background: rgba(214, 169, 74, 0.16); }
+.vtable.logs td { padding: 14px 12px; }
+.vtable .logid { font-family: var(--mono); font-size: .78em; color: var(--ink-faint); margin-top: 2px; }
+.vtable.logs td.players { max-width: 420px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-soft); }
+.flag { display: inline-block; margin-left: 8px; padding: 1px 8px; border-radius: 999px; font-size: .78em; font-style: normal; border: 1px solid var(--felt-line); color: var(--ink-soft); vertical-align: .05em; }
+.flag.rej, .flag.err { border-color: var(--ruby); color: #f0a597; }
+.flag.fb { border-color: var(--brass-deep); color: var(--brass); }
+.flag.auto { border-color: var(--jade); color: var(--jade); }
+.viewer-panel .pager-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 12px; font-size: .8em; flex: none; }
+.viewer-panel .step { flex: 1; min-height: 0; overflow: auto; padding-right: 6px; }
+.viewer-panel .step .big { font-size: 1.15em; margin: 10px 0 6px; }
+.viewer-panel .step .sub { color: var(--ink-soft); margin: 4px 0 0 4px; }
+.viewer-panel .refrow { display: flex; align-items: center; gap: 14px; margin: 16px 0; }
+.viewer-panel .refrow code { font-family: var(--mono); font-size: .85em; padding: 8px 12px; border-radius: 10px; background: var(--felt-deep); border: 1px solid var(--felt-line); color: var(--brass); }
+.viewer-panel .facts { display: grid; grid-template-columns: max-content 1fr; gap: 6px 22px; font-size: .8em; margin: 0 0 14px; }
+.viewer-panel .facts dt { color: var(--ink-faint); }
+.viewer-panel .facts dd { margin: 0; font-family: var(--mono); font-size: .92em; word-break: break-word; }
+.viewer-panel details { margin: 8px 0; font-size: .8em; }
+.viewer-panel summary { cursor: pointer; color: var(--ink-soft); padding: 6px 0; }
+.viewer-panel details pre.raw { max-height: 420px; margin: 6px 0 0; font-size: .92em; line-height: 1.35; }

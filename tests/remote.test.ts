@@ -235,10 +235,15 @@ describe("remote play", { timeout: 60_000 }, () => {
     expect(denied.body.error).toMatch(/switched off/);
     expect((await peer.json("POST", "/api/v1/game/play-now")).status).toBe(403);
     expect((await peer.json("GET", "/api/v1/state")).status).toBe(200); // reading still works
+    // the Game Viewer (D-120) is for remote players with board control only, and read-only
+    expect((await peer.json("GET", "/api/v1/history")).status).toBe(403);
     // and remote players can't switch it back on themselves
     expect((await peer.request("POST", "/api/v1/remote", { boardControl: true })).status).toBe(403);
     await t.ok("POST", "/remote", { boardControl: true });
     expect((await peer.json("POST", "/api/v1/layout", { seats: 4 })).status).toBe(200);
+    expect((await peer.json("GET", "/api/v1/history")).status).toBe(200);
+    expect((await peer.json("POST", "/api/v1/history")).status).toBe(405);
+    expect((await peer.request("GET", "/api/v1/logs/x.zip")).status).toBe(403); // the zips themselves stay on the table
     // settings stay with the table (D-088): a remote board can't change a game's display choices, even with control on
     await t.ok("POST", "/game/select", { gameId: "pachisi" });
     expect((await peer.json("POST", "/api/v1/game/prefs", { prefs: { colors: {} } })).status).toBe(403);

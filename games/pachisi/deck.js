@@ -1,9 +1,7 @@
 // Pachisi deck UI: roll the die, then pick which token to move (here, or by tapping it on the board, D-102).
 import { esc, playerColor, remainingMs } from "/shared/board-kit.js";
-import { pieceFace, pieceName } from "./board.js";
+import { FINISH, PIPS, pieceFace, pieceName } from "./board.js";
 
-const FINISH = 44;
-const PIPS = { 1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] };
 const dieFace = (n) =>
   `<div style="width:84px;height:84px;border-radius:16px;background:#fbf8ef;display:grid;grid-template:repeat(3,1fr)/repeat(3,1fr);padding:12px;flex:none;box-shadow:0 8px 20px rgba(0,0,0,.4)">${Array.from({ length: 9 }, (_, k) => `<i style="width:14px;height:14px;border-radius:50%;background:#1b1a17;place-self:center;visibility:${n && PIPS[n].includes(k) ? "visible" : "hidden"}"></i>`).join("")}</div>`;
 const after = (p, die) => {

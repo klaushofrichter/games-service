@@ -12,6 +12,7 @@ happened in a game, why a rule misbehaved, or why an AI made a move.
 | `run.json` | Metadata: which game and version, which table, when, who played, settings, how it ended, counts, verification. |
 | `game-001.jsonl` | Every record of game 1, one JSON object per line, in order. A simulation has `game-002.jsonl` and so on. |
 | `game-001.state.json` | The game's complete state when the log ended (the rules' own state object). Absent if it could not be rebuilt. |
+| `game-001.moves.jsonl` | The move list: every record of game 1 as a readable row, player moves numbered (see *Moves* below). Absent in simulations and older logs. |
 
 ## run.json
 
@@ -54,6 +55,9 @@ simulation). Seats are numbers from 0; the `start` record maps them to players, 
   `boardView`, `isOver`, `canContinueWithout`; `seat` if it was one player's view). Only the first 20 are recorded; `counts.errors` has all.
 - `disconnected`: a player's phone went away (`seat`); `waiting` is the game's text when it could not go on without
   them (the game was paused until they were back). `reconnected`: the phone came back. Not inputs; replay skips them.
+- `pause`: the game stood still, `reason` `cloud` (the connection to the service was lost), `ai` (an AI player, `seat`,
+  ran over its time) or `player` (waiting for a player who went away). `resume`: it went on, `reason` `cloud`, `ai` (the
+  AI answered), `playNow` (the AI's quick move was played) or `player` (everyone is back). Not inputs; replay skips them.
 - `snapshot`: the complete state after `inputs` accepted inputs (only if the table was set to take snapshots).
 - `end`: `reason` as above, `summary` (`text` and `highlights`, the game's own result; null when interrupted) and
   `stateHash` (a fingerprint of the final state; null if it could not be rebuilt).
@@ -64,3 +68,26 @@ The state after any record can be rebuilt exactly: start the game's rules with t
 and seats, and feed the `intent`, `timer`, `seatJoined` and `seatLeft` records in order (the refused ones too). The
 table does this to verify every log. To understand a game without the rules, follow the records: who moved what, what
 was refused and why, which events followed, and compare with `game-NNN.state.json` at the end.
+
+## Moves (`game-NNN.moves.jsonl`)
+
+The same game as rows a person or an LLM can follow, one JSON object per line, as the table's Game Viewer shows it.
+**Player moves are numbered from 1** (`n`), refused ones too, in the order they were sent: "move 43" means the row with
+`n: 43`. Every other record (a timer, a player joining or leaving, a pause) is a row with `n: null` between the moves.
+Each row has:
+
+- `line`: the record's line in `game-NNN.jsonl` (the `start` record is line 1), to find the raw record.
+- `kind`: `move`, `timer`, `seatJoined`, `seatLeft`, `disconnected`, `reconnected`, `pause`, `resume`, `error`,
+  `snapshot`, `start`, `end`, or `gap`: no record for at least two minutes without a pause to explain it (its `line` is
+  the record after the silence).
+- `at` (as in the record) and `t` (milliseconds since the start); `seat` and `player` (name); for moves `by`, `intent`,
+  `accepted`, `reason`, `ai` as in the record; `error` (the message) if the rules threw; `events` (how many).
+- `text`: what happened, in words. Games describe their own steps (`flags` has `described`); otherwise it is a generic
+  line made from the record.
+- `columns`: game-specific values for the viewer's columns (e.g. round, die, card), `details`: more from the game.
+- `steps`: what happened within this row for other players or by the rules alone, e.g. a coin flipped once everyone
+  had guessed, a move a turn timer made, a forced move; `auto: true` marks a move nobody chose.
+- `flags`: `rejected` (refused), `error`, `fallback` (an AI's quick move), `auto` (the rules moved by themselves).
+
+`node scripts/game-log.ts <zip> move 43` in the games-service repository prints a move in full, with the state before
+and after it rebuilt by replay (`moves 40-45` for a range, `info` for an overview).

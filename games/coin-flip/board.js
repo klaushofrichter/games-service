@@ -44,8 +44,9 @@ export function mount(root) {
     if (ms === null) return void (el.innerHTML = "");
     const s = Math.ceil(ms / 1000);
     const frac = view.roundMs ? Math.max(0, Math.min(1, ms / view.roundMs)) : 0;
-    el.innerHTML = `<div style="font-family:var(--mono);font-size:44px;color:${s <= 5 ? "var(--ruby, #e8735f)" : "var(--brass)"}">${s}</div>
-      <div style="height:8px;border-radius:4px;background:rgba(255,255,255,.12);overflow:hidden"><div style="height:100%;width:${(frac * 100).toFixed(1)}%;background:${s <= 5 ? "var(--ruby, #e8735f)" : "var(--brass)"};transition:width .25s linear"></div></div>
+    const color = s <= 5 ? "var(--ruby, #e8735f)" : "var(--brass)";
+    el.innerHTML = `<div style="font-family:var(--mono);font-size:44px;color:${color}">${s}</div>
+      <div style="height:8px;border-radius:4px;background:rgba(255,255,255,.12);overflow:hidden"><div style="height:100%;width:${(frac * 100).toFixed(1)}%;background:${color};transition:width .25s linear"></div></div>
       <div class="muted" style="font-size:18px;margin-top:6px">seconds to pick</div>`;
   };
   const tick = setInterval(clock, 250);

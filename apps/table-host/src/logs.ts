@@ -6,6 +6,7 @@ import { mkdir, readdir, readFile, rename, rm, writeFile, stat, unlink } from "n
 import { join } from "node:path";
 import JSZip from "jszip";
 import type { LogRecord } from "./runtime.ts";
+import type { MoveRow } from "./moves.ts";
 
 /** What a log says about itself (run.json). Format 2 (D-116) adds everything after `gameSource`. */
 export interface RunMeta {
@@ -146,7 +147,7 @@ export class LogStore {
    * Pack a log: run.json, the README, each game's records and, where given, its final state. It is queued for the
    * service at once (D-116); the queue entry goes when the service has it, or with the log at the end of retention.
    */
-  async save(meta: RunMeta, games: LogRecord[][], states: unknown[] = []): Promise<string> {
+  async save(meta: RunMeta, games: LogRecord[][], states: unknown[] = [], moves: (MoveRow[] | undefined)[] = []): Promise<string> {
     await mkdir(this.dir, { recursive: true });
     const zip = new JSZip();
     zip.file("README.md", README);
@@ -155,6 +156,8 @@ export class LogStore {
       const n = String(i + 1).padStart(3, "0");
       zip.file(`game-${n}.jsonl`, records.map((r) => JSON.stringify(r)).join("\n") + "\n");
       if (states[i] !== undefined) zip.file(`game-${n}.state.json`, JSON.stringify(states[i], null, 1));
+      // The move list (D-120): the records as readable rows, player moves numbered, as the game described them.
+      if (moves[i]) zip.file(`game-${n}.moves.jsonl`, moves[i]!.map((r) => JSON.stringify(r)).join("\n") + "\n");
     });
     const buf = await zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE" });
     const file = join(this.dir, `${meta.id}.zip`);
@@ -171,9 +174,9 @@ export class LogStore {
   }
 
   /** The game ended: pack its log and remove the running file. */
-  async finish(running: RunningLog, meta: RunMeta, records: LogRecord[], state: unknown): Promise<string> {
+  async finish(running: RunningLog, meta: RunMeta, records: LogRecord[], state: unknown, moves?: MoveRow[]): Promise<string> {
     running.close();
-    const file = await this.save(meta, [records], [state]);
+    const file = await this.save(meta, [records], [state], [moves]);
     if (running.dir) await rm(running.dir, { recursive: true, force: true });
     return file;
   }
@@ -202,8 +205,8 @@ export class LogStore {
   }
 
   /** Pack an interrupted game's log under its own id and remove its running file. */
-  async saveInterrupted(dir: string, meta: RunMeta, records: LogRecord[], state: unknown): Promise<string> {
-    const file = await this.save(meta, [records], [state]);
+  async saveInterrupted(dir: string, meta: RunMeta, records: LogRecord[], state: unknown, moves?: MoveRow[]): Promise<string> {
+    const file = await this.save(meta, [records], [state], [moves]);
     await rm(dir, { recursive: true, force: true });
     return file;
   }
@@ -280,15 +283,61 @@ export class LogStore {
     }
   }
 
-  static async unzip(buf: Buffer): Promise<{ meta: RunMeta; games: LogRecord[][] }> {
+  static async unzip(buf: Buffer): Promise<{ meta: RunMeta; games: LogRecord[][]; moves: (MoveRow[] | null)[] }> {
     const zip = await JSZip.loadAsync(buf);
     const meta = JSON.parse(await zip.file("run.json")!.async("string")) as RunMeta;
-    const names = Object.keys(zip.files).filter((n) => n.endsWith(".jsonl")).sort();
+    const names = Object.keys(zip.files).filter((n) => /^game-\d+\.jsonl$/.test(n)).sort();
     const games: LogRecord[][] = [];
+    const moves: (MoveRow[] | null)[] = [];
+    const lines = (text: string) => text.trim().split("\n").filter(Boolean).map((l) => JSON.parse(l));
     for (const n of names) {
-      const text = await zip.file(n)!.async("string");
-      games.push(text.trim().split("\n").map((l) => JSON.parse(l)));
+      games.push(lines(await zip.file(n)!.async("string")));
+      const m = zip.file(n.replace(/\.jsonl$/, ".moves.jsonl"));
+      moves.push(m ? lines(await m.async("string")) : null);
     }
-    return { meta, games };
+    return { meta, games, moves };
+  }
+
+  /** Recently opened logs, unpacked (D-120): the Game Viewer pages through one log with many small requests. */
+  private opened = new Map<string, { modified: number; log: Awaited<ReturnType<typeof LogStore.unzip>> }>();
+  /** run.json of every log, by id and modification time, for the viewer's list. */
+  private metas = new Map<string, { modified: number; meta: RunMeta }>();
+
+  /** A stored log, unpacked; null if there is no such log. Kept for a few logs, until the file changes. */
+  async open(id: string): Promise<Awaited<ReturnType<typeof LogStore.unzip>> | null> {
+    if (!/^[A-Za-z0-9-]+$/.test(id)) return null;
+    const s = await stat(join(this.dir, `${id}.zip`)).catch(() => null);
+    if (!s) return null;
+    const hit = this.opened.get(id);
+    if (hit && hit.modified === s.mtimeMs) return hit.log;
+    const buf = await this.read(id);
+    if (!buf) return null;
+    const log = await LogStore.unzip(buf);
+    this.opened.delete(id);
+    this.opened.set(id, { modified: s.mtimeMs, log });
+    while (this.opened.size > 4) this.opened.delete(this.opened.keys().next().value!);
+    return log;
+  }
+
+  /** Every stored log with its run.json, newest first (D-120). A log that cannot be read is left out. */
+  async listWithMeta(): Promise<{ id: string; bytes: number; modified: string; meta: RunMeta }[]> {
+    const out = [];
+    for (const l of await this.list()) {
+      const modified = Date.parse(l.modified);
+      let hit = this.metas.get(l.id);
+      if (!hit || hit.modified !== modified) {
+        try {
+          const buf = await this.read(l.id);
+          if (!buf) continue;
+          const zip = await JSZip.loadAsync(buf);
+          hit = { modified, meta: JSON.parse(await zip.file("run.json")!.async("string")) as RunMeta };
+          this.metas.set(l.id, hit);
+        } catch {
+          continue;
+        }
+      }
+      out.push({ ...l, meta: hit.meta });
+    }
+    return out;
   }
 }

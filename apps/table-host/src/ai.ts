@@ -81,13 +81,7 @@ export class AiWorker {
   /** Stop a move in progress: the thread is terminated and the caller's promise rejects with AiCancelled. */
   cancel() {
     if (!this.pending && this.worker) return; // idle: keep the thread (and its loaded rules) for the next move
-    const p = this.pending;
-    this.pending = null;
-    const w = this.worker;
-    this.worker = null;
-    this.ready = null;
-    void w?.terminate();
-    p?.reject(new AiCancelled());
+    this.terminate();
   }
 
   terminate() {

@@ -228,10 +228,13 @@ async function openTerms(back) {
  * own colour from the board's settings (D-106), else the seat's), with near-black or white letters, whichever contrasts more.
  */
 function seatBadgeHtml(p) {
-  const color = playerColor({ players: state.players, prefs: state.game?.prefs ?? {} }, p.seat);
+  const color = colorOf(p.seat);
   const title = esc(seatTitle(state.seatEdges, p.seat));
   return `<div class="badge" style="background:${color};color:${inkOn(color)}" title="${title}, your colour" aria-label="${title}">${esc(seatBadge(state.seatEdges, p.seat))}</div>`;
 }
+
+/** A seated player's colour (D-106), as the board shows it. */
+const colorOf = (seat) => playerColor({ players: state.players, prefs: state.game?.prefs ?? {} }, seat);
 
 /** The seat as compass initials for the badge beside the name (D-093): "NE", "S". */
 const seatBadge = (edges, seat) => seatName(edges, seat).replace(/(north|south|east|west)/g, (w) => w[0]).toUpperCase();
@@ -293,7 +296,7 @@ function renderJoin() {
 function renderLobby(p) {
   const players = state.players
     // Each name with a dot in that player's colour (D-104), the colour of their plate on the board; no seat, no colour.
-    .map((x) => `<div class="row"><span class="${x.id === me ? "me" : ""}"><span class="pdot${x.seat == null ? " none" : ""}"${x.seat == null ? "" : ` style="background:${playerColor({ players: state.players, prefs: state.game?.prefs ?? {} }, x.seat)}"`} aria-hidden="true"></span>${esc(x.name)}</span>
+    .map((x) => `<div class="row"><span class="${x.id === me ? "me" : ""}"><span class="pdot${x.seat == null ? " none" : ""}"${x.seat == null ? "" : ` style="background:${colorOf(x.seat)}"`} aria-hidden="true"></span>${esc(x.name)}</span>
       <span class="muted">${x.seat == null ? "no seat" : `${esc(seatName(state.seatEdges, x.seat))} seat`}${state.phase === "ready" ? (x.ready ? " · ready" : " · not ready") : ""}${x.connected ? "" : " · away"}</span></div>`)
     .join("");
   let action = `<div class="card muted">Choose a game on the board.</div>`;
