@@ -3,7 +3,7 @@
 // own `describe` can say what each step meant and the state before and after any step can be shown.
 import type { GameDefinition, GameEvent, Intent, StepDescription, StepInfo } from "../../../packages/sdk/src/index.ts";
 import type { Manifest } from "../../../packages/protocol/src/index.ts";
-import { GameRuntime, VirtualClock, type AiMoveMeta, type LogRecord } from "./runtime.ts";
+import { feedInput, GameRuntime, VirtualClock, type AiMoveMeta, type LogRecord } from "./runtime.ts";
 
 export type RowKind = "start" | "move" | "timer" | "seatJoined" | "seatLeft" | "disconnected" | "reconnected" | "pause" | "resume" | "error" | "snapshot" | "gap" | "end";
 
@@ -141,14 +141,7 @@ class Stepper {
   }
   /** Feed one input as the table did; an exception the game threw then, it throws again now (D-116). */
   feed(r: InputRecord) {
-    try {
-      if (r.t === "intent") this.rt.submit(r.seat, r.intent, r.by);
-      else if (r.t === "timer") this.rt.fireTimer(r.id);
-      else if (r.t === "seatJoined") this.rt.seatJoined(r.seat);
-      else this.rt.seatLeft(r.seat);
-    } catch {
-      // the same exception as in the game
-    }
+    feedInput(this.rt, r);
   }
 }
 
@@ -286,7 +279,15 @@ export interface MoveQuery {
 
 const PROBLEM = new Set(["rejected", "error", "fallback"]);
 /** Rows that are a problem by themselves: silence, a pause, an error, a phone that went away. */
-export const PROBLEM_KINDS = new Set<RowKind>(["gap", "pause", "error", "disconnected"]);
+const PROBLEM_KINDS = new Set<RowKind>(["gap", "pause", "error", "disconnected"]);
+
+/** A row with a problem: a refused move, an error, an AI fallback, or a problem kind of row. */
+export const isProblem = (r: MoveRow) => r.flags.some((f) => PROBLEM.has(f)) || PROBLEM_KINDS.has(r.kind);
+
+/** A move list packed in a zip (D-120), as buildMoves would return it. */
+export function packedList(rows: MoveRow[]): MoveList {
+  return { rows, moves: rows.reduce((a, r) => Math.max(a, r.n ?? 0), 0), described: rows.some((r) => r.flags.includes("described")) };
+}
 
 /** One page of a move list, filtered. `offset` is into the filtered rows. */
 export function pageMoves(list: MoveList, q: MoveQuery = {}) {
@@ -296,7 +297,7 @@ export function pageMoves(list: MoveList, q: MoveQuery = {}) {
     (r) =>
       (q.seat === undefined || r.seat === q.seat) &&
       (!q.movesOnly || r.kind === "move") &&
-      (!q.problems || r.flags.some((f) => PROBLEM.has(f)) || PROBLEM_KINDS.has(r.kind)) &&
+      (!q.problems || isProblem(r)) &&
       (!needle || r.text.toLowerCase().includes(needle) || (r.player ?? "").toLowerCase().includes(needle)),
   );
   let offset = Math.max(0, Math.round(q.offset ?? 0));
