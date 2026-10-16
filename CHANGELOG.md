@@ -6,6 +6,9 @@ page is the history. Leave it empty if there is nothing to add beyond the commit
 
 ## [Unreleased]
 
+- Board, Up next screen: each player's chip is framed in their colour, with a ring that fills once they are ready;
+  a player whose phone dropped shows no dot on a red background. Tapping a chip offers **Remove**, online or not.
+- Board lobby: a selected player's card shows its thicker border in the player's colour instead of brass.
 - The board's access code badge shows how long the code is valid (*valid forever*, *valid for 12 weeks*, … *valid
   for 30 minutes*), and *expired* in red once it has run out, while the table keeps working.
 - The board's access code keypad takes a pasted code (Ctrl/⌘+V, or its **Paste** button), with or without the
