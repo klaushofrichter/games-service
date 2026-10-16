@@ -6,6 +6,10 @@ page is the history. Leave it empty if there is nothing to add beyond the commit
 
 ## [Unreleased]
 
+- Board: **Escape** closes the topmost window (settings, lobby, dialogs), like a tap beside it; in a confirmation it
+  means Cancel (D-122). The settings and lobby windows no longer rebuild while a game runs: in a game of AI players the
+  settings jumped back to the top several times a second, so *Done* could not be reached. *Done* now stays at the bottom
+  of the settings.
 - Hold'em and Roulette use the players' lobby colours (D-121): the winner's name and the bets in Hold'em, the chips in
   Roulette, as on the seat plates. Before, they used the seat's colour, so a colour picked in the settings did not show.
 - Roulette: chips sit on their cells again. Their drop-in animation moved every chip to the layout's top-left corner;
