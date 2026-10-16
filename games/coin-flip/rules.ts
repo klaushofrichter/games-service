@@ -67,12 +67,13 @@ function describeStep(step: StepInfo<State>): StepDescription | null {
     };
   };
   const scores = (seat: number | null) => (seat === null ? null : (after.scores[seat] ?? 0));
+  const picks = () => ({ picks: Object.fromEntries(before.active.map((s) => [after.names[s], after.lastGuesses[s] ?? "none"])) });
   if (step.kind === "intent") {
     const g = String(step.intent?.payload ?? "");
     return {
       text: step.accepted ? `guesses ${g}` : `tries to guess ${g || "nothing"}`,
       columns: { round, guess: step.accepted ? g : null, coin: flipped ? after.lastFlip : null, score: scores(step.seat) },
-      ...(flipped ? { steps: [flip()], details: { picks: Object.fromEntries(before.active.map((s) => [after.names[s], after.lastGuesses[s] ?? "none"])) } } : {}),
+      ...(flipped ? { steps: [flip()], details: picks() } : {}),
     };
   }
   if (step.kind === "timer" && flipped) {
@@ -80,7 +81,7 @@ function describeStep(step: StepInfo<State>): StepDescription | null {
       text: `Time is up in round ${round}`,
       columns: { round, guess: null, coin: after.lastFlip, score: null },
       steps: [flip()],
-      details: { picks: Object.fromEntries(before.active.map((s) => [after.names[s], after.lastGuesses[s] ?? "none"])) },
+      details: picks(),
     };
   }
   if (step.kind === "seatLeft" && flipped) return { text: `${step.names[step.seat!] ?? "A player"} left; everyone else had guessed`, columns: { round, coin: after.lastFlip }, steps: [flip()] };
