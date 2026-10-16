@@ -468,7 +468,7 @@ def dialogs(browser, board):
     board.wait_for_selector(".dialog:has-text('Remove Mira?')")
     board.click(".dialog [data-x=yes]")
     wait(lambda: all(p["name"] != "Mira" for p in api("GET", "/state")["players"]), 5, "Mira to be removed")
-    # Klaus is now the last player at the table, with a game chosen (D-117): the board says he can't be removed
+    # Klaus is now the last player at the table, with a game chosen (D-118): the board says he can't be removed
     # instead of asking.
     klaus = next(p for p in api("GET", "/state")["players"] if p["name"] == "Klaus")
     board.click(f".ready-list [data-chip='{klaus['id']}']")

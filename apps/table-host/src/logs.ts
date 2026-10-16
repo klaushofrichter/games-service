@@ -29,7 +29,7 @@ export interface RunMeta {
   settings?: Record<string, unknown>;
   players?: PlayerMeta[];
   seed?: number;
-  /** Developer settings that were on (D-117), e.g. a game started without a player at the table. */
+  /** Developer settings that were on (D-118), e.g. a game started without a player at the table. */
   developer?: { allowNoLocalPlayer?: boolean };
   endReason?: string;
   endReasons?: Record<string, number>;

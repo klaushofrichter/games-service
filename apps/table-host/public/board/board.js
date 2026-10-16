@@ -120,7 +120,7 @@ async function chooseGame(id) {
 }
 
 /**
- * The last player at the table can't be removed while a game is chosen or running (D-117), unless the developer
+ * The last player at the table can't be removed while a game is chosen or running (D-118), unless the developer
  * setting allows games without one: say so instead of asking. The table refuses it too.
  */
 function cannotRemove(p) {
@@ -307,7 +307,7 @@ function placeSettings(playing) {
   const front = playing ? gameEdge() : viewEdge();
   let [corner, other] = FRONT_CORNERS[front];
   if (playing && LOBBY_CORNER[state.game?.lobbyButton ?? "bottom-right"] === corner) corner = other;
-  // The developer setting (D-117) marks the gear while it is on, so nobody forgets it.
+  // The developer setting (D-118) marks the gear while it is on, so nobody forgets it.
   settingsBtn.className = `${corner} along-${front === "south" || front === "north" ? "x" : "y"}${state.developer?.allowNoLocalPlayer ? " dev" : ""}`;
   settingsBtn.querySelector("svg").style.transform = `rotate(${ROT[front]}deg)`;
   placeFlip(playing, front, corner);
@@ -773,7 +773,7 @@ function playerChip(p) {
 function renderReady() {
   const humans = state.players.filter((p) => p.kind === "human" && p.seat !== null);
   const needs = state.game.needs ?? [];
-  // AI players only (the developer setting, D-117): nobody needs to tap Ready.
+  // AI players only (the developer setting, D-118): nobody needs to tap Ready.
   const all = needs.length === 0 && (humans.length > 0 || state.developer?.allowNoLocalPlayer) && humans.every((p) => p.ready && p.connected);
   const seated = state.players.filter((p) => p.seat !== null).length;
   const g = games.find((x) => x.id === state.game.id);

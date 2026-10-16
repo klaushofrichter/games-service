@@ -1,4 +1,4 @@
-"""Browser check of the developer setting "Games without a player at the table" (D-117).
+"""Browser check of the developer setting "Games without a player at the table" (D-118).
   python3 scripts/e2e/developer.py out/
 
 A Table Host of its own (port 8094). With the setting off, the board says the last player at the table can't be

@@ -26,7 +26,7 @@ export function baseMeta(o: {
   startedAt: number;
   settings: Record<string, unknown>;
   players: PlayerMeta[];
-  /** Developer settings in force when the game started (D-117); only those that are on. */
+  /** Developer settings in force when the game started (D-118); only those that are on. */
   developer?: { allowNoLocalPlayer?: boolean };
   games?: number;
   seed?: number;

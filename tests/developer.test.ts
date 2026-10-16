@@ -1,4 +1,4 @@
-// The developer setting "Games without a player at the table" (D-117): off at every start, the table's board turns it
+// The developer setting "Games without a player at the table" (D-118): off at every start, the table's board turns it
 // on. Off: a game needs a player at the table, and the board can't remove the last one while a game is chosen or
 // running (a phone that goes away still leaves). On: remote and AI players only, or AI players only.
 import { afterEach, describe, expect, it } from "vitest";
@@ -10,7 +10,7 @@ afterEach(async () => t?.close());
 
 const pick = (rounds = 1) => t.ok("POST", "/game/select", { gameId: "coin-flip", settings: { rounds, roundSeconds: 0 } });
 
-describe("games without a player at the table (D-117)", () => {
+describe("games without a player at the table (D-118)", () => {
   it("is off at start, and the state says so", async () => {
     t = await testHost();
     expect((await t.ok("GET", "/state")).developer).toEqual({ allowNoLocalPlayer: false, protectedPlayer: null });

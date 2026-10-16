@@ -6,6 +6,8 @@ page is the history. Leave it empty if there is nothing to add beyond the commit
 
 ## [Unreleased]
 
+- A player's colour stays with them when they move to another seat (D-117); before, the default colour changed
+  with the seat.
 - A developer setting in the board's Settings, *Games without a player at the table*: off at every start, it allows
   games with remote and AI players only, or AI players only, for testing. While it is off, the board no longer removes
   the last player at the table once a game is chosen or running. The gear shows DEV while it is on.

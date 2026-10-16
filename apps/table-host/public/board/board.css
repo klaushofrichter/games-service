@@ -215,7 +215,7 @@ pre.raw { font-family: var(--mono); font-size: 0.7em; color: var(--ink-soft); ba
 }
 #settings-button:hover { opacity: 1; color: var(--brass); border-color: var(--brass-deep); }
 #settings-button svg { transition: transform .3s; }
-/* Developer setting on (D-117): a small tag on the gear. */
+/* Developer setting on (D-118): a small tag on the gear. */
 #settings-button.dev { opacity: 1; color: var(--brass); border-color: var(--brass-deep); }
 #settings-button.dev::after {
   content: "DEV"; position: absolute; top: -9px; right: -14px; padding: 1px 6px; border-radius: 8px;
