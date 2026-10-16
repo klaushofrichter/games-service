@@ -6,6 +6,10 @@ page is the history. Leave it empty if there is nothing to add beyond the commit
 
 ## [Unreleased]
 
+- Hold'em and Roulette use the players' lobby colours (D-121): the winner's name and the bets in Hold'em, the chips in
+  Roulette, as on the seat plates. Before, they used the seat's colour, so a colour picked in the settings did not show.
+- Roulette: chips sit on their cells again. Their drop-in animation moved every chip to the layout's top-left corner;
+  now only new chips drop in, in place.
 - **Game Viewer** on the board (D-120): *Game logs* in the settings and the lobby lists the finished games on this
   table. A game opens as a table of its moves, numbered, with the time, the player and what happened in the game's
   own words (Coin Flip and Pachisi describe theirs), filters for a player, moves only and problems, *Move #* to jump to
