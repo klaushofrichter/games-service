@@ -202,6 +202,11 @@ export interface LobbyState {
   remote: { boardControl: boolean; maxPlayers: number; players: number };
   /** The table's display choices from the board's settings (D-092), followed by every board, remote ones too. */
   display: { sound: boolean };
+  /**
+   * The developer setting (D-117): games without a player at the table. `protectedPlayer`: the one player the board
+   * may not remove while it is off (the last one at the table, while a game is chosen or running).
+   */
+  developer: { allowNoLocalPlayer: boolean; protectedPlayer: string | null };
 }
 
 export interface CloudStatus {

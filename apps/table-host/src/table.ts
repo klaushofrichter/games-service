@@ -46,6 +46,8 @@ export interface TableConfig {
   showTestGames: boolean; // stub games used by the automated tests
   /** A snapshot of the whole state in the log every N inputs (D-116); 0: none. */
   logSnapshotEvery?: number;
+  /** The developer setting's value at start (ALLOW_NO_LOCAL_PLAYER, D-117); the board can change it until a restart. */
+  allowNoLocalPlayer?: boolean;
 }
 
 interface Player extends PlayerInfo {
@@ -98,6 +100,7 @@ export class Table extends EventEmitter {
   constructor(config: TableConfig, games: Map<string, InstalledGame>, logs: LogStore) {
     super();
     this.config = config;
+    this.allowNoLocalPlayer = !!config.allowNoLocalPlayer;
     this.games = games;
     this.logs = logs;
     this.rotateJoinToken();
@@ -153,6 +156,7 @@ export class Table extends EventEmitter {
         .filter(([, m]) => m.shown)
         .map(([playerId, m]) => ({ playerId, seat: m.seat, since: m.startedAt, deadline: m.deadline })),
       display: { sound: this.sound },
+      developer: { allowNoLocalPlayer: this.allowNoLocalPlayer, protectedPlayer: this.protectedPlayer()?.id ?? null },
       remote: { boardControl: this.remoteBoardControl, maxPlayers: this.config.maxRemotePlayers, players: this.humans().filter((p) => p.location === "remote").length },
     };
   }
@@ -249,6 +253,31 @@ export class Table extends EventEmitter {
   }
 
   /** Remote boards may act unless switched off at the table or by the running game's manifest (D-006). */
+  /**
+   * Developer setting (D-117): games may start, and go on, without a player at the table (remote players and AIs, or
+   * AIs only). In memory only, so every start of the Table Host turns it off unless ALLOW_NO_LOCAL_PLAYER=1.
+   */
+  allowNoLocalPlayer = false;
+
+  setDeveloper(d: unknown) {
+    const v = (d as { allowNoLocalPlayer?: unknown } | null)?.allowNoLocalPlayer;
+    if (typeof v !== "boolean") throw new TableError(400, "allowNoLocalPlayer must be true or false");
+    if (v === this.allowNoLocalPlayer) return;
+    this.allowNoLocalPlayer = v;
+    if (this.phase === "ready") this.revalidateSelection();
+    this.changed();
+  }
+
+  /**
+   * The player the board may not remove (D-117): the last human seated at the table while a game is chosen or
+   * running, unless the developer setting allows games without one. A phone that goes away still leaves.
+   */
+  protectedPlayer(): Player | null {
+    if (this.allowNoLocalPlayer || !["ready", "active", "paused"].includes(this.phase)) return null;
+    const local = this.seated().filter((p) => p.kind === "human" && p.location === "local");
+    return local.length === 1 ? local[0] : null;
+  }
+
   remoteBoardControl = true;
 
   setRemoteBoardControl(on: boolean) {
@@ -508,6 +537,8 @@ export class Table extends EventEmitter {
   /** Evict a human (revokes the session) or remove an AI. */
   removePlayer(playerId: string, reason: "evicted" | "left" = "evicted") {
     const p = this.mustPlayer(playerId);
+    if (reason === "evicted" && this.protectedPlayer()?.id === p.id)
+      throw new TableError(409, `${p.name} is the last player at the table; a game needs one (the developer setting in the board's settings allows games without)`);
     if (p.graceTimer) clearTimeout(p.graceTimer);
     this.players.delete(playerId);
     this.emit("removed", playerId, reason);
@@ -658,7 +689,7 @@ export class Table extends EventEmitter {
         needs.push(counts.length === 1 ? `needs exactly ${counts[0]} players, ${more} more` : `needs ${more} more player${more === 1 ? "" : "s"}`);
       }
     }
-    if (!seated.some((p) => p.kind === "human" && p.location === "local")) needs.push("needs at least one player at the table");
+    if (!this.allowNoLocalPlayer && !seated.some((p) => p.kind === "human" && p.location === "local")) needs.push("needs at least one player at the table");
     return needs;
   }
 
@@ -1089,7 +1120,7 @@ export class Table extends EventEmitter {
 
   /** Write the game's log to disk from its first record (D-116). A disk problem must not stop the game. */
   private beginLog(rt: GameRuntime, game: InstalledGame, settings: Record<string, unknown>, aiOptions: Record<number, Record<string, unknown>>) {
-    const meta = baseMeta({ id: logId(game.manifest.id), game, tableName: this.config.tableName, tableId: this.tableId, simulation: false, startedAt: this.gameStartedAt, settings, players: this.playersMeta(aiOptions) });
+    const meta = baseMeta({ id: logId(game.manifest.id), game, tableName: this.config.tableName, tableId: this.tableId, simulation: false, startedAt: this.gameStartedAt, settings, players: this.playersMeta(aiOptions), developer: { allowNoLocalPlayer: this.allowNoLocalPlayer } });
     try {
       const log = this.logs.begin(meta);
       for (const r of rt.log) log.append(r);

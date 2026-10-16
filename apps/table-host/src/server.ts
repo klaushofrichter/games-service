@@ -33,7 +33,7 @@ export const remoteOf = (req: IncomingMessage): RemoteContext | undefined => (re
 type Client = ({ ws: WebSocket; role: "board" } | { ws: WebSocket; role: "deck"; playerId: string } | { ws: WebSocket; role: "pending" }) & { remote?: boolean };
 
 /** Reads a remote client may make: lobby and game state, never logs, saves, simulations or local join codes. */
-const REMOTE_DENIED = /^\/(join|simulation|logs|saves|invites|remote|qr|cloud)(\/|$)/;
+const REMOTE_DENIED = /^\/(join|simulation|logs|saves|invites|remote|qr|cloud|developer)(\/|$)/;
 /**
  * Changes a remote client may make (an allowlist): seat layout and running games. Never turn the table's
  * board (remote boards face their own seat), remove or move players, add AI seats, change AI options,
@@ -173,6 +173,7 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
     let match: RegExpMatchArray | null;
 
     if (m === "GET" && path === "/state") return json(res, 200, forClient(!!remote, table.state()));
+    if (m === "POST" && path === "/developer") return (table.setDeveloper(body), json(res, 200, table.state()));
     if (m === "POST" && path === "/remote") return (table.setRemoteBoardControl(!!body.boardControl), json(res, 200, table.state()));
     if (m === "POST" && path === "/invites") {
       if (!opts.createInvite) throw new TableError(409, "remote play needs the Game Table service (CLOUD_URL)");

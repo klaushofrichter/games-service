@@ -119,6 +119,16 @@ async function chooseGame(id) {
   if (settings) act("POST", "/game/select", { gameId: id, settings });
 }
 
+/**
+ * The last player at the table can't be removed while a game is chosen or running (D-117), unless the developer
+ * setting allows games without one: say so instead of asking. The table refuses it too.
+ */
+function cannotRemove(p) {
+  if (!p || state.developer?.protectedPlayer !== p.id) return false;
+  toast(`${p.name} is the last player at the table, and a game needs one. The developer setting in Settings allows games without.`);
+  return true;
+}
+
 /** The AI player's window: how it plays in the chosen game, and Remove (D-103), which works with or without a game. */
 async function configureAi(playerId) {
   const p = state.players.find((x) => x.id === playerId);
@@ -297,7 +307,8 @@ function placeSettings(playing) {
   const front = playing ? gameEdge() : viewEdge();
   let [corner, other] = FRONT_CORNERS[front];
   if (playing && LOBBY_CORNER[state.game?.lobbyButton ?? "bottom-right"] === corner) corner = other;
-  settingsBtn.className = `${corner} along-${front === "south" || front === "north" ? "x" : "y"}`;
+  // The developer setting (D-117) marks the gear while it is on, so nobody forgets it.
+  settingsBtn.className = `${corner} along-${front === "south" || front === "north" ? "x" : "y"}${state.developer?.allowNoLocalPlayer ? " dev" : ""}`;
   settingsBtn.querySelector("svg").style.transform = `rotate(${ROT[front]}deg)`;
   placeFlip(playing, front, corner);
 }
@@ -400,6 +411,9 @@ function openSettings() {
       ${gameSettings}
       ${items.length ? `<div class="group game-settings"><div class="eyebrow">${esc(state.game.name)}</div>${items.map((it, k) => `<div class="row"><span>${esc(it.label)}</span>${control(it, k)}</div>`).join("")}</div>` : ""}
       ${serviceSettings()}
+      <div class="group developer"><div class="eyebrow">Developer</div>
+        <div class="row"><span>Games without a player at the table</span><button data-dev-no-local class="${state.developer?.allowNoLocalPlayer ? "on" : ""}" role="switch" aria-checked="${!!state.developer?.allowNoLocalPlayer}">${state.developer?.allowNoLocalPlayer ? "On" : "Off"}</button></div>
+        <div class="faint" style="font-size:.7em;margin-top:6px">For testing: games with remote and AI players only, or AI players only. Off again when the table restarts.</div></div>
       <div class="actions" style="display:flex;justify-content:flex-end;margin-top:20px"><button class="primary" data-close-overlay>Done</button></div></div>`;
     faceFront(o.querySelector(".panel"));
   };
@@ -423,6 +437,7 @@ function openSettings() {
       (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()).catch(() => toast("Fullscreen was refused by the browser"));
     }
     if (b.dataset.sound !== undefined) return void act("POST", "/display", { sound: state.display?.sound === false });
+    if (b.dataset.devNoLocal !== undefined) return void act("POST", "/developer", { allowNoLocalPlayer: !state.developer?.allowNoLocalPlayer });
     if (b.dataset.accessCode !== undefined) return openCodePad();
     if (b.dataset.colorPlayer) return void act("POST", `/players/${encodeURIComponent(b.dataset.colorPlayer)}/color`, { color: b.dataset.color });
     if (b.dataset.setting) {
@@ -758,7 +773,8 @@ function playerChip(p) {
 function renderReady() {
   const humans = state.players.filter((p) => p.kind === "human" && p.seat !== null);
   const needs = state.game.needs ?? [];
-  const all = needs.length === 0 && humans.length > 0 && humans.every((p) => p.ready && p.connected);
+  // AI players only (the developer setting, D-117): nobody needs to tap Ready.
+  const all = needs.length === 0 && (humans.length > 0 || state.developer?.allowNoLocalPlayer) && humans.every((p) => p.ready && p.connected);
   const seated = state.players.filter((p) => p.seat !== null).length;
   const g = games.find((x) => x.id === state.game.id);
   const roomForAi = g?.ai && seated < Math.max(...state.game.players);
@@ -942,6 +958,7 @@ center.addEventListener("click", async (e) => {
     // The player's chip on the Up next screen: remove them, online or not.
     const p = state.players.find((x) => x.id === d.chip);
     if (!p) return;
+    if (cannotRemove(p)) return;
     const why = p.kind === "ai" ? "The AI player leaves its seat." : p.connected ? "Their phone is disconnected and must scan the QR code again to rejoin." : "Their phone is offline; the seat is freed now instead of after the waiting time.";
     if (await confirmDialog(`Remove ${p.name}?`, why, "Remove")) {
       if (selectedPlayer === p.id) selectedPlayer = null;
@@ -949,6 +966,7 @@ center.addEventListener("click", async (e) => {
     }
   } else if (d.remove) {
     const p = state.players.find((x) => x.id === d.remove);
+    if (cannotRemove(p)) return;
     if (await confirmDialog(`Remove ${p?.name}?`, p?.kind === "ai" ? "The AI player leaves its seat." : "Their phone is disconnected and must scan the QR code again to rejoin.", "Remove")) {
       selectedPlayer = null;
       act("DELETE", `/players/${d.remove}`);
@@ -1023,6 +1041,7 @@ function openLobbyOverlay() {
     if (b.dataset.terms !== undefined) openTerms();
     if (b.dataset.remove) {
       const p = state.players.find((x) => x.id === b.dataset.remove);
+      if (cannotRemove(p)) return;
       if (await confirmDialog(`Remove ${p?.name}?`, "This may end games that cannot continue without them.", "Remove")) act("DELETE", `/players/${b.dataset.remove}`);
     }
     if (b.dataset.end !== undefined && (await confirmDialog("End this game?", "The game stops for everyone and the result is recorded as ended.", "End game"))) {
