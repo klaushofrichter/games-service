@@ -106,18 +106,6 @@ export class Store {
     return out;
   }
 
-  /** Several changes as one transaction (all or nothing). */
-  batch(fn: () => void) {
-    this.db.exec("BEGIN");
-    try {
-      fn();
-      this.db.exec("COMMIT");
-    } catch (e) {
-      this.db.exec("ROLLBACK");
-      throw e;
-    }
-  }
-
   // ----- game logs: files on disk when persistent; the caller keeps them in memory otherwise -----
 
   private logPath(id: string) {
@@ -237,11 +225,16 @@ function openWithRecovery(dir: string, log: (m: string) => void): { db: Database
   const prev = join(dir, "snapshots", "state.prev.db");
   const stamp = () => new Date().toISOString().replace(/[:.]/g, "-");
   const when = () => (existsSync(snap) ? new Date(statSync(snap).mtimeMs).toISOString() : "");
-  /** Move the live files aside (never delete what might be the only copy) and put the snapshot in their place. */
-  const fromSnapshot = (why: string) => {
+  /** Move the live files aside (never delete what might be the only copy); returns where they went. */
+  const moveAside = (why: string) => {
     const aside = `${main}.${why}-${stamp()}`;
     for (const suffix of ["", "-wal", "-shm"]) if (existsSync(main + suffix)) renameSync(main + suffix, aside + suffix);
-    copyFileSync(snap, main);
+    return aside;
+  };
+  /** Move the live files aside and put a snapshot in their place. */
+  const fromSnapshot = (why: string, source = snap) => {
+    moveAside(why);
+    copyFileSync(source, main);
   };
 
   if (existsSync(marker)) {
@@ -250,9 +243,7 @@ function openWithRecovery(dir: string, log: (m: string) => void): { db: Database
     const source = wantPrev ? prev : snap;
     if (existsSync(source)) {
       const at = new Date(statSync(source).mtimeMs).toISOString();
-      const aside = `${main}.replaced-${stamp()}`;
-      for (const suffix of ["", "-wal", "-shm"]) if (existsSync(main + suffix)) renameSync(main + suffix, aside + suffix);
-      copyFileSync(source, main);
+      fromSnapshot("replaced", source);
       log(`RESTORE_FROM_SNAPSHOT: started from ${wantPrev ? "snapshots/state.prev.db" : "the snapshot"} of ${at}; the previous state.db was kept beside it`);
       return { db: openChecked(main), opened: { how: "snapshot", detail: wantPrev ? "marker-previous" : "marker" } };
     }
@@ -280,8 +271,7 @@ function openWithRecovery(dir: string, log: (m: string) => void): { db: Database
       return { db: openChecked(main), opened: { how: "snapshot", detail: reason } };
     }
     // No snapshot to fall back on: start empty rather than not at all (tables pair again), and keep the damaged file.
-    const aside = `${main}.damaged-${stamp()}`;
-    for (const suffix of ["", "-wal", "-shm"]) if (existsSync(main + suffix)) renameSync(main + suffix, aside + suffix);
+    const aside = moveAside("damaged");
     log(`ERROR: state.db is damaged (${reason}) and there is no snapshot; starting with an empty state. The damaged file is ${aside}`);
     return { db: openChecked(main), opened: { how: "corrupt-fresh", detail: reason } };
   }
