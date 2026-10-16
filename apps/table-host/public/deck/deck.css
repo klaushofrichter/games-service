@@ -80,3 +80,17 @@ body.modal-open { overflow: hidden; }
 .md-table table { width: 100%; border-collapse: collapse; font-size: 0.88em; }
 .md-table th { text-align: left; font-weight: 500; color: var(--ink-soft); font-size: 0.8em; text-transform: uppercase; letter-spacing: .06em; padding: 4px 6px; }
 .md-table td { padding: 6px; border-top: 1px solid var(--felt-line); vertical-align: top; }
+
+/* During a game (D-123): a slim tab bar instead of the header, no footer, tighter edges, so the game's deck gets the
+   height. The own tab shows the player's colour, name and seat; the game's tab its name. */
+body.in-game footer { display: none; }
+body.in-game #app { padding: max(8px, env(safe-area-inset-top)) 10px max(10px, env(safe-area-inset-bottom)); gap: 8px; }
+#top, #body, .table-tab { display: flex; flex-direction: column; gap: 18px; }
+body.in-game #top { gap: 8px; }
+.table-tab[hidden] { display: none; }
+.tabs { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 4px; padding: 3px; border: 1px solid var(--felt-line); border-radius: 12px; background: rgba(0, 0, 0, 0.22); }
+.tabs button { display: flex; align-items: center; justify-content: center; gap: 7px; min-width: 0; min-height: 40px; padding: 6px 10px; border: 0; border-radius: 9px; background: transparent; color: var(--ink-soft); font-size: 0.92em; box-shadow: none; }
+.tabs button[aria-selected="true"] { background: rgba(255, 255, 255, 0.1); color: var(--ink); box-shadow: inset 0 0 0 1px var(--felt-line); }
+.tabs .pdot { margin: 0; flex: none; }
+.tabs .tab-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tabs .tab-seat { flex: none; font-family: var(--display); font-weight: 700; color: var(--brass); }

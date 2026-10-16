@@ -6,6 +6,10 @@ page is the history. Leave it empty if there is nothing to add beyond the commit
 
 ## [Unreleased]
 
+- Phones: during a game the header is a slim tab bar (D-123), so the game gets the screen: your own tab (colour, name,
+  seat) has Rules, everyone at the table and the terms; the game's tab opens by itself when it is your turn. The
+  lobby looks as before.
+- Player colour 6 is pearl instead of citron, which looked too much like amber (D-124).
 - Board: **Escape** closes the topmost window (settings, lobby, dialogs), like a tap beside it; in a confirmation it
   means Cancel (D-122). The settings and lobby windows no longer rebuild while a game runs: in a game of AI players the
   settings jumped back to the top several times a second, so *Done* could not be reached. *Done* now stays at the bottom

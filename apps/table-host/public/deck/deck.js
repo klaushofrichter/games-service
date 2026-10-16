@@ -84,6 +84,10 @@ function connect(hello) {
       if (state.phase !== "active" && state.phase !== "paused") gameMsg = null;
     } else if (m.ch === "game" && m.type === "view") {
       gameMsg = { ...m.payload, receivedAt: Date.now() };
+      // When it becomes this player's turn the game's tab comes to the front (D-123).
+      const myTurn = !!m.payload.view?.myTurn;
+      if (myTurn && !wasMyTurn) tab = "game";
+      wasMyTurn = myTurn;
       if (navigator.vibrate && m.payload.view?.myTurn && !m.payload.events?.length) navigator.vibrate(60);
     }
     render();
@@ -102,11 +106,16 @@ function connect(hello) {
 
 // ---------- layout: a header that re-renders freely, and a body the game module owns ----------
 
-app.innerHTML = `<div id="top"></div><div id="body"></div>`;
+app.innerHTML = `<div id="top"></div><div id="table" class="table-tab" role="tabpanel" aria-labelledby="tab-table"></div><div id="body" role="tabpanel"></div>`;
 const top = app.querySelector("#top");
+const tablePanel = app.querySelector("#table");
 const body = app.querySelector("#body");
-body.style.cssText = "display:flex;flex-direction:column;gap:18px";
-top.style.cssText = "display:flex;flex-direction:column;gap:18px";
+
+// During a game (D-123) the header is a slim tab bar: the player's own tab (colour, name, seat) opens what the header
+// used to show plus everyone at the table, Rules and the terms; the game's tab holds the game's deck, which stays mounted
+// while the other tab is open. Outside a game the deck has the full header as before.
+let tab = "game";
+let wasMyTurn = false;
 
 function self() {
   return state?.players.find((p) => p.id === me);
@@ -115,7 +124,8 @@ function self() {
 function renderTop() {
   if (!me || !state || removed) return;
   const p = self();
-  const inGame = gameMsg && (state.phase === "active" || state.phase === "paused");
+  const inGame = !!(gameMsg && (state.phase === "active" || state.phase === "paused"));
+  document.body.classList.toggle("in-game", inGame);
   const pause = state.phase === "paused" ? state.pause : null;
   const paused = !pause
     ? ""
@@ -124,11 +134,38 @@ function renderTop() {
       : pause.reason === "player"
       ? `<div class="banner">Waiting for ${esc((pause.players ?? []).map((w) => w.name).join(" and ") || "a player")} to come back. ${esc((pause.players ?? [])[0]?.text ?? "")}</div>`
       : `<div class="banner">Game paused: the table lost its connection. It continues by itself when the connection is back.</div>`;
-  top.innerHTML = `${paused}${banner ? `<div class="banner">${esc(banner)}</div>` : ""}
-    <div class="who"><div><div class="eyebrow">${esc(state.tableName)}${inGame ? ` · ${esc(state.game?.name)}` : ""}</div><h1>${esc(p?.name ?? "")}</h1></div>
+  const banners = `${paused}${banner ? `<div class="banner">${esc(banner)}</div>` : ""}`;
+  if (inGame) {
+    const color = p?.seat == null ? null : colorOf(p.seat);
+    top.innerHTML = `${banners}<div class="tabs" role="tablist" aria-label="Deck">
+      <button type="button" role="tab" id="tab-table" data-tab="table" aria-selected="${tab === "table"}" aria-controls="table">
+        ${color ? `<span class="pdot" style="background:${color}" aria-hidden="true"></span>` : ""}<span class="tab-name">${esc(p?.name ?? "")}</span>${p?.seat == null ? "" : `<span class="tab-seat">${esc(seatBadge(state.seatEdges, p.seat))}</span>`}</button>
+      <button type="button" role="tab" id="tab-game" data-tab="game" aria-selected="${tab === "game"}" aria-controls="body">${esc(state.game?.name ?? "Game")}</button></div>`;
+    body.setAttribute("aria-labelledby", "tab-game");
+    tablePanel.innerHTML = tab === "table" ? `${whoHtml(p, true)}<div class="card list"><div class="eyebrow" style="margin-bottom:6px">At the table</div>${playersHtml()}</div>
+      <div class="center"><a href="/deck/terms.html" data-terms class="faint">Terms of service</a></div>` : "";
+  } else {
+    tab = "game";
+    tablePanel.innerHTML = "";
+    top.innerHTML = `${banners}${whoHtml(p, false)}
+    ${p?.seat != null ? "" : `<div class="card muted">No seat yet. You'll get one when a seat opens.</div>`}`;
+  }
+  tablePanel.hidden = !(inGame && tab === "table");
+  body.style.display = inGame && tab === "table" ? "none" : "";
+}
+
+/** The player's name, the Rules button and the seat badge: the header outside a game, the top of the own tab in one. */
+function whoHtml(p, inGame) {
+  return `<div class="who"><div><div class="eyebrow">${esc(state.tableName)}${inGame ? ` · ${esc(state.game?.name)}` : ""}</div><h1>${esc(p?.name ?? "")}</h1></div>
       <div class="who-side">${state.game?.howToPlay ? `<button type="button" class="rules-btn" data-rules aria-haspopup="dialog">Rules</button>` : ""}
-      ${p?.seat == null ? "" : seatBadgeHtml(p)}</div></div>
-    ${inGame || p?.seat != null ? "" : `<div class="card muted">No seat yet. You'll get one when a seat opens.</div>`}`;
+      ${p?.seat == null ? "" : seatBadgeHtml(p)}</div></div>`;
+}
+
+function setTab(t) {
+  if (tab === t) return;
+  tab = t;
+  renderTop();
+  if (t === "game") window.scrollTo(0, 0);
 }
 
 // ---------- game rules (D-099): the chosen game's how-to-play.md in a modal, with this table's settings on top ----------
@@ -136,9 +173,18 @@ function renderTop() {
 const rulesCache = new Map(); // url -> markdown
 let rulesOpen = null; // the open modal element
 
-top.addEventListener("click", (e) => {
-  if (e.target.closest("[data-rules]")) void openRules();
-});
+for (const el of [top, tablePanel]) {
+  el.addEventListener("click", (e) => {
+    if (e.target.closest("[data-rules]")) void openRules();
+    const t = e.target.closest("[data-tab]");
+    if (t) setTab(t.dataset.tab);
+    const terms = e.target.closest("a[data-terms]");
+    if (terms) {
+      e.preventDefault();
+      void openTerms(terms);
+    }
+  });
+}
 
 /**
  * A sheet over the phone (D-099, D-108): a title, ✕ top right, a scrolling body and a Close button. Closed by ✕, Close,
@@ -188,7 +234,7 @@ async function fetchText(url) {
 async function openRules() {
   const g = state?.game;
   if (!g?.howToPlay) return;
-  const modal = openSheet("How to play", g.name, `How to play ${g.name}`, top.querySelector("[data-rules]"));
+  const modal = openSheet("How to play", g.name, `How to play ${g.name}`, app.querySelector("[data-rules]"));
   if (!modal) return;
   const shown = (g.settingsShown ?? []).filter((s) => s.value !== undefined);
   const settings = shown.length
@@ -293,12 +339,16 @@ function renderJoin() {
   });
 }
 
-function renderLobby(p) {
-  const players = state.players
+/** Everyone at the table with their colour and seat (D-104). */
+function playersHtml() {
+  return state.players
     // Each name with a dot in that player's colour (D-104), the colour of their plate on the board; no seat, no colour.
     .map((x) => `<div class="row"><span class="${x.id === me ? "me" : ""}"><span class="pdot${x.seat == null ? " none" : ""}"${x.seat == null ? "" : ` style="background:${colorOf(x.seat)}"`} aria-hidden="true"></span>${esc(x.name)}</span>
       <span class="muted">${x.seat == null ? "no seat" : `${esc(seatName(state.seatEdges, x.seat))} seat`}${state.phase === "ready" ? (x.ready ? " · ready" : " · not ready") : ""}${x.connected ? "" : " · away"}</span></div>`)
     .join("");
+}
+
+function renderLobby(p) {
   let action = `<div class="card muted">Choose a game on the board.</div>`;
   if (state.phase === "ready" && state.game) {
     action = p?.seat == null
@@ -311,7 +361,7 @@ function renderLobby(p) {
     action = `<div class="card"><div class="eyebrow">Result</div><div class="display" style="font-size:1.3em;margin-top:6px">${esc(state.summary.text)}</div>
       ${t ? `<table class="summary-table"><tr>${t.columns.map((c) => `<th>${esc(c)}</th>`).join("")}</tr>${t.rows.map((r) => `<tr>${r.map((c) => `<td>${esc(c)}</td>`).join("")}</tr>`).join("")}</table>` : ""}</div>`;
   }
-  return `${action}<div class="card list"><div class="eyebrow" style="margin-bottom:6px">At the table</div>${players}</div>`;
+  return `${action}<div class="card list"><div class="eyebrow" style="margin-bottom:6px">At the table</div>${playersHtml()}</div>`;
 }
 
 // ---------- the game's own deck UI ----------

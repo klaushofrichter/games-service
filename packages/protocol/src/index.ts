@@ -138,7 +138,7 @@ export type Phase = "idle" | "loading" | "ready" | "active" | "paused" | "termin
  * Player colours (D-106): one per player, chosen in the board's settings and the same in every game. By default a player
  * takes their seat's colour, `PLAYER_COLORS[seat % 8]`. Distinct for common colour-vision deficiencies on the felt.
  */
-export const PLAYER_COLORS = ["#e8b04a", "#5fb7e8", "#e8735f", "#7fd18b", "#c38be8", "#e8e15f", "#5fe0c8", "#e88fbf"] as const;
+export const PLAYER_COLORS = ["#e8b04a", "#5fb7e8", "#e8735f", "#7fd18b", "#c38be8", "#dde3ea", "#5fe0c8", "#e88fbf"] as const;
 
 export interface PlayerInfo {
   id: string;
