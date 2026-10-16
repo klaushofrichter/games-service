@@ -110,6 +110,13 @@ export const manifestSchema = z.object({
   lobbyButton: z.enum(["top-left", "top-right", "bottom-left", "bottom-right"]).default("bottom-right"),
   deck: z.object({ minWidth: z.number().optional(), orientation: z.string().optional() }).optional(),
   permissions: z.array(z.string()).default([]),
+  /**
+   * The Game Viewer's extra columns (D-120), filled from the `columns` of the game's `describe`. Besides these it always
+   * shows the move number, time, player and the step's text.
+   */
+  viewer: z
+    .object({ columns: z.array(z.object({ key: z.string().regex(/^[A-Za-z][\w-]{0,30}$/), label: z.string().max(24) })).max(4).default([]) })
+    .default({ columns: [] }),
   /** Test games are hidden on the board unless the table is configured to show them. */
   test: z.boolean().default(false),
 });

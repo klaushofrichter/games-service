@@ -25,11 +25,18 @@ export type LogRecord =
   // Not inputs either (D-119): a player's phone went away or came back; `waiting`: the game can't go on without them.
   | { t: "disconnected"; at: number; seat: number; waiting?: string }
   | { t: "reconnected"; at: number; seat: number }
+  // Not inputs either (D-120): the game stood still. `reason` "cloud" (the service connection was lost), "ai" (an AI
+  // player ran over its time, `seat`) or "player" (waiting for a player who went away, D-119); resume `reason` "cloud",
+  // "ai" (it answered), "playNow" (its quick move) or "player" (everyone is back).
+  | { t: "pause"; at: number; reason: PauseReason; seat?: number }
+  | { t: "resume"; at: number; reason: ResumeReason }
   // "interrupted": the table stopped during the game; the log was closed at its next start (no summary, and a hash
   // only if the game could be replayed then).
   | { t: "end"; at: number; reason: EndReason; summary: GameSummary | null; stateHash: string | null };
 
 export type EndReason = "finished" | "terminated" | "seatLeft" | "interrupted";
+export type PauseReason = "cloud" | "ai" | "player";
+export type ResumeReason = "cloud" | "ai" | "playNow" | "player";
 
 /** An exception thrown by the game's code, as recorded in its log (D-116). */
 export interface LoggedError {
@@ -213,9 +220,14 @@ export class GameRuntime {
     this.deadlines.set(id, this.clock.now() + ms);
   }
 
-  /** Stop the clock: pending timers keep their remaining time. Timer firings are logged, so replay is unaffected. */
-  pause() {
-    if (this.paused || this.over) return;
+  /**
+   * Stop the clock: pending timers keep their remaining time. Timer firings are logged, so replay is unaffected. With a
+   * reason the pause is logged (D-120), also when the game was already paused for another reason.
+   */
+  pause(reason?: PauseReason, seat?: number) {
+    if (this.over) return;
+    if (reason && !this.opts.replay) this.record({ t: "pause", at: this.clock.now(), reason, ...(seat === undefined ? {} : { seat }) });
+    if (this.paused) return;
     const now = this.clock.now();
     const left = new Map<string, number>();
     for (const [id, deadline] of this.deadlines) left.set(id, Math.max(0, deadline - now));
@@ -223,8 +235,9 @@ export class GameRuntime {
     this.paused = left;
   }
 
-  resume() {
+  resume(reason?: ResumeReason) {
     if (!this.paused) return;
+    if (reason && !this.opts.replay && !this.over) this.record({ t: "resume", at: this.clock.now(), reason });
     const left = this.paused;
     this.paused = null;
     for (const [id, ms] of left) this.setTimer(id, ms);

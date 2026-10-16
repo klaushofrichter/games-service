@@ -45,8 +45,8 @@ Or skip the pairing code: create an access code in the console (*Access codes*) 
 | --- | --- |
 | `packages/protocol` | Message envelope, manifest schema (zod), seat layouts and edges, lobby types |
 | `packages/sdk` | `defineGame`, seeded RNG, the `GameContext` games receive, `count()` and `list()` for end-of-game texts, cards (`cards.ts`) |
-| `apps/table-host/src` | HTTP + WebSocket server, lobby (`table.ts`), game runtime and replay (`runtime.ts`), game logs (`logs.ts`, `game-log.ts`, and `log-format.md`, the README in every log), simulation, cloud link, remote-play gateway (`remote.ts`, WebRTC) |
-| `apps/table-host/public` | Board and deck pages (plain HTML/CSS/JS); `shared/` has the board kit and the rules renderer (`markdown.js`) |
+| `apps/table-host/src` | HTTP + WebSocket server, lobby (`table.ts`), game runtime and replay (`runtime.ts`), game logs (`logs.ts`, `game-log.ts`, and `log-format.md`, the README in every log), move lists and the Game Viewer's endpoints (`moves.ts`, `history.ts`), simulation, cloud link, remote-play gateway (`remote.ts`, WebRTC) |
+| `apps/table-host/public` | Board and deck pages (plain HTML/CSS/JS), the board's Game Viewer (`board/viewer.js`); `shared/` has the board kit and the rules renderer (`markdown.js`) |
 | `apps/cloud/src` | Cloud service: pairing, access codes (`access-codes.ts`), heartbeat, metrics, log upload/download, download tokens, invites and WebRTC signaling; its persistent state (`store.ts`, SQLite) |
 | `apps/cloud/public` | Admin portal (`/admin`) and the remote player's invite page (`/i/CODE`) with its service worker |
 | `games/roulette` | European roulette, 1–6 players, simultaneous betting, three AI styles |
@@ -55,7 +55,8 @@ Or skip the pairing code: create an access code in the console (*Access codes*) 
 | `games/coin-flip` | Guess heads or tails, 1–8 players, simultaneous, AI, players can join mid-game, optional time limit, per-player statistics |
 | `games/quartet` | Test game (hidden unless `SHOW_TEST_GAMES=1`): exactly 4 humans, no AI, sequential turns, ends if a player leaves |
 | `apps/cloud/src/game-repos.ts`, `apps/table-host/src/extra-games.ts`, `packages/protocol/src/bundle.ts` | Extra-game repositories: fetching and packing on the service, installing on tables, the bundle format |
-| `scripts/e2e/` | Browser end-to-end checks (Playwright): `run-all.sh` runs them all, `play.py` per game, `layout.py`, `admin.py` for the portal and sign-in, `codes.py` for access codes and a service restart, `remote.py` for remote play, `extra.py` for extra-game repositories, `logs.py` for game logs; shared helpers in `common.py` |
+| `scripts/e2e/` | Browser end-to-end checks (Playwright): `run-all.sh` runs them all, `play.py` per game, `layout.py`, `admin.py` for the portal and sign-in, `codes.py` for access codes and a service restart, `remote.py` for remote play, `extra.py` for extra-game repositories, `logs.py` for game logs, `viewer.py` for the Game Viewer; shared helpers in `common.py` |
+| `scripts/game-log.ts` | Reads a game log zip from the command line: an overview, a range of moves, one move in full with the state before and after (D-120) |
 | `scripts/sync-secrets.sh` | Puts the values from your local `.env` into GitHub and the cluster, without printing them |
 | `scripts/release-notes.sh`, `release.sh` | The release step of the deploy |
 | `scripts/soak.ts` | AI-only soak run over every game and player count |
@@ -99,11 +100,12 @@ curl -s -H "$K" -X POST $H/face -d '{"edge":"west"}'       # turn the lobby to a
 curl -s -H "$K" -X POST $H/game/select -d '{"gameId":"coin-flip","settings":{"rounds":5}}'
 curl -s -H "$K" -X POST $H/simulation -d '{"gameId":"coin-flip","players":4,"games":100,"seed":42}'
 curl -s -H "$K" $H/logs/<id>.zip -o run.zip                # JSONL game logs
+curl -s -H "$K" "$H/history/<id>/1/moves?offset=0&limit=25" # a finished game's moves (D-120)
 ```
 
-Full list: `GET /state, /join, /games, /metrics, /game/board, /logs, /logs/{id}.zip` and `POST /logs/{id}/verify, /join/new, /layout, /face, /rotate, /seats/move, /ai, /game/select, /game/settings, /game/prefs, /display, /game/start, /game/end, /game/close, /game/resume, /game/play-now, /game/save, /simulation, /players/{id}/ai-options, /invites, /remote, /cloud/code`, `GET /saves, /qr?text=URL`, `DELETE /players/{id}`.
+Full list: `GET /state, /join, /games, /metrics, /game/board, /logs, /logs/{id}.zip, /history, /history/{id}, /history/{id}/{game}/moves, /history/{id}/{game}/moves/{n}, /history/{id}/{game}/lines/{line}` and `POST /logs/{id}/verify, /join/new, /layout, /face, /rotate, /seats/move, /ai, /game/select, /game/settings, /game/prefs, /display, /game/start, /game/end, /game/close, /game/resume, /game/play-now, /game/save, /simulation, /players/{id}/ai-options, /invites, /remote, /cloud/code`, `GET /saves, /qr?text=URL`, `DELETE /players/{id}`.
 
-Remote players reach a subset over WebRTC (D-057): reads, except the join code, logs, saves, simulations, invites, the remote settings, QR codes and the access code; changes only `/layout` and `/game/select|start|end|close|play-now`.
+Remote players reach a subset over WebRTC (D-057): reads, except the join code, logs, saves, simulations, invites, the remote settings, QR codes and the access code; changes only `/layout` and `/game/select|start|end|close|play-now`. With board control they may also read `/history` (the Game Viewer, D-120), never the zips themselves.
 
 Decks speak JSON envelopes over `/ws`: `system.hello {joinToken, name}` or `{sessionToken}` (remote decks: `{name}`), then `lobby.ready {ready}` and `game.intent {name, payload}`. The host answers with `system.welcome {playerId, sessionToken}`, `lobby.state`, `game.view {seat, view, events, over, timers, now}` (this seat only), `system.ack | reject {reason} | error {message}`, and `system.removed {reason}` when the player is removed. The board says `system.hello {role: "board", key}` and gets `game.board` instead of `game.view`.
 
@@ -123,6 +125,7 @@ export default defineGame<State>({
   canContinueWithout(state, seat) { ... },    // optional: true, or { wait: text } if the game needs this player (D-119)
   ai(view, seat, ctx, options) { ... },       // optional: an intent, null, or a promise of one (D-112)
   aiFallback(view, seat, ctx, options) { ... }, // optional: a quick move for "Play now"
+  describe(step) { ... },                     // optional: one step in words for the Game Viewer and logs (D-120)
 });
 ```
 
@@ -133,6 +136,8 @@ The UI modules export `mount(root, ctx)` returning `{ update(view, events, info)
 **AI players that take their time (D-112).** `ai()` may answer later: return a promise, for a search or a call to a language model, and the table keeps running meanwhile. `ctx.signal` is aborted when the game moves on (the AI is then asked again with the new view, and a late answer for an old view is dropped), pauses or ends; `ctx.deadline` is when the table expects the move. The manifest's `ai.timeoutSeconds` (default 20) sets that budget per move. When an AI runs out of time, the game pauses (timers stop, nobody moves) and the board shows a card at the AI's seat with **Play now**: tapping it plays the game's `aiFallback()` move for it, a quick synchronous choice (without one, the AI is asked again). If nobody taps, the game goes on as soon as the AI answers. Remote boards with board control can tap it too. A failing AI gets its fallback at once. `"ai": { "worker": true }` runs the AI in a worker thread, one per AI player, so even a synchronous search never blocks the table; it gets the view and options as plain data, and a stale search is stopped by ending the thread. While an AI has been thinking for more than a moment, the lobby state's `aiThinking` lists it (`{ playerId, seat, since, deadline }`), and games get it as `info.aiThinking` on the board and the phones. The log records each such move's thinking time (`ai: { ms, fallback?, worker?, error? }`); replay never looks at it. Simulations wait for the answers and play the fallback when one is out of time. Synchronous AIs work as before.
 
 **Players lost during a game (D-119).** When a player's phone goes away, the table asks the game `canContinueWithout(state, seat)`. `true` (or no such hook): the game goes on, and the player leaves after the waiting time (`GRACE_MS`, 60 s), when `onSeatLeft` decides. `{ wait: "…" }`: the game needs this player. It pauses (timers stop, AI players wait), their seat is held with no time limit, and the board shows a card at their seat with the game's text and **End game** (remote boards with board control too); the phones say whom the game waits for. When the phone comes back the game goes on by itself. Removing a player the game needs ends it with that text, and the board's Remove says so first (the lobby state's `needed` lists them). `onSeatLeft` may also end the game with its own reason, `{ end: { text, highlights? } }`, e.g. when a team is broken or too few players are left. The hook is a question about the state, never a change: replay asks it again. The log records disconnects and returns (`disconnected`, `reconnected`); replay skips them. The test game `partners` (tests/fixtures/seat-games) shows both kinds.
+
+**Describing moves for the Game Viewer (D-120).** After a game, the board's Game Viewer, the move list in the log and LLMs reading it show every step as one line. By default that line is generic (`play card 54`, `timer turn`). A game says what a step meant with `describe(step)`: `step` has `kind` (`intent`, `timer`, `seatJoined`, `seatLeft`), `seat`, `intent` and `by` (for moves), `timer`, `accepted`, `reason` (why the rules refused it), `events`, `names` (seat → name), and the state `before` and `after` it, rebuilt by replay; the game is over, so it may reveal everything. Return `{ text, columns?, details?, steps? }` or null for the generic line. `text` is one line without the player's name ("plays a Seven: 4 steps for marble 3"). `columns` fills the viewer's extra columns, declared in the manifest as `"viewer": { "columns": [{ "key": "round", "label": "Round" }] }` (up to four). `details` is shown when a step is opened. `steps` lists what happened within the step for other seats or by the rules alone, such as a forced move, a seat the AI took over or a turn timer's move: `{ seat?, text, auto? }`, where `auto` marks a move nobody chose. Like the rules, `describe` is pure and is never called while the game runs. Coin Flip and Pachisi have one.
 
 **Moves on the board (D-102).** A game may let players act by touching the board as well as their phone, to feel more like a real table: list the intent names in the manifest, e.g. Pachisi's `"boardIntents": ["move"]`. The board's `mount(root, ctx)` then gets `ctx.act(seat, name, payload)`, which resolves with `{ ok, reason }` (a rejection also shows as a toast), and `info.controlSeats` lists the seats this board may act for: on the table's board every human sitting at the table, on a remote board only its own player. The table checks again: an intent not in `boardIntents` is refused (403), the table's board never acts for AI or remote players, a remote board only for the player who joined through it, and the game's own rules decide the rest (whose turn, which token). The game log records such intents with `by: "board"`. Everything else, such as Pachisi's roll, stays on the phones. Pachisi: tap a token that can move; the phones follow at once.
 
@@ -216,6 +221,21 @@ yourself or handing it to Claude.
   state). A simulation has one pair of files per game. `LOG_SNAPSHOT_EVERY` adds state snapshots.
 - **Verified:** every game is replayed when it ends, and `run.json` says whether it reached the same state; the
   console flags logs that *do not replay*. `POST /api/v1/logs/{id}/verify` replays a stored log on the table.
+- **The move list (D-120):** each finished game's zip also has `game-001.moves.jsonl`, every record as a readable row
+  in the game's own words (its `describe`), with **player moves numbered from 1**, refused ones too; timers, players
+  joining or leaving and pauses are rows between them, and a silence of two minutes or more without a pause shows as a
+  gap. Each row names its line in `game-001.jsonl`. The log also records when the game stood still and why
+  (`pause`/`resume`: the service lost, an AI over its time, a player away; Play now). See *Moves* in `log-format.md`.
+- **Game Viewer on the board (D-120):** *Game logs* in the settings and the lobby lists the finished games on this table
+  (not the one being played). A game opens as a table of its moves, a page at a time, with filters (a player, moves
+  only, problems), *Move #* to jump to a move, and a simulation's games one by one; a move opens in full with its
+  intent, events, AI timing, the state before and after, and a reference to copy such as
+  `20261016044059-loopy-491f #54`, so a developer can tell Claude exactly where to look. Remote players with board
+  control can open it too. Simulations and older logs get their move list built when opened.
+- **For developers and LLMs:** `node scripts/game-log.ts <zip>` reads a log without a table: `info`, `moves 40-45`,
+  `move 43` (in full, with the state before and after), `state 43 [--before]`, `line 17`; `--json` for scripts,
+  `--games ../loopy-game/games` for games from other repositories (states and descriptions need the game's rules in
+  the version the log was written with).
 - **Console:** *Game logs* lists them with their metadata and filters by game, table, date and kind. A download token
   can be limited the same way (game, table, from and to), so one link gives a pipeline or a Claude session exactly
   the logs it should read: `GET /dl/<token>` lists them, `GET /dl/<token>/<id>.zip` fetches one.
@@ -291,6 +311,7 @@ python3 scripts/e2e/remote.py out/         # remote play in a second browser (st
 python3 scripts/e2e/seat_loss.py out/     # a player lost during a game: the waiting card, the phone's banner, the return, Remove that ends the game (starts its own host)
 python3 scripts/e2e/developer.py out/     # the developer setting: the last player at the table, DEV on the gear, a game of AIs only (starts its own host)
 python3 scripts/e2e/logs.py out/          # game logs: a simulation from the board, a game with a phone, a table stopped mid-game, the console (starts its own cloud and host)
+python3 scripts/e2e/viewer.py out/        # the Game Viewer: logs from the lobby and the settings, moves, filters, Move #, a move in full, facing east (starts its own host)
 python3 scripts/e2e/extra.py out/          # extra-game repositories: console, table, remote player (starts its own fake GitHub, cloud and host)
 python3 scripts/e2e/layout.py out/         # decks at 4 phone sizes x 3 games, the board at 5 screen sizes
 ```

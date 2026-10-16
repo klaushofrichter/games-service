@@ -2,7 +2,7 @@
 // one side: they enter the track just after their side's midpoint, go once around, and turn into
 // their 4-cell home column at that midpoint. Progress per token: -1 = in base, 0–39 = on the track,
 // 40–43 = home column, 44 = finished.
-import { defineGame, type GameContext, type SeatInfo } from "../../packages/sdk/src/index.ts";
+import { defineGame, list, type GameContext, type SeatInfo, type StepDescription, type StepInfo } from "../../packages/sdk/src/index.ts";
 
 export const TRACK = 40;
 export const FINISH = 44;
@@ -158,6 +158,43 @@ export function chooseMove(s: State, seat: number, legal: number[], level: strin
 
 const where = (p: number) => (p === -1 ? "base" : p === FINISH ? "home" : p >= TRACK ? `home column ${p - TRACK + 1}` : `step ${p + 1}`);
 
+/**
+ * The Game Viewer's line for a step (D-120): the roll and the move, captures, and the move the turn timer makes for a
+ * player who took too long, shown as an automatic sub-step.
+ */
+function describeStep(step: StepInfo<State>): StepDescription | null {
+  const { before: b, events } = step;
+  const name = (seat: number) => step.names[seat] ?? b.players[seat]?.name ?? `seat ${seat}`;
+  const rolled = events.find((e) => e.name === "rolled")?.data as { seat: number; die: number } | undefined;
+  const moved = events.find((e) => e.name === "moved")?.data as NonNullable<State["lastMove"]> | undefined;
+  const parts: string[] = [];
+  if (rolled) parts.push(`rolls a ${rolled.die}`);
+  if (events.some((e) => e.name === "threeSixes")) parts.push("third six in a row, the turn is lost");
+  if (events.some((e) => e.name === "noMove")) parts.push("no token can move");
+  if (moved) {
+    const sent = moved.captured.map((c) => `${name(c.seat)}'s token ${c.token + 1}`);
+    parts.push(`token ${moved.token + 1} from ${where(moved.from)} to ${where(moved.to)}${sent.length ? `, sends ${list(sent)} back to base` : ""}`);
+  }
+  if (events.some((e) => e.name === "won")) parts.push("all tokens home: wins");
+  const columns = {
+    turn: b.turns,
+    die: rolled?.die ?? (moved ? b.die : null),
+    token: moved ? moved.token + 1 : null,
+    captures: moved?.captured.length ? moved.captured.length : null,
+  };
+  if (step.kind === "intent") {
+    if (!step.accepted) {
+      const t = Number((step.intent?.payload as { token?: unknown } | undefined)?.token);
+      return { text: step.intent?.name === "move" ? `tries to move token ${Number.isFinite(t) ? t + 1 : "?"}` : `tries to ${step.intent?.name ?? "act"}`, columns: { turn: b.turns } };
+    }
+    return parts.length ? { text: parts.join(" · "), columns } : null;
+  }
+  if (step.kind === "timer" && parts.length) {
+    return { text: `Time is up for ${name(b.turn)}`, columns, steps: [{ seat: b.turn, text: parts.join(" · "), auto: true }] };
+  }
+  return null;
+}
+
 const publicPlayers = (s: State) => Object.values(s.players).map((p) => ({ seat: p.seat, name: p.name, side: p.side, tokens: p.tokens }));
 
 export default defineGame<State>({
@@ -256,6 +293,8 @@ export default defineGame<State>({
       },
     };
   },
+
+  describe: describeStep,
 
   // Pachisi has no hidden information, so the seat view carries the whole board and the AI can use
   // the same heuristic as the turn timer.

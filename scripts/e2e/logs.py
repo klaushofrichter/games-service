@@ -112,7 +112,7 @@ try:
         with console.expect_download() as dl:
             console.click(f"button[data-log='{played['id']}']")
         z = zipfile.ZipFile(io.BytesIO(open(dl.value.path(), "rb").read()))
-        assert sorted(z.namelist()) == ["README.md", "game-001.jsonl", "game-001.state.json", "run.json"], z.namelist()
+        assert sorted(z.namelist()) == ["README.md", "game-001.jsonl", "game-001.moves.jsonl", "game-001.state.json", "run.json"], z.namelist()  # the move list since D-120
         run = json.loads(z.read("run.json"))
         assert run["format"] == "gametable-log/2" and run["verify"]["ok"] == 1, run
         br.close()

@@ -23,6 +23,7 @@ import { HOW_TO_PLAY, settingsWithDefaults, sourceMeta, type InstalledGame } fro
 /** The URL a deck fetches a game's rules from (D-099), or null. */
 const howToPlayUrl = (g: InstalledGame) => (g.howToPlay ? `/games/${g.manifest.id}/${HOW_TO_PLAY}` : null);
 import { GameRuntime, realClock, type AiMoveMeta, type LogRecord } from "./runtime.ts";
+import { movesFor } from "./moves.ts";
 import { baseMeta, countRecords, rebuild, verifyGame, verifySummary } from "./game-log.ts";
 import { AiCancelled, AiWorker, aiMove, isPromise, usesWorker } from "./ai.ts";
 import type { LogStore, PlayerMeta, RunningLog } from "./logs.ts";
@@ -203,13 +204,14 @@ export class Table extends EventEmitter {
     if (!rt || rt.over || (this.phase !== "active" && this.phase !== "paused")) return;
     if (this.waitingFor.size) {
       if (this.phase === "active") {
-        rt.pause();
+        rt.pause("player");
         this.stopAllAi(); // they start again from the current view when the game goes on
         this.phase = "paused";
         this.pause = this.playerPause();
         this.emit("game", [{ name: "paused", data: { reason: "player" } }]);
       } else if (this.pause?.reason === "ai") {
         this.stopAllAi(); // a missing player matters more than a slow AI; it thinks again afterwards
+        rt.pause("player");
         this.pause = this.playerPause();
       } else if (this.pause?.reason === "player") this.pause = this.playerPause();
       // Paused for the cloud: that pause stays; resumeGame comes back here when the link returns.
@@ -217,10 +219,11 @@ export class Table extends EventEmitter {
     }
     if (this.phase !== "paused" || this.pause?.reason !== "player") return;
     if (!this.cloudOnline) {
+      rt.pause("cloud");
       this.pause = { reason: "cloud", since: Date.now(), canSave: !!this.selected?.game.manifest.saveGame };
       return;
     }
-    rt.resume();
+    rt.resume("player");
     this.phase = "active";
     this.pause = null;
     this.emit("game", [{ name: "resumed" }]);
@@ -242,7 +245,7 @@ export class Table extends EventEmitter {
 
   pauseGame(reason: "cloud") {
     if ((this.phase !== "active" && this.pause?.reason !== "ai") || !this.runtime) return;
-    this.runtime.pause();
+    this.runtime.pause(reason);
     this.stopAllAi(); // AI players start again from the current view when the game resumes
     this.phase = "paused";
     this.pause = { reason, since: Date.now(), canSave: !!this.selected?.game.manifest.saveGame };
@@ -257,11 +260,12 @@ export class Table extends EventEmitter {
     if (!this.cloudOnline) throw new TableError(409, "still offline; the game resumes by itself when the connection returns");
     if (this.waitingFor.size) {
       // Back online, but someone the game needs is still away (D-119): wait for them instead.
+      this.runtime.pause("player");
       this.pause = this.playerPause();
       this.changed();
       return;
     }
-    this.runtime.resume();
+    this.runtime.resume("cloud");
     this.phase = "active";
     this.pause = null;
     this.emit("game", [{ name: "resumed" }]);
@@ -968,7 +972,7 @@ export class Table extends EventEmitter {
       verify: game ? verifySummary([verifyGame(game, rt.log)]) : { checked: 0, ok: 0, failed: [], skipped: "game not installed" },
     };
     const id = running.log.id;
-    const saving = this.logs.finish(running.log, meta, rt.log, rt.state);
+    const saving = this.logs.finish(running.log, meta, rt.log, rt.state, movesFor(game ?? undefined, rt.log));
     this.pendingSaves.add(saving);
     try {
       await saving;
@@ -1089,13 +1093,13 @@ export class Table extends EventEmitter {
     clearTimeout(mv.showTimer);
     clearTimeout(mv.overdueTimer);
     if (this.aiMoves.get(playerId) === mv) this.aiMoves.delete(playerId);
-    if (this.pause?.reason === "ai" && this.pause.ai?.playerId === playerId) this.resumeAfterAi();
+    if (this.pause?.reason === "ai" && this.pause.ai?.playerId === playerId) this.resumeAfterAi("ai");
   }
 
   /** Back from an AI pause (D-112): the game's timers run again. */
-  private resumeAfterAi() {
+  private resumeAfterAi(reason: "ai" | "playNow") {
     if (!this.runtime) return;
-    this.runtime.resume();
+    this.runtime.resume(reason);
     this.phase = "active";
     this.pause = null;
     this.emit("game", [{ name: "resumed" }]);
@@ -1116,7 +1120,7 @@ export class Table extends EventEmitter {
   /** Time is up (D-112): the game pauses while the AI keeps thinking; the board offers "Play now" for it. */
   private aiOverdue(p: Player, mv: AiMoveState) {
     if (this.aiMoves.get(p.id) !== mv || this.phase !== "active" || !this.runtime) return;
-    this.runtime.pause();
+    this.runtime.pause("ai", mv.seat);
     // Other AI players start again from the current view after the pause; this one keeps thinking.
     for (const [id, other] of [...this.aiMoves]) if (id !== p.id) this.cancelAiMove(id, other);
     this.phase = "paused";
@@ -1134,7 +1138,7 @@ export class Table extends EventEmitter {
     const p = this.players.get(this.pause.ai!.playerId);
     const mv = p ? this.aiMoves.get(p.id) : undefined;
     if (p && mv) this.cancelAiMove(p.id, mv);
-    this.resumeAfterAi();
+    this.resumeAfterAi("playNow");
     const fallback = p && p.seat !== null ? this.runtime.aiFallbackIntent(p.seat, this.aiRng(p)) : null;
     if (p && fallback) this.submitAi(p, fallback, { ms: mv?.startedAt ? Date.now() - mv.startedAt : 0, fallback: true, ...this.workerMeta() }, true);
     if ((this.phase as string) === "active" && !(p && fallback)) this.scheduleAi();
@@ -1259,7 +1263,7 @@ export class Table extends EventEmitter {
         verify: { checked: 0, ok: 0, failed: [], skipped: rebuilt ? "interrupted: the state was rebuilt by replay, there is no end state to compare with" : "interrupted, and the game could not be replayed on this table" },
       };
       try {
-        await this.logs.saveInterrupted(dir, full, log, rebuilt?.state);
+        await this.logs.saveInterrupted(dir, full, log, rebuilt?.state, movesFor(same, log));
         ids.push(meta.id);
         this.emit("logSaved", meta.id);
       } catch (err) {
