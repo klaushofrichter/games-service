@@ -135,13 +135,47 @@ describe("access codes: tables", () => {
     const c = await newCode();
     const t = await host({ accessCode: c.code.toLowerCase() });
     await until(() => t.host.table.cloud.status === "online");
-    expect(t.host.table.cloud.code).toEqual({ hint: c.hint, source: "start", status: "accepted" });
+    // The code's validity reaches the board too (a month from now, on the table's clock).
+    await until(() => t.host.table.cloud.code?.expiresAt !== undefined);
+    expect(t.host.table.cloud.code).toEqual({ hint: c.hint, source: "start", status: "accepted", expiresAt: expect.any(Number) });
+    const left = t.host.table.cloud.code!.expiresAt! - Date.now();
+    expect(left).toBeGreaterThan(27 * 86400_000);
+    expect(left).toBeLessThan(32 * 86400_000);
     const state = await t.ok("GET", "/state");
-    expect(state.cloud.code).toEqual({ hint: c.hint, source: "start", status: "accepted" });
+    expect(state.cloud.code).toMatchObject({ hint: c.hint, source: "start", status: "accepted" });
     expect(JSON.stringify(state)).not.toContain(c.code.replace("-", "")); // phones get the lobby state too
     const row = await tableRow(t.host.cloud!["identity"].tableId);
     expect(row).toMatchObject({ status: "approved", reposFrom: "code", code: { id: c.id, label: "Klaus home" } });
     expect(await codeRow(c.id)).toMatchObject({ state: "active", table: { tableId: row.tableId, status: "approved" }, boundAt: expect.any(Number) });
+  });
+
+  it("tells the board how long its code is valid, follows an edit, and keeps working past it", async () => {
+    const c = await newCode({ validity: "week" });
+    const t = await host({ accessCode: c.code });
+    const left = async () => (await until(() => (t.host.table.cloud.code?.expiresAt !== undefined ? t.host.table.cloud.code : null))).expiresAt;
+    const week = (await left())! - Date.now();
+    expect(week).toBeGreaterThan(6.9 * 86400_000);
+    expect(week).toBeLessThanOrEqual(7 * 86400_000);
+    // An admin makes it forever: the board hears it at the next heartbeat.
+    await admin("PATCH", `/admin/api/codes/${c.id}`, { validity: "forever" });
+    await until(() => t.host.table.cloud.code?.expiresAt === null);
+    // Past its validity (the service's clock jumps): still online, the time left is in the past.
+    await admin("PATCH", `/admin/api/codes/${c.id}`, { validity: "week" });
+    await until(() => typeof t.host.table.cloud.code?.expiresAt === "number");
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(Date.now() + 8 * 86400_000);
+    await until(() => (t.host.table.cloud.code?.expiresAt ?? Infinity) <= Date.now());
+    expect(t.host.table.cloud).toMatchObject({ status: "online", code: { status: "accepted" } });
+  });
+
+  it("does not resend the lobby state for every heartbeat just because the time left shrank", async () => {
+    const c = await newCode({ validity: "month" });
+    const t = await host({ accessCode: c.code });
+    await until(() => t.host.table.cloud.code?.expiresAt !== undefined);
+    let changes = 0;
+    t.host.table.on("state", () => changes++);
+    await new Promise((r) => setTimeout(r, 400)); // about eight heartbeats at 50 ms
+    expect(changes).toBe(0);
   });
 
   it("serves one board: a second table with the same code is refused and waits for a pairing code", async () => {

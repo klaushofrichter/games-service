@@ -28,6 +28,8 @@ interface TableConfigMsg {
   logRetentionDays: number;
   /** Extra-game bundles this table gets (D-097); absent from services older than that. */
   gameBundles?: BundleRef[];
+  /** The validity of the code that approved this table (D-112); absent from older services, null without a code. */
+  accessCode?: { hint: string; expiresInMs: number | null } | null;
 }
 
 export interface CloudLinkOptions {
@@ -90,9 +92,26 @@ export class CloudLink {
     return board ? { code: board, source: "board" } : null;
   }
 
+  /** The code's validity as the service last reported it: on this table's clock, null = forever. */
+  private codeExpiry: { hint: string; at: number | null } | undefined;
+
   private codeInfo(): AccessCodeStatus | null {
     const c = this.accessCode;
-    return c ? { hint: c.code.slice(0, 2), source: c.source, status: this.codeStatus ?? "waiting" } : null;
+    if (!c) return null;
+    const info: AccessCodeStatus = { hint: c.code.slice(0, 2), source: c.source, status: this.codeStatus ?? "waiting" };
+    // Only for the code the service accepted from us (the hint must match, or it is about another code).
+    if (info.status === "accepted" && this.codeExpiry && this.codeExpiry.hint === info.hint) info.expiresAt = this.codeExpiry.at;
+    return info;
+  }
+
+  private noteValidity(v: TableConfigMsg["accessCode"]) {
+    if (v === undefined) return; // an older service
+    const next = v ? { hint: String(v.hint), at: v.expiresInMs === null ? null : Date.now() + Number(v.expiresInMs) } : undefined;
+    const cur = this.codeExpiry;
+    // The time left shrinks with every heartbeat: only an edit (or a first answer) counts as a change, so the lobby
+    // state is not sent to every board every 15 seconds.
+    const same = !next ? !cur : !!cur && cur.hint === next.hint && (cur.at === null ? next.at === null : next.at !== null && Math.abs(cur.at - next.at) < 60_000);
+    if (!same) this.codeExpiry = next;
   }
 
   /**
@@ -283,6 +302,7 @@ export class CloudLink {
   }
 
   private applyConfig(c: TableConfigMsg) {
+    this.noteValidity(c.accessCode);
     // Old services send no gameBundles: leave whatever is installed alone.
     if (Array.isArray(c.gameBundles)) void this.extras?.sync(c.gameBundles);
     if (!Number.isInteger(c.logRetentionDays) || c.logRetentionDays === this.logs.retentionDays) return;

@@ -6,6 +6,8 @@ page is the history. Leave it empty if there is nothing to add beyond the commit
 
 ## [Unreleased]
 
+- The board's access code badge shows how long the code is valid (*valid forever*, *valid for 12 weeks*, … *valid
+  for 30 minutes*), and *expired* in red once it has run out, while the table keeps working.
 - The board's access code keypad takes a pasted code (Ctrl/⌘+V, or its **Paste** button), with or without the
   dash; the console now copies a new code without the dash.
 - Game logs for analysis: every game's log, simulations included, now reaches the service. A table writes the log
