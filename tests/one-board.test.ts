@@ -79,3 +79,25 @@ describe("one board window", () => {
     expect(next.answer).toBe("welcome");
   });
 });
+
+describe("connection counts (D-133)", () => {
+  it("a deck per player, the board, and what the table serves", async () => {
+    await board({ tab: "tab-a" });
+    const ann = await t.joinDeck("Ann");
+    await t.joinDeck("Ben");
+    const annAgain = await Deck.connect(t.base, { sessionToken: ann.sessionToken });
+    open.push(annAgain);
+    await until(() => ann.closeCode === 4009);
+    expect(await t.ok("GET", "/connections")).toMatchObject({ boards: 1, remoteBoards: 0, decks: 2 });
+    expect(t.host.table.state().players.find((p) => p.name === "Ann")!.connected).toBe(true);
+  });
+
+  it("serves eight decks at most", async () => {
+    await t.ok("POST", "/layout", { seats: 8 });
+    const decks = [];
+    for (const name of ["A", "B", "C", "D", "E", "F", "G", "H"]) decks.push(await t.joinDeck(name));
+    open.push(...decks);
+    await expect(t.joinDeck("I")).rejects.toThrow(/eight phones|no free seat/i);
+    expect((await t.ok("GET", "/connections")).decks).toBe(8);
+  });
+});

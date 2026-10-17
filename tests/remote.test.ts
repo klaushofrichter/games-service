@@ -337,6 +337,30 @@ describe("remote play", { timeout: 60_000 }, () => {
     expect(s.lastState().joinUrl).toBe("");
   });
 
+  it("serves one board per remote player: a newer window replaces the older one (D-133)", async () => {
+    const t = await pairedHost();
+    const peer = await RemotePeer.connect((await t.ok("POST", "/invites")).token);
+    const first = await peer.socket({ role: "board" });
+    await first.next((m) => m.type === "welcome");
+    const second = await peer.socket({ role: "board" });
+    await second.next((m) => m.type === "welcome");
+    await until(() => first.s.closed);
+    expect(first.s.msgs.some((m) => m.type === "replaced")).toBe(true);
+    const c = await t.ok("GET", "/connections");
+    expect(c).toMatchObject({ boards: 0, remoteBoards: 1, limits: { boards: 1, remoteBoards: 4, decks: 8 } });
+  });
+
+  it("serves no more remote boards than it has remote seats (D-133)", async () => {
+    const t = await pairedHost({ maxRemotePlayers: 1 });
+    const a = await RemotePeer.connect((await t.ok("POST", "/invites")).token);
+    await (await a.socket({ role: "board" })).next((m) => m.type === "welcome");
+    const b = await RemotePeer.connect((await t.ok("POST", "/invites")).token);
+    const refused = await b.socket({ role: "board" });
+    const err = await refused.next((m) => m.type === "error");
+    expect(err.payload.message).toMatch(/every remote seat/);
+    expect((await t.ok("GET", "/connections")).remoteBoards).toBe(1);
+  });
+
   it("refuses unknown invites at the cloud", async () => {
     await pairedHost();
     await expect(RemotePeer.connect("NOPE1234")).rejects.toThrow(/404/);

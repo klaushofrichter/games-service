@@ -31,7 +31,10 @@ export interface RemoteContext {
 }
 export const remoteOf = (req: IncomingMessage): RemoteContext | undefined => (req as IncomingMessage & { gtRemote?: RemoteContext }).gtRemote;
 
-type Client = ({ ws: WebSocket; role: "board" } | { ws: WebSocket; role: "deck"; playerId: string } | { ws: WebSocket; role: "pending" }) & { remote?: boolean; tab?: string };
+type Client = ({ ws: WebSocket; role: "board" } | { ws: WebSocket; role: "deck"; playerId: string } | { ws: WebSocket; role: "pending" }) & { remote?: boolean; tab?: string; session?: string };
+
+/** Connections one table serves at most (D-133): one local board, a deck per player (eight seats at most), and a board per remote player. */
+const MAX_DECKS = 8;
 
 /** Reads a remote client may make: lobby and game state, never logs, saves, simulations or local join codes. */
 const REMOTE_DENIED = /^\/(join|simulation|logs|saves|invites|remote|qr|cloud|developer)(\/|$)/;
@@ -187,6 +190,7 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
     let match: RegExpMatchArray | null;
 
     if (m === "GET" && path === "/state") return json(res, 200, forClient(!!remote, table.state()));
+    if (m === "GET" && path === "/connections" && !remote) return json(res, 200, connections());
     if (m === "POST" && path === "/developer") return (table.setDeveloper(body), json(res, 200, table.state()));
     if (m === "POST" && path === "/remote") return (table.setRemoteBoardControl(!!body.boardControl), json(res, 200, table.state()));
     if (m === "POST" && path === "/invites") {
@@ -357,6 +361,23 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
 
   const wss = new WebSocketServer({ server, path: "/ws", maxPayload: 64 * 1024 });
 
+  /** Moves a client out because a newer window took its place (D-132, D-133): it is told so and closed. */
+  const replaceClient = (o: Client) => {
+    send(o.ws, envelope("system", "replaced", {}));
+    o.ws.close(4009, "opened in another window");
+    clients.delete(o as Client & { alive?: boolean });
+  };
+  /** What the table serves right now (D-133). */
+  const connections = () => {
+    const all = [...clients];
+    return {
+      boards: all.filter((c) => c.role === "board" && !c.remote).length,
+      remoteBoards: all.filter((c) => c.role === "board" && c.remote).length,
+      decks: all.filter((c) => c.role === "deck").length,
+      limits: { boards: 1, remoteBoards: table.config.maxRemotePlayers, decks: MAX_DECKS },
+    };
+  };
+
   const onConnection = (ws: WebSocket, req: IncomingMessage) => {
     const remoteCtx = remoteOf(req);
     const remote = !!remoteCtx;
@@ -385,7 +406,15 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
               send(ws, envelope("lobby", "state", forClient(remote, table.state())));
               if (table.phase === "active" || table.phase === "paused") sendGame([client], []);
             };
-            if (remote) return acceptBoard();
+            if (remote) {
+              // A board per remote player (D-133): the newest window of a remote session replaces its older one, and
+              // the table serves no more remote boards than it has remote seats.
+              c.session = remoteCtx!.session;
+              const remoteBoards = [...clients].filter((o) => o !== client && o.role === "board" && o.remote);
+              remoteBoards.filter((o) => o.session === c.session).forEach(replaceClient);
+              if (remoteBoards.filter((o) => o.session !== c.session).length >= (table.config.maxRemotePlayers)) throw new TableError(409, "this table already shows its board to every remote seat");
+              return acceptBoard();
+            }
             // One board window at the table PC (D-132). A second one is told where the table is and gets nothing; it
             // takes over only when asked (takeover), or when it is the same browser tab coming back (a reload, a
             // dropped connection), and the window it replaces is told so. A board that does not answer a ping within
@@ -394,11 +423,7 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
             c.tab = tab;
             const others = () => [...clients].filter((o) => o !== client && o.role === "board" && !o.remote && o.ws.readyState === o.ws.OPEN);
             const replace = () => {
-              for (const o of others()) {
-                send(o.ws, envelope("system", "replaced", {}));
-                o.ws.close(4009, "the board is open in another window");
-                clients.delete(o);
-              }
+              others().forEach(replaceClient);
               acceptBoard();
             };
             const live = others();
@@ -420,10 +445,14 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
             return;
           } else if (p.sessionToken) {
             const info = table.resume(String(p.sessionToken));
+            // One deck per player (D-133): the player's newest window replaces the older one, which is told so.
+            [...clients].filter((o) => o !== client && o.role === "deck" && o.playerId === info.id).forEach(replaceClient);
+            if ([...clients].filter((o) => o.role === "deck").length >= MAX_DECKS) throw new TableError(409, "the table serves eight phones at most");
             c.role = "deck";
             c.playerId = info.id;
             reply("welcome", { role: "deck", playerId: info.id }, msg.seq);
           } else {
+            if ([...clients].filter((o) => o.role === "deck").length >= MAX_DECKS) throw new TableError(409, "the table serves eight phones at most");
             const { playerId, sessionToken } = remoteCtx ? table.joinRemote(p.name, remoteCtx.session) : table.join(String(p.joinToken ?? ""), p.name);
             c.role = "deck";
             c.playerId = playerId;

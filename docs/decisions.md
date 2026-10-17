@@ -385,3 +385,16 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   - **Checks.** `tests/one-board.test.ts` (elsewhere and no state, the game named, takeover with the old window told
     and closed, the same tab, a dead connection, a closed window); `scripts/e2e/one_board.py` (panel, keep, take
     over, reload keeps the board, closing frees it; in `run-all.sh`).
+- **D-133 · 2026-10-17 · Klaus** — One table serves at most one local board, a deck per player (eight at most), and a
+  board per remote player (four at most, `maxRemotePlayers`), and keeps count. *Why:* a game engine shows one game to
+  one board; two windows of the same thing (D-132) can show different moments or make a move twice.
+  - **Decks.** A player's newest deck window replaces the older one (`system replaced`, close 4009); the old one says
+    *Your deck is open in another window* with *Use this window*, which takes it back. The player stays connected
+    throughout. A ninth deck is refused.
+  - **Remote boards.** A remote session's newest board replaces its older one; a board for a session beyond the remote
+    seats is refused (*this table already shows its board to every remote seat*).
+  - **Counting.** `GET /api/v1/connections` (table key, not for remote clients): `{boards, remoteBoards, decks,
+    limits}`.
+  - **Checks.** `tests/one-board.test.ts` (a deck per player, eight decks), `tests/remote.test.ts` (one board per
+    remote player, no more than the remote seats), `tests/platform.test.ts` (a second tab replaces the first, the
+    player stays connected), `scripts/e2e/one_board.py` (the deck moved and taken back, the counts).

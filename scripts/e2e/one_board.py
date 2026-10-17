@@ -4,11 +4,12 @@
 A Table Host of its own (port 8097) with a game of Pachisi running (AI players, developer setting: no player at the
 table). A second board window (another tab, so another tab id) shows "The board is open in another window", names the
 game, and gets no table state. "Show the board here" moves the board: the first window shows "The board moved to
-another window", the second shows the game. A reload of the window that has the board keeps it without a question.
+another window", the second shows the game. A reload of the window that has the board keeps it without a question. A player's deck opened in a second tab moves
+there; the first tab says so and takes it back with "Use this window" (D-133).
 """
 import os, sys
 from playwright.sync_api import sync_playwright
-from common import api, errors, start_table, wait, watch
+from common import api, errors, join_deck, start_table, wait, watch
 
 OUT = sys.argv[1] if len(sys.argv) > 1 else "e2e-out"
 os.makedirs(OUT, exist_ok=True)
@@ -70,6 +71,25 @@ try:
         first.wait_for_timeout(300)
         first.click("[data-elsewhere=here]")
         first.wait_for_selector("#game-layer:not([hidden])", timeout=10000)
+        # One deck per player (D-133): the same phone's second tab takes the deck; the first can take it back.
+        a("POST", "/game/end", {})
+        wait(lambda: a("GET", "/state")["phase"] not in ("active", "paused"), 10, "the game to end")
+        phone = br.new_context(viewport={"width": 390, "height": 844})
+        d1 = phone.new_page()
+        watch(d1, "deck 1")
+        join_deck(d1, a("GET", "/join")["url"], "Ann")
+        d2 = phone.new_page()  # the same browser: it finds Ann's saved session
+        watch(d2, "deck 2")
+        d2.goto(BASE + "/deck/")
+        d2.wait_for_selector(".who h1", timeout=10000)
+        d1.wait_for_selector("text=Your deck is open in another window", timeout=10000)
+        d1.screenshot(path=os.path.join(OUT, "one-deck-replaced.png"))
+        conn = a("GET", "/connections")
+        assert conn["decks"] == 1 and conn["boards"] == 1, conn
+        d1.click("[data-action=deck-here]")
+        d1.wait_for_selector(".who h1", timeout=10000)
+        d2.wait_for_selector("text=Your deck is open in another window", timeout=10000)
+        assert [p for p in a("GET", "/state")["players"] if p["name"] == "Ann"][0]["connected"], "Ann went offline"
         br.close()
 finally:
     proc.terminate()

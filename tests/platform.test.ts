@@ -261,14 +261,16 @@ describe("deck socket robustness", () => {
     expect(nameless.payload.message).toMatch(/needs a name/);
   });
 
-  it("keeps a player connected while a second socket with the same session closes", async () => {
+  it("a second tab with the same session replaces the first; the player stays connected (D-133)", async () => {
     const t = await host({ graceMs: 100 });
     const a = await t.joinDeck("A");
     const second = await Deck.connect(t.base, { sessionToken: a.sessionToken }); // e.g. a second tab
-    second.ws.close();
+    await until(() => a.closeCode === 4009);
+    expect(a.messages.some((m) => m.ch === "system" && m.type === "replaced")).toBe(true);
     await sleep(250);
     const p = t.host.table.state().players.find((x) => x.name === "A")!;
     expect(p.connected).toBe(true);
+    second.ws.close();
   });
 });
 
