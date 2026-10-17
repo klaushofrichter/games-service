@@ -3,12 +3,47 @@
   "name": "Duel",
   "version": "1.0.0",
   "sdk": "^0.1",
-  "description": "Test game for localSeat (D-128): two players, the one at the table sits south.",
-  "players": [2],
+  "description": "Test game for localSeat (D-128) and the board's settings window (D-129): two players, the one at the table sits south; a setting with five choices and one with two.",
+  "players": [
+    2
+  ],
   "turnModel": "sequential",
-  "seatLayouts": [2],
-  "edges": ["north", "south"],
+  "seatLayouts": [
+    2
+  ],
+  "edges": [
+    "north",
+    "south"
+  ],
   "localSeat": "south",
-  "ai": { "supported": true, "options": [] },
-  "test": true
+  "ai": {
+    "supported": true,
+    "options": []
+  },
+  "test": true,
+  "settings": [
+    {
+      "key": "pace",
+      "type": "enum",
+      "values": [
+        "no limit",
+        "very slow",
+        "slow",
+        "quick",
+        "very quick"
+      ],
+      "default": "no limit",
+      "label": "Pace of play"
+    },
+    {
+      "key": "side",
+      "type": "enum",
+      "values": [
+        "left",
+        "right"
+      ],
+      "default": "left",
+      "label": "Side"
+    }
+  ]
 }

@@ -439,6 +439,13 @@ toolsBtn.addEventListener("click", () => openAdvanced());
  * setPrefs(patch) stores display choices for this game on the table; board and decks get them as info.prefs.
  */
 let settingsOverlay = null;
+/**
+ * A choice with up to this many options shows as a row of buttons; more become a pulldown (D-129), since a row of
+ * eight time controls ran out of the window.
+ */
+const SEG_MAX = 3;
+const pulldown = (attr, options, label) =>
+  `<select class="pulldown" ${attr} aria-label="${esc(label)}">${options.map((op) => `<option value="${esc(op.value)}" ${op.on ? "selected" : ""}>${esc(op.label)}</option>`).join("")}</select>`;
 /** The chosen game's settings fields from its manifest (D-090), or none. */
 const gameFields = () => (state.game && games.find((x) => x.id === state.game.id)?.settings) || [];
 function openSettings() {
@@ -462,6 +469,7 @@ function openSettings() {
     if (it.type === "button") return `<button data-item="${k}">${esc(it.action ?? it.label)}</button>`;
     if (it.type === "swatches")
       return `<span class="swatches">${it.options.map((c, i) => `<button class="swatch ${c === it.value ? "on" : ""}" style="--c:${esc(c)}" data-item="${k}" data-val="${i}" aria-label="${esc(it.label)}: colour ${i + 1}"></button>`).join("")}</span>`;
+    if (it.options.length > SEG_MAX) return pulldown(`data-item-select="${k}"`, it.options.map((op, i) => ({ value: String(i), label: op.label ?? op.value, on: op.value === it.value })), it.label);
     return `<span class="seg">${it.options.map((op, i) => `<button class="${op.value === it.value ? "on" : ""}" data-item="${k}" data-val="${i}">${esc(op.label ?? op.value)}</button>`).join("")}</span>`;
   };
   const draw = () => {
@@ -485,7 +493,10 @@ function openSettings() {
         return `<span class="stepper"><button data-setting="${esc(f.key)}" data-delta="-1" ${f.min !== undefined && v <= f.min ? "disabled" : ""} aria-label="Less">−</button>
           <span class="value">${esc(v)}</span><button data-setting="${esc(f.key)}" data-delta="1" ${f.max !== undefined && v >= f.max ? "disabled" : ""} aria-label="More">+</button></span>`;
       if (f.type === "bool") return `<button data-setting="${esc(f.key)}" data-toggle class="${v ? "on" : ""}" role="switch" aria-checked="${!!v}">${v ? "On" : "Off"}</button>`;
-      if (f.type === "enum") return `<span class="seg">${f.values.map((x) => `<button class="${String(v) === x ? "on" : ""}" data-setting="${esc(f.key)}" data-value="${esc(x)}">${esc(x)}</button>`).join("")}</span>`;
+      if (f.type === "enum")
+        return f.values.length > SEG_MAX
+          ? pulldown(`data-setting-select="${esc(f.key)}"`, f.values.map((x) => ({ value: x, label: x, on: String(v) === x })), f.label ?? f.key)
+          : `<span class="seg">${f.values.map((x) => `<button class="${String(v) === x ? "on" : ""}" data-setting="${esc(f.key)}" data-value="${esc(x)}">${esc(x)}</button>`).join("")}</span>`;
       return `<span class="value">${esc(v)}</span>`;
     };
     // Player colours (D-106): a table setting for every seated player, used in the lobby and by every game.
@@ -526,6 +537,18 @@ function openSettings() {
   // The code's "valid for …" counts down while the settings are open (down to minutes).
   const tick = setInterval(() => state?.cloud?.code?.expiresAt && draw(), 30_000);
   document.addEventListener("fullscreenchange", draw);
+  // Choices with more options than fit as buttons are pulldowns (D-129).
+  o.addEventListener("change", (e) => {
+    const sel = e.target.closest("select");
+    if (!sel) return;
+    if (sel.dataset.settingSelect) {
+      const f = gameFields().find((x) => x.key === sel.dataset.settingSelect);
+      if (f && sel.value !== String(state.game.settings?.[f.key] ?? f.default)) act("POST", "/game/settings", { settings: { [f.key]: sel.value } });
+    } else if (sel.dataset.itemSelect !== undefined) {
+      const it = items[Number(sel.dataset.itemSelect)];
+      it?.onChange?.(it.options[Number(sel.value)].value);
+    }
+  });
   o.addEventListener("click", (e) => {
     const b = e.target.closest("button");
     if (e.target === o || b?.dataset.closeOverlay !== undefined) return close();
@@ -1245,6 +1268,18 @@ function openAdvanced() {
   draw();
   const unsub = onState(draw);
   const close = () => (unsub(), o.remove());
+  // Choices with more options than fit as buttons are pulldowns (D-129).
+  o.addEventListener("change", (e) => {
+    const sel = e.target.closest("select");
+    if (!sel) return;
+    if (sel.dataset.settingSelect) {
+      const f = gameFields().find((x) => x.key === sel.dataset.settingSelect);
+      if (f && sel.value !== String(state.game.settings?.[f.key] ?? f.default)) act("POST", "/game/settings", { settings: { [f.key]: sel.value } });
+    } else if (sel.dataset.itemSelect !== undefined) {
+      const it = items[Number(sel.dataset.itemSelect)];
+      it?.onChange?.(it.options[Number(sel.value)].value);
+    }
+  });
   o.addEventListener("click", (e) => {
     const b = e.target.closest("button");
     if (e.target === o || b?.dataset.closeOverlay !== undefined) return close();

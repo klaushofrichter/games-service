@@ -406,3 +406,10 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   most, so a board that never settles still gets its button). Boards without it behave as before. Coin Flip resolves
   it when the coin has landed; Loopy when its replay queue is empty (loopy-game L-029). README, *Writing a game*,
   describes it. `scripts/e2e/play.py endings` fails when *Show result* appears while the coin still spins.
+- **D-129 · 2026-10-17 · Klaus** — In the board's settings window, a choice with more than three options is a pulldown
+  instead of a row of buttons. *Why:* Chess's eight time controls ran out of the window: the last was clipped and the
+  rest could not be reached. *Implementation (Claude):* for a game's manifest settings (`enum`) and for the choices a
+  game adds itself (`choice`); two or three options stay buttons. The pulldown is a native `select`, which the
+  kiosk's Chromium opens as a touch list. Check: `scripts/e2e/settings_choice.py` with the test game Duel (a five-choice
+  setting is a pulldown with all five, inside the window; a two-choice one stays buttons; both change the table's
+  settings); it fails without the change.

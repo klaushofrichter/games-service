@@ -259,6 +259,11 @@ pre.raw { font-family: var(--mono); font-size: 0.7em; color: var(--ink-soft); ba
 .overlay.settings .seg button.on, .overlay.settings button.on:not(.swatch), .overlay.advanced button.on { border-color: var(--brass); color: var(--brass); }
 /* A choice (e.g. Pachisi's pieces, D-102): the chosen option filled, its label dark on brass so it stays readable. */
 .overlay.settings .seg button.on { background: var(--brass); color: #1b1407; }
+/* A choice with many options (D-129): a pulldown as tall as the buttons, sized to its longest option. */
+.overlay.settings select.pulldown { min-height: 48px; min-width: 170px; max-width: 100%; padding: 0.4em 2.2em 0.4em 0.9em; border-radius: 999px;
+  border: 1px solid var(--brass); background: var(--felt-deep, #0a1d19) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M6 9l6 6 6-6' fill='none' stroke='%23d6a94a' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 0.8em center / 1.1em;
+  color: var(--ink); font: inherit; appearance: none; -webkit-appearance: none; cursor: pointer; }
+.overlay.settings select.pulldown option { background: #0f2a24; color: #f3eee2; }
 .swatches { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
 .swatch { width: 40px; height: 40px; padding: 0; border-radius: 50%; background: var(--c); border: 3px solid transparent; }
 .overlay.settings .swatch.on { border-color: #fbf8ef; box-shadow: 0 0 0 3px var(--c); }
