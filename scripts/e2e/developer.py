@@ -2,8 +2,9 @@
   python3 scripts/e2e/developer.py out/
 
 A Table Host of its own (port 8094). With the setting off, the board says the last player at the table can't be
-removed while a game is chosen; turned on in Settings, the gear shows DEV, and a game of AI players only starts from
-the board and plays on it.
+removed while a game is chosen. The setting, Simulation and Game logs are under Advanced, the hammer-and-wrench button
+beside the gear (D-128), not in Settings or the lobby; turned on, Advanced shows DEV, and a game of AI players only
+starts from the board and plays on it.
 """
 import os, sys
 from playwright.sync_api import sync_playwright
@@ -40,14 +41,25 @@ try:
         assert board.locator(".dialog").count() == 0, "no Remove dialog for the last player at the table"
         board.wait_for_selector(".toast", state="detached")
 
-        # On: Settings › Developer; the gear shows DEV.
+        # The lobby has no Simulation or Game logs buttons any more, and Settings no Developer group (D-128).
+        assert board.locator("button[data-sim], button[data-logs]").count() == 0
         board.click("#settings-button")
-        board.click("[data-dev-no-local]")
-        board.wait_for_selector("[data-dev-no-local].on")
-        board.screenshot(path=os.path.join(OUT, "developer-settings.png"))
-        board.click("[data-close-overlay]")
-        board.wait_for_selector("#settings-button.dev")
-        board.locator("#settings-button").screenshot(path=os.path.join(OUT, "developer-gear.png"))
+        board.wait_for_selector(".overlay.settings .panel")
+        assert board.locator(".overlay.settings [data-dev-no-local], .overlay.settings [data-viewer]").count() == 0
+        board.click(".overlay.settings [data-close-overlay]")
+
+        # On: Advanced › Developer; the hammer and wrench show DEV.
+        board.click("#tools-button")
+        board.wait_for_selector(".overlay.advanced button[data-adv=sim]")
+        board.wait_for_selector(".overlay.advanced button[data-adv=logs]")
+        board.click(".overlay.advanced [data-dev-no-local]")
+        board.wait_for_selector(".overlay.advanced [data-dev-no-local].on")
+        board.screenshot(path=os.path.join(OUT, "developer-advanced.png"))
+        board.click(".overlay.advanced [data-close-overlay]")
+        board.wait_for_selector("#tools-button.dev")
+        gear, tools = board.locator("#settings-button").bounding_box(), board.locator("#tools-button").bounding_box()
+        assert abs(gear["y"] - tools["y"]) < 2 and 60 <= tools["x"] - gear["x"] <= 80, f"beside the gear: {gear} {tools}"
+        board.screenshot(path=os.path.join(OUT, "developer-buttons.png"), clip={"x": 0, "y": 960, "width": 420, "height": 120})
 
         # Ann can go now; two AIs alone start from the board and play.
         board.click(f"[data-chip='{ann['id']}']")
@@ -64,7 +76,7 @@ try:
 
         # Off again: the gear is plain.
         a("POST", "/developer", {"allowNoLocalPlayer": False})
-        board.wait_for_selector("#settings-button:not(.dev)")
+        board.wait_for_selector("#tools-button:not(.dev)")
         br.close()
     if errors:
         raise AssertionError("browser errors:\n" + "\n".join(errors))

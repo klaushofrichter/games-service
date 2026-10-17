@@ -42,10 +42,11 @@ try:
         board = br.new_page(viewport={"width": 1920, "height": 1080})
         watch(board, "board")
         board.goto(TABLE + "/board/")
-        board.wait_for_selector("[data-sim]")
+        board.wait_for_selector("#tools-button:not([hidden])")
 
-        # 1. A simulation from the board's dialog: the dialog says how the games ended.
-        board.click("[data-sim]")
+        # 1. A simulation from the board's dialog (under Advanced, D-128): the dialog says how the games ended.
+        board.click("#tools-button")
+        board.click("button[data-adv=sim]")
         board.select_option("select[name=game]", "coin-flip")
         board.fill("input[name=players]", "2")
         board.fill("input[name=games]", "3")

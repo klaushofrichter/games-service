@@ -57,7 +57,7 @@ try:
         deck.locator("text=Rita").first.wait_for(timeout=20000)
         rboard.locator("text=Pick a game").wait_for(timeout=20000)
         assert rboard.locator("aside.join").count() == 0, "remote board must not show the local join code"
-        assert rboard.locator("button[data-sim]").count() == 0, "remote board must not offer simulations"
+        assert rboard.locator("button[data-sim], button[data-adv=sim]").count() == 0, "remote board must not offer simulations"
         players = wait(lambda: [x for x in state()["players"] if x["name"] == "Rita"])
         assert players[0]["location"] == "remote" and players[0]["seat"] is not None, players
         board.wait_for_selector(".invite-body >> text=1 of 4 remote seats in use")
@@ -92,6 +92,11 @@ try:
         remote.screenshot(path=os.path.join(OUT, "remote-north-seat.png"))
         assert rboard.locator("#corners button[data-face]").count() == 0, "remote boards don't turn the table"
         assert not rboard.locator("#settings-button").is_visible(), "settings stay with the table (D-088)"
+        # Advanced (D-128): with board control, the game logs only; no simulations, no developer setting.
+        rboard.locator("#tools-button").click()
+        rboard.locator(".overlay.advanced button[data-adv=logs]").wait_for()
+        assert rboard.locator(".overlay.advanced button[data-adv=sim], .overlay.advanced [data-dev-no-local]").count() == 0, "remote Advanced: game logs only"
+        rboard.locator(".overlay.advanced [data-close-overlay]").click()
         assert not rboard.locator("#view-button").is_visible(), "the full-width view is only for east and west seats (D-101)"
 
         # remote board control: change the layout from the remote board, then the table switches control off
