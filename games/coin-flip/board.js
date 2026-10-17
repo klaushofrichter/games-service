@@ -84,6 +84,8 @@ export function mount(root) {
     });
   }
 
+  const idleWaiters = [];
+  let spin = null; // the coin's spin animation
   return {
     update(v, events, i) {
       info = i;
@@ -93,18 +95,25 @@ export function mount(root) {
         spinning = true;
         clearTimeout(spinTimer);
         playSound(info, "coin-spin", spinSound);
-        center.querySelector(".cf-coin").animate([{ transform: "rotateY(0)" }, { transform: "rotateY(1800deg)" }], { duration: SPIN_MS, easing: "cubic-bezier(.2,.7,.2,1)" });
+        spin = center.querySelector(".cf-coin").animate([{ transform: "rotateY(0)" }, { transform: "rotateY(1800deg)" }], { duration: SPIN_MS, easing: "cubic-bezier(.2,.7,.2,1)" });
         spinTimer = setTimeout(() => {
           spinning = false;
           playSound(info, "coin-land", landSound);
           if (view) draw();
+          const landed = () => idleWaiters.splice(0).forEach((r) => r());
+          spin ? spin.finished.then(landed, landed) : landed();
         }, SPIN_MS);
       }
       draw();
     },
+    /** Resolves once the coin has landed: the platform shows Show result only then (D-134). */
+    whenIdle() {
+      return spinning ? new Promise((r) => idleWaiters.push(r)) : Promise.resolve();
+    },
     destroy() {
       clearInterval(tick);
       clearTimeout(spinTimer);
+      idleWaiters.splice(0).forEach((r) => r());
     },
   };
 }

@@ -398,3 +398,11 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   - **Checks.** `tests/one-board.test.ts` (a deck per player, eight decks), `tests/remote.test.ts` (one board per
     remote player, no more than the remote seats), `tests/platform.test.ts` (a second tab replaces the first, the
     player stays connected), `scripts/e2e/one_board.py` (the deck moved and taken back, the counts).
+- **D-134 · 2026-10-17 · Klaus** — *Show result* waits until the game's board has shown the end. *Why:* a board window
+  that falls behind (a background tab, which the browser slows down, or a slow PC) showed *Show result* over a game
+  that still looked unfinished (D-132). *Implementation (Claude):* a game's board may return `whenIdle()` from
+  `mount`, a promise that resolves once it has shown everything it was sent; when a game ends by itself, the platform
+  holds the final screen as before (D-091) and shows *Show result* only once that promise resolves (two minutes at
+  most, so a board that never settles still gets its button). Boards without it behave as before. Coin Flip resolves
+  it when the coin has landed; Loopy when its replay queue is empty (loopy-game L-029). README, *Writing a game*,
+  describes it. `scripts/e2e/play.py endings` fails when *Show result* appears while the coin still spins.

@@ -355,7 +355,11 @@ def endings(browser, board):
     for d, g in zip(decks, ["heads", "tails"]):
         d.wait_for_selector(f"[data-guess={g}]:not([disabled])")
         d.click(f"[data-guess={g}]")
+    # The game is over at once, but Show result waits until the board has shown the end: the coin lands first (D-134).
+    wait(lambda: api("GET", "/state")["phase"] == "finished", 5, "the game to end")
+    assert board.locator("#result-button:not([hidden])").count() == 0, "Show result appeared while the coin was still spinning"
     board.wait_for_selector("#result-button:not([hidden])")  # held, as a game that ended by itself
+    assert not board.evaluate("() => document.querySelector('.cf-coin')?.getAnimations().some((a) => a.playState === 'running')"), "Show result appeared before the coin landed"
     time.sleep(1.4)
     assert board.evaluate("() => window.gameTableSounds") == [], "no sounds with sound off"
     board.click("#result-button")
