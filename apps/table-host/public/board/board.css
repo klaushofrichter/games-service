@@ -97,7 +97,15 @@ html, body { overflow: hidden; }
 .join img { width: 250px; height: 250px; border-radius: 10px; background: #fff; padding: 8px; }
 /* No free seat (D-129): the code faded, the reason in its place of honour. */
 .join.full .eyebrow { color: #f1a197; }
-.join img.dimmed { opacity: .18; filter: grayscale(1); }
+.join img.dimmed, .join-big img.dimmed { opacity: .18; filter: grayscale(1); }
+/* The join code from the settings (D-130): large enough to scan from a seat across the table. */
+.overlay.join-code { z-index: 44; }
+.overlay.join-code .settings-actions { gap: 12px; }
+.join-big { display: flex; flex-direction: column; align-items: center; gap: 14px; margin-top: 6px; }
+.join-big img { width: 360px; height: 360px; border-radius: 12px; background: #fff; padding: 10px; }
+.join-big .url { font-family: var(--mono); font-size: 0.85em; color: var(--ink); word-break: break-all; text-align: center; }
+.join-big .code { font-family: var(--mono); font-size: 1.6em; letter-spacing: 0.18em; color: var(--brass); }
+.join-big .full-note { max-width: 360px; text-align: center; font-size: .85em; color: #f1a197; }
 .join .full-note { max-width: 250px; text-align: center; font-size: .78em; line-height: 1.4; color: var(--ink); }
 .join .url { font-family: var(--mono); font-size: 0.78em; color: var(--ink); word-break: break-all; text-align: center; }
 .join .code { font-family: var(--mono); font-size: 1.5em; letter-spacing: 0.18em; color: var(--brass); }
@@ -362,7 +370,7 @@ button.copy:hover, button.copy.done { color: var(--brass); border-color: var(--b
 .viewer-panel details pre.raw { max-height: 420px; margin: 6px 0 0; font-size: .92em; line-height: 1.35; }
 
 /* Settings: Done stays at the bottom of the panel, however long the settings get. */
-.overlay.settings .settings-actions, .overlay.advanced .settings-actions {
+.overlay.settings .settings-actions, .overlay.advanced .settings-actions, .overlay.join-code .settings-actions {
   position: sticky; bottom: -26px; z-index: 1; display: flex; justify-content: flex-end;
   margin: 20px -30px -26px; padding: 14px 30px 18px; background: var(--felt); border-top: 1px solid var(--felt-line);
 }

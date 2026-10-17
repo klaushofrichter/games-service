@@ -406,7 +406,7 @@ export class Table extends EventEmitter {
 
   resume(sessionToken: string): PlayerInfo {
     const p = [...this.players.values()].find((x) => x.sessionToken && x.sessionToken === sessionToken);
-    if (!p) throw new TableError(403, "session expired; scan the QR code to join again");
+    if (!p) throw new TableError(403, "session expired; scan the QR code to join again (during a game: Settings › Show join code on the board)");
     if (p.graceTimer) clearTimeout(p.graceTimer);
     p.graceTimer = undefined;
     const wasAway = !p.connected;

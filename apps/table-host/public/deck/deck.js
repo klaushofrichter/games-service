@@ -318,7 +318,7 @@ function render() {
   if (removed) {
     closeGame();
     top.innerHTML = "";
-    body.innerHTML = `<div class="card center"><h1>You left the table</h1><p class="muted">${REMOTE ? "Ask the table for a new invite to join again." : "Scan the QR code on the board to join again."}</p></div>`;
+    body.innerHTML = `<div class="card center"><h1>You left the table</h1><p class="muted">${REMOTE ? "Ask the table for a new invite to join again." : "Scan the QR code on the board to join again. During a game, the board shows it under Settings › Show join code."}</p></div>`;
     return;
   }
   if (!me) return renderJoin();
@@ -351,7 +351,7 @@ function renderJoin() {
     return;
   }
   if (!joinToken) {
-    body.innerHTML = `<div class="card center"><h1>Join the table</h1><p class="muted">Scan the QR code on the board, or type the address shown below it.</p></div>`;
+    body.innerHTML = `<div class="card center"><h1>Join the table</h1><p class="muted">Scan the QR code on the board, or type the address shown below it. During a game, the board shows it under Settings › Show join code.</p></div>`;
     return;
   }
   if (noSeat) {

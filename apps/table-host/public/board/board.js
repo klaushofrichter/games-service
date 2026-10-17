@@ -485,6 +485,8 @@ function openSettings() {
       <div class="group"><div class="eyebrow">Display</div>
         <div class="row"><span>Sound effects</span><button data-sound class="${state.display?.sound !== false ? "on" : ""}" role="switch" aria-checked="${state.display?.sound !== false}">${state.display?.sound !== false ? "On" : "Off"}</button></div>
         <div class="row"><span>Fullscreen</span>${fs ? `<button data-fs class="${document.fullscreenElement ? "on" : ""}">${document.fullscreenElement ? "Leave fullscreen" : "Fullscreen"}</button>` : `<span class="faint">not available in this browser</span>`}</div></div>
+      <div class="group"><div class="eyebrow">Joining</div>
+        <div class="row"><span>The QR code and address for phones, to join or rejoin, also during a game</span><button data-join-code>Show join code…</button></div></div>
       ${playerColors()}
       ${gameSettings}
       ${items.length ? `<div class="group game-settings"><div class="eyebrow">${esc(state.game.name)}</div>${items.map((it, k) => `<div class="row"><span>${esc(it.label)}</span>${control(it, k)}</div>`).join("")}</div>` : ""}
@@ -512,6 +514,7 @@ function openSettings() {
     }
     if (b.dataset.sound !== undefined) return void act("POST", "/display", { sound: state.display?.sound === false });
     if (b.dataset.accessCode !== undefined) return openCodePad();
+    if (b.dataset.joinCode !== undefined) return openJoinCode();
     if (b.dataset.colorPlayer) return void act("POST", `/players/${encodeURIComponent(b.dataset.colorPlayer)}/color`, { color: b.dataset.color });
     if (b.dataset.setting) {
       const f = gameFields().find((x) => x.key === b.dataset.setting);
@@ -1155,6 +1158,36 @@ function openLobbyOverlay() {
       unsub();
       o.remove();
     }
+  });
+  overlayRoot.appendChild(o);
+}
+
+// ---------- the join code, from the settings (D-130) ----------
+/**
+ * The QR code, address and code for phones, whenever the lobby's QR panel is not on the screen (during a game): a
+ * phone that lost its seat or its session rejoins with it. Follows a new code and the free seats (D-129).
+ */
+function openJoinCode() {
+  const o = document.createElement("div");
+  o.className = "overlay join-code";
+  const draw = () => {
+    if (!state) return;
+    const code = state.joinUrl.split("/").pop();
+    setPanel(o, `<div class="panel"><h2>Join the table</h2>
+      <div class="join-big">
+        <img src="/qr.svg?u=${encodeURIComponent(state.joinUrl)}" alt="QR code to join this table" class="${state.noSeat ? "dimmed" : ""}">
+        <div>${linkLine(state.joinUrl)}<div class="code" style="text-align:center;margin-top:6px">${esc(code)}</div></div>
+        ${state.noSeat ? `<div class="full-note">${esc(state.noSeat)}</div>` : `<div class="faint" style="font-size:.75em;text-align:center">Scan with the phone's camera to join, or to rejoin after the phone lost its seat.</div>`}
+      </div>
+      <div class="actions settings-actions"><button data-new-code-here>New code</button><button class="primary" data-close-overlay>Done</button></div></div>`);
+  };
+  draw();
+  const unsub = onState(draw);
+  const close = () => (unsub(), o.remove());
+  o.addEventListener("click", async (e) => {
+    const b = e.target.closest("button");
+    if (e.target === o || b?.dataset.closeOverlay !== undefined) return close();
+    if (b?.dataset.newCodeHere !== undefined && (await confirmDialog("New join code?", "The current QR code stops working. Players already at the table stay in.", "New code"))) act("POST", "/join/new");
   });
   overlayRoot.appendChild(o);
 }
