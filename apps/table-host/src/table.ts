@@ -643,7 +643,7 @@ export class Table extends EventEmitter {
   removePlayer(playerId: string, reason: "evicted" | "left" = "evicted") {
     const p = this.mustPlayer(playerId);
     if (reason === "evicted" && this.protectedPlayer()?.id === p.id)
-      throw new TableError(409, `${p.name} is the last player at the table; a game needs one (the developer setting in the board's settings allows games without)`);
+      throw new TableError(409, `${p.name} is the last player at the table; a game needs one (the developer setting under Advanced on the board allows games without)`);
     if (p.graceTimer) clearTimeout(p.graceTimer);
     // During a game the seat keeps the player's colour (D-125): the game may go on with an AI in it (Loopy) or show it.
     if ((this.phase === "active" || this.phase === "paused") && p.seat !== null) {

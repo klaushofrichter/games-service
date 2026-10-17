@@ -20,6 +20,7 @@ const pauseLayer = document.getElementById("pause-layer");
 const cornersEl = document.getElementById("corners");
 const settingsBtn = document.getElementById("settings-button");
 const flipBtn = document.getElementById("flip-button");
+const toolsBtn = document.getElementById("tools-button");
 const viewBtn = document.getElementById("view-button");
 const resultBtn = document.getElementById("result-button");
 
@@ -160,7 +161,7 @@ async function chooseGame(id) {
  */
 function cannotRemove(p) {
   if (!p || state.developer?.protectedPlayer !== p.id) return false;
-  toast(`${p.name} is the last player at the table, and a game needs one. The developer setting in Settings allows games without.`);
+  toast(`${p.name} is the last player at the table, and a game needs one. The developer setting under Advanced (hammer and wrench) allows games without.`);
   return true;
 }
 
@@ -351,14 +352,40 @@ const FRONT_CORNERS = { south: ["bl", "br"], west: ["tl", "bl"], north: ["tr", "
 const LOBBY_CORNER = { "top-left": "tl", "top-right": "tr", "bottom-left": "bl", "bottom-right": "br" };
 function placeSettings(playing) {
   settingsBtn.hidden = REMOTE;
-  if (REMOTE) return;
   const front = playing ? "south" : viewEdge(); // D-127: fixed during a game, whichever way the game faces
   let [corner, other] = FRONT_CORNERS[front];
   if (playing && LOBBY_CORNER[state.game?.lobbyButton ?? "bottom-right"] === corner) corner = other;
-  // The developer setting (D-118) marks the gear while it is on, so nobody forgets it.
-  settingsBtn.className = `${corner} along-${front === "south" || front === "north" ? "x" : "y"}${state.developer?.allowNoLocalPlayer ? " dev" : ""}`;
-  settingsBtn.querySelector("svg").style.transform = `rotate(${ROT[front]}deg)`;
-  placeFlip(playing, front, corner);
+  if (!REMOTE) {
+    settingsBtn.className = `${corner} along-${front === "south" || front === "north" ? "x" : "y"}`;
+    settingsBtn.querySelector("svg").style.transform = `rotate(${ROT[front]}deg)`;
+    placeFlip(playing, front, corner);
+  }
+  placeTools(playing, front, corner);
+}
+
+/**
+ * Advanced (D-128): hammer and wrench, the next button along the edge from the gear, toward the middle (past the
+ * turn-around button when that sits there). On a remote board, only with board control, and in the gear's place,
+ * since a remote board has no gear: there it offers the game logs only.
+ */
+function placeTools(playing, front, gearCorner) {
+  toolsBtn.hidden = REMOTE && !state.remote?.boardControl;
+  if (toolsBtn.hidden) return;
+  // The developer setting (D-118) marks it while it is on, so nobody forgets it.
+  toolsBtn.classList.toggle("dev", !!state.developer?.allowNoLocalPlayer && !REMOTE);
+  const flipInside = playing && !REMOTE && gearCorner !== FRONT_CORNERS[front][0]; // the turn button at 172 px
+  const along = REMOTE ? 102 : flipInside ? 242 : 172;
+  const alongX = front === "south" || front === "north";
+  const st = toolsBtn.style;
+  st.left = st.right = st.top = st.bottom = "";
+  if (alongX) {
+    st[gearCorner[1] === "l" ? "left" : "right"] = `${along}px`;
+    st[gearCorner[0] === "t" ? "top" : "bottom"] = "32px";
+  } else {
+    st[gearCorner[0] === "t" ? "top" : "bottom"] = `${along}px`;
+    st[gearCorner[1] === "l" ? "left" : "right"] = "32px";
+  }
+  toolsBtn.querySelector("svg").style.transform = `rotate(${ROT[front]}deg)`;
 }
 
 /**
@@ -381,6 +408,7 @@ function placeFlip(playing, front, gearCorner) {
 }
 flipBtn.addEventListener("click", () => act("POST", "/face", { edge: gameEdge() === "south" ? "north" : "south" }));
 settingsBtn.addEventListener("click", () => openSettings());
+toolsBtn.addEventListener("click", () => openAdvanced());
 
 /**
  * The settings modal: the board's own settings (Fullscreen), then whatever the chosen game adds. A game adds
@@ -460,11 +488,7 @@ function openSettings() {
       ${playerColors()}
       ${gameSettings}
       ${items.length ? `<div class="group game-settings"><div class="eyebrow">${esc(state.game.name)}</div>${items.map((it, k) => `<div class="row"><span>${esc(it.label)}</span>${control(it, k)}</div>`).join("")}</div>` : ""}
-      <div class="group"><div class="eyebrow">Game logs</div><div class="row"><span>Finished games on this table, move by move</span><button data-viewer>Open…</button></div></div>
       ${serviceSettings()}
-      <div class="group developer"><div class="eyebrow">Developer</div>
-        <div class="row"><span>Games without a player at the table</span><button data-dev-no-local class="${state.developer?.allowNoLocalPlayer ? "on" : ""}" role="switch" aria-checked="${!!state.developer?.allowNoLocalPlayer}">${state.developer?.allowNoLocalPlayer ? "On" : "Off"}</button></div>
-        <div class="faint" style="font-size:.7em;margin-top:6px">For testing: games with remote and AI players only, or AI players only. Off again when the table restarts.</div></div>
       <div class="actions settings-actions"><button class="primary" data-close-overlay>Done</button></div></div>`);
   };
   const close = () => {
@@ -487,9 +511,7 @@ function openSettings() {
       (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()).catch(() => toast("Fullscreen was refused by the browser"));
     }
     if (b.dataset.sound !== undefined) return void act("POST", "/display", { sound: state.display?.sound === false });
-    if (b.dataset.devNoLocal !== undefined) return void act("POST", "/developer", { allowNoLocalPlayer: !state.developer?.allowNoLocalPlayer });
     if (b.dataset.accessCode !== undefined) return openCodePad();
-    if (b.dataset.viewer !== undefined) return (close(), openGameLogs());
     if (b.dataset.colorPlayer) return void act("POST", `/players/${encodeURIComponent(b.dataset.colorPlayer)}/color`, { color: b.dataset.color });
     if (b.dataset.setting) {
       const f = gameFields().find((x) => x.key === b.dataset.setting);
@@ -749,7 +771,7 @@ function toolbar() {
   // Left: the table's seat layout. Right: managing players (D-086).
   return `<div class="toolbar">
     ${seatButtons()}
-    ${REMOTE ? (state.remote?.boardControl ? `<div class="right"><button data-logs>Game logs…</button></div>` : "") : `<div class="right"><button data-add-ai>+ AI player</button><button data-invite>Invite…</button><button data-sim>Simulation…</button><button data-logs>Game logs…</button></div>`}
+    ${REMOTE ? "" : `<div class="right"><button data-add-ai>+ AI player</button><button data-invite>Invite…</button></div>`}
   </div>
   ${REMOTE || !sel ? "" : `<div class="toolbar selected"><div class="right"><span class="faint">${esc(sel.name)}</span>
     ${sel.kind === "ai" ? `<button data-config="${sel.id}">Configure</button>` : ""}
@@ -1048,8 +1070,6 @@ center.addEventListener("click", async (e) => {
   } else if ("start" in d) act("POST", "/game/start");
   else if ("close" in d) act("POST", "/game/close");
   else if ("again" in d) act("POST", "/game/select", { gameId: state.game.id, settings: state.game.settings });
-  else if ("sim" in d) openSimulation();
-  else if ("logs" in d) openGameLogs();
   else if ("invite" in d) openInvite();
   else if ("newCode" in d && (await confirmDialog("New join code?", "The current QR code stops working. Players already at the table stay in.", "New code"))) act("POST", "/join/new");
 });
@@ -1127,8 +1147,44 @@ function openLobbyOverlay() {
   overlayRoot.appendChild(o);
 }
 
+// ---------- Advanced (D-128) ----------
+/**
+ * Tools that are not part of playing: AI-only simulations, the game logs and the developer setting, behind the
+ * hammer-and-wrench button beside the gear. A remote board with board control gets the game logs only.
+ */
+function openAdvanced() {
+  const o = document.createElement("div");
+  o.className = "overlay advanced";
+  const draw = () => {
+    if (!state) return;
+    const dev = !!state.developer?.allowNoLocalPlayer;
+    setPanel(o, `<div class="panel"><h2>Advanced</h2>
+      <p class="muted" style="font-size:.8em;margin-top:-6px">For testing and finding problems; not needed to play.</p>
+      ${REMOTE ? "" : `<div class="group"><div class="eyebrow">Simulation</div>
+        <div class="row"><span>Games of AI players only, without the board, for testing and AI training</span><button data-adv="sim">Simulation…</button></div></div>`}
+      <div class="group"><div class="eyebrow">Game logs</div>
+        <div class="row"><span>Finished games on this table, move by move</span><button data-adv="logs">Game logs…</button></div></div>
+      ${REMOTE ? "" : `<div class="group developer"><div class="eyebrow">Developer</div>
+        <div class="row"><span>Games without a player at the table</span><button data-adv="no-local" data-dev-no-local class="${dev ? "on" : ""}" role="switch" aria-checked="${dev}">${dev ? "On" : "Off"}</button></div>
+        <div class="faint" style="font-size:.7em;margin-top:6px">For testing: games with remote and AI players only, or AI players only. Off again when the table restarts.</div></div>`}
+      <div class="actions settings-actions"><button class="primary" data-close-overlay>Done</button></div></div>`);
+  };
+  draw();
+  const unsub = onState(draw);
+  const close = () => (unsub(), o.remove());
+  o.addEventListener("click", (e) => {
+    const b = e.target.closest("button");
+    if (e.target === o || b?.dataset.closeOverlay !== undefined) return close();
+    const a = b?.dataset.adv;
+    if (a === "sim") return (close(), openSimulation());
+    if (a === "logs") return (close(), openGameLogs());
+    if (a === "no-local") act("POST", "/developer", { allowNoLocalPlayer: !state.developer?.allowNoLocalPlayer });
+  });
+  overlayRoot.appendChild(o);
+}
+
 // ---------- the Game Viewer (D-120) ----------
-/** Finished games, move by move: from the settings and the lobby, and for remote players with board control. */
+/** Finished games, move by move: from Advanced (D-128), also on remote boards with board control. */
 function openGameLogs() {
   openViewer({ api, overlayRoot, toast, face: (el) => (faceFront(el), viewEdge() === "east" || viewEdge() === "west") });
 }

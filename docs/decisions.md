@@ -313,3 +313,12 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   games-service checkout. The manifest schema does not enforce the format, so a repository that has not switched yet
   keeps working on tables. All built-in games start at `2026.10.17.1` (the switch from semver is the one change the
   check allows without a code change). Check: `tests/game-versions.test.ts`.
+
+## Advanced: tools that are not part of playing (17 Oct 2026)
+
+- **D-128 · 2026-10-17 · Klaus** — *Simulation*, *Game logs* and the developer setting *Games without a player at the table* are not game functions, so they move off the lobby and out of the settings into an **Advanced** window, opened by a hammer-and-wrench button beside the gear. The lobby's toolbar keeps *+ AI player* and *Invite*; the settings keep what players need. *Implementation (Claude):*
+  - **Button.** `#tools-button` in `board/index.html`, styled like the gear, placed by `placeTools()` in `board.js`: the next button along the edge from the gear toward the middle (172 px from the corner, or 242 px during a game when the turn-around button sits at 172 px), turned with the gear. While the developer setting is on, it carries the DEV tag (moved from the gear, D-118).
+  - **Window.** `openAdvanced()`: *Simulation* (opens the simulation dialog as before), *Game logs* (the viewer, D-120), *Developer* with the toggle; it follows the lobby state and closes with *Done*, a tap beside it or Escape, like the settings. Simulations are available during a game too: they never touch the running game (D-064).
+  - **Remote boards.** With board control they keep the game logs (D-120): the button sits where the gear would be (a remote board has none) and the window offers the game logs only. Without board control there is no button.
+  - **Texts.** Messages that pointed to the setting in Settings point to Advanced.
+  - **Checks.** `scripts/e2e/developer.py` (no Simulation or Game logs in the lobby, no Developer group or game logs in the settings; the toggle under Advanced, DEV on the new button, its place beside the gear), `logs.py` (the simulation from Advanced), `viewer.py` (the viewer from Advanced, facing east too) and `remote.py` (game logs only on a remote board with board control).
