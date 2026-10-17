@@ -46,10 +46,11 @@ try:
         board = br.new_page(viewport={"width": 1920, "height": 1080})
         watch(board, "board")
         board.goto(TABLE + "/board/")
-        board.wait_for_selector("button[data-logs]")
+        board.wait_for_selector("#tools-button:not([hidden])")
 
-        # 2. The list, from the lobby's toolbar: newest first, with the game, players and log id.
-        board.click("button[data-logs]")
+        # 2. The list, from Advanced (D-128): newest first, with the game, players and log id.
+        board.click("#tools-button")
+        board.click(".overlay.advanced button[data-adv=logs]")
         board.wait_for_selector(".vtable.logs tbody tr")
         rows = board.locator(".vtable.logs tbody tr")
         assert rows.count() == 2, rows.count()
@@ -111,11 +112,11 @@ try:
         board.click("button[data-close]")
         board.wait_for_selector(".overlay.viewer", state="detached")
 
-        # 6. From the settings, with the board facing east: the panel is turned and stays on the screen.
+        # 6. With the board facing east: the panel is turned and stays on the screen.
         t("POST", "/face", {"edge": "east"})
-        board.wait_for_function("document.querySelector('#settings-button') && !document.querySelector('#settings-button').hidden")
-        board.click("#settings-button")
-        board.click(".overlay.settings button[data-viewer]")
+        board.wait_for_function("document.querySelector('#tools-button') && !document.querySelector('#tools-button').hidden")
+        board.click("#tools-button")
+        board.click(".overlay.advanced button[data-adv=logs]")
         board.wait_for_selector(".viewer-panel.sideways .vtable.logs tbody tr")
         box = board.locator(".viewer-panel").bounding_box()
         assert box["x"] >= 0 and box["y"] >= 0 and box["x"] + box["width"] <= 1920 and box["y"] + box["height"] <= 1080, box

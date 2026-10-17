@@ -95,6 +95,18 @@ html, body { overflow: hidden; }
 
 .join { align-self: start; display: flex; flex-direction: column; align-items: center; gap: 14px; background: rgba(0,0,0,0.22); border: 1px solid var(--felt-line); border-radius: var(--radius); padding: 22px; }
 .join img { width: 250px; height: 250px; border-radius: 10px; background: #fff; padding: 8px; }
+/* No free seat (D-129): the code faded, the reason in its place of honour. */
+.join.full .eyebrow { color: #f1a197; }
+.join img.dimmed, .join-big img.dimmed { opacity: .18; filter: grayscale(1); }
+/* The join code from the settings (D-130): large enough to scan from a seat across the table. */
+.overlay.join-code { z-index: 44; }
+.overlay.join-code .settings-actions { gap: 12px; }
+.join-big { display: flex; flex-direction: column; align-items: center; gap: 14px; margin-top: 6px; }
+.join-big img { width: 360px; height: 360px; border-radius: 12px; background: #fff; padding: 10px; }
+.join-big .url { font-family: var(--mono); font-size: 0.85em; color: var(--ink); word-break: break-all; text-align: center; }
+.join-big .code { font-family: var(--mono); font-size: 1.6em; letter-spacing: 0.18em; color: var(--brass); }
+.join-big .full-note { max-width: 360px; text-align: center; font-size: .85em; color: #f1a197; }
+.join .full-note { max-width: 250px; text-align: center; font-size: .78em; line-height: 1.4; color: var(--ink); }
 .join .url { font-family: var(--mono); font-size: 0.78em; color: var(--ink); word-break: break-all; text-align: center; }
 .join .code { font-family: var(--mono); font-size: 1.5em; letter-spacing: 0.18em; color: var(--brass); }
 
@@ -212,11 +224,20 @@ pre.raw { font-family: var(--mono); font-size: 0.7em; color: var(--ink-soft); ba
   display: grid; place-items: center; color: var(--ink-soft, #cfd8d3); opacity: .6;
   background: rgba(10, 29, 25, 0.75); border: 1px solid var(--felt-line);
 }
+#tools-button {
+  position: absolute; z-index: 21; width: 58px; height: 58px; padding: 0; border-radius: 50%;
+  display: grid; place-items: center; color: var(--ink-soft, #cfd8d3); opacity: .6;
+  background: rgba(10, 29, 25, 0.75); border: 1px solid var(--felt-line);
+}
+/* Advanced (D-128): hammer and wrench beside the gear; placed by board.js, which sets left/right/top/bottom. */
+#tools-button:hover, #tools-button:active { opacity: 1; color: var(--brass); border-color: var(--brass-deep); }
+#tools-button svg { transition: transform .3s; }
+
 #settings-button:hover { opacity: 1; color: var(--brass); border-color: var(--brass-deep); }
 #settings-button svg { transition: transform .3s; }
-/* Developer setting on (D-118): a small tag on the gear. */
-#settings-button.dev { opacity: 1; color: var(--brass); border-color: var(--brass-deep); }
-#settings-button.dev::after {
+/* Developer setting on (D-118): a small tag on the Advanced button (D-128). */
+#tools-button.dev { opacity: 1; color: var(--brass); border-color: var(--brass-deep); }
+#tools-button.dev::after {
   content: "DEV"; position: absolute; top: -9px; right: -14px; padding: 1px 6px; border-radius: 8px;
   font: 700 11px/1.4 system-ui, sans-serif; letter-spacing: .06em; color: #10251f; background: var(--brass);
 }
@@ -228,14 +249,14 @@ pre.raw { font-family: var(--mono); font-size: 0.7em; color: var(--ink-soft); ba
 #settings-button.along-y.bl { left: 32px; bottom: 102px; }
 #settings-button.along-y.tr { right: 32px; top: 102px; }
 #settings-button.along-y.br { right: 32px; bottom: 102px; }
-.overlay.settings .panel { min-width: 560px; }
+.overlay.settings .panel, .overlay.advanced .panel { min-width: 560px; }
 /* Terms of service (D-108): a title with ✕ on the right, the text from /shared/terms.md. */
 .overlay.terms { z-index: 45; }
 .terms-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
 .terms-close { width: 52px; height: 52px; padding: 0; border-radius: 50%; flex: none; font-size: 1.1em; }
 .overlay.terms .md { font-size: 0.95em; line-height: 1.55; color: var(--ink); }
 .overlay.terms .md p { margin: 0 0 0.8em; }
-.overlay.settings .seg button.on, .overlay.settings button.on:not(.swatch) { border-color: var(--brass); color: var(--brass); }
+.overlay.settings .seg button.on, .overlay.settings button.on:not(.swatch), .overlay.advanced button.on { border-color: var(--brass); color: var(--brass); }
 /* A choice (e.g. Pachisi's pieces, D-102): the chosen option filled, its label dark on brass so it stays readable. */
 .overlay.settings .seg button.on { background: var(--brass); color: #1b1407; }
 .swatches { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
@@ -349,7 +370,7 @@ button.copy:hover, button.copy.done { color: var(--brass); border-color: var(--b
 .viewer-panel details pre.raw { max-height: 420px; margin: 6px 0 0; font-size: .92em; line-height: 1.35; }
 
 /* Settings: Done stays at the bottom of the panel, however long the settings get. */
-.overlay.settings .settings-actions {
+.overlay.settings .settings-actions, .overlay.advanced .settings-actions, .overlay.join-code .settings-actions {
   position: sticky; bottom: -26px; z-index: 1; display: flex; justify-content: flex-end;
   margin: 20px -30px -26px; padding: 14px 30px 18px; background: var(--felt); border-top: 1px solid var(--felt-line);
 }

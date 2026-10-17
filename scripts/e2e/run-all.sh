@@ -33,6 +33,8 @@ run python3 scripts/e2e/ai_wait.py "$OUT"
 run python3 scripts/e2e/logs.py "$OUT"
 run python3 scripts/e2e/developer.py "$OUT"
 run python3 scripts/e2e/seat_loss.py "$OUT"
+run python3 scripts/e2e/seats_full.py "$OUT"
+run python3 scripts/e2e/rejoin.py "$OUT"
 run python3 scripts/e2e/viewer.py "$OUT"
 
 if ((${#failed[@]})); then

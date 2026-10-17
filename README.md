@@ -24,7 +24,7 @@ npm test                 # the automated tests: lobby, cloud, sign-in and each g
 TABLE_KEY=dev npm run host
 ```
 
-Open `http://localhost:8080/board/` on the table PC (full screen, 1920 × 1080 or 4K). Phones on the same WiFi scan the QR code, or type the URL shown under it.
+Open `http://localhost:8080/board/` on the table PC (full screen, 1920 × 1080 or 4K). Phones on the same WiFi scan the QR code, or type the URL shown under it. When no seat is free, the QR panel and the phone say so, and *+ AI player* and *Invite* are greyed out (D-129): choose more seats on the board, or remove a player. During a game the lobby's QR panel is not shown: *Settings › Show join code* shows the QR code and the address, so a phone that lost its seat can rejoin (D-130).
 
 With Docker: `docker compose -f deploy/docker-compose.yml up --build` starts a cloud service and a table host. The table shows a 6-character pairing code; approve it in the admin portal at `http://localhost:8081/admin` (in local development it asks for `ADMIN_TOKEN`: `change-me-dev-admin-token` unless you set your own), or with
 
@@ -81,7 +81,7 @@ Or skip the pairing code: create an access code in the console (*Access codes*) 
 | `AI_DELAY_MS` | 800 | Pause before an AI player acts |
 | `MAX_REMOTE_PLAYERS` | 4 | Remote seat limit (phase 1c) |
 | `ALLOW_REMOTE_BOARD` | 0 | Serve the board to non-loopback clients (development only) |
-| `ALLOW_NO_LOCAL_PLAYER` | 0 | `1` starts with the developer setting *Games without a player at the table* on (D-118); the board's Settings turn it on or off until the next restart |
+| `ALLOW_NO_LOCAL_PLAYER` | 0 | `1` starts with the developer setting *Games without a player at the table* on (D-118); *Advanced* on the board (hammer and wrench, D-128) turns it on or off until the next restart |
 | `LOG_SNAPSHOT_EVERY` | 0 | A snapshot of the whole game state in the log every N moves (D-116); 0: only the final state |
 | `SHOW_TEST_GAMES` | 0 | `1` lists the test game (`quartet`) in the game menu; the tests and `run-all.sh` turn it on |
 | `DATA_DIR`, `GAMES_DIR` | `<repo>/data`, `<repo>/games` | Logs, saves, the table's identity and a typed access code (`table.json`) and extra-game bundles (`extra-games/`); the built-in games |
@@ -230,7 +230,7 @@ yourself or handing it to Claude.
   joining or leaving and pauses are rows between them, and a silence of two minutes or more without a pause shows as a
   gap. Each row names its line in `game-001.jsonl`. The log also records when the game stood still and why
   (`pause`/`resume`: the service lost, an AI over its time, a player away; Play now). See *Moves* in `log-format.md`.
-- **Game Viewer on the board (D-120):** *Game logs* in the settings and the lobby lists the finished games on this table
+- **Game Viewer on the board (D-120):** *Game logs* under *Advanced* (D-128) lists the finished games on this table
   (not the one being played). A game opens as a table of its moves, a page at a time, with filters (a player, moves
   only, problems), *Move #* to jump to a move, and a simulation's games one by one; a move opens in full with its
   intent, events, AI timing, the state before and after, and a reference to copy such as

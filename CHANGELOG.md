@@ -6,6 +6,17 @@ page is the history. Leave it empty if there is nothing to add beyond the commit
 
 ## [Unreleased]
 
+- **Show join code** in the board's settings (D-130): the QR code, the address and the code in a large window, also
+  during a game, when the lobby's QR panel is not on the screen. A phone that lost its seat rejoins with it; the
+  phone's "scan the QR code" messages say where to find it.
+- A full table (D-129): when no seat is free, *+ AI player* and *Invite* are greyed out, the board's QR panel says
+  *No free seat* with what would help (more seats, or removing a player), and a phone that scans the code is told so
+  instead of getting the name form; it shows the form by itself once a seat is free. Nobody joins without a seat any
+  more.
+- **Advanced** on the board (D-128): a hammer-and-wrench button beside the gear opens *Simulation…*, *Game logs…*
+  and the developer setting *Games without a player at the table*. They are no longer in the lobby's toolbar or the
+  settings, which keep what players need. The DEV tag is on this button now. On a remote board with board control it
+  offers the game logs only.
 - Board: during a game the gear and the turn-around button stay where they are when the game is turned (D-127). In
   Loopy they had landed on the round and deck displays when the game faced north.
 - A player removed during a game leaves their colour on the seat (D-125): in Loopy the AI that takes over keeps it,
@@ -22,7 +33,7 @@ page is the history. Leave it empty if there is nothing to add beyond the commit
   Roulette, as on the seat plates. Before, they used the seat's colour, so a colour picked in the settings did not show.
 - Roulette: chips sit on their cells again. Their drop-in animation moved every chip to the layout's top-left corner;
   now only new chips drop in, in place.
-- **Game Viewer** on the board (D-120): *Game logs* in the settings and the lobby lists the finished games on this
+- **Game Viewer** on the board (D-120): *Game logs* under *Advanced* lists the finished games on this
   table. A game opens as a table of its moves, numbered, with the time, the player and what happened in the game's
   own words (Coin Flip and Pachisi describe theirs), filters for a player, moves only and problems, *Move #* to jump to
   a move, and each move in full with the state before and after and a reference to copy for a developer or Claude
@@ -38,9 +49,9 @@ page is the history. Leave it empty if there is nothing to add beyond the commit
   leaves. Today's games go on as before.
 - A player's colour stays with them when they move to another seat (D-117); before, the default colour changed
   with the seat.
-- A developer setting in the board's Settings, *Games without a player at the table*: off at every start, it allows
+- A developer setting on the board (now under *Advanced*), *Games without a player at the table*: off at every start, it allows
   games with remote and AI players only, or AI players only, for testing. While it is off, the board no longer removes
-  the last player at the table once a game is chosen or running. The gear shows DEV while it is on.
+  the last player at the table once a game is chosen or running. *Advanced* shows DEV while it is on.
 - Board, Up next screen: each player's chip is framed in their colour, with a ring that fills once they are ready;
   a player whose phone dropped shows no dot on a red background. Tapping a chip offers **Remove**, online or not.
 - Board lobby: a selected player's card shows its thicker border in the player's colour instead of brass.

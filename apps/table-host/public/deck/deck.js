@@ -21,6 +21,28 @@ let banner = "";
 let removed = false;
 let seq = 0;
 let retry = 0;
+/** No free seat at the table (D-129): the reason, shown instead of the name form until a seat is free. */
+let noSeat = null;
+let seatTimer = null;
+
+/** Ask the table whether a seat is free for this join code; look again every few seconds while there is none. */
+async function checkSeat() {
+  try {
+    const r = await fetch(`/j/${encodeURIComponent(joinToken)}/seat`, { cache: "no-store" });
+    if (!r.ok) return; // an old code: the hello says so
+    const b = await r.json();
+    const was = noSeat;
+    noSeat = b.free ? null : b.message;
+    if (noSeat) watchSeat();
+    if (was !== noSeat && !me) render();
+  } catch {
+    // offline for a moment: keep what we know
+  }
+}
+function watchSeat() {
+  if (seatTimer || !joinToken || REMOTE) return;
+  seatTimer = setInterval(() => (me || !noSeat ? (clearInterval(seatTimer), (seatTimer = null)) : checkSeat()), 4000);
+}
 const pending = new Map(); // seq -> resolve
 
 const storage = {
@@ -77,6 +99,13 @@ function connect(hello) {
           storage.clear();
           me = null;
           banner = msg;
+        } else if (m.payload.code === "no-seat") {
+          // Taken by someone else just now (D-129): say why, and look again. A remote player's invite page shows it.
+          if (REMOTE) banner = msg;
+          else {
+            noSeat = msg;
+            watchSeat();
+          }
         } else if (!resolve) toast(msg);
       }
     } else if (m.ch === "lobby" && m.type === "state") {
@@ -289,7 +318,7 @@ function render() {
   if (removed) {
     closeGame();
     top.innerHTML = "";
-    body.innerHTML = `<div class="card center"><h1>You left the table</h1><p class="muted">${REMOTE ? "Ask the table for a new invite to join again." : "Scan the QR code on the board to join again."}</p></div>`;
+    body.innerHTML = `<div class="card center"><h1>You left the table</h1><p class="muted">${REMOTE ? "Ask the table for a new invite to join again." : "Scan the QR code on the board to join again. During a game, the board shows it under Settings › Show join code."}</p></div>`;
     return;
   }
   if (!me) return renderJoin();
@@ -322,7 +351,15 @@ function renderJoin() {
     return;
   }
   if (!joinToken) {
-    body.innerHTML = `<div class="card center"><h1>Join the table</h1><p class="muted">Scan the QR code on the board, or type the address shown below it.</p></div>`;
+    body.innerHTML = `<div class="card center"><h1>Join the table</h1><p class="muted">Scan the QR code on the board, or type the address shown below it. During a game, the board shows it under Settings › Show join code.</p></div>`;
+    return;
+  }
+  if (noSeat) {
+    // No free seat (D-129): instead of the name form, why not and what would help; the page looks again by itself.
+    if (body.querySelector("#no-seat")?.dataset.msg === noSeat) return;
+    body.innerHTML = `<div id="no-seat" class="card center"><div class="eyebrow">Game Table</div><h1>No free seat</h1>
+      <p class="muted">${esc(noSeat)}</p><p class="faint" style="font-size:.85em">This page checks again by itself.</p></div>`;
+    body.querySelector("#no-seat").dataset.msg = noSeat;
     return;
   }
   if (body.querySelector("#join")) return;
@@ -435,3 +472,5 @@ function genericDeck(root) {
 }
 
 render();
+// Joining by QR code (D-129): is there a seat? Asked before the name form, so nobody types a name for nothing.
+if (joinToken && !REMOTE && !storage.get()) void checkSeat();
