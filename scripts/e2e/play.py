@@ -326,17 +326,21 @@ def coinflip(browser, board):
 
 @scenario
 def endings(browser, board):
-    """D-089..D-093: the phone's name line, sound off, a game ended from the lobby, a full table."""
+    """D-089..D-093: the phone's name line, sound off, a game ended from the lobby, a full table (D-129)."""
     api("POST", "/layout", {"seats": 2})
     decks = [join(browser, n) for n in ["Klaus", "Mira"]]
     # the phone: name on the left, the seat's compass badge on the right, no separate seat card
     badges = [d.inner_text(".who .badge") for d in decks]
     assert badges == ["S", "N"], f"seat badges {badges}"
     assert decks[0].locator(".seatcard").count() == 0, "no separate seat card"
-    extra = join(browser, "Paul")  # the 2-seat table is full
-    extra.wait_for_selector("text=No seat yet")
-    assert extra.locator(".who .badge").count() == 0, "a player without a seat has no badge"
-    extra.close()
+    # The 2-seat table is full (D-129): a third phone is told so instead of getting the name form.
+    ctx = browser.new_context(viewport={"width": 390, "height": 844}, device_scale_factor=2, has_touch=True)
+    extra = ctx.new_page()
+    watch(extra, "Paul")
+    extra.goto(api("GET", "/join")["url"])
+    extra.wait_for_selector("#no-seat :text('No free seat')")
+    assert extra.locator("input[name=name]").count() == 0, "no name form without a free seat"
+    ctx.close()
     # sound off: a whole game plays without a single sound effect
     api("POST", "/display", {"sound": False})
     board.click("#settings-button")  # also wakes audio, as a touch would

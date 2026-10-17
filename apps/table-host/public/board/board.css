@@ -95,6 +95,10 @@ html, body { overflow: hidden; }
 
 .join { align-self: start; display: flex; flex-direction: column; align-items: center; gap: 14px; background: rgba(0,0,0,0.22); border: 1px solid var(--felt-line); border-radius: var(--radius); padding: 22px; }
 .join img { width: 250px; height: 250px; border-radius: 10px; background: #fff; padding: 8px; }
+/* No free seat (D-129): the code faded, the reason in its place of honour. */
+.join.full .eyebrow { color: #f1a197; }
+.join img.dimmed { opacity: .18; filter: grayscale(1); }
+.join .full-note { max-width: 250px; text-align: center; font-size: .78em; line-height: 1.4; color: var(--ink); }
 .join .url { font-family: var(--mono); font-size: 0.78em; color: var(--ink); word-break: break-all; text-align: center; }
 .join .code { font-family: var(--mono); font-size: 1.5em; letter-spacing: 0.18em; color: var(--brass); }
 

@@ -83,13 +83,18 @@ describe("joining", () => {
     expect(b.playerId).toMatch(/^p_/);
   });
 
-  it("leaves extra players without a seat when the layout is full", async () => {
+  it("refuses a newcomer when every seat is taken, and says what would help (D-129)", async () => {
     await t.ok("POST", "/layout", { seats: 2 });
     await t.joinDeck("A");
     await t.joinDeck("B");
-    await t.joinDeck("C");
+    expect((await t.ok("GET", "/state")).noSeat).toMatch(/no free seat\. Choose more seats on the board/i);
+    await expect(t.joinDeck("C")).rejects.toThrow(/no free seat/i);
     const s = await t.ok("GET", "/state");
-    expect(s.players.map((p: any) => p.seat)).toEqual([0, 1, null]);
+    expect(s.players.map((p: any) => p.seat)).toEqual([0, 1]);
+    // More seats: room again.
+    await t.ok("POST", "/layout", { seats: 4 });
+    expect((await t.ok("GET", "/state")).noSeat).toBeNull();
+    await t.joinDeck("C");
   });
 });
 
@@ -299,16 +304,18 @@ describe("game selection gating", () => {
     expect(r.body.error).toMatch(/Roulette does not support 8 seats/);
   });
 
-  it("a chosen game that is full seats no more newcomers, and refuses more AI players", async () => {
+  it("a chosen game that is full takes no more newcomers, and refuses more AI players", async () => {
     await t.ok("POST", "/layout", { seats: 6 });
     for (const n of ["A", "B", "C"]) await t.joinDeck(n);
     await t.ok("POST", "/game/select", { gameId: "pachisi" }); // at most 4
     await t.ok("POST", "/ai", {});
     expect((await t.api("POST", "/ai", {})).body.error).toMatch(/Pachisi takes at most 4 players/);
-    const late = await t.joinDeck("Late");
+    // D-129: a newcomer is refused with the reason, instead of joining without a seat.
+    await expect(t.joinDeck("Late")).rejects.toThrow(/Pachisi takes at most 4 players/);
     const s = await t.ok("GET", "/state");
     expect(s.phase).toBe("ready"); // the choice stands
-    expect(s.players.find((p: any) => p.id === late.playerId).seat).toBeNull();
+    expect(s.players).toHaveLength(4);
+    expect(s.noSeat).toMatch(/Pachisi takes at most 4 players/);
   });
 
   it("validates settings against the manifest", async () => {

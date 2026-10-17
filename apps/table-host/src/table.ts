@@ -30,9 +30,12 @@ import type { LogStore, PlayerMeta, RunningLog } from "./logs.ts";
 
 export class TableError extends Error {
   readonly status: number;
-  constructor(status: number, message: string) {
+  /** A machine-readable reason where a client acts on it, e.g. "no-seat" (D-129). */
+  readonly code?: string;
+  constructor(status: number, message: string, code?: string) {
     super(message);
     this.status = status;
+    this.code = code;
   }
 }
 
@@ -164,6 +167,7 @@ export class Table extends EventEmitter {
         .map(([playerId, m]) => ({ playerId, seat: m.seat, since: m.startedAt, deadline: m.deadline })),
       display: { sound: this.sound },
       developer: { allowNoLocalPlayer: this.allowNoLocalPlayer, protectedPlayer: this.protectedPlayer()?.id ?? null },
+      noSeat: this.noFreeSeat(),
       remote: { boardControl: this.remoteBoardControl, maxPlayers: this.config.maxRemotePlayers, players: this.humans().filter((p) => p.location === "remote").length },
     };
   }
@@ -381,6 +385,9 @@ export class Table extends EventEmitter {
       throw new TableError(403, "join code is invalid or expired; scan the QR code again");
     if (location === "remote" && this.humans().filter((p) => p.location === "remote").length >= this.config.maxRemotePlayers)
       throw new TableError(409, "the table has no room for more remote players");
+    // A seat is taken when a player joins (D-129): with none free, nobody joins to stand around without one.
+    const noSeat = this.noFreeSeat();
+    if (noSeat) throw new TableError(409, noSeat, "no-seat");
     const name = this.cleanName(rawName);
     const id = newId("p");
     const sessionToken = randomBytes(24).toString("base64url");
@@ -436,6 +443,23 @@ export class Table extends EventEmitter {
 
   private humans() {
     return [...this.players.values()].filter((p) => p.kind === "human");
+  }
+
+  /**
+   * Why nobody can take a seat now, in words for the phone and the board, or null when a seat is free (D-129). A seat
+   * is taken as soon as a player has joined (phone, invite or AI), connected or reconnecting. Full: every seat of the
+   * layout on the edges the chosen game uses is taken, or the chosen game has as many players as it takes.
+   */
+  noFreeSeat(): string | null {
+    const playing = this.phase === "active" || this.phase === "paused" || this.phase === "terminating";
+    const m = this.phase === "ready" || playing ? this.selected?.game.manifest : undefined;
+    const max = m ? Math.max(...allowedPlayerCounts(m)) : 8;
+    const atMax = !!m && this.seated().length >= max;
+    if (!atMax && this.freeSeats().length > 0) return null;
+    if (playing) return "There is no free seat in this game. Join after it.";
+    if (atMax) return `There is no free seat: ${m!.name} takes at most ${max} players. Remove a player on the board first.`;
+    const larger = this.allowedLayouts().some((l) => l > this.layout);
+    return larger ? "There is no free seat. Choose more seats on the board, or remove a player there." : "There is no free seat. Remove a player on the board first.";
   }
 
   private seated() {

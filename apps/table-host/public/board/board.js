@@ -748,9 +748,21 @@ document.addEventListener("click", async (e) => {
   }, 1600);
 }, true);
 
+/** No free seat (D-129): + AI player and Invite are greyed out, with the reason as their tooltip. */
+function fullAttr() {
+  return state.noSeat ? `disabled title="${esc(state.noSeat)}"` : "";
+}
+
 function joinPanel() {
   if (REMOTE) return "";
   const code = state.joinUrl.split("/").pop();
+  // No free seat (D-129): the code still works for nobody, so the panel says so; a phone that scans it is told too.
+  if (state.noSeat) return `<aside class="join full">
+    <div class="eyebrow">No free seat</div>
+    <img src="/qr.svg?u=${encodeURIComponent(state.joinUrl)}" alt="QR code to join this table, while no seat is free" class="dimmed">
+    <div class="full-note">${esc(state.noSeat)}</div>
+    <button data-new-code style="font-size:.7em">New code</button>
+  </aside>`;
   return `<aside class="join">
     <div class="eyebrow">Scan to join</div>
     <img src="/qr.svg?u=${encodeURIComponent(state.joinUrl)}" alt="QR code to join this table">
@@ -771,7 +783,7 @@ function toolbar() {
   // Left: the table's seat layout. Right: managing players (D-086).
   return `<div class="toolbar">
     ${seatButtons()}
-    ${REMOTE ? "" : `<div class="right"><button data-add-ai>+ AI player</button><button data-invite>Invite…</button></div>`}
+    ${REMOTE ? "" : `<div class="right"><button data-add-ai ${fullAttr()}>+ AI player</button><button data-invite ${fullAttr()}>Invite…</button></div>`}
   </div>
   ${REMOTE || !sel ? "" : `<div class="toolbar selected"><div class="right"><span class="faint">${esc(sel.name)}</span>
     ${sel.kind === "ai" ? `<button data-config="${sel.id}">Configure</button>` : ""}
@@ -855,7 +867,7 @@ function renderReady() {
       <div><div class="eyebrow">Up next · ${playersLabel(state.game.players)} · ${seated} seated</div><h1>${esc(state.game.name)}</h1>
       <div class="sub">${needs.length ? `${esc(needs.map((n, i) => (i ? n : n[0].toUpperCase() + n.slice(1))).join(" · "))}. Scan the code to join${g?.ai ? " or add an AI player" : ""}.` : !humans.length ? "AI players only (developer setting): <b>Start game</b> plays it on the board." : !state.players.some((p) => p.seat !== null && p.kind === "human" && p.location === "local") && state.developer?.allowNoLocalPlayer ? "No player at the table (developer setting). Everyone taps <b>Ready</b> on their phone." : "Everyone taps <b>Ready</b> on their phone."}</div></div>
       <div class="ready-list">${state.players.filter((p) => p.seat !== null).map(playerChip).join("")}</div>
-      ${REMOTE ? "" : `<div class="toolbar">${seatButtons()}${roomForAi ? `<div class="right"><button data-add-ai>+ AI player</button></div>` : ""}</div>`}
+      ${REMOTE ? "" : `<div class="toolbar">${seatButtons()}${roomForAi ? `<div class="right"><button data-add-ai ${fullAttr()}>+ AI player</button></div>` : ""}</div>`}
       <div class="toolbar"><button class="primary" data-start ${all ? "" : "disabled"}>Start game</button><button data-close>Change game</button>
       ${REMOTE ? "" : (() => { const sel = state.players.find((p) => p.id === selectedPlayer); return sel?.kind === "ai" ? `<button data-config="${sel.id}">Configure ${esc(sel.name)}</button>` : state.players.some((p) => p.kind === "ai") ? `<span class="faint" style="font-size:.7em">Tap an AI seat to configure it</span>` : ""; })()}
       </div>
@@ -1119,7 +1131,7 @@ function openLobbyOverlay() {
         .join("") || `<div class="faint">Nobody yet</div>`}</div>
       ${REMOTE ? "" : `<div class="group"><div class="eyebrow">View</div><div class="row"><span>Lobby and menus face</span>
         <span class="seg">${EDGE_ORDER.map((e) => `<button data-face="${e}" class="${state.frontEdge === e ? "on" : ""}">${e[0].toUpperCase() + e.slice(1)}</button>`).join("")}</span></div></div>`}
-      <div class="group">${REMOTE ? "" : `<div class="row"><span>Remote players${state.remote?.players ? ` · ${state.remote.players} joined` : ""}</span><button data-invite>Invite…</button></div>`}
+      <div class="group">${REMOTE ? "" : `<div class="row"><span>Remote players${state.remote?.players ? ` · ${state.remote.players} joined` : ""}</span><button data-invite ${fullAttr()}>Invite…</button></div>`}
         <div class="row"><span>Terms of service</span><button data-terms>Open</button></div></div>
       <div class="actions" style="display:flex;justify-content:space-between;margin-top:20px">
         <button class="danger" data-end>End game</button><button class="primary" data-close-overlay>Back to game</button></div></div>`);
