@@ -1,0 +1,14 @@
+{
+  "id": "duel",
+  "name": "Duel",
+  "version": "1.0.0",
+  "sdk": "^0.1",
+  "description": "Test game for localSeat (D-128): two players, the one at the table sits south.",
+  "players": [2],
+  "turnModel": "sequential",
+  "seatLayouts": [2],
+  "edges": ["north", "south"],
+  "localSeat": "south",
+  "ai": { "supported": true, "options": [] },
+  "test": true
+}

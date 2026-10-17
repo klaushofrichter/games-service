@@ -352,3 +352,17 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   panels only. `scripts/e2e/remote.py` checks during a game: the deck fills the window's height on both tabs, keeps
   its size after Hide and Show and follows a resize (it failed before the fix); loopy-game adds a remote check with
   Loopy (`scripts/e2e/loopy_remote.py`).
+
+## A single player at the table (17 Oct 2026)
+
+- **D-128 · 2026-10-17 · Klaus** — A game can ask that the one player at the table sits on a given edge: with exactly
+  one human playing at the table and the others remote or AI, the table moves them there when the game starts. Chess
+  asks for south. *Why:* a remote player's board already turns so their own seat is at the bottom (D-059), but the
+  table's board doesn't move: a local player seated north while sitting at the south side of the screen saw their
+  own pieces from across the board, and no button could fix that. *Implementation (Claude):* manifest `localSeat`
+  (an edge, optional). When the game is chosen (with the layout switch of D-078, so the lobby already shows it) and again at *Start* (someone may have joined or moved since), the table moves that player to the first seat on that edge, swapping with whoever
+  sits there (a remote or AI player) or taking it if free; colours travel with the players (D-117). With two or more
+  people at the table everyone keeps the seat they chose, and nothing moves when the player already sits on that
+  edge. The game starts with the new seats, so its log, its seat plates and every board agree. Check:
+  `tests/local-seat.test.ts` with the test game Duel (`tests/fixtures/local-seat`): a remote player swapped north, an
+  AI player swapped, already south, two people at the table, a game without the field.

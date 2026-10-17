@@ -915,6 +915,7 @@ export class Table extends EventEmitter {
     this.selected = { game: g, settings: merged };
     // The table follows the game: a layout it supports, and nobody on an edge it does not use.
     this.applyLayout(layout);
+    this.placeLocalPlayer(g.manifest); // and the one player at the table on the game's edge (D-128)
     this.summary = null;
     for (const p of this.players.values()) p.ready = p.kind === "ai";
     this.phase = "ready";
@@ -938,6 +939,7 @@ export class Table extends EventEmitter {
     const notReady = this.seated().filter((p) => p.kind === "human" && (!p.ready || !p.connected));
     if (notReady.length) throw new TableError(409, `waiting for ${notReady.map((p) => p.name).join(", ")}`);
     const { game, settings } = this.selected;
+    this.placeLocalPlayer(game.manifest);
     const seats = this.seated().map((p) => this.seatInfo(p));
     const aiOptions: Record<number, Record<string, unknown>> = {};
     for (const p of this.seated()) if (p.kind === "ai") aiOptions[p.seat!] = aiDefaults(game.manifest, p.aiOptions);
@@ -959,6 +961,27 @@ export class Table extends EventEmitter {
     this.emit("game", []);
     this.scheduleAi();
     if (rt.over) void this.onGameOver();
+  }
+
+  /**
+   * A game's `localSeat` (D-128): the one human playing at the table moves to that edge when the game starts, swapping
+   * with the remote or AI player there (or taking a free seat). Nothing happens with two or more people at the table,
+   * or when they already sit on that edge.
+   */
+  private placeLocalPlayer(m: Manifest) {
+    if (!m.localSeat) return;
+    const seated = this.seated();
+    const local = seated.filter((p) => p.kind === "human" && p.location === "local");
+    if (local.length !== 1) return;
+    const me = local[0];
+    const edges = seatEdges(this.layout);
+    if (edges[me.seat!] === m.localSeat) return;
+    const target = edges.findIndex((e) => e === m.localSeat);
+    if (target < 0) return;
+    this.colors(); // everyone keeps their colour across the swap (D-117)
+    const other = seated.find((p) => p.seat === target);
+    if (other) other.seat = me.seat;
+    me.seat = target;
   }
 
   end() {
