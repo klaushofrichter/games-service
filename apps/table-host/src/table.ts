@@ -1192,6 +1192,17 @@ export class Table extends EventEmitter {
   }
 
   /**
+   * Fire one of the running game's timers now (D-136), e.g. Hold'em's "Next hand" instead of waiting out the result.
+   * Only timers the manifest lists in `skipTimers`; the server lets remote boards do it only with board control.
+   */
+  skipTimer(id: unknown) {
+    if (typeof id !== "string") throw new TableError(400, "skip-timer needs a timer id");
+    if (this.phase !== "active" || !this.runtime) throw new TableError(409, this.phase === "paused" ? "the game is paused" : "no game is running");
+    if (!this.runtime.manifest.skipTimers.includes(id)) throw new TableError(403, `${this.runtime.manifest.name} does not let the board skip "${id}"`);
+    if (!this.runtime.skipTimer(id)) throw new TableError(409, "nothing to skip right now");
+  }
+
+  /**
    * "Play now" on the board (D-112): stop waiting for the AI the game paused for and play the game's quick move for it
    * (or, if the game has none, ask the AI again with a fresh budget).
    */

@@ -228,12 +228,15 @@ describe("remote play", { timeout: 60_000 }, () => {
     expect((await peer.json("POST", "/api/v1/layout", { seats: 6 })).status).toBe(200);
     // "Play now" for an AI out of time (D-112) is open to remote boards with control: here nobody is waited for (409)
     expect((await peer.json("POST", "/api/v1/game/play-now")).status).toBe(409);
+    // so is skipping a game's wait (D-136): allowed through, and here no game runs (409)
+    expect((await peer.json("POST", "/api/v1/game/skip-timer", { id: "next" })).status).toBe(409);
     await t.ok("POST", "/remote", { boardControl: false });
     expect(t.host.table.state().remote.boardControl).toBe(false);
     const denied = await peer.json("POST", "/api/v1/layout", { seats: 4 });
     expect(denied.status).toBe(403);
     expect(denied.body.error).toMatch(/switched off/);
     expect((await peer.json("POST", "/api/v1/game/play-now")).status).toBe(403);
+    expect((await peer.json("POST", "/api/v1/game/skip-timer", { id: "next" })).status).toBe(403);
     expect((await peer.json("GET", "/api/v1/state")).status).toBe(200); // reading still works
     // the Game Viewer (D-120) is for remote players with board control only, and read-only
     expect((await peer.json("GET", "/api/v1/history")).status).toBe(403);

@@ -1047,9 +1047,28 @@ function boardAct(seat, name, payload) {
   });
 }
 
+/**
+ * Fire one of the game's skippable timers now (D-136), e.g. Hold'em's "Next hand". Resolves { ok, reason }. A timer that
+ * fired meanwhile (a second tap, the wait ran out) answers 409 and is not worth a toast.
+ */
+async function skipTimer(id) {
+  const res = await fetch("/api/v1/game/skip-timer", {
+    method: "POST",
+    headers: { ...(KEY ? { "x-table-key": KEY } : {}), "content-type": "application/json" },
+    body: JSON.stringify({ id }),
+  }).catch(() => null);
+  if (res?.ok) return { ok: true };
+  const data = await res?.json().catch(() => ({}));
+  if (res?.status !== 409) toast(data?.error ?? "Could not skip");
+  return { ok: false, reason: data?.error };
+}
+
 function gameInfo() {
   return {
     controlSeats: controlSeats(),
+    // Whether this board may use the game's table controls (Next hand, D-136): always on the table's board, on a
+    // remote board only while the table gives remote players board control.
+    boardControl: !REMOTE || !!state.remote?.boardControl,
     players: state.players,
     seatColors: state.seatColors ?? {}, // seats whose player left keep their colour (D-125)
     seatEdges: state.seatEdges,
@@ -1081,7 +1100,7 @@ async function showGame() {
       mod = { mount: genericBoard };
     }
     if (game !== mine) return; // a newer game replaced this one while loading
-    mine.inst = mod.mount(gameLayer, { gameId: state.game.id, assetUrl: (p) => `/games/${state.game.id}/assets/${p}`, act: boardAct });
+    mine.inst = mod.mount(gameLayer, { gameId: state.game.id, assetUrl: (p) => `/games/${state.game.id}/assets/${p}`, act: boardAct, skipTimer });
   }
   if (game.inst && gameMsg) game.inst.update(gameMsg.view, [], gameInfo());
 }

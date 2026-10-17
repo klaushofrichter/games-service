@@ -18,7 +18,7 @@ export type LogRecord =
   | { t: "start"; at: number; gameId: string; version: string; seed: number; settings: Record<string, unknown>; seats: SeatInfo[]; aiOptions: Record<number, Record<string, unknown>>; simulation: boolean }
   // Inputs carry `gt`, the game time the rules saw as ctx.now() (D-126); replay hands it back. Older logs lack it.
   | { t: "intent"; at: number; gt?: number; seat: number; by: "human" | "ai" | "board"; intent: Intent; accepted: boolean; reason?: string; events?: GameEvent[]; ai?: AiMoveMeta; error?: LoggedError }
-  | { t: "timer"; at: number; gt?: number; id: string; events?: GameEvent[]; error?: LoggedError }
+  | { t: "timer"; at: number; gt?: number; id: string; early?: boolean; events?: GameEvent[]; error?: LoggedError }
   | { t: "seatJoined"; at: number; gt?: number; seat: SeatInfo; events?: GameEvent[]; error?: LoggedError }
   | { t: "seatLeft"; at: number; gt?: number; seat: number; ended: boolean; events?: GameEvent[]; error?: LoggedError }
   // Not inputs: replay skips them (D-116). An error outside the input steps (a view, the end check); a copy of the state.
@@ -355,14 +355,15 @@ export class GameRuntime {
     return { ok: true };
   }
 
-  fireTimer(id: string) {
+  fireTimer(id: string, early = false) {
     if (this.over || !this.def.onTimer) return;
     const gt = this.beginStep();
+    const flag = early ? { early: true } : {};
     const events = this.guarded(
       () => this.apply(this.def.onTimer!(this.state, id, this.ctx())),
-      (error) => ({ t: "timer", at: this.clock.now(), gt, id, error }),
+      (error) => ({ t: "timer", at: this.clock.now(), gt, id, ...flag, error }),
     );
-    this.record({ t: "timer", at: this.clock.now(), gt, id, events });
+    this.record({ t: "timer", at: this.clock.now(), gt, id, ...flag, events });
     this.inputDone();
     this.afterStep(events);
   }
@@ -451,6 +452,17 @@ export class GameRuntime {
       this.recordError("boardView", e);
       throw e;
     }
+  }
+
+  /**
+   * Fire a pending timer now instead of at its deadline (D-136): the board's "Next hand" and the like. Logged as a
+   * timer firing with `early: true`, so replay fires it at the same point. False if the timer is not pending.
+   */
+  skipTimer(id: string): boolean {
+    if (this.over || this.paused || !this.timers.has(id)) return false;
+    this.clearTimer(id);
+    this.fireTimer(id, true);
+    return true;
   }
 
   /** Pending timers as absolute deadlines (clock time), for countdowns on board and decks. */

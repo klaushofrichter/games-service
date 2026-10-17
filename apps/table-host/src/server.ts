@@ -41,10 +41,10 @@ const REMOTE_DENIED = /^\/(join|simulation|logs|saves|invites|remote|qr|cloud|de
 /**
  * Changes a remote client may make (an allowlist): seat layout and running games. Never turn the table's
  * board (remote boards face their own seat), remove or move players, add AI seats, change AI options,
- * save, or resume — those stay with the people at the table. "Play now" for an AI that is out of time (D-112) is a
- * move of the running game, so remote players with board control may tap it too.
+ * save, or resume — those stay with the people at the table. "Play now" for an AI that is out of time (D-112) and
+ * skipping a game's wait (D-136) are moves of the running game, so remote players with board control may tap them too.
  */
-const REMOTE_ACTIONS = /^\/(layout|game\/(select|start|end|close|play-now))$/;
+const REMOTE_ACTIONS = /^\/(layout|game\/(select|start|end|close|play-now|skip-timer))$/;
 
 const MIME: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
@@ -242,6 +242,8 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
     if (m === "POST" && path === "/game/resume") return (table.resumeGame(), json(res, 200, table.state()));
     // An AI player is out of time (D-112): play the game's quick move for it instead of waiting.
     if (m === "POST" && path === "/game/play-now") return (table.playNow(), json(res, 200, table.state()));
+    // Skip a game's wait, e.g. Hold'em's "Next hand" (D-136): fire a timer the manifest lists in skipTimers now.
+    if (m === "POST" && path === "/game/skip-timer") return (table.skipTimer(body.id), json(res, 200, table.state()));
     if (m === "POST" && path === "/game/save") return json(res, 200, { saveId: await table.saveAndExit(), state: table.state() });
     if (m === "GET" && path === "/saves") return json(res, 200, await logs.listSaves());
     if (m === "GET" && path === "/game/board") {
