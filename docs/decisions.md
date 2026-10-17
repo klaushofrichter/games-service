@@ -420,3 +420,27 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   agent slot). *When it comes back:* a hybrid first (the game's planner scores the legal moves, the model chooses among
   the best few and keeps per-game notes), the API called directly from the host, measured against the coded AI in
   AI-only simulations.
+- **D-136 · 2026-10-17 · Klaus** — In Hold'em the board gets a button to go on to the next hand while a hand's result
+  is shown, instead of waiting out the result's pause. Remote boards show it too while the table gives remote players
+  board control. *Why:* with the pause long enough to read the result, players who have seen it wait for nothing.
+  *Implementation (Claude):* a manifest's `skipTimers` (default none) lists the timers a board may fire early; Hold'em
+  lists `next`. `POST /game/skip-timer { id }` (`Table.skipTimer`, `GameRuntime.skipTimer`) clears the pending timer
+  and fires it at once: 403 for an id not listed, 409 when it is not pending or the game is paused, 400 without an id.
+  Remote boards may call it with board control only (like *Play now*, D-112). The log records `timer` with
+  `early: true`, so replay fires it at the same point (D-032). Games get `ctx.skipTimer(id)` and `info.boardControl`.
+  Hold'em (2026.10.17.2) shows **Next hand · 7 s** under the result, in the pot line's place, **Finish** after the last
+  hand; a tap disables it until the next view. Check: `tests/skip-timer.test.ts` (fires at once, logged early, 409/403/400, paused, replay
+  verifies, manifest default), `tests/remote.test.ts` (remote boards with and without board control),
+  `scripts/e2e/next_hand.py` (the button on the table's board and on a remote board over WebRTC, gone while board
+  control is off, a tap starts the next hand at once, Finish on the last).
+- **D-137 · 2026-10-17 · Klaus** — In Hold'em every player's cards and bet lie on the felt. *Why:* the south player's
+  cards sat on the rail and the bet off the table (north the same). *Implementation (Claude):* a seat's spot was a
+  fixed fraction of the way from its plate to the middle; north and south plates are much closer to the middle than
+  east and west, so the same fraction left them on the rail. The spot is now straight in from the seat, 85 px inside
+  the felt's stadium edge (its rounded ends included, for the outer seats of three or four on an edge), on every edge.
+  The dealer button sits beside the dealer's cards (to their right, as the dealer sees them), on the felt; it used to
+  sit on the rail. Check: `scripts/e2e/next_hand.py` with 2, 4, 6 and 8 seats (north, south, east and west seated):
+  every card, bet chip and the dealer button inside the felt, and nothing in the middle (shared cards, pot, message,
+  Next hand) over a seat's cards. Known: on a remote board viewed from a side seat, the middle turns with the viewer
+  and the shared cards run across the felt's short side, where they touch the east and west seats' cards; this was so
+  before.
