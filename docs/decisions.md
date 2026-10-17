@@ -366,3 +366,22 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   edge. The game starts with the new seats, so its log, its seat plates and every board agree. Check:
   `tests/local-seat.test.ts` with the test game Duel (`tests/fixtures/local-seat`): a remote player swapped north, an
   AI player swapped, already south, two people at the table, a game without the field.
+
+## One board window (17 Oct 2026)
+
+- **D-132 · 2026-10-17 · Klaus** — The table PC shows the board in one window at a time. A second window says *The board
+  is open in another window* (naming the game when one runs) and offers *Show the board here* or *Keep the other
+  window*. *Why:* with two board windows open, a Loopy game finished while the window in front was still replaying
+  round 13 (the other, a background tab, is slowed down by the browser), so *Show result* appeared over a game that
+  looked unfinished.
+  - **Host.** A local board's hello carries `tab` (the window's id, kept across reloads in sessionStorage). With
+    another local board connected, the host pings it: if it answers within 1.5 s, the new window gets `system
+    elsewhere {phase, game}` and no state; if not (closed window, dead connection), the new one takes the board. A
+    hello with `takeover: true`, or from the same tab (a reload, a reconnect), takes the board at once: the old window
+    gets `system replaced` and is closed (4009). Remote boards belong to remote players and are not limited.
+  - **Board.** A panel over everything: *Show the board here* reconnects with `takeover`; *Keep the other window*
+    tries to close the window, else says it can be closed. The replaced window shows *The board moved to another
+    window* with the same buttons. Neither window reconnects by itself.
+  - **Checks.** `tests/one-board.test.ts` (elsewhere and no state, the game named, takeover with the old window told
+    and closed, the same tab, a dead connection, a closed window); `scripts/e2e/one_board.py` (panel, keep, take
+    over, reload keeps the board, closing frees it; in `run-all.sh`).

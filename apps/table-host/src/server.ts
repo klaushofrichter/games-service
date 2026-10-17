@@ -31,7 +31,7 @@ export interface RemoteContext {
 }
 export const remoteOf = (req: IncomingMessage): RemoteContext | undefined => (req as IncomingMessage & { gtRemote?: RemoteContext }).gtRemote;
 
-type Client = ({ ws: WebSocket; role: "board" } | { ws: WebSocket; role: "deck"; playerId: string } | { ws: WebSocket; role: "pending" }) & { remote?: boolean };
+type Client = ({ ws: WebSocket; role: "board" } | { ws: WebSocket; role: "deck"; playerId: string } | { ws: WebSocket; role: "pending" }) & { remote?: boolean; tab?: string };
 
 /** Reads a remote client may make: lobby and game state, never logs, saves, simulations or local join codes. */
 const REMOTE_DENIED = /^\/(join|simulation|logs|saves|invites|remote|qr|cloud|developer)(\/|$)/;
@@ -379,8 +379,45 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
           const p = msg.payload ?? {};
           if (p.role === "board") {
             if (!remote && !keyOk(p.key)) throw new TableError(401, "board needs the table key");
-            c.role = "board";
-            reply("welcome", { role: "board", remote }, msg.seq);
+            const acceptBoard = () => {
+              c.role = "board";
+              reply("welcome", { role: "board", remote }, msg.seq);
+              send(ws, envelope("lobby", "state", forClient(remote, table.state())));
+              if (table.phase === "active" || table.phase === "paused") sendGame([client], []);
+            };
+            if (remote) return acceptBoard();
+            // One board window at the table PC (D-132). A second one is told where the table is and gets nothing; it
+            // takes over only when asked (takeover), or when it is the same browser tab coming back (a reload, a
+            // dropped connection), and the window it replaces is told so. A board that does not answer a ping within
+            // 1.5 s is gone (a closed window, a dead connection) and does not count. Remote boards: any number.
+            const tab = typeof p.tab === "string" ? p.tab.slice(0, 64) : "";
+            c.tab = tab;
+            const others = () => [...clients].filter((o) => o !== client && o.role === "board" && !o.remote && o.ws.readyState === o.ws.OPEN);
+            const replace = () => {
+              for (const o of others()) {
+                send(o.ws, envelope("system", "replaced", {}));
+                o.ws.close(4009, "the board is open in another window");
+                clients.delete(o);
+              }
+              acceptBoard();
+            };
+            const live = others();
+            if (!live.length || p.takeover || (tab !== "" && live.every((o) => o.tab === tab))) return replace();
+            const answered = new Set<unknown>();
+            for (const o of live) {
+              o.ws.once("pong", () => answered.add(o));
+              o.ws.ping();
+            }
+            setTimeout(() => {
+              if (ws.readyState !== ws.OPEN) return;
+              if (others().some((o) => answered.has(o))) {
+                const st = table.state();
+                return reply("elsewhere", { phase: st.phase, game: st.game?.name ?? null }, msg.seq);
+              }
+              for (const o of others()) (o.ws.terminate(), clients.delete(o));
+              acceptBoard();
+            }, 1500);
+            return;
           } else if (p.sessionToken) {
             const info = table.resume(String(p.sessionToken));
             c.role = "deck";

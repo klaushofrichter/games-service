@@ -1343,11 +1343,69 @@ function wsSend(ch, type, payload) {
   });
 }
 
+// ---------- one board window at the table (D-132) ----------
+// This tab's id, kept across reloads (sessionStorage), so a reload or a dropped connection gets the board back at once.
+const TAB = (() => {
+  try {
+    let t = sessionStorage.getItem("gametable.board.tab");
+    if (!t) sessionStorage.setItem("gametable.board.tab", (t = Math.random().toString(36).slice(2, 12)));
+    return t;
+  } catch {
+    return "";
+  }
+})();
+let elsewhere = null; // why this window does not show the table: "elsewhere" (another window has it) or "replaced"
+let takeover = false;
+const elsewhereLayer = document.createElement("div");
+elsewhereLayer.id = "elsewhere-layer";
+elsewhereLayer.hidden = true;
+document.body.appendChild(elsewhereLayer);
+function renderElsewhere(why, info = {}) {
+  elsewhere = why;
+  elsewhereLayer.hidden = !why;
+  if (!why) return void (elsewhereLayer.innerHTML = "");
+  const playing = info.phase === "active" || info.phase === "paused";
+  const title = why === "replaced" ? "The board moved to another window" : "The board is open in another window";
+  const text =
+    why === "replaced"
+      ? "Another window took over the table. Only one window shows the board, so that a game is never shown twice."
+      : playing
+        ? `A game${info.game ? ` of ${esc(info.game)}` : ""} is running there. Only one window shows the board at a time.`
+        : "Only one window shows the board at a time.";
+  elsewhereLayer.innerHTML = `<div class="panel"><h2>${title}</h2><p>${text}</p><div class="row">
+    <button class="primary" type="button" data-elsewhere="here">Show the board here</button>
+    <button type="button" data-elsewhere="leave">${why === "replaced" ? "Leave it there" : "Keep the other window"}</button></div>
+    <p class="note" hidden>You can close this window.</p></div>`;
+}
+elsewhereLayer.addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-elsewhere]");
+  if (!b) return;
+  if (b.dataset.elsewhere === "leave") {
+    elsewhereLayer.querySelector(".row").hidden = true;
+    elsewhereLayer.querySelector(".note").hidden = false;
+    window.close(); // works only for windows a script opened; otherwise the note stays
+    return;
+  }
+  takeover = true;
+  renderElsewhere(null);
+  if (ws && ws.readyState <= 1) ws.close();
+  else connect();
+});
+
 function connect() {
   ws = openTableSocket(REMOTE);
-  ws.onopen = () => ws.send(JSON.stringify({ v: 1, ch: "system", type: "hello", payload: REMOTE ? { role: "board" } : { role: "board", key: KEY } }));
+  ws.onopen = () => {
+    const hello = REMOTE ? { role: "board" } : { role: "board", key: KEY, tab: TAB, ...(takeover ? { takeover: true } : {}) };
+    takeover = false;
+    ws.send(JSON.stringify({ v: 1, ch: "system", type: "hello", payload: hello }));
+  };
   ws.onmessage = async (ev) => {
     const m = JSON.parse(ev.data);
+    if (m.ch === "system" && (m.type === "elsewhere" || m.type === "replaced")) {
+      renderElsewhere(m.type, m.payload ?? {});
+      if (m.type === "elsewhere") ws.close();
+      return;
+    }
     const answer = m.ch === "system" && m.seq !== undefined && wsPending.get(m.seq);
     if (answer) {
       wsPending.delete(m.seq);
@@ -1370,7 +1428,8 @@ function connect() {
   ws.onclose = () => {
     for (const r of wsPending.values()) r({ ok: false, reason: "connection lost" });
     wsPending.clear();
-    setTimeout(connect, 1000);
+    // A window without the table waits for "Show the board here"; that button reconnects (D-132).
+    if (!elsewhere) setTimeout(connect, takeover ? 0 : 1000);
   };
 }
 connect();

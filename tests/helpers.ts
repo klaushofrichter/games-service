@@ -50,6 +50,8 @@ export class Deck {
   playerId = "";
   sessionToken = "";
   closeCode: number | null = null;
+  /** The answer to hello: "welcome", or "elsewhere" for a second board window (D-132). */
+  answer = "";
   private waiters: { pred: (m: Envelope<any>) => boolean; resolve: (m: Envelope<any>) => void }[] = [];
   private seq = 0;
   ws!: WebSocket;
@@ -78,9 +80,10 @@ export class Deck {
       this.ws.once("open", () => res());
       this.ws.once("error", rej);
     });
-    const welcome = this.next((m) => m.ch === "system" && (m.type === "welcome" || m.type === "error"));
+    const welcome = this.next((m) => m.ch === "system" && (m.type === "welcome" || m.type === "error" || m.type === "elsewhere"));
     this.send("system", "hello", hello);
     const w = await welcome;
+    this.answer = w.type;
     if (w.type === "error") throw new Error(w.payload.message);
     this.playerId = w.payload.playerId;
     if (w.payload.sessionToken) this.sessionToken = w.payload.sessionToken;
