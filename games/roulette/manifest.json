@@ -1,7 +1,7 @@
 {
   "id": "roulette",
   "name": "Roulette",
-  "version": "1.0.0",
+  "version": "2026.10.17.1",
   "sdk": "^0.1",
   "description": "European single-zero roulette. Everyone bets at once from their phone, then the wheel spins. Points only, no real-world value.",
   "players": {
