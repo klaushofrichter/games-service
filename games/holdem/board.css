@@ -2,11 +2,11 @@
   background: radial-gradient(ellipse at 50% 40%, #1d6b4b, #0e3d2c 70%); box-shadow: 0 0 0 16px #3a2512, 0 0 0 20px #a57c28, 0 30px 80px rgba(0,0,0,.6); }
 .he-center { position:absolute; left:960px; top:540px; transform: translate(-50%,-50%); text-align:center; transition: transform .6s; }
 .he-board { display:flex; gap:16px; justify-content:center; --w: 104px; }
-.he-pot { margin-top: 22px; font-family: var(--display); font-size: 36px; color: var(--ink); }
+.he-pot { margin-top: 16px; font-family: var(--display); font-size: 36px; line-height: 1; color: var(--ink); }
 .he-pot b { color: var(--brass); }
 .he-pot:empty { display: none; } /* at a result: Next hand takes its place, clear of the south seat's cards */
 .he-street { font-size: 20px; letter-spacing: .2em; text-transform: uppercase; color: var(--brass); margin-bottom: 18px; }
-.he-msg { font-size: 26px; color: var(--ink); min-height: 34px; margin-top: 8px; }
+.he-msg { font-size: 26px; color: var(--ink); min-height: 34px; margin-top: 4px; } /* close under the pot, clear of the south seat's cards */
 .he-spot { position:absolute; transform: translate(-50%,-50%); display:flex; flex-direction:column; align-items:center; gap:8px; transition: transform .5s; }
 .he-hole { display:flex; gap:6px; --w: 62px; }
 .he-hole.folded { opacity: .25; }

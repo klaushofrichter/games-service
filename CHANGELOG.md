@@ -6,6 +6,7 @@ page is the history. Leave it empty if there is nothing to add beyond the commit
 
 ## [Unreleased]
 
+- Hold'em: "… to act" sits right under the pot, clear of the south seat's cards.
 - Hold'em: **Next hand** on the board under each hand's result (D-136), with the seconds left, starts the next hand
   at once instead of waiting out *Seconds to show each result* (**Finish** after the last hand). Remote boards show it
   too while the table gives remote players board control. Games list such skippable waits in the manifest
