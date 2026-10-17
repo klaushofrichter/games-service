@@ -280,7 +280,7 @@ function seatBadgeHtml(p) {
 }
 
 /** A seated player's colour (D-106), as the board shows it. */
-const colorOf = (seat) => playerColor({ players: state.players, prefs: state.game?.prefs ?? {} }, seat);
+const colorOf = (seat) => playerColor({ players: state.players, seatColors: state.seatColors ?? {} }, seat);
 
 /** The seat as compass initials for the badge beside the name (D-093): "NE", "S". */
 const seatBadge = (edges, seat) => seatName(edges, seat).replace(/(north|south|east|west)/g, (w) => w[0]).toUpperCase();
@@ -372,6 +372,7 @@ function info() {
     seat: gameMsg?.seat,
     me: self(),
     players: state.players,
+    seatColors: state.seatColors ?? {}, // seats whose player left keep their colour (D-125)
     settings: state.game?.settings ?? {},
     prefs: state.game?.prefs ?? {},
     timers: gameMsg?.timers ?? {},

@@ -137,4 +137,42 @@ describe("player colours on the table (D-106)", () => {
       await t.close();
     }
   });
+
+  it("a seat keeps the colour of a player who leaves during the game, for an AI taking it over (D-125)", async () => {
+    const t = await testHost();
+    try {
+      await t.ok("POST", "/layout", { seats: 4 });
+      const ann = await t.joinDeck("Ann");
+      const ben = await t.joinDeck("Ben");
+      await t.ok("POST", "/ai", {});
+      const ids = Object.fromEntries(t.host.table.state().players.map((p) => [p.name, p.id]));
+      await t.ok("POST", `/players/${ids.Ben}/color`, { color: SEAT_COLORS[5] });
+      const benSeat = t.host.table.state().players.find((p) => p.name === "Ben")!.seat!;
+      await t.ok("POST", "/game/select", { gameId: "pachisi", settings: { turnSeconds: 0, tokens: 1 } });
+      await ann.request("lobby", "ready", { ready: true });
+      await ben.request("lobby", "ready", { ready: true });
+      await t.ok("POST", "/game/start");
+      expect(t.host.table.state().seatColors).toEqual({});
+      await t.ok("DELETE", `/players/${ids.Ben}`);
+      let st = t.host.table.state();
+      expect(st.phase).toBe("active");
+      expect(st.seatColors).toEqual({ [benSeat]: SEAT_COLORS[5] });
+      expect(playerColor(st, benSeat)).toBe(SEAT_COLORS[5]); // not the seat's own colour
+      // nobody else gets it, and taking it in the settings swaps with the empty seat
+      const annBefore = colorOf(t, "Ann");
+      expect(st.players.map((p) => p.color)).not.toContain(SEAT_COLORS[5]);
+      await t.ok("POST", `/players/${ids.Ann}/color`, { color: SEAT_COLORS[5] });
+      st = t.host.table.state();
+      expect(colorOf(t, "Ann")).toBe(SEAT_COLORS[5]);
+      expect(st.seatColors).toEqual({ [benSeat]: annBefore });
+      // back in the lobby the seat is an ordinary empty seat again
+      await t.ok("POST", "/game/end", {});
+      await t.ok("POST", "/game/close", {});
+      expect(t.host.table.state().seatColors).toEqual({});
+      ann.close();
+      ben.close();
+    } finally {
+      await t.close();
+    }
+  });
 });

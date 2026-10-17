@@ -6,6 +6,8 @@ page is the history. Leave it empty if there is nothing to add beyond the commit
 
 ## [Unreleased]
 
+- A player removed during a game leaves their colour on the seat (D-125): in Loopy the AI that takes over keeps it,
+  instead of switching to the seat's default colour (which could be someone else's).
 - Phones: during a game the header is a slim tab bar (D-123), so the game gets the screen: your own tab (colour, name,
   seat) has Rules, everyone at the table and the terms; the game's tab opens by itself when it is your turn. The
   lobby looks as before.

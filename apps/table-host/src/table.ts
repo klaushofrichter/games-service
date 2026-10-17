@@ -83,6 +83,8 @@ export class Table extends EventEmitter {
   private sound = true;
   /** Display choices per game id (D-088), set from the board's settings; in memory, so they last until a restart. */
   private prefs = new Map<string, Record<string, unknown>>();
+  /** Colours of seats whose player left during the game (D-125), kept until the next game or the lobby. */
+  private leftColors = new Map<number, string>();
   runtime: GameRuntime | null = null;
   private summary: GameSummary | null = null;
   private stateRev = 0;
@@ -156,6 +158,7 @@ export class Table extends EventEmitter {
       cloud: this.cloud,
       pause: this.pause,
       needed: this.neededPlayers(),
+      seatColors: this.seatColors(),
       aiThinking: [...this.aiMoves.entries()]
         .filter(([, m]) => m.shown)
         .map(([playerId, m]) => ({ playerId, seat: m.seat, since: m.startedAt, deadline: m.deadline })),
@@ -582,7 +585,7 @@ export class Table extends EventEmitter {
   colors(): Map<string, string> {
     const seated = this.seated();
     const out = new Map<string, string>();
-    const used = new Set<string>();
+    const used = new Set<string>(Object.values(this.seatColors()));
     for (const p of seated) {
       if (p.chosenColor && !used.has(p.chosenColor)) {
         out.set(p.id, p.chosenColor);
@@ -605,6 +608,12 @@ export class Table extends EventEmitter {
     return out;
   }
 
+  /** Empty seats that keep the colour of the player who left them during the game (D-125), seat → colour. */
+  private seatColors(): Record<number, string> {
+    const taken = new Set(this.seated().map((p) => p.seat));
+    return Object.fromEntries([...this.leftColors].filter(([seat]) => !taken.has(seat)));
+  }
+
   private playerInfos(): PlayerInfo[] {
     const colors = this.colors();
     return [...this.players.values()].map(({ sessionToken, graceTimer, aiSeed, remoteSession, chosenColor, keptColor, ...info }) => ({ ...info, color: colors.get(info.id) ?? null }));
@@ -623,6 +632,9 @@ export class Table extends EventEmitter {
     const mine = colors.get(p.id)!;
     const other = this.seated().find((q) => q.id !== p.id && colors.get(q.id) === c);
     if (other) other.chosenColor = mine;
+    // An empty seat keeping a departed player's colour (D-125) swaps too.
+    const left = Object.entries(this.seatColors()).find(([, x]) => x === c);
+    if (left) this.leftColors.set(Number(left[0]), mine);
     p.chosenColor = c;
     this.changed();
   }
@@ -633,6 +645,11 @@ export class Table extends EventEmitter {
     if (reason === "evicted" && this.protectedPlayer()?.id === p.id)
       throw new TableError(409, `${p.name} is the last player at the table; a game needs one (the developer setting in the board's settings allows games without)`);
     if (p.graceTimer) clearTimeout(p.graceTimer);
+    // During a game the seat keeps the player's colour (D-125): the game may go on with an AI in it (Loopy) or show it.
+    if ((this.phase === "active" || this.phase === "paused") && p.seat !== null) {
+      const c = this.colors().get(p.id);
+      if (c) this.leftColors.set(p.seat, c);
+    }
     this.players.delete(playerId);
     this.waitingFor.delete(playerId);
     this.emit("removed", playerId, reason);
@@ -905,6 +922,7 @@ export class Table extends EventEmitter {
     this.runningGame = game;
     this.gameStartedAt = Date.now();
     this.beginLog(rt, game, settings, aiOptions);
+    this.leftColors.clear();
     this.phase = "active";
     rt.onChange((kind, events) => {
       if (kind === "over") void this.onGameOver(events);
@@ -930,6 +948,7 @@ export class Table extends EventEmitter {
     this.assertNotPlaying("return to the lobby");
     this.selected = null;
     this.summary = null;
+    this.leftColors.clear();
     this.phase = "idle";
     for (const p of this.players.values()) p.ready = p.kind === "ai";
     this.changed();

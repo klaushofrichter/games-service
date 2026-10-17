@@ -213,6 +213,12 @@ export interface LobbyState {
    */
   needed: Record<string, string>;
   /**
+   * Empty seats whose player left during the game, with that player's colour (D-125), seat → colour: a game that goes
+   * on with the seat (Loopy's AI takes it over) keeps showing it in the same colour. Kept until the next game starts
+   * or the table returns to the lobby; `playerColor(info, seat)` in the board kit uses it.
+   */
+  seatColors: Record<number, string>;
+  /**
    * AI players thinking about a move for more than a moment (D-112): their seat, since when, and the time they may
    * take (host clock, `deadline`). Games may show it; the board shows "Play now" once a deadline has passed.
    */
