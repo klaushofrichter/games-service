@@ -116,7 +116,7 @@ A game is a folder with `manifest.json` (validated by `packages/protocol`; the f
 ```ts
 import { defineGame } from "../../packages/sdk/src/index.ts";
 export default defineGame<State>({
-  setup(ctx, settings) { ... },               // ctx.random(), ctx.setTimer(), ctx.seats
+  setup(ctx, settings) { ... },               // ctx.random(), ctx.setTimer(), ctx.now(), ctx.seats
   onIntent(state, seat, intent, ctx) { ... }, // return { state, events } or { reject }
   view(state, seat) { ... },                  // private, per seat
   boardView(state) { ... },                   // public
@@ -147,7 +147,7 @@ The UI modules export `mount(root, ctx)` returning `{ update(view, events, info)
 
 **Board settings.** The board's gear button opens a settings modal: Fullscreen for every game, then anything the chosen game adds. A game adds items by exporting `settings({ info, setPrefs })` from its `board.js`, which returns a list of `{ type: "toggle" | "choice" | "swatches" | "button", label, value, options, onChange }`. `setPrefs(patch)` stores display choices for that game on the table (`POST /game/prefs`, at most 20 keys and 4 KB, `null` removes a key). Board and decks get them as `info.prefs`, and they last until the host restarts. They are display choices only: not part of the rules, the log or replay. Pachisi uses this for its pieces (numbers or icons, D-102). **Player colours (D-106)** are the table's, not a game's: the settings modal has a *Player colours* group for every seated player (`POST /players/{id}/color` with a colour from `PLAYER_COLORS` in the protocol; taking someone's colour swaps the two). Every player in the lobby state carries `color` (their choice, else their seat's, always distinct; `null` without a seat), so games read it from `info.players`, most simply through `playerColor(info, seat)` in the board kit. When a player leaves during a game, their seat keeps their colour until the next game (`seatColors` in the lobby state, `info.seatColors`, D-125), so a game that goes on with that seat, like Loopy with an AI taking over, shows it unchanged; `playerColor` handles that. The board shows it as the border of each player's card and a dot before the name, in the lobby and on every game's seat plates; the phones as the seat badge and a dot in *At the table* (D-104). Remote boards have no settings. The modal also lists the chosen game's manifest settings: changeable with − / + until the game starts (`POST /game/settings`), read-only while it runs; a setting may give a `step`. A game's `isOver()` summary may include `table: { columns, rows }`, which the result screen and the phones show; when a game ends by itself the board keeps its final screen until someone taps *Show result*. Sound effects go through `playSound(info, name, make)` from the board kit, which respects the table's sound setting (`info.sound`).
 
-Rules must be deterministic: all randomness through `ctx.random()`. The host logs the seed and every input (intents, timer firings, seat changes), so `replay()` rebuilds any game exactly; the tests check this for live games and simulations.
+Rules must be deterministic: all randomness through `ctx.random()`, and the time only through `ctx.now()`: the game time in ms since the start, pauses left out (D-126), logged with every input so replay gets the same value; it is how a game charges a chess clock. The host logs the seed and every input (intents, timer firings, seat changes), so `replay()` rebuilds any game exactly; the tests check this for live games and simulations.
 
 ## Extra-game repositories
 
