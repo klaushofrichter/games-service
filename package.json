@@ -10,6 +10,7 @@
     "host": "node apps/table-host/src/main.ts",
     "cloud": "node apps/cloud/src/main.ts",
     "test": "vitest run",
+    "check:versions": "node scripts/check-game-versions.ts",
     "typecheck": "tsc -p tsconfig.check.json"
   },
   "dependencies": {

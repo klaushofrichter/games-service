@@ -288,3 +288,28 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   moves, the log, replay, old logs).
 - **D-127 · 2026-10-17 · Klaus** — During a game the gear and the turn-around button no longer move or turn when the game is turned: they stay where they are when the game faces south. *Why:* turned to face north, Loopy's round and deck displays moved to where the buttons had gone, and they overlapped; fixed buttons also make the board more consistent. *Implementation (Claude):* changes D-088/D-101 for games: `placeSettings` uses the south edge during a game (the gear moves to the other end only if the game's Lobby button is in that corner, as before), and the turn-around button keeps its place and its icon; its label still says which way it turns. The lobby is unchanged: the gear follows the edge the lobby faces. `play.py roulette` checks that turning the game leaves both buttons where they are; Loopy's browser check turns the game north and checks the layout there.
 
+## Game versions (17 Oct 2026)
+
+- **D-127 · 2026-10-17 · Klaus** — Games use calendar versions like the services, `YYYY.MM.DD.N` (America/Chicago),
+  and a game's version changes when, and only when, the game changes. *The rule:*
+  1. **A game is its folder** (`games/<id>/`): rules and every module they import from the folder, the board and phone
+     UI, styles, assets, the rules for players (`how-to-play.md`) and the manifest.
+  2. **Any change in the folder takes a new version** in the same pull request: the date of the change, with `N` one
+     more than the game's last version of that day, else 1. Several games changed in one pull request each take their
+     own.
+  3. **Nothing else changes a game's version.** The lobby, the board kit, the SDK, the table host and the service are
+     the platform; a platform release leaves every game's version as it is. Logs record the platform's version beside
+     the game's (`run.json` `platform`), so a log still says which platform ran it.
+  4. **A version never changes without a change in the folder**, never goes down and is never dated in the future.
+  5. The same holds in every game repository (extra-games, loopy-game, and any added later).
+  *Why the version lives in the manifest, unlike the services' (kube-setup's requirement 1):* a service's version is
+  the release that shipped it, so generating it at deploy time is right. A game must keep its version through releases
+  that don't touch it, and extra-game bundles reach tables without git history, so the version has to travel in the
+  game's own files. The rule keeps what requirement 1 protects (nobody forgets a bump, nothing drifts) with a check
+  instead of generation. *Implementation (Claude):* `scripts/check-game-versions.ts` compares each game folder with
+  the branch a pull request goes into and fails on a changed game without a new version, a new version without a
+  change, a version that doesn't go up, a malformed one or a future date; `--fix` sets the next version for every
+  changed game. It runs in the required `test` check here, and extra-game repositories run the same file from their
+  games-service checkout. The manifest schema does not enforce the format, so a repository that has not switched yet
+  keeps working on tables. All built-in games start at `2026.10.17.1` (the switch from semver is the one change the
+  check allows without a code change). Check: `tests/game-versions.test.ts`.

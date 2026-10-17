@@ -1,7 +1,7 @@
 {
   "id": "quartet",
   "name": "Quartet",
-  "version": "0.1.0",
+  "version": "2026.10.17.1",
   "sdk": "^0.1",
   "description": "Exactly four humans pass a token around the table twice. A stub game for turn order and manifest gating.",
   "players": [4],
