@@ -39,7 +39,8 @@ happened in a game, why a rule misbehaved, or why an AI made a move.
 ## Records (`game-NNN.jsonl`)
 
 Every record has `t` (its type) and `at` (milliseconds: epoch time in a played game, virtual time from 0 in a
-simulation). Seats are numbers from 0; the `start` record maps them to players, and `run.json` lists the players.
+simulation). Inputs (`intent`, `timer`, `seatJoined`, `seatLeft`) also have `gt`: the game time the rules saw, ms
+since the start with paused time left out (games use it for clocks; replay uses it). Seats are numbers from 0; the `start` record maps them to players, and `run.json` lists the players.
 
 - `start`: `gameId`, `version`, `seed` (all randomness in the rules comes from it), `settings`, `seats` (`seat`,
   `playerId`, `name`, `kind`, `edge` of the board), `aiOptions` per seat, `simulation`.

@@ -26,7 +26,7 @@
 .rl-chip circle.face { stroke: rgba(0, 0, 0, .55); stroke-width: 2; }
 .rl-chip circle.ring { fill: none; stroke: rgba(255, 255, 255, .8); stroke-width: 2; stroke-dasharray: 5 5; }
 .rl-chip text { font-family: var(--text); font-size: 13px; font-weight: 700; fill: #111; }
-.rl-chip { animation: rl-drop .35s ease-out; }
+.rl-chip.new { animation: rl-drop .35s ease-out; }
 @keyframes rl-drop { from { transform: translateY(-30px); opacity: 0; } to { transform: none; opacity: 1; } }
 .rl-history { display: flex; gap: 8px; justify-content: center; margin-top: 18px; }
 .rl-history span { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: 17px; border: 2px solid rgba(255,255,255,.25); }

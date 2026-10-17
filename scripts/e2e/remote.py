@@ -196,7 +196,9 @@ try:
         rboard.locator(".overlay.terms .terms-close").click()
         rboard.locator(".overlay.terms").wait_for(state="detached")
         rboard.locator("[data-close-overlay]").click()
-        deck.locator("footer a[data-terms]").click()
+        # During a game the terms sit on the player's own tab (D-123), not in the footer.
+        deck.locator("#tab-table").click()
+        deck.locator(".table-tab a[data-terms]").click()
         deck.locator(".rules-modal .md >> text=entertainment").wait_for(timeout=5000)
         deck.locator(".rules-modal .rules-close").click()
         deck.locator(".rules-modal").wait_for(state="detached")

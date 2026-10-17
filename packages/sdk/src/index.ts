@@ -32,6 +32,12 @@ export interface GameContext {
   /** Ask the host to call onTimer(id) after ms (virtual time in headless simulations). */
   setTimer(id: string, ms: number): void;
   clearTimer(id: string): void;
+  /**
+   * Game time in ms since the game started, with the time it stood paused left out (D-126): when this input happened,
+   * for chess clocks and the like. Logged with every input, so a replay gets the same values. Rules stay otherwise
+   * time-free; timers remain the way to make something happen later.
+   */
+  now(): number;
   seats: SeatInfo[];
 }
 

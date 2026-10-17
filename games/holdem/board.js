@@ -1,6 +1,6 @@
 // Hold'em board UI: an oval felt with the shared cards and pot, each player's bet and face-down cards
 // toward the middle, the dealer button, and revealed hands at showdown.
-import { esc, html, remainingMs, seatColor, seatPlates, useStyles } from "/shared/board-kit.js";
+import { esc, html, playerColor, remainingMs, seatPlates, useStyles } from "/shared/board-kit.js";
 import { card } from "/games/holdem/assets/cards.js";
 
 const CX = 960, CY = 540; // board.css positions the felt and centre around this point
@@ -42,7 +42,7 @@ export function mount(root) {
       center.querySelector(".he-pot").innerHTML = v.phase === "handOver" && v.result ? "" : `Pot <b>${v.pot}</b>`;
       let msg = "";
       if (v.phase === "handOver" && v.result) {
-        msg = v.result.winners.map((w) => `<b style="color:${seatColor(w.seat)}">${esc(name(w.seat))}</b> wins ${w.amount}${w.hand ? ` with ${w.hand.toLowerCase()}` : ""}`).join(" · ");
+        msg = v.result.winners.map((w) => `<b style="color:${playerColor(i, w.seat)}">${esc(name(w.seat))}</b> wins ${w.amount}${w.hand ? ` with ${w.hand.toLowerCase()}` : ""}`).join(" · ");
       } else if (v.toAct !== null) {
         msg = `${esc(name(v.toAct))} to act <span class="he-clock"></span>`;
       }
@@ -59,7 +59,7 @@ export function mount(root) {
           const act = v.lastAction?.seat === p.seat && v.phase === "betting" ? `<span class="he-act">${esc(v.lastAction.action)}</span>` : "";
           return `<div class="he-spot" style="left:${x}px;top:${y}px;transform:translate(-50%,-50%) rotate(${pos.rot}deg)">
             <div class="he-hole ${p.folded ? "folded" : ""}">${hole}</div>
-            <div class="he-bet">${p.bet ? `<span class="he-chip" style="background:${seatColor(p.seat)}"></span>${p.bet}` : ""}${act}</div></div>`;
+            <div class="he-bet">${p.bet ? `<span class="he-chip" style="background:${playerColor(i, p.seat)}"></span>${p.bet}` : ""}${act}</div></div>`;
         })
         .join("");
 

@@ -44,6 +44,9 @@ def roulette(browser, board):
     for d in decks:
         d.click("#ready")
     time.sleep(0.4)
+    # Mira picks a colour that is not her seat's: her chips must show it (lobby colours, D-106).
+    mira = next(p for p in api("GET", "/state")["players"] if p["name"] == "Mira")
+    api("POST", f"/players/{mira['id']}/color", {"color": "#c38be8"})
     api("POST", "/game/start")
     decks[0].wait_for_selector(".rd-balance")
     d0, d1, d2 = decks
@@ -51,6 +54,15 @@ def roulette(browser, board):
     d1.click("[data-chip='50']"); d1.click("[data-type=dozen][data-target='2']"); d1.click("[data-type=odd]")
     d2.click("[data-chip='25']"); d2.click("[data-type=straight][data-target='0']"); d2.click("[data-type=column][data-target='3']")
     time.sleep(0.8)
+    # Every chip on its own cell, not stacked in the layout's corner; each in its player's colour.
+    faces = board.locator(".rl-chip circle.face")
+    spots = {(round(b["x"]), round(b["y"])) for b in (faces.nth(k).bounding_box() for k in range(faces.count()))}
+    assert faces.count() >= 6 and len(spots) == faces.count(), spots
+    colors = {p["name"]: p["color"] for p in api("GET", "/state")["players"]}
+    for amount, who in (("100", "Klaus"), ("50", "Mira"), ("25", "Jonas")):
+        fill = board.locator(f".rl-chip:has(text:text-is('{amount}')) circle.face").first.get_attribute("fill")
+        assert fill == colors[who], (who, fill, colors[who])
+    assert colors["Mira"] == "#c38be8", colors
     shot(board, "board-betting")
     shot(d0, "deck-betting")
     for d in decks:
@@ -377,7 +389,7 @@ def dialogs(browser, board):
     time.sleep(0.5)
     # D-104: the phone's "At the table" list shows each player's colour before the name (the seat's colour, which
     # framed their plate in a game)
-    hexes = ["#e8b04a", "#5fb7e8", "#e8735f", "#7fd18b", "#c38be8", "#e8e15f", "#5fe0c8", "#e88fbf"]
+    hexes = ["#e8b04a", "#5fb7e8", "#e8735f", "#7fd18b", "#c38be8", "#dde3ea", "#5fe0c8", "#e88fbf"]
     rgb = lambda h: f"rgb({int(h[1:3], 16)}, {int(h[3:5], 16)}, {int(h[5:7], 16)})"
     want = [rgb(hexes[p["seat"]]) for p in api("GET", "/state")["players"]]
     decks[0].wait_for_function("(n) => document.querySelectorAll('.list .row .pdot').length === n", arg=len(want))
@@ -398,6 +410,17 @@ def dialogs(browser, board):
     shot(board, "settings-colours-lobby")
     board.click("[data-close-overlay]")
     shot(board, "lobby-colours")
+    # The settings stay put while the table changes around them: a state change they do not show leaves the panel as it
+    # is (it used to be rebuilt on every state, losing its scroll position), and Escape closes them (D-122).
+    board.click("#settings-button")
+    board.wait_for_selector(".overlay.settings .panel")
+    board.evaluate("document.querySelector('.overlay.settings .panel').__mark = 1")
+    api("POST", "/face", {"edge": "west"})
+    board.wait_for_function("document.querySelector('.overlay.settings .panel').style.transform.includes('90deg')", timeout=5000)
+    assert board.evaluate("document.querySelector('.overlay.settings .panel').__mark") == 1, "the settings panel was rebuilt"
+    api("POST", "/face", {"edge": "south"})
+    board.keyboard.press("Escape")
+    board.wait_for_selector(".overlay.settings", state="detached")
     pick_game(board, "roulette")
     board.wait_for_selector(".dialog.form")
     board.fill(".dialog [name=rounds]", "4")
@@ -537,6 +560,83 @@ def rules(browser, board):
     shot(d, "terms")
     d.locator(".rules-modal .rules-close").click()
     d.wait_for_selector(".rules-modal", state="detached")
+    return [d]
+
+
+@scenario
+def tabs(browser, board):
+    """D-123: during a game the phone's header is a slim tab bar (own tab, game tab), without the footer; the own tab
+    has the name, Rules, everyone at the table and the terms; the game's tab comes forward when it is this player's turn."""
+    api("POST", "/layout", {"seats": 2})
+    ctx = browser.new_context(viewport={"width": 320, "height": 568}, device_scale_factor=2, has_touch=True)
+    d = ctx.new_page()
+    watch(d, "phone")
+    join_deck(d, api("GET", "/join")["url"], "Klaus")
+    assert d.locator("#top .who").count() == 1 and d.locator("footer").is_visible(), "the lobby keeps the full header and footer"
+    assert d.locator(".tabs").count() == 0, "no tabs outside a game"
+    api("POST", "/ai", {})
+    api("POST", "/game/select", {"gameId": "pachisi", "settings": {"turnSeconds": 60, "tokens": 4}})
+    d.click("#ready")
+    wait(lambda: all(p["ready"] for p in api("GET", "/state")["players"] if p["seat"] is not None), 10, "everyone ready")
+    api("POST", "/game/start")
+    d.wait_for_selector(".tabs #tab-game[aria-selected=true]")
+    d.wait_for_selector(".pc-who")
+    assert d.locator("#top .who").count() == 0, "no full header during a game"
+    assert not d.locator("footer").is_visible(), "no footer during a game"
+    h = d.locator(".tabs").bounding_box()["height"]
+    assert h <= 52, f"the tab bar is {h}px high"
+    assert d.evaluate("() => document.documentElement.scrollWidth <= innerWidth"), "the tab bar makes the page wider"
+    assert "Klaus" in d.inner_text("#tab-table") and "Pachisi" in d.inner_text("#tab-game")
+    shot(d, "tabs-game")
+    # the own tab: name, seat badge, Rules, everyone at the table, the terms; the game's deck stays mounted
+    d.click("#tab-table")
+    d.wait_for_selector(".table-tab .who h1 >> text=Klaus")
+    assert d.locator(".table-tab .list .row").count() == 2
+    assert d.locator(".table-tab .who .badge").count() == 1
+    assert not d.locator("#body").is_visible() and d.locator("#body .pc-who").count() == 1, "the game's deck is hidden, not removed"
+    shot(d, "tabs-table")
+    d.locator(".table-tab [data-rules]").click()
+    d.locator(".rules-modal .md h3").first.wait_for()
+    d.keyboard.press("Escape")
+    d.wait_for_selector(".rules-modal", state="detached")
+    d.locator(".table-tab a[data-terms]").click()
+    d.locator(".rules-modal .md >> text=entertainment").wait_for()
+    d.locator(".rules-modal .rules-close").click()
+    d.wait_for_selector(".rules-modal", state="detached")
+    d.click("#tab-game")
+    d.wait_for_selector("#body .pc-who", state="visible")
+    # the game's tab comes forward when the turn comes back to this player
+    me = next(p["seat"] for p in api("GET", "/state")["players"] if p["name"] == "Klaus")
+    board_view = lambda: api("GET", "/game/board")["view"]
+    for attempt in range(6):
+        if d.locator("#tab-game[aria-selected=true]").count() == 0:
+            d.click("#tab-game")
+        wait(lambda: (lambda v: v["over"] or (v["turn"] == me and v["phase"] == "roll"))(board_view()), 15, "Klaus's turn to roll")
+        if board_view()["over"]:
+            break
+        d.locator(".pc-roll:not([hidden])").click()
+        d.wait_for_timeout(150)
+        d.click("#tab-table")
+        end = time.time() + 10
+        came = False
+        while time.time() < end:
+            v = board_view()
+            if v["turn"] == me and v["phase"] == "move" and board.locator(".pc-token.tap").count():
+                board.locator(".pc-token.tap").first.click(force=True)
+            if d.locator("#tab-game[aria-selected=true]").count():
+                came = True
+                break
+            if v["turn"] == me and v["phase"] == "roll" and d.locator("#tab-table[aria-selected=true]").count():
+                break  # the turn came back before the tab was opened: try again
+            time.sleep(0.2)
+        if came:
+            break
+    else:
+        raise AssertionError("the game's tab did not come forward on Klaus's turn")
+    shot(d, "tabs-turn")
+    api("POST", "/game/end", {})
+    d.wait_for_selector("#top .who")
+    assert d.locator(".tabs").count() == 0 and d.locator("footer").is_visible(), "the full header and footer come back after the game"
     return [d]
 
 

@@ -6,6 +6,20 @@ page is the history. Leave it empty if there is nothing to add beyond the commit
 
 ## [Unreleased]
 
+- A player removed during a game leaves their colour on the seat (D-125): in Loopy the AI that takes over keeps it,
+  instead of switching to the seat's default colour (which could be someone else's).
+- Phones: during a game the header is a slim tab bar (D-123), so the game gets the screen: your own tab (colour, name,
+  seat) has Rules, everyone at the table and the terms; the game's tab opens by itself when it is your turn. The
+  lobby looks as before.
+- Player colour 6 is pearl instead of citron, which looked too much like amber (D-124).
+- Board: **Escape** closes the topmost window (settings, lobby, dialogs), like a tap beside it; in a confirmation it
+  means Cancel (D-122). The settings and lobby windows no longer rebuild while a game runs: in a game of AI players the
+  settings jumped back to the top several times a second, so *Done* could not be reached. *Done* now stays at the bottom
+  of the settings.
+- Hold'em and Roulette use the players' lobby colours (D-121): the winner's name and the bets in Hold'em, the chips in
+  Roulette, as on the seat plates. Before, they used the seat's colour, so a colour picked in the settings did not show.
+- Roulette: chips sit on their cells again. Their drop-in animation moved every chip to the layout's top-left corner;
+  now only new chips drop in, in place.
 - **Game Viewer** on the board (D-120): *Game logs* in the settings and the lobby lists the finished games on this
   table. A game opens as a table of its moves, numbered, with the time, the player and what happened in the game's
   own words (Coin Flip and Pachisi describe theirs), filters for a player, moves only and problems, *Move #* to jump to

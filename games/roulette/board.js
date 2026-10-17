@@ -1,5 +1,5 @@
 // Roulette board UI: a spinning European wheel and the betting layout with everyone's chips.
-import { html, remainingMs, seatColor, seatPlates, svg, useStyles } from "/shared/board-kit.js";
+import { html, playerColor, remainingMs, seatPlates, svg, useStyles } from "/shared/board-kit.js";
 
 const ORDER = [0, 32, 15, 19, 4, 21, 2, 25, 17, 34, 6, 27, 13, 36, 11, 30, 8, 23, 10, 5, 24, 16, 33, 1, 20, 14, 31, 9, 22, 18, 29, 7, 28, 12, 35, 3, 26];
 const RED = new Set([1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36]);
@@ -157,12 +157,15 @@ export function mount(root) {
     wheel.spin.style.transform = `rotate(${rotation}deg)`;
   }
 
+  /** Chips already on the layout, so a redraw drops in only the new ones. */
+  let shownChips = new Set();
   function drawChips(v) {
     layout.chips.innerHTML = "";
     const perCell = {};
     for (const b of v.bets) {
       (perCell[cellKey(b)] ??= []).push(b);
     }
+    const shown = new Set();
     for (const list of Object.values(perCell)) {
       list.forEach((b, k) => {
         const c = cellFor(b);
@@ -171,13 +174,20 @@ export function mount(root) {
         const inside = b.type === "straight" || b.type === "red" || b.type === "black";
         const baseY = inside ? c.y + c.h / 2 : c.y + c.h - 22;
         const cy = baseY + (Math.floor(k / cols) - (Math.ceil(list.length / cols) - 1) / 2) * 28;
-        const g = svg("g", { class: "rl-chip", transform: `translate(${cx} ${cy})` }, layout.chips);
-        svg("circle", { r: 17, class: "face", fill: seatColor(b.seat) }, g);
+        // The outer group places the chip; the inner one drops in. A CSS animation of `transform` on the placed group
+        // would replace its position, and every chip would sit in the layout's corner.
+        const id = `${b.seat}:${cellKey(b)}:${b.amount}:${k}`;
+        shown.add(id);
+        const at = svg("g", { transform: `translate(${cx} ${cy})` }, layout.chips);
+        const g = svg("g", { class: `rl-chip${shownChips.has(id) ? "" : " new"}` }, at);
+        // Each player's chips in their lobby colour (D-106), as on their seat plate.
+        svg("circle", { r: 17, class: "face", fill: playerColor(info, b.seat) }, g);
         svg("circle", { r: 13, class: "ring" }, g);
         const t = svg("text", { "text-anchor": "middle", "dominant-baseline": "central" }, g);
         t.textContent = short(b.amount);
       });
     }
+    shownChips = shown;
   }
 
   function markWinners(n) {

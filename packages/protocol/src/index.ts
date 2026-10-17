@@ -138,7 +138,7 @@ export type Phase = "idle" | "loading" | "ready" | "active" | "paused" | "termin
  * Player colours (D-106): one per player, chosen in the board's settings and the same in every game. By default a player
  * takes their seat's colour, `PLAYER_COLORS[seat % 8]`. Distinct for common colour-vision deficiencies on the felt.
  */
-export const PLAYER_COLORS = ["#e8b04a", "#5fb7e8", "#e8735f", "#7fd18b", "#c38be8", "#e8e15f", "#5fe0c8", "#e88fbf"] as const;
+export const PLAYER_COLORS = ["#e8b04a", "#5fb7e8", "#e8735f", "#7fd18b", "#c38be8", "#dde3ea", "#5fe0c8", "#e88fbf"] as const;
 
 export interface PlayerInfo {
   id: string;
@@ -212,6 +212,12 @@ export interface LobbyState {
    * the board says so before it asks.
    */
   needed: Record<string, string>;
+  /**
+   * Empty seats whose player left during the game, with that player's colour (D-125), seat → colour: a game that goes
+   * on with the seat (Loopy's AI takes it over) keeps showing it in the same colour. Kept until the next game starts
+   * or the table returns to the lobby; `playerColor(info, seat)` in the board kit uses it.
+   */
+  seatColors: Record<number, string>;
   /**
    * AI players thinking about a move for more than a moment (D-112): their seat, since when, and the time they may
    * take (host clock, `deadline`). Games may show it; the board shows "Play now" once a deadline has passed.

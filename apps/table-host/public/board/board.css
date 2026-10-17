@@ -347,3 +347,9 @@ button.copy:hover, button.copy.done { color: var(--brass); border-color: var(--b
 .viewer-panel details { margin: 8px 0; font-size: .8em; }
 .viewer-panel summary { cursor: pointer; color: var(--ink-soft); padding: 6px 0; }
 .viewer-panel details pre.raw { max-height: 420px; margin: 6px 0 0; font-size: .92em; line-height: 1.35; }
+
+/* Settings: Done stays at the bottom of the panel, however long the settings get. */
+.overlay.settings .settings-actions {
+  position: sticky; bottom: -26px; z-index: 1; display: flex; justify-content: flex-end;
+  margin: 20px -30px -26px; padding: 14px 30px 18px; background: var(--felt); border-top: 1px solid var(--felt-line);
+}

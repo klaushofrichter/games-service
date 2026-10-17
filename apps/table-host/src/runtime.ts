@@ -16,10 +16,11 @@ import type { GameSummary, Manifest } from "../../../packages/protocol/src/index
 
 export type LogRecord =
   | { t: "start"; at: number; gameId: string; version: string; seed: number; settings: Record<string, unknown>; seats: SeatInfo[]; aiOptions: Record<number, Record<string, unknown>>; simulation: boolean }
-  | { t: "intent"; at: number; seat: number; by: "human" | "ai" | "board"; intent: Intent; accepted: boolean; reason?: string; events?: GameEvent[]; ai?: AiMoveMeta; error?: LoggedError }
-  | { t: "timer"; at: number; id: string; events?: GameEvent[]; error?: LoggedError }
-  | { t: "seatJoined"; at: number; seat: SeatInfo; events?: GameEvent[]; error?: LoggedError }
-  | { t: "seatLeft"; at: number; seat: number; ended: boolean; events?: GameEvent[]; error?: LoggedError }
+  // Inputs carry `gt`, the game time the rules saw as ctx.now() (D-126); replay hands it back. Older logs lack it.
+  | { t: "intent"; at: number; gt?: number; seat: number; by: "human" | "ai" | "board"; intent: Intent; accepted: boolean; reason?: string; events?: GameEvent[]; ai?: AiMoveMeta; error?: LoggedError }
+  | { t: "timer"; at: number; gt?: number; id: string; events?: GameEvent[]; error?: LoggedError }
+  | { t: "seatJoined"; at: number; gt?: number; seat: SeatInfo; events?: GameEvent[]; error?: LoggedError }
+  | { t: "seatLeft"; at: number; gt?: number; seat: number; ended: boolean; events?: GameEvent[]; error?: LoggedError }
   // Not inputs: replay skips them (D-116). An error outside the input steps (a view, the end check); a copy of the state.
   | { t: "error"; at: number; where: string; seat?: number; error: LoggedError }
   | { t: "snapshot"; at: number; inputs: number; state: unknown }
@@ -127,6 +128,14 @@ export class GameRuntime {
   private rng: () => number;
   private timers = new Map<string, unknown>();
   private deadlines = new Map<string, number>();
+  /** Game time (D-126): the clock when the game started, the time spent paused, and since when it is paused. */
+  private startedAt: number;
+  private pausedMs = 0;
+  private pausedSince: number | null = null;
+  /** The game time of the input being handled: what ctx.now() says during it and what its record carries. */
+  private stepGt: number | null = null;
+  /** In replay: the game time of the input being fed, from its record. */
+  private replayGt = 0;
   /** While paused: remaining time of each timer, re-armed on resume. */
   private paused: Map<string, number> | null = null;
   private listeners: Listener[] = [];
@@ -162,6 +171,7 @@ export class GameRuntime {
     this.clock = clock;
     this.opts = opts;
     this.rng = createRng(seed);
+    this.startedAt = clock.now();
     this.record({ t: "start", at: clock.now(), gameId: manifest.id, version: manifest.version, seed, settings, seats, aiOptions: opts.aiOptions ?? {}, simulation: !!opts.simulation });
     this.state = def.setup(this.ctx(), settings);
   }
@@ -175,8 +185,30 @@ export class GameRuntime {
       ...rngCtx(this.rng),
       setTimer: (id, ms) => this.setTimer(id, ms),
       clearTimer: (id) => this.clearTimer(id),
+      now: () => this.stepGt ?? this.gameTime(),
       seats: this.seats,
     };
+  }
+
+  /**
+   * Milliseconds of game time since the start (D-126): the table's clock with the time spent paused left out, so a
+   * pause (cloud, a slow AI, a player away) costs nobody. In replay, the value the input was logged with.
+   */
+  gameTime(): number {
+    if (this.opts.replay) return this.replayGt;
+    const now = this.clock.now();
+    return Math.max(0, now - this.startedAt - this.pausedMs - (this.pausedSince === null ? 0 : now - this.pausedSince));
+  }
+
+  /** Start an input step: fix its game time, so the rules and the log see the same value. */
+  private beginStep(): number {
+    this.stepGt = this.gameTime();
+    return this.stepGt;
+  }
+
+  /** For replay: the game time of the next input, from its record (0 for logs from before D-126). */
+  setReplayTime(gt: number | undefined) {
+    this.replayGt = typeof gt === "number" && Number.isFinite(gt) ? gt : 0;
   }
 
   /** Every record as it is logged (D-116): the table writes them to disk as the game goes. */
@@ -243,6 +275,7 @@ export class GameRuntime {
     if (reason && !this.opts.replay) this.record({ t: "pause", at: this.clock.now(), reason, ...(seat === undefined ? {} : { seat }) });
     if (this.paused) return;
     const now = this.clock.now();
+    this.pausedSince = now;
     const left = new Map<string, number>();
     for (const [id, deadline] of this.deadlines) left.set(id, Math.max(0, deadline - now));
     this.clearAllTimers();
@@ -254,6 +287,8 @@ export class GameRuntime {
     if (reason && !this.opts.replay && !this.over) this.record({ t: "resume", at: this.clock.now(), reason });
     const left = this.paused;
     this.paused = null;
+    if (this.pausedSince !== null) this.pausedMs += Math.max(0, this.clock.now() - this.pausedSince);
+    this.pausedSince = null;
     for (const [id, ms] of left) this.setTimer(id, ms);
   }
 
@@ -303,17 +338,18 @@ export class GameRuntime {
 
   submit(seat: number, intent: Intent, by: "human" | "ai" | "board", ai?: AiMoveMeta): { ok: true } | { ok: false; reason: string } {
     if (this.over) return { ok: false, reason: "game is over" };
+    const gt = this.beginStep();
     const meta = ai ? { ai } : {};
     const r = this.guarded(
       () => this.def.onIntent(this.state, seat, intent, this.ctx()),
-      (error) => ({ t: "intent", at: this.clock.now(), seat, by, intent, accepted: false, ...meta, error }),
+      (error) => ({ t: "intent", at: this.clock.now(), gt, seat, by, intent, accepted: false, ...meta, error }),
     );
     if (isReject(r)) {
-      this.record({ t: "intent", at: this.clock.now(), seat, by, intent, accepted: false, reason: r.reject, ...meta });
+      this.record({ t: "intent", at: this.clock.now(), gt, seat, by, intent, accepted: false, reason: r.reject, ...meta });
       return { ok: false, reason: r.reject };
     }
     const events = this.apply(r);
-    this.record({ t: "intent", at: this.clock.now(), seat, by, intent, accepted: true, events, ...meta });
+    this.record({ t: "intent", at: this.clock.now(), gt, seat, by, intent, accepted: true, events, ...meta });
     this.inputDone();
     this.afterStep(events);
     return { ok: true };
@@ -321,23 +357,25 @@ export class GameRuntime {
 
   fireTimer(id: string) {
     if (this.over || !this.def.onTimer) return;
+    const gt = this.beginStep();
     const events = this.guarded(
       () => this.apply(this.def.onTimer!(this.state, id, this.ctx())),
-      (error) => ({ t: "timer", at: this.clock.now(), id, error }),
+      (error) => ({ t: "timer", at: this.clock.now(), gt, id, error }),
     );
-    this.record({ t: "timer", at: this.clock.now(), id, events });
+    this.record({ t: "timer", at: this.clock.now(), gt, id, events });
     this.inputDone();
     this.afterStep(events);
   }
 
   seatJoined(seat: SeatInfo) {
     if (this.over) return;
+    const gt = this.beginStep();
     this.seats = [...this.seats.filter((s) => s.seat !== seat.seat), seat].sort((a, b) => a.seat - b.seat);
     const events = this.guarded(
       () => (this.def.onSeatJoined ? this.apply(this.def.onSeatJoined(this.state, seat, this.ctx())) : []),
-      (error) => ({ t: "seatJoined", at: this.clock.now(), seat, error }),
+      (error) => ({ t: "seatJoined", at: this.clock.now(), gt, seat, error }),
     );
-    this.record({ t: "seatJoined", at: this.clock.now(), seat, events });
+    this.record({ t: "seatJoined", at: this.clock.now(), gt, seat, events });
     this.inputDone();
     this.afterStep(events);
   }
@@ -367,12 +405,13 @@ export class GameRuntime {
   /** Returns true if the game ended because of it. */
   seatLeft(seat: number): boolean {
     if (this.over) return true;
+    const gt = this.beginStep();
     // A game that can't go on without this seat ends with its own reason (D-119). Asked before the seat goes, so a
     // replay asks the same question of the same state.
     const needed = this.canContinueWithout(seat);
     if (needed !== true) {
       this.seats = this.seats.filter((s) => s.seat !== seat);
-      this.record({ t: "seatLeft", at: this.clock.now(), seat, ended: true });
+      this.record({ t: "seatLeft", at: this.clock.now(), gt, seat, ended: true });
       this.inputDone();
       this.finish("seatLeft", { text: needed.wait, highlights: { leftSeat: seat } });
       return true;
@@ -380,17 +419,17 @@ export class GameRuntime {
     this.seats = this.seats.filter((s) => s.seat !== seat);
     const r = this.guarded<StepResult<unknown> | "end" | SeatLeftEnd>(
       () => (this.def.onSeatLeft ? this.def.onSeatLeft(this.state, seat, this.ctx()) : "end"),
-      (error) => ({ t: "seatLeft", at: this.clock.now(), seat, ended: false, error }),
+      (error) => ({ t: "seatLeft", at: this.clock.now(), gt, seat, ended: false, error }),
     );
     if (r === "end" || (r && typeof r === "object" && "end" in r)) {
       const own = typeof r === "object" && typeof r.end?.text === "string" ? r.end : null;
-      this.record({ t: "seatLeft", at: this.clock.now(), seat, ended: true });
+      this.record({ t: "seatLeft", at: this.clock.now(), gt, seat, ended: true });
       this.inputDone();
       this.finish("seatLeft", { text: own ? own.text : "The game ended because a player left.", highlights: { leftSeat: seat, ...(own?.highlights ?? {}) } });
       return true;
     }
     const events = this.apply(r);
-    this.record({ t: "seatLeft", at: this.clock.now(), seat, ended: false, events });
+    this.record({ t: "seatLeft", at: this.clock.now(), gt, seat, ended: false, events });
     this.inputDone();
     this.afterStep(events);
     return this.over;
@@ -475,6 +514,7 @@ export function replayLog(manifest: Manifest, def: GameDefinition<any>, log: Log
  */
 export function feedInput(rt: GameRuntime, r: LogRecord) {
   try {
+    if (r.t === "intent" || r.t === "timer" || r.t === "seatJoined" || r.t === "seatLeft") rt.setReplayTime(r.gt);
     if (r.t === "intent") rt.submit(r.seat, r.intent, r.by); // rejected ones too: a rule may draw randomness before rejecting
     else if (r.t === "timer") rt.fireTimer(r.id);
     else if (r.t === "seatJoined") rt.seatJoined(r.seat);
