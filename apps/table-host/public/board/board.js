@@ -961,6 +961,7 @@ function gameInfo() {
   return {
     controlSeats: controlSeats(),
     players: state.players,
+    seatColors: state.seatColors ?? {}, // seats whose player left keep their colour (D-125)
     seatEdges: state.seatEdges,
     seatPositions: seatPositions(state.seatEdges),
     frontEdge: gameEdge(),

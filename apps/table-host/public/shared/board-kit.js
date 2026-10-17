@@ -86,11 +86,15 @@ export function ping(ctx, out, t, { freq = 2600, partials = [1, 1.58, 2.27], dec
 /**
  * A player's colour (D-106): the table gives every seated player one (`player.color` in the lobby state), chosen in
  * the board's settings or else their seat's, the same in the lobby and in every game. Boards and decks both use this,
- * so they always agree. A seat nobody sits in gets the seat's colour.
+ * so they always agree. A seat nobody sits in gets the colour of the player who left it during the game (D-125), else
+ * the seat's colour.
  */
 export function playerColor(info, seat) {
+  const ok = (c) => typeof c === "string" && /^#[0-9a-f]{6}$/i.test(c);
   const c = info?.players?.find((p) => p.seat === seat)?.color;
-  return typeof c === "string" && /^#[0-9a-f]{6}$/i.test(c) ? c : seatColor(seat);
+  if (ok(c)) return c;
+  const left = info?.seatColors?.[seat]; // the colour of the player who left this seat during the game (D-125)
+  return ok(left) ? left : seatColor(seat);
 }
 
 /** Relative luminance of a #rrggbb colour (WCAG 2). */
