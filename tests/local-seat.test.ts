@@ -15,7 +15,7 @@ async function host() {
   await t.ok("POST", "/game/select", { gameId: "duel" });
   return t;
 }
-const seatOf = (name: string) => t.host.table.state().players.find((p) => p.name.startsWith(name))!.seat;
+const seatOf = (name: string) => t.host.table.state().players.find((p) => p.name === name)!.seat;
 const edgeOf = (name: string) => t.host.table.state().seatEdges[seatOf(name)!];
 async function start(...decks: { request: (ch: string, type: string, payload: unknown) => Promise<unknown> }[]) {
   for (const d of decks) await d.request("lobby", "ready", { ready: true });
