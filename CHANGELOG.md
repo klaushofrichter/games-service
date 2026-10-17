@@ -6,6 +6,10 @@ page is the history. Leave it empty if there is nothing to add beyond the commit
 
 ## [Unreleased]
 
+- A full table (D-129): when no seat is free, *+ AI player* and *Invite* are greyed out, the board's QR panel says
+  *No free seat* with what would help (more seats, or removing a player), and a phone that scans the code is told so
+  instead of getting the name form; it shows the form by itself once a seat is free. Nobody joins without a seat any
+  more.
 - **Advanced** on the board (D-128): a hammer-and-wrench button beside the gear opens *Simulation…*, *Game logs…*
   and the developer setting *Games without a player at the table*. They are no longer in the lobby's toolbar or the
   settings, which keep what players need. The DEV tag is on this button now. On a remote board with board control it

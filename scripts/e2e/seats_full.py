@@ -1,0 +1,68 @@
+"""Browser check of a full table (D-129).
+  python3 scripts/e2e/seats_full.py out/
+
+A Table Host of its own (port 8096), two seats. Ann joins by phone and an AI player takes the other seat: + AI player
+and Invite are greyed out, and the board's QR panel says there is no free seat. A second phone that scans the code
+sees why instead of the name form; when the AI player is removed on the board, that phone shows the form by itself
+and Ben takes the seat.
+"""
+import os, sys
+from playwright.sync_api import sync_playwright
+from common import api, errors, join_deck, start_table, wait, watch
+
+OUT = sys.argv[1] if len(sys.argv) > 1 else "e2e-out"
+os.makedirs(OUT, exist_ok=True)
+BASE = "http://127.0.0.1:8096"
+KEY = "fullk"
+
+
+def a(method, path, body=None):
+    return api(method, path, body, base=BASE, key=KEY)
+
+
+proc = start_table(8096, TABLE_KEY=KEY, PUBLIC_URL=BASE)
+try:
+    with sync_playwright() as p:
+        br = p.chromium.launch()
+        board = br.new_page(viewport={"width": 1920, "height": 1080})
+        watch(board, "board")
+        board.goto(BASE + "/board/")
+        a("POST", "/layout", {"seats": 2})
+        url = a("GET", "/join")["url"]
+        ann = br.new_context(viewport={"width": 390, "height": 844}).new_page()
+        watch(ann, "Ann")
+        join_deck(ann, url, "Ann")
+        board.wait_for_selector("button[data-add-ai]:not([disabled])")
+        ai = a("POST", "/ai", {})["playerId"]
+
+        # Full: the board's buttons are greyed out with the reason, and the QR panel says so.
+        board.wait_for_selector("button[data-add-ai][disabled]")
+        board.wait_for_selector("button[data-invite][disabled]")
+        assert "Choose more seats" in board.get_attribute("button[data-add-ai]", "title")
+        board.wait_for_selector("aside.join.full :text('No free seat')")
+        assert "Choose more seats on the board" in board.inner_text("aside.join.full")
+        board.screenshot(path=os.path.join(OUT, "seats-full-board.png"))
+
+        # A second phone scans the code: why not, instead of the name form.
+        ben = br.new_context(viewport={"width": 390, "height": 844}).new_page()
+        watch(ben, "Ben", ignore=("409",))
+        ben.goto(url)
+        ben.wait_for_selector("#no-seat :text('No free seat')")
+        assert ben.locator("input[name=name]").count() == 0
+        ben.screenshot(path=os.path.join(OUT, "seats-full-phone.png"))
+
+        # A seat frees up: the phone shows the form by itself, and Ben joins.
+        a("DELETE", f"/players/{ai}")
+        board.wait_for_selector("button[data-add-ai]:not([disabled])")
+        board.wait_for_selector("aside.join:not(.full)")
+        ben.wait_for_selector("input[name=name]", timeout=10000)
+        ben.fill("input[name=name]", "Ben")
+        ben.click("button[type=submit]")
+        ben.wait_for_selector(".who h1")
+        wait(lambda: any(pl["name"] == "Ben" and pl["seat"] is not None for pl in a("GET", "/state")["players"]), 5, "Ben seated")
+        br.close()
+    if errors:
+        raise AssertionError("browser errors:\n" + "\n".join(errors))
+    print("seats-full: ok")
+finally:
+    proc.kill()

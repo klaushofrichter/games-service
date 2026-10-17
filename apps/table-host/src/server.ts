@@ -191,6 +191,8 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
     if (m === "POST" && path === "/remote") return (table.setRemoteBoardControl(!!body.boardControl), json(res, 200, table.state()));
     if (m === "POST" && path === "/invites") {
       if (!opts.createInvite) throw new TableError(409, "remote play needs the Game Table service (CLOUD_URL)");
+      const noSeat = table.noFreeSeat(); // an invite with no seat to offer only disappoints (D-129)
+      if (noSeat) throw new TableError(409, noSeat, "no-seat");
       if (table.cloud.status !== "online") throw new TableError(409, "the table is not connected to the service right now");
       return json(res, 201, await opts.createInvite());
     }
@@ -313,6 +315,12 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
         return res.end();
       }
       let match: RegExpMatchArray | null;
+      // A phone that scanned the QR code asks first whether there is a seat for it (D-129); only with the current code.
+      if ((match = path.match(/^\/j\/([A-Za-z0-9]{4,12})\/seat$/))) {
+        if (remoteOf(req) || match[1].toUpperCase() !== table.currentJoin().token) return json(res, 403, { error: "join code is invalid or expired; scan the QR code again" });
+        const noSeat = table.noFreeSeat();
+        return json(res, 200, { free: !noSeat, message: noSeat });
+      }
       if ((match = path.match(/^\/j\/([A-Za-z0-9]{4,12})$/))) {
         res.writeHead(302, { location: `/deck/?t=${match[1].toUpperCase()}` });
         return res.end();
@@ -338,7 +346,7 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
       }
       json(res, 404, { error: "not found" });
     } catch (err) {
-      if (err instanceof TableError) return json(res, err.status, { error: err.message });
+      if (err instanceof TableError) return json(res, err.status, { error: err.message, ...(err.code ? { code: err.code } : {}) });
       console.error(err);
       json(res, 500, { error: "internal error" });
     }
@@ -407,7 +415,7 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
       } catch (err) {
         const message = err instanceof TableError ? err.message : "internal error";
         if (!(err instanceof TableError)) console.error(err);
-        reply("error", { message, status: err instanceof TableError ? err.status : 500 }, msg.seq);
+        reply("error", { message, status: err instanceof TableError ? err.status : 500, ...(err instanceof TableError && err.code ? { code: err.code } : {}) }, msg.seq);
         if (msg.type === "hello") ws.close(4003, message);
       }
     });

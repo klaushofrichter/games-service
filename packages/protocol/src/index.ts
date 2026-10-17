@@ -232,6 +232,8 @@ export interface LobbyState {
    * may not remove while it is off (the last one at the table, while a game is chosen or running).
    */
   developer: { allowNoLocalPlayer: boolean; protectedPlayer: string | null };
+  /** Why nobody can take a seat now (every seat taken, or the chosen game is full), or null (D-129). */
+  noSeat: string | null;
 }
 
 export interface CloudStatus {

@@ -24,7 +24,7 @@ npm test                 # the automated tests: lobby, cloud, sign-in and each g
 TABLE_KEY=dev npm run host
 ```
 
-Open `http://localhost:8080/board/` on the table PC (full screen, 1920 × 1080 or 4K). Phones on the same WiFi scan the QR code, or type the URL shown under it.
+Open `http://localhost:8080/board/` on the table PC (full screen, 1920 × 1080 or 4K). Phones on the same WiFi scan the QR code, or type the URL shown under it. When no seat is free, the QR panel and the phone say so, and *+ AI player* and *Invite* are greyed out (D-129): choose more seats on the board, or remove a player.
 
 With Docker: `docker compose -f deploy/docker-compose.yml up --build` starts a cloud service and a table host. The table shows a 6-character pairing code; approve it in the admin portal at `http://localhost:8081/admin` (in local development it asks for `ADMIN_TOKEN`: `change-me-dev-admin-token` unless you set your own), or with
 

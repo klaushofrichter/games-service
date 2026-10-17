@@ -245,16 +245,16 @@ describe("deck socket robustness", () => {
 
   it("rejects intents from a player who is not seated in the running game", async () => {
     const t = await host();
-    await t.ok("POST", "/layout", { seats: 2 });
     const a = await t.joinDeck("A");
     const b = await t.joinDeck("B");
-    const c = await t.joinDeck("C"); // no seat left
-    expect(t.host.table.state().players.find((p) => p.name === "C")!.seat).toBeNull();
-    await t.ok("POST", "/game/select", { gameId: "coin-flip", settings: { rounds: 1, roundSeconds: 0 } });
+    await t.ok("POST", "/game/select", { gameId: "pachisi", settings: { turnSeconds: 0 } });
     await a.request("lobby", "ready", { ready: true });
     await b.request("lobby", "ready", { ready: true });
     await t.ok("POST", "/game/start");
-    const r = await c.request("game", "intent", { name: "guess", payload: "heads" });
+    // Pachisi seats nobody during a game: C joins and waits for the next one, without a seat.
+    const c = await t.joinDeck("C");
+    expect(t.host.table.state().players.find((p) => p.name === "C")!.seat).toBeNull();
+    const r = await c.request("game", "intent", { name: "roll" });
     expect(r.type).toBe("error");
     expect(r.payload.message).toMatch(/not playing/);
     const nameless = await a.request("game", "intent", { payload: "heads" });
