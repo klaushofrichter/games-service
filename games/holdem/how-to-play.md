@@ -25,7 +25,7 @@ Never show your phone to the others: your two cards are only there.
 3. **Flop:** three shared cards. Betting round.
 4. **Turn:** a fourth shared card. Betting round.
 5. **River:** a fifth shared card. Last betting round.
-6. **Showdown:** all remaining hands are shown on the board and the best hand wins the pot.
+6. **Showdown:** all remaining hands are shown on the board and the best hand wins the pot. The next hand starts after a few seconds, or at once when someone taps **Next hand** on the board.
 
 After the flop, betting starts with the first player after the dealer. The dealer button moves one player clockwise each hand.
 
@@ -72,7 +72,7 @@ With a time limit, a countdown runs on your turn. When it runs out, you check if
 | Small bet (big blind) | 10 | Bet size; doubles on turn and river |
 | Hands to play | 20 | Number of hands (1–200) |
 | Seconds per decision (0 = no limit) | 30 | Time for each decision |
-| Seconds to show each result | 8 | Pause before the next hand |
+| Seconds to show each result | 8 | Pause before the next hand (**Next hand** on the board skips it) |
 
 AI players can be *tight* (plays only good hands) or *loose* (plays more hands and raises more often).
 

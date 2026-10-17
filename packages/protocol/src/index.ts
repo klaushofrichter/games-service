@@ -114,6 +114,11 @@ export const manifestSchema = z.object({
    * only for its own player. Anything else still comes from the phones only.
    */
   boardIntents: z.array(z.string().regex(/^[A-Za-z][\w-]{0,39}$/)).max(10).default([]),
+  /**
+   * Timers the board may fire early (D-136), e.g. Hold'em's "next", which ends the pause on a hand's result. The
+   * table's board may, and remote boards with board control. The firing is logged like any timer, so replay is exact.
+   */
+  skipTimers: z.array(z.string().regex(/^[A-Za-z][\w-]{0,39}$/)).max(10).default([]),
   lobbyButton: z.enum(["top-left", "top-right", "bottom-left", "bottom-right"]).default("bottom-right"),
   deck: z.object({ minWidth: z.number().optional(), orientation: z.string().optional() }).optional(),
   permissions: z.array(z.string()).default([]),

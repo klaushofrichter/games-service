@@ -6,6 +6,12 @@ page is the history. Leave it empty if there is nothing to add beyond the commit
 
 ## [Unreleased]
 
+- Hold'em: **Next hand** on the board under each hand's result (D-136), with the seconds left, starts the next hand
+  at once instead of waiting out *Seconds to show each result* (**Finish** after the last hand). Remote boards show it
+  too while the table gives remote players board control. Games list such skippable waits in the manifest
+  (`skipTimers`).
+- Hold'em: every player's cards and bet lie on the felt (D-137). The north and south seats' cards used to sit on the
+  rail and their bets off the table; the dealer button sits beside the dealer's cards, on the felt too.
 - **Show join code** in the board's settings (D-130): the QR code, the address and the code in a large window, also
   during a game, when the lobby's QR panel is not on the screen. A phone that lost its seat rejoins with it; the
   phone's "scan the QR code" messages say where to find it.
