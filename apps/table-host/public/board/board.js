@@ -337,6 +337,27 @@ window.addEventListener("pointerdown", () => audio(), { capture: true });
 
 let lastPhase = null;
 let holdFinal = false;
+// Show result waits until the game's board has shown the end (D-134): a board still replaying moves (a slow or
+// background window) keeps playing them first. The game's board says when through its optional whenIdle().
+let finalSettled = true;
+let finalToken = 0;
+const FINAL_WAIT_MS = 120000; // a board that never settles still gets its button
+function settleFinal() {
+  const token = ++finalToken;
+  finalSettled = false;
+  const inst = game?.inst;
+  let idle;
+  try {
+    idle = inst && typeof inst.whenIdle === "function" ? Promise.resolve(inst.whenIdle()) : Promise.resolve();
+  } catch {
+    idle = Promise.resolve();
+  }
+  Promise.race([idle.catch(() => {}), new Promise((r) => setTimeout(r, FINAL_WAIT_MS))]).then(() => {
+    if (token !== finalToken) return;
+    finalSettled = true;
+    if (state) render();
+  });
+}
 resultBtn.addEventListener("click", () => {
   holdFinal = false;
   render();
@@ -694,13 +715,20 @@ function render() {
   const playing = state.phase === "active" || state.phase === "paused" || state.phase === "terminating";
   // A game that ends by itself keeps its last screen until someone taps Show result (D-091); one ended from the
   // lobby goes straight to the result. This is per screen: each board (and remote board) moves on by itself.
-  if (state.phase === "finished" && (lastPhase === "active" || lastPhase === "paused") && game) holdFinal = true;
-  if (state.phase !== "finished") holdFinal = false;
+  if (state.phase === "finished" && (lastPhase === "active" || lastPhase === "paused") && game) {
+    holdFinal = true;
+    settleFinal();
+  }
+  if (state.phase !== "finished") {
+    holdFinal = false;
+    finalSettled = true;
+    finalToken++;
+  }
   lastPhase = state.phase;
   const showingGame = playing || holdFinal;
   lobbyBtn.hidden = !playing;
   lobbyBtn.className = state.game?.lobbyButton ?? "bottom-right";
-  resultBtn.hidden = !holdFinal;
+  resultBtn.hidden = !holdFinal || !finalSettled;
   resultBtn.className = `primary ${state.game?.lobbyButton ?? "bottom-right"}`;
 
   renderPause();
