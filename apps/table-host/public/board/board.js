@@ -343,14 +343,16 @@ resultBtn.addEventListener("click", () => {
 
 // ---------- settings (D-088) ----------
 // A gear beside the corner at the left end of the edge the board faces (as seen from that edge), turned to it.
-// During a game it moves to the other end of that edge if the game's Lobby button sits in that corner.
+// During a game it stays put (D-127): where it is when the game faces south, also when the game is turned to face north,
+// so it never lands on the game's own displays; it moves to the other end of that edge if the game's Lobby button sits
+// in that corner.
 // Not on a remote player's copy: settings stay with the table.
 const FRONT_CORNERS = { south: ["bl", "br"], west: ["tl", "bl"], north: ["tr", "tl"], east: ["br", "tr"] };
 const LOBBY_CORNER = { "top-left": "tl", "top-right": "tr", "bottom-left": "bl", "bottom-right": "br" };
 function placeSettings(playing) {
   settingsBtn.hidden = REMOTE;
   if (REMOTE) return;
-  const front = playing ? gameEdge() : viewEdge();
+  const front = playing ? "south" : viewEdge(); // D-127: fixed during a game, whichever way the game faces
   let [corner, other] = FRONT_CORNERS[front];
   if (playing && LOBBY_CORNER[state.game?.lobbyButton ?? "bottom-right"] === corner) corner = other;
   // The developer setting (D-118) marks the gear while it is on, so nobody forgets it.
@@ -360,8 +362,9 @@ function placeSettings(playing) {
 }
 
 /**
- * The turn button sits to the left of the gear as seen by whoever the game faces (D-101): in the corner itself when the
- * gear is at that player's left end (the corner buttons are hidden during a game), else one step toward the middle.
+ * The turn button sits to the left of the gear (D-101), as seen from the south edge, and like the gear it does not move
+ * or turn when the game is turned (D-127): in the corner itself when the gear is at the left end (the corner buttons are
+ * hidden during a game), else one step toward the middle.
  */
 function placeFlip(playing, front, gearCorner) {
   flipBtn.hidden = REMOTE || !playing;
@@ -372,8 +375,7 @@ function placeFlip(playing, front, gearCorner) {
   st.left = st.right = st.top = st.bottom = "";
   st[gearCorner[1] === "l" ? "left" : "right"] = `${along}px`;
   st[gearCorner[0] === "t" ? "top" : "bottom"] = "32px";
-  flipBtn.querySelector("svg").style.transform = `rotate(${ROT[front]}deg)`;
-  const label = `Turn the game to face ${front === "south" ? "north" : "south"}`;
+  const label = `Turn the game to face ${gameEdge() === "south" ? "north" : "south"}`;
   flipBtn.title = label;
   flipBtn.setAttribute("aria-label", label);
 }
