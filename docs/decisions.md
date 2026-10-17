@@ -339,3 +339,16 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   - **Phone.** "Join the table", "You left the table" and the expired-session message add where the code is during a game: *Settings › Show join code* on the board.
   - **Rejoining.** Unchanged rules: a game that seats newcomers (`dynamicPlayers`, e.g. Coin Flip) gives the returning player a seat at once; others seat them for the next game. A phone that comes back within the waiting time still reconnects by itself, without the code.
   - **Checks.** `scripts/e2e/rejoin.py`: Ann and Ben in Coin Flip; Ben's phone goes away for good and he leaves after the waiting time; a new phone page tells him where the code is; the board's *Settings › Show join code* shows the current address and code during the game; his phone opens it, joins, gets a seat in the running game and can guess.
+
+## The remote deck during a game (17 Oct 2026)
+
+- **D-131 · 2026-10-17 · Klaus** — On the remote player's page the deck keeps its size during a game: tapping the
+  player's own tab no longer folds it, coming back to the game no longer shows a tiny card, and the deck uses the
+  window's height. *Why:* on an iPad, Loopy's deck collapsed on the own tab and came back with a card a tenth of its
+  size, and the deck stopped at 640 px with room to spare. The deck window took the height of its content (D-095),
+  measured at the bottom of its last panel: the hidden game panel measured 0, and a game deck that sizes itself to its
+  window (Loopy) then shrank with it. *Implementation (Claude):* during a game (the deck shows its tab bar, D-123) the
+  window takes the full height, like a phone; outside a game it still fits its content, measured over the visible
+  panels only. `scripts/e2e/remote.py` checks during a game: the deck fills the window's height on both tabs, keeps
+  its size after Hide and Show and follows a resize (it failed before the fix); loopy-game adds a remote check with
+  Loopy (`scripts/e2e/loopy_remote.py`).

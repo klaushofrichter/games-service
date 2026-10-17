@@ -193,6 +193,32 @@ try:
         rboard.locator(".pc-wrap").wait_for(timeout=5000)
         remote.wait_for_timeout(600)
         remote.screenshot(path=os.path.join(OUT, "remote-pachisi.png"))
+        # D-131: during a game the deck window is a phone screen. It takes the window's height on both of the deck's
+        # tabs, and coming back to the game's tab gives the game the same room as before (Loopy's card shrank).
+        GAME = """() => { const w = document.getElementById('deck-wrap').getBoundingClientRect(); const f = document.getElementById('deck');
+          const d = f.contentDocument.scrollingElement;
+          return { bottom: Math.round(w.bottom), inner: innerHeight, frame: f.contentWindow.innerHeight, scrolls: d.scrollHeight > d.clientHeight + 1 }; }"""
+        def game_deck(what):
+            remote.wait_for_timeout(400)
+            g = remote.evaluate(GAME)
+            assert abs(g["bottom"] - (g["inner"] - 16)) < 2, f"{what}: the deck should fill the window's height: {g}"
+            return g
+        g = game_deck("in a game")
+        deck.locator("#tab-table").click()
+        t = game_deck("own tab")
+        assert abs(t["frame"] - g["frame"]) < 2, f"the own tab changed the deck's size: {g} -> {t}"
+        deck.locator("#tab-game").click()
+        back = game_deck("back to the game")
+        assert abs(back["frame"] - g["frame"]) < 2 and not back["scrolls"], f"back on the game tab: {g} -> {back}"
+        remote.locator("#deck-min").click()
+        remote.wait_for_timeout(300)
+        assert remote.evaluate("() => document.getElementById('deck-wrap').getBoundingClientRect().height") < 80, "Hide should fold the deck"
+        remote.locator("#deck-min").click()
+        assert abs(game_deck("after Hide and Show")["frame"] - g["frame"]) < 2
+        remote.set_viewport_size({"width": 1180, "height": 600})
+        assert game_deck("a shorter window")["frame"] < g["frame"]
+        remote.set_viewport_size({"width": 1440, "height": 900})
+        game_deck("the window back to its size")
         # D-108: the terms open in a window on the remote board and a sheet on the remote deck, never a new tab
         tabs = len(remote_ctx.pages)
         rboard.locator("#lobby-button").click()
