@@ -374,3 +374,11 @@ button.copy:hover, button.copy.done { color: var(--brass); border-color: var(--b
   position: sticky; bottom: -26px; z-index: 1; display: flex; justify-content: flex-end;
   margin: 20px -30px -26px; padding: 14px 30px 18px; background: var(--felt); border-top: 1px solid var(--felt-line);
 }
+/* Another window shows the board (D-132): this one says so and offers to take over. */
+#elsewhere-layer { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 24px; background: rgba(4, 10, 9, 0.92); }
+#elsewhere-layer .panel { max-width: 720px; padding: 36px 40px; text-align: center; background: var(--felt); border: 2px solid var(--brass-deep); border-radius: 22px; }
+#elsewhere-layer h2 { font-family: var(--display); font-size: 40px; margin: 4px 0 12px; }
+#elsewhere-layer p { color: var(--ink-soft); font-size: 21px; margin: 0 0 24px; }
+#elsewhere-layer .row { display: flex; flex-wrap: wrap; gap: 14px; justify-content: center; }
+#elsewhere-layer button { font-size: 20px; padding: 12px 24px; }
+#elsewhere-layer .note { margin: 8px 0 0; }
