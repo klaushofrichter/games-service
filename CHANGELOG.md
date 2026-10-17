@@ -6,6 +6,8 @@ page is the history. Leave it empty if there is nothing to add beyond the commit
 
 ## [Unreleased]
 
+- Board: during a game the gear and the turn-around button stay where they are when the game is turned (D-127). In
+  Loopy they had landed on the round and deck displays when the game faced north.
 - A player removed during a game leaves their colour on the seat (D-125): in Loopy the AI that takes over keeps it,
   instead of switching to the seat's default colour (which could be someone else's).
 - Phones: during a game the header is a slim tab bar (D-123), so the game gets the screen: your own tab (colour, name,
