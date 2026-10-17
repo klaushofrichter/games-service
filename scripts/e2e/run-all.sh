@@ -36,6 +36,7 @@ run python3 scripts/e2e/seat_loss.py "$OUT"
 run python3 scripts/e2e/seats_full.py "$OUT"
 run python3 scripts/e2e/rejoin.py "$OUT"
 run python3 scripts/e2e/viewer.py "$OUT"
+run python3 scripts/e2e/one_board.py "$OUT"
 
 if ((${#failed[@]})); then
   printf '::error::e2e failed: %s\n' "${failed[@]}"

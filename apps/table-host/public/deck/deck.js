@@ -19,6 +19,7 @@ let state = null;
 let gameMsg = null; // last game.view message { seat, view, events, timers, now, receivedAt }
 let banner = "";
 let removed = false;
+let replaced = false; // this player's deck opened in another window (D-133)
 let seq = 0;
 let retry = 0;
 /** No free seat at the table (D-129): the reason, shown instead of the name form until a seat is free. */
@@ -90,6 +91,8 @@ function connect(hello) {
         retry = 0;
         banner = "";
         if (joinToken) history.replaceState(null, "", "/deck/"); // keep the join code out of the address bar and history
+      } else if (m.type === "replaced") {
+        replaced = true;
       } else if (m.type === "removed") {
         removed = true;
         storage.clear();
@@ -125,6 +128,7 @@ function connect(hello) {
     for (const r of pending.values()) r({ ok: false, reason: "connection lost" });
     pending.clear();
     if (removed || ev.code === 4003) return render();
+    if (replaced || ev.code === 4009) return ((replaced = true), render());
     const token = storage.get();
     if (!token) return render();
     banner = "Reconnecting…";
@@ -283,6 +287,15 @@ async function openRules() {
 }
 
 // The terms of service in the same kind of sheet (D-108), not a page of their own: no "Back" that might go nowhere.
+// The deck back in this window (D-133): reconnect with the saved session, which moves the deck away from the other one.
+body.addEventListener("click", (e) => {
+  if (!e.target.closest("[data-action=deck-here]")) return;
+  const token = storage.get();
+  replaced = false;
+  if (!token) return render();
+  retry = 0;
+  connect({ sessionToken: token });
+});
 document.querySelector("footer a[data-terms]")?.addEventListener("click", (e) => {
   e.preventDefault();
   void openTerms(e.currentTarget);
@@ -315,6 +328,12 @@ const colorOf = (seat) => playerColor({ players: state.players, seatColors: stat
 const seatBadge = (edges, seat) => seatName(edges, seat).replace(/(north|south|east|west)/g, (w) => w[0]).toUpperCase();
 
 function render() {
+  if (replaced) {
+    closeGame();
+    top.innerHTML = "";
+    body.innerHTML = `<div class="card center"><h1>Your deck is open in another window</h1><p class="muted">Each player has one deck at a time, so a move is never made twice.</p><button class="primary" type="button" data-action="deck-here">Use this window</button></div>`;
+    return;
+  }
   if (removed) {
     closeGame();
     top.innerHTML = "";
