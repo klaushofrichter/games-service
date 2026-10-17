@@ -50,13 +50,18 @@ describe("game versions (D-127)", () => {
   it("fails when a game's files changed without a new version, and --fix sets today's", () => {
     repo({ chess: { version: "2026.01.02.1" }, dice: { version: "2026.01.02.1" } });
     write("chess", { version: "2026.01.02.1", rules: "export default { changed: true };\n" });
+    // A manifest formatted its own way (one line, arrays inline): --fix changes only the version's value.
+    const compact = (v: string) => `{ "id": "chess", "name": "chess", "version": "${v}", "description": "d", "seatLayouts": [2, 4] }\n`;
+    writeFileSync(join(dir, "games", "chess", "manifest.json"), compact("2026.01.02.1"));
     const r = check();
     expect(r.code).toBe(1);
     expect(r.out).toContain(`games/chess changed but its version is still 2026.01.02.1: set it to ${today}.1`);
     expect(r.out).not.toContain("games/dice");
     expect(check("--fix").code).toBe(0);
     expect(version("chess")).toBe(`${today}.1`);
+    expect(readFileSync(join(dir, "games", "chess", "manifest.json"), "utf8")).toBe(compact(`${today}.1`));
     expect(version("dice")).toBe("2026.01.02.1"); // untouched game keeps its version
+
   });
 
   it("counts a manifest change other than the version as a game change", () => {

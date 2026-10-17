@@ -88,8 +88,8 @@ for (const id of readdirSync(dir, { withFileTypes: true }).filter((e) => e.isDir
 
   if (changed && old && head.version === old.version) {
     if (fix) {
-      head.version = suggest;
-      writeFileSync(path, `${JSON.stringify(head, null, 2)}\n`);
+      // Only the version's value changes; the rest of the file keeps its formatting.
+      writeFileSync(path, readFileSync(path, "utf8").replace(/("version"\s*:\s*)"[^"]*"/, `$1"${suggest}"`));
       fixed.push(`${where}: ${old.version} → ${suggest}`);
       continue;
     }
