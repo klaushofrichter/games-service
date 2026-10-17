@@ -274,3 +274,15 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
 - **D-124 · 2026-10-16 · Klaus** — Player colour 6 is pearl (`#dde3ea`) instead of citron (`#e8e15f`), which was too close to colour 1 (amber). *Why:* hard to tell apart on the felt. *Implementation (Claude):* refines D-106. Pearl is the one neutral among seven hues, so colour-blind players cannot mistake it for another; it takes dark letters on the phone's badge. Colours are not stored across restarts, so nothing needs to move.
 - **D-125 · 2026-10-16 · Klaus** — A player removed during a game leaves their colour on the seat: an AI that takes the seat over (Loopy) plays in that colour, not in the seat's default colour, which another player may have. *Implementation (Claude):* refines D-106/D-117. The table keeps the colour of a seat whose player leaves during the game (removed, or gone past the waiting time) and lists it in the lobby state as `seatColors` (empty seats only). `playerColor(info, seat)` in the board kit uses it for an empty seat, so every game gets it; board and phones pass it in `info.seatColors`. Nobody else gets that colour meanwhile; a player who picks it in the settings swaps with the empty seat. It is cleared when the next game starts or the table returns to the lobby.
 
+## Game time for clocks (17 Oct 2026)
+
+- **D-126 · 2026-10-17 · Claude** — Rules may read the game time: `ctx.now()`, milliseconds since the game started with
+  the time it stood paused left out. *Why:* Chess (extra-games) needs real chess clocks, which charge each player the
+  time they took. D-040 kept rules time-free, so a game could only count with timers, which would have meant a timer
+  firing every second into the log. *Implementation (Claude):* the runtime counts the time spent paused (a lost
+  service connection, a slow AI, a player away), so a pause costs no player time, and fixes the game time at the start
+  of every input, so the rules and the log see the same value. Inputs (`intent`, `timer`, `seatJoined`, `seatLeft`)
+  carry it as `gt`; replay hands it back, so replays stay exact (D-032). Logs from before have no `gt`: they replay
+  with 0, and no game read the time then. Timers stay the way to make something happen later; `now()` only says when
+  an input happened. Refines D-040. Check: `tests/game-time.test.ts` (start, pauses, a second pause reason, refused
+  moves, the log, replay, old logs).
