@@ -413,3 +413,10 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   kiosk's Chromium opens as a touch list. Check: `scripts/e2e/settings_choice.py` with the test game Duel (a five-choice
   setting is a pulldown with all five, inside the window; a two-choice one stays buttons; both change the table's
   settings); it fails without the change.
+- **D-135 · 2026-10-17 · Klaus** — LLM-powered AI players are postponed. *Why:* their main gains over the coded AI
+  (table talk, explaining moves, teamwork in words) need a conversational interface the table does not have, and would
+  crowd the experience for now; on raw strength a model is not expected to beat a planner like Loopy's *strong*. The
+  provisions stay as they are (D-028 configuration on the table, D-112 background AI with *Play now*, Loopy's `llm`
+  agent slot). *When it comes back:* a hybrid first (the game's planner scores the legal moves, the model chooses among
+  the best few and keeps per-game notes), the API called directly from the host, measured against the coded AI in
+  AI-only simulations.
