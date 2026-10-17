@@ -37,6 +37,8 @@
   #deck-bar button { padding: 4px 10px; font-size: .9em; }
   #deck { flex: 1; width: 100%; border: 0; }
   #deck-wrap.min { height: auto; }
+  /* During a game the deck is a phone screen: it takes the window's height, whichever tab shows (D-131). */
+  #deck-wrap.in-game:not(.min) { height: calc(100% - 32px) !important; }
   #deck-wrap.min #deck { display: none; }
   #status { position: absolute; left: 50%; top: 16px; transform: translateX(-50%); background: rgba(0,0,0,.7); padding: 8px 16px; border-radius: 999px; font-size: .9em; }
   @media (max-width: 700px) {
@@ -293,8 +295,15 @@
     }
     const app = doc && doc.getElementById("app");
     if (!app || !app.lastElementChild) return;
+    // During a game (the deck has its tab bar, D-123) the window takes the full height instead (D-131): game decks
+    // size themselves to their window, so fitting the window to them fed back into ever smaller cards, and the
+    // hidden game tab measured 0 and collapsed the window.
+    const inGame = !!doc.getElementById("tab-table");
+    wrap.classList.toggle("in-game", inGame);
+    if (inGame) return void (wrap.style.height = "");
     const win = doc.defaultView;
-    const bottom = app.lastElementChild.getBoundingClientRect().bottom + win.scrollY;
+    // The lowest visible part of the deck: a hidden panel has no box and must not count.
+    const bottom = Math.max(0, ...[...app.children].filter((el) => el.getClientRects().length).map((el) => el.getBoundingClientRect().bottom)) + win.scrollY;
     const pad = parseFloat(win.getComputedStyle(app).paddingBottom) || 0;
     const footer = doc.querySelector("footer");
     const content = Math.ceil(bottom + pad + (footer ? footer.offsetHeight : 0));
