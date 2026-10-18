@@ -198,7 +198,7 @@ describe("remote play", { timeout: 60_000 }, () => {
       ["DELETE", `/api/v1/players/${ana.id}`, undefined],
       ["POST", "/api/v1/ai", {}],
       ["POST", "/api/v1/seats/move", { playerId: ana.id, seat: 3 }],
-      ["POST", `/api/v1/players/${ana.id}/color`, { color: "#5fe0c8" }], // colours are the table's settings (D-106)
+      ["POST", `/api/v1/players/${ana.id}/color`, { color: "#f08a3c" }], // colours are the table's settings (D-106)
       ["POST", "/api/v1/game/save", {}],
       ["POST", "/api/v1/game/resume", {}],
       ["POST", `/api/v1/players/${ana.id}/ai-options`, { options: {} }],

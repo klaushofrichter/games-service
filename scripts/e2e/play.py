@@ -46,7 +46,7 @@ def roulette(browser, board):
     time.sleep(0.4)
     # Mira picks a colour that is not her seat's: her chips must show it (lobby colours, D-106).
     mira = next(p for p in api("GET", "/state")["players"] if p["name"] == "Mira")
-    api("POST", f"/players/{mira['id']}/color", {"color": "#c38be8"})
+    api("POST", f"/players/{mira['id']}/color", {"color": "#9d6bf0"})
     api("POST", "/game/start")
     decks[0].wait_for_selector(".rd-balance")
     d0, d1, d2 = decks
@@ -62,7 +62,7 @@ def roulette(browser, board):
     for amount, who in (("100", "Klaus"), ("50", "Mira"), ("25", "Jonas")):
         fill = board.locator(f".rl-chip:has(text:text-is('{amount}')) circle.face").first.get_attribute("fill")
         assert fill == colors[who], (who, fill, colors[who])
-    assert colors["Mira"] == "#c38be8", colors
+    assert colors["Mira"] == "#9d6bf0", colors
     shot(board, "board-betting")
     shot(d0, "deck-betting")
     for d in decks:
@@ -117,7 +117,7 @@ def pachisi(browser, board):
     rows = board.locator(".player-colors .row")
     assert rows.count() == 3, "one row per seated player"
     rows.nth(0).locator(".swatch").nth(4).click()
-    purple = "rgb(195, 139, 232)"
+    purple = "rgb(157, 107, 240)"  # colour 5, purple (D-147)
     wait_for = lambda page, sel, color: page.wait_for_function(
         "([s, c]) => [...document.querySelectorAll(s)].some((e) => getComputedStyle(e).backgroundColor === c)", arg=[sel, color], timeout=5000)
     wait_for(decks[0], ".pc-tokens .card > div:first-child", purple)  # Klaus's phone follows
@@ -425,7 +425,7 @@ def dialogs(browser, board):
     time.sleep(0.5)
     # D-104: the phone's "At the table" list shows each player's colour before the name (the seat's colour, which
     # framed their plate in a game)
-    hexes = ["#e8b04a", "#5fb7e8", "#e8735f", "#7fd18b", "#c38be8", "#dde3ea", "#5fe0c8", "#e88fbf"]
+    hexes = ["#f2d24b", "#5fb7e8", "#e5484d", "#7fd18b", "#9d6bf0", "#dde3ea", "#f08a3c", "#ef8fcf"]
     rgb = lambda h: f"rgb({int(h[1:3], 16)}, {int(h[3:5], 16)}, {int(h[5:7], 16)})"
     want = [rgb(hexes[p["seat"]]) for p in api("GET", "/state")["players"]]
     decks[0].wait_for_function("(n) => document.querySelectorAll('.list .row .pdot').length === n", arg=len(want))
@@ -439,10 +439,10 @@ def dialogs(browser, board):
     board.click("#settings-button")
     board.wait_for_selector(".player-colors")
     assert board.locator(".game-settings").count() == 0
-    board.locator(".player-colors .row").nth(0).locator(".swatch").nth(6).click()  # Klaus: teal
-    teal = rgb(hexes[6])
-    decks[0].wait_for_function("(c) => getComputedStyle(document.querySelector('.who .badge')).backgroundColor === c", arg=teal, timeout=5000)
-    board.wait_for_function("(c) => [...document.querySelectorAll('#seats .seat.taken')].some((e) => getComputedStyle(e).borderTopColor === c)", arg=teal, timeout=5000)
+    board.locator(".player-colors .row").nth(0).locator(".swatch").nth(6).click()  # Klaus: orange (D-147)
+    orange = rgb(hexes[6])
+    decks[0].wait_for_function("(c) => getComputedStyle(document.querySelector('.who .badge')).backgroundColor === c", arg=orange, timeout=5000)
+    board.wait_for_function("(c) => [...document.querySelectorAll('#seats .seat.taken')].some((e) => getComputedStyle(e).borderTopColor === c)", arg=orange, timeout=5000)
     shot(board, "settings-colours-lobby")
     board.click("[data-close-overlay]")
     shot(board, "lobby-colours")
