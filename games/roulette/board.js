@@ -140,6 +140,16 @@ export function mount(root) {
   let info = null;
   let view = null;
   let revealTimer = null;
+  /** The pending reveal of the last spin (ball, number, winners), or null; and who waits for it (whenIdle, D-149). */
+  let pendingReveal = null;
+  const idleWaiters = [];
+  function revealNow() {
+    clearTimeout(revealTimer);
+    const r = pendingReveal;
+    pendingReveal = null;
+    if (r) r();
+    idleWaiters.splice(0).forEach((w) => w());
+  }
 
   const clock = box.querySelector(".rl-clock");
   const tick = setInterval(() => {
@@ -211,14 +221,20 @@ export function mount(root) {
         spinTo(v.last.number);
         markWinners(null);
         box.querySelector(".rl-msg").textContent = "No more bets";
-        clearTimeout(revealTimer);
-        revealTimer = setTimeout(() => {
+        revealNow(); // an earlier spin still waiting: show it before this one
+        const last = v.last;
+        const history = v.history;
+        pendingReveal = () => {
           wheel.ball.setAttribute("opacity", 1);
-          box.querySelector(".rl-msg").innerHTML = `${v.last.number} <span style="color:${v.last.color === "red" ? "#e0544a" : v.last.color === "green" ? "#3fbf7f" : "#cfcfcf"}">${v.last.color}</span>`;
-          markWinners(v.last.number);
-          renderHistory(v.history);
-        }, events.some((e) => e.name === "wheelSpun") ? 5200 : 0);
+          box.querySelector(".rl-msg").innerHTML = `${last.number} <span style="color:${last.color === "red" ? "#e0544a" : last.color === "green" ? "#3fbf7f" : "#cfcfcf"}">${last.color}</span>`;
+          markWinners(last.number);
+          renderHistory(history);
+        };
+        revealTimer = setTimeout(revealNow, events.some((e) => e.name === "wheelSpun") ? 5200 : 0);
       } else if (v.phase === "betting") {
+        // A short result time: the next round's betting can arrive before the wheel stops. Reveal the spin at once,
+        // so the reveal can't later overwrite "Place your bets".
+        revealNow();
         markWinners(null);
         box.querySelector(".rl-msg").textContent = v.over ? "Game over" : "Place your bets";
         renderHistory(v.history);
@@ -234,9 +250,16 @@ export function mount(root) {
       });
       box.querySelector(".rl-legend").textContent = v.phase === "betting" ? "Bet from your phone. Tap Done when you're finished." : "";
     },
+    /** Resolves once the last spin is revealed: the platform shows Show result only then (D-134), so the final
+     *  board shows the number, not "No more bets". */
+    whenIdle() {
+      return pendingReveal ? new Promise((r) => idleWaiters.push(r)) : Promise.resolve();
+    },
     destroy() {
       clearInterval(tick);
       clearTimeout(revealTimer);
+      pendingReveal = null;
+      idleWaiters.splice(0).forEach((w) => w());
     },
   };
 

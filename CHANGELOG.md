@@ -6,6 +6,9 @@ page is the history. Leave it empty if there is nothing to add beyond the commit
 
 ## [Unreleased]
 
+- End screens with eight players and long names (D-149): Coin Flip shows its results beside the coin, the corner
+  buttons sit closer to the edge and to each other, long AI names fit on the lobby's seat cards, and Roulette's last
+  screen shows the number instead of "No more bets".
 - A game setting typed out of range (D-146) is caught in the settings window: a message names the setting and what it
   can be, waits for OK, and the window stays open on that field.
 - Player names (D-148): at most 12 characters, and each name once at a table (ignoring upper and lower case); a
