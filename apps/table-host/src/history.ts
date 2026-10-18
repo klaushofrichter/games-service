@@ -5,6 +5,7 @@ import type { InstalledGame } from "./games.ts";
 import type { LogStore, RunMeta } from "./logs.ts";
 import { buildMoves, packedList, pageMoves, stateAt, type MoveList, type MoveQuery, type MoveRow } from "./moves.ts";
 import type { LogRecord } from "./runtime.ts";
+import { withStatistics } from "./stats.ts";
 
 /** A log in the viewer's list. */
 export interface HistoryEntry {
@@ -112,6 +113,14 @@ export class History {
       });
     }
     return { ...entryOf(id, log.meta), meta: log.meta, rulesInstalled: !!this.rules(log.meta), columns: this.columns(log.meta, out.length ? (await this.load(id, 1))!.list.rows : []), gameList: out };
+  }
+
+  /** A finished game's statistics window (D-136): its summary with the statistics, read from the log; null without one. */
+  async statistics(id: string, game: number) {
+    const l = await this.load(id, game);
+    if (!l) return null;
+    const end = l.records.at(-1);
+    return end?.t === "end" ? withStatistics(end.summary, l.records) : null;
   }
 
   async page(id: string, game: number, q: MoveQuery) {

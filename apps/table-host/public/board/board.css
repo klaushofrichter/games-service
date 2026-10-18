@@ -387,3 +387,32 @@ button.copy:hover, button.copy.done { color: var(--brass); border-color: var(--b
 #elsewhere-layer .row { display: flex; flex-wrap: wrap; gap: 14px; justify-content: center; }
 #elsewhere-layer button { font-size: 20px; padding: 12px 24px; }
 #elsewhere-layer .note { margin: 8px 0 0; }
+
+/* The statistics window (D-136). Its button sits beside Show result, toward the middle of that edge. */
+#stats-button { position: absolute; z-index: 20; font-size: 0.9em; }
+#stats-button.bottom-right { right: 260px; bottom: 38px; }
+#stats-button.bottom-left { left: 260px; bottom: 38px; }
+#stats-button.top-right { right: 260px; top: 38px; }
+#stats-button.top-left { left: 260px; top: 38px; }
+.overlay.statistics { z-index: 42; }
+.overlay .panel.stats-panel { width: min(1100px, 92vw); max-height: 88vh; padding: 22px 28px 26px; }
+.overlay .panel.stats-panel.sideways { width: min(1100px, 88vh); max-height: 92vw; }
+.stats-head { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; position: sticky; top: -22px; z-index: 1; margin: -22px -28px 0; padding: 16px 28px 12px; background: var(--felt); border-bottom: 1px solid var(--felt-line); }
+.stats-head h2 { margin: 0 auto 0 0; font-size: 30px; }
+.stats-turn { display: flex; align-items: center; gap: 6px; color: var(--ink-soft); font-size: 15px; }
+.stats-turn button { min-width: 44px; padding: 8px 10px; }
+.stats-turn button.on { border-color: var(--brass); color: var(--brass); }
+.stats-result { color: var(--ink-soft); font-size: 20px; margin: 14px 0 4px; }
+.stats-panel h4 { margin: 22px 0 10px; font-size: 14px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-soft); font-weight: 500; }
+.awards { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
+.award { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 16px 14px; text-align: center; background: var(--felt-deep); border: 1px solid var(--felt-line); border-radius: 14px; }
+.award-icon { font-size: 44px; line-height: 1.1; }
+.award h3 { margin: 4px 0 0; font-family: var(--display); font-size: 22px; }
+.award-holders { margin: 0; font-size: 19px; color: var(--brass); font-weight: 600; }
+.award em { font-style: normal; font-size: 16px; }
+.award small { color: var(--ink-soft); font-size: 14px; }
+.no-awards { color: var(--ink-soft); font-size: 19px; margin: 6px 0; }
+.stats-table { border-collapse: collapse; font-size: 20px; width: 100%; }
+.stats-table th { font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-soft); font-weight: 500; padding: 4px 12px; text-align: center; }
+.stats-table td { padding: 7px 12px; text-align: center; border-top: 1px solid var(--felt-line); }
+.stats-table td:first-child, .stats-table th:first-child { text-align: left; padding-left: 0; white-space: nowrap; }

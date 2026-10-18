@@ -1,4 +1,4 @@
-import { count, defineGame, list, type GameContext, type StepDescription, type StepInfo } from "../../packages/sdk/src/index.ts";
+import { count, defineGame, leastAward, list, mostAward, type GameAward, type GameContext, type StepDescription, type StepInfo } from "../../packages/sdk/src/index.ts";
 
 type Guess = "heads" | "tails";
 
@@ -202,6 +202,13 @@ export default defineGame<State>({
           return [state.names[s], state.scores[s] ?? 0, st.heads, st.tails, st.headsPct === null ? "–" : `${st.headsPct}%`];
         }),
       },
+      // The statistics window's awards (D-136); one that nobody or everybody would get is left out.
+      awards: [
+        mostAward({ id: "sharpshooter", icon: "🎯", title: "Sharpshooter", blurb: "Guessed right most often." }, state.active.map((s) => ({ seat: s, score: state.scores[s] ?? 0 })), (n) => count(n, "correct guess", "correct guesses")),
+        mostAward({ id: "heads-fan", icon: "🙂", title: "Heads Fan", blurb: "Called heads most often." }, state.active.map((s) => ({ seat: s, score: stats(state, s).heads })), (n) => count(n, "heads call")),
+        mostAward({ id: "tails-fan", icon: "🐾", title: "Tails Fan", blurb: "Called tails most often." }, state.active.map((s) => ({ seat: s, score: stats(state, s).tails })), (n) => count(n, "tails call")),
+        leastAward({ id: "unlucky", icon: "🌧️", title: "Unlucky", blurb: "Guessed right least often." }, state.active.map((s) => ({ seat: s, score: state.scores[s] ?? 0 })), (n) => count(n, "correct guess", "correct guesses")),
+      ].filter((a): a is GameAward => a !== null),
     };
   },
 

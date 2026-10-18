@@ -1,9 +1,9 @@
 // Game SDK: what a game author writes against.
 // Rules are pure: given the same state, inputs and RNG stream they produce the same result,
 // so a game can be replayed from its log.
-import type { GameSummary, Manifest } from "../../protocol/src/index.ts";
+import type { GameAward, GameSummary, Manifest } from "../../protocol/src/index.ts";
 
-export type { GameSummary, Manifest };
+export type { GameAward, GameSummary, Manifest };
 
 export interface SeatInfo {
   seat: number;
@@ -171,4 +171,34 @@ export function list(names: string[]): string {
 
 export function isReject<S>(r: StepResult<S>): r is { reject: string } {
   return "reject" in r;
+}
+
+/**
+ * An award for the seats with the highest score (D-136), or null when nobody stands out: everyone scores 0, or every
+ * seat ties. `value(best)` labels the winning score, e.g. (n) => count(n, "capture").
+ */
+export function mostAward(
+  award: Omit<GameAward, "seats" | "value">,
+  scores: { seat: number; score: number }[],
+  value?: (best: number) => string,
+): GameAward | null {
+  if (scores.length < 2) return null;
+  const best = Math.max(...scores.map((s) => s.score));
+  if (best <= 0) return null;
+  const seats = scores.filter((s) => s.score === best).map((s) => s.seat);
+  if (seats.length === scores.length) return null;
+  return { ...award, seats, ...(value ? { value: value(best) } : {}) };
+}
+
+/** An award for the seats with the lowest score (D-136), or null when every seat ties. */
+export function leastAward(
+  award: Omit<GameAward, "seats" | "value">,
+  scores: { seat: number; score: number }[],
+  value?: (least: number) => string,
+): GameAward | null {
+  if (scores.length < 2) return null;
+  const least = Math.min(...scores.map((s) => s.score));
+  const seats = scores.filter((s) => s.score === least).map((s) => s.seat);
+  if (seats.length === scores.length) return null;
+  return { ...award, seats, ...(value ? { value: value(least) } : {}) };
 }

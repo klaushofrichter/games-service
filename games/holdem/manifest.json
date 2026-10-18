@@ -1,7 +1,7 @@
 {
   "id": "holdem",
   "name": "Hold'em",
-  "version": "2026.10.17.3",
+  "version": "2026.10.18.1",
   "sdk": "^0.1",
   "description": "Fixed-limit Texas Hold'em. Your two cards stay on your phone; the board shows the shared cards and the pot. Points only.",
   "players": {

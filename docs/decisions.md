@@ -466,3 +466,28 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   plays a sound once the context runs, if that happens within a second, so a board nobody has touched yet does not
   release a pile of old sounds at the first tap. Check:
   `scripts/e2e/next_hand.py` (each of the seven sounds plays, a shuffle for every hand, the first included).
+
+## The statistics window (18 Oct 2026)
+
+- **D-136 · 2026-10-18 · Klaus** — A finished game's awards and statistics in a window on the board, for every game
+  that sends them. *Why:* the C# Loopy ended with trophies (*The Killer*, *The Piñata*, …) and per-player counts; this
+  is worth having for all games, drawn the same way.
+  - **Data.** A game's summary may carry `awards: { id, icon, title, blurb?, seats, value? }[]`; the SDK's `mostAward`
+    and `leastAward` build them, ties shared. The host keeps an award only when some, not all, players hold it (an
+    award everyone or nobody gets says nothing), and adds from the game log `players` and `play` (moves, time per
+    move and longest move per player, without paused time; times for people only) plus two awards of its own,
+    *Quick Draw* and *Deep Thinker*, when at least two people made three moves or more. Games count their own numbers
+    during play (Hold'em) or read them from their moves at the end (Chess); the log is the platform's source.
+  - **Window.** Board only, at the table and on remote boards (not the phones). Scrollable: the awards as cards with
+    the holders' names, *No awards in this game.* when there are none, then the game's table and *Moves and time*.
+    At the table it can be turned to any edge (S, N, W, E); a remote board faces its own player. English only.
+  - **Where.** A *Statistics* button beside *Show result* when a game ends by itself, one on the result screen, and
+    one in the Game Viewer for finished games (`GET /history/{log}/{game}/statistics`, the same data from the log).
+    No button when a game sends nothing for it.
+  - **Games.** Coin Flip: *Sharpshooter*, *Heads Fan*, *Tails Fan*, *Unlucky*. Hold'em (counted during play, in the
+    state): *Best of All* (the best hand shown), *Rich* (most points at any time), *The Best Pot*, *The Shark* (most
+    hands won), *Firestarter* (most bets and raises), *Careful* (most folds), *All In*; its table adds peak, hands won,
+    biggest pot, bets, folds and best hand. Chess (extra-games) and Loopy (loopy-game L-030) have their own.
+  - **Checks.** `tests/statistics.test.ts` (the helpers, the host's checks, moves and pace without pauses, Coin Flip
+    and Hold'em awards, the history endpoint); `scripts/e2e/play.py endings` (the button, the awards shown, turning to
+    east and north, the result screen's button, Escape).

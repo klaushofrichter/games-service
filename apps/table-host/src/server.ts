@@ -270,6 +270,10 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
       const info = await history.info(match[1]);
       return info ? json(res, 200, info) : json(res, 404, { error: "no such log" });
     }
+    if (m === "GET" && (match = path.match(/^\/history\/([\w-]+)\/(\d{1,4})\/statistics$/))) {
+      const st = await history.statistics(match[1], Number(match[2]));
+      return st ? json(res, 200, st) : json(res, 404, { error: "no statistics for this game" });
+    }
     if (m === "GET" && (match = path.match(/^\/history\/([\w-]+)\/(\d{1,4})\/moves$/))) {
       const num = (k: string) => (qs.has(k) && qs.get(k) !== "" && Number.isFinite(Number(qs.get(k))) ? Number(qs.get(k)) : undefined);
       const page = await history.page(match[1], Number(match[2]), {
