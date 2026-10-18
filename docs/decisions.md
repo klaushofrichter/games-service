@@ -586,3 +586,18 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   - **Joining.** A taken name is refused with `{status: 409, code: "name-taken"}` (`name-invalid` for "(AI)"); the phone's join form shows the reason under the name and keeps what was typed; its field takes 12 characters. A remote player types the name on the service's invite page and can't retype it there, so a taken name gets a number instead ("Ann 2", cut to fit 12); the invite page's field takes 12 too.
   - **Change name.** On the phone, beside Rules in the header, outside a game: a sheet with the name, *Save*, and the reason if it is refused (`lobby.rename {name}` on the socket). Not during a game, since games and their logs use the names they started with; not for AI players. The board has no keyboard, so renaming is the player's own business on their phone.
   - **Checks.** `tests/names.test.ts` (cutting and tidying, taken names ignoring case and after the cut, "(AI)", empty names, remote numbering, rename rules) and `scripts/e2e/names.py` (a taken name on the join form, the 12-character field, Change name refused and accepted, the board following).
+- **D-149 · 2026-10-18 · Klaus** — End screens fit at the most players with the longest names. Klaus found Coin Flip's
+  last screen with eight players overlapping the north plates (title) and the south plates (results), and asked to check
+  every game at its most players, the statistics window too, with long names. *Survey (Claude):* every game played to
+  the end at its most seats with 12-character names, each handed to an AI ("Christophers (AI)", the longest a seat
+  shows): Coin Flip 8, Hold'em 8, Roulette 6, Pachisi 4, with the end, statistics and result screens captured.
+  - **Coin Flip.** At the end the results table stands beside a smaller coin instead of under it, so nothing reaches
+    the north or south plates; names in it stay on one line.
+  - **Show result, Statistics, Lobby.** The corner buttons sit 26 px from the edges (was 38), and *Statistics* sits
+    10 px beside *Show result*, measured, so the buttons take less of the corner a south-east or north-east plate needs.
+  - **Lobby seat cards.** A name longer than 12 characters (only an AI that took a seat over) is a size smaller, so
+    "Maximilianus (AI)" is no longer cut.
+  - **Roulette** could end on "No more bets": the number is revealed 5.2 s after the spin, the game could end sooner,
+    and the board had no `whenIdle()` (D-134). It now has one that resolves at the reveal, and a new round's betting
+    reveals the last spin at once, so a late reveal can't overwrite "Place your bets".
+  - Hold'em, Pachisi and every statistics window already fitted (the statistics window scrolls).
