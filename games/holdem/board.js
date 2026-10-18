@@ -131,16 +131,20 @@ export function mount(root, ctx = {}) {
   };
 
   // One sound per event, in the order they happen within a step: a move, the cards it brings, the pot going out.
-  let heard = false; // the first update: a board that comes up as the game starts missed its handStarted event
+  // The hand whose shuffle played: once per hand. A board that comes up as the game starts may miss the first hand's
+  // handStarted event, or get it only after a first update without events; either way hand 1 is shuffled once.
+  let shuffled = 0;
   function sounds(events, v) {
     let at = 0;
-    if (!heard && !events.length && v.hand === 1 && v.phase === "betting" && !v.lastAction && !v.board.length) {
-      events = [{ name: "handStarted" }];
+    if (shuffled === 0 && !events.length && v.hand === 1 && v.phase === "betting" && !v.lastAction && !v.board.length) {
+      events = [{ name: "handStarted", data: { hand: 1 } }];
     }
-    heard = true;
     const later = (ms, name, make) => (ms ? setTimeout(() => playSound(info, name, make), ms) : playSound(info, name, make));
     for (const e of events) {
       if (e.name === "handStarted") {
+        const hand = e.data?.hand ?? v.hand;
+        if (hand === shuffled) continue;
+        shuffled = hand;
         later(at, "holdem-shuffle", shuffleSound);
         later(at + SHUFFLE_S * 1000, "holdem-deal", dealSound(2 * v.players.filter((p) => p.dealt).length));
         at += 1500;
