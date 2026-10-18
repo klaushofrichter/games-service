@@ -3,6 +3,7 @@
 import { renderRules } from "/shared/markdown.js";
 import { ROT, W, H, SEAT_COLORS, audio, copyText, esc, seatName, seatPositions, claimServiceWorkerPage, openTableSocket } from "/shared/board-kit.js";
 import { openViewer } from "/board/viewer.js";
+import { hasStatistics, openStatistics } from "/board/stats.js";
 
 const KEY = window.TABLE_KEY;
 // A remote player's copy of the board (phase 1c): it runs inside the cloud's invite page, which carries
@@ -23,6 +24,7 @@ const flipBtn = document.getElementById("flip-button");
 const toolsBtn = document.getElementById("tools-button");
 const viewBtn = document.getElementById("view-button");
 const resultBtn = document.getElementById("result-button");
+const statsBtn = document.getElementById("stats-button");
 
 let state = null;
 let games = [];
@@ -358,6 +360,12 @@ function settleFinal() {
     if (state) render();
   });
 }
+/** The statistics window (D-136): it faces the board's front edge; at the table it can be turned to any edge. */
+function showStatistics() {
+  if (!state?.summary || overlayRoot.querySelector(".overlay.statistics")) return;
+  openStatistics({ summary: state.summary, gameName: state.game?.name, overlayRoot, edge: viewEdge(), turnable: !REMOTE });
+}
+statsBtn.addEventListener("click", showStatistics);
 resultBtn.addEventListener("click", () => {
   holdFinal = false;
   render();
@@ -753,6 +761,10 @@ function render() {
   lobbyBtn.className = state.game?.lobbyButton ?? "bottom-right";
   resultBtn.hidden = !holdFinal || !finalSettled;
   resultBtn.className = `primary ${state.game?.lobbyButton ?? "bottom-right"}`;
+  // Beside Show result, when the game has statistics (D-136).
+  statsBtn.hidden = resultBtn.hidden || !hasStatistics(state.summary);
+  statsBtn.className = state.game?.lobbyButton ?? "bottom-right";
+  if (state.phase !== "finished") overlayRoot.querySelector(".overlay.statistics")?.remove();
 
   renderPause();
   renderCorners(showingGame && state.phase !== "paused");
@@ -940,7 +952,7 @@ function renderFinished() {
       <div class="summary"><div class="eyebrow">${esc(state.game?.name ?? "Game")} · finished</div>
       <div class="big">${esc(s?.text ?? "Game over")}</div>
       ${s?.table ? summaryTable(s.table) : ""}
-      <div class="toolbar"><button class="primary" data-again>Play again</button><button data-close>Back to lobby</button></div></div>
+      <div class="toolbar"><button class="primary" data-again>Play again</button>${hasStatistics(s) ? `<button data-stats>Statistics</button>` : ""}<button data-close>Back to lobby</button></div></div>
     </section>${joinPanel()}`;
 }
 
@@ -1154,6 +1166,7 @@ center.addEventListener("click", async (e) => {
     }
   } else if ("start" in d) act("POST", "/game/start");
   else if ("close" in d) act("POST", "/game/close");
+  else if ("stats" in d) showStatistics();
   else if ("again" in d) act("POST", "/game/select", { gameId: state.game.id, settings: state.game.settings });
   else if ("invite" in d) openInvite();
   else if ("newCode" in d && (await confirmDialog("New join code?", "The current QR code stops working. Players already at the table stay in.", "New code"))) act("POST", "/join/new");
@@ -1313,7 +1326,13 @@ function openAdvanced() {
 // ---------- the Game Viewer (D-120) ----------
 /** Finished games, move by move: from Advanced (D-128), also on remote boards with board control. */
 function openGameLogs() {
-  openViewer({ api, overlayRoot, toast, face: (el) => (faceFront(el), viewEdge() === "east" || viewEdge() === "west") });
+  openViewer({
+    api,
+    overlayRoot,
+    toast,
+    face: (el) => (faceFront(el), viewEdge() === "east" || viewEdge() === "west"),
+    openStats: (summary, gameName) => openStatistics({ summary, gameName, overlayRoot, edge: viewEdge(), turnable: !REMOTE }),
+  });
 }
 
 function openSimulation() {

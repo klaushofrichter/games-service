@@ -11,7 +11,7 @@ const END = { finished: "finished", terminated: "ended from the lobby", seatLeft
  * Open the viewer. `api(method, path)` is the board's API helper (it shows errors itself); `face(panel)` turns the
  * panel to the edge the board faces and returns whether it is sideways; `toast(text)` shows a short note.
  */
-export function openViewer({ api, overlayRoot, face, toast }) {
+export function openViewer({ api, overlayRoot, face, toast, openStats }) {
   const o = document.createElement("div");
   o.className = "overlay viewer";
   o.innerHTML = `<div class="panel viewer-panel" role="dialog" aria-modal="true" aria-label="Game logs"></div>`;
@@ -105,6 +105,7 @@ export function openViewer({ api, overlayRoot, face, toast }) {
         <span class="seg seats"><button data-seat="" class="${f.seat === null ? "on" : ""}">Everyone</button>${players.map((x) => `<button data-seat="${x.seat}" class="${f.seat === x.seat ? "on" : ""}">${esc(x.name)}</button>`).join("")}</span>
         <button data-toggle="movesOnly" class="${f.movesOnly ? "on" : ""}">Moves only</button>
         <button data-toggle="problems" class="${f.problems ? "on" : ""}">Problems</button>
+        ${openStats && g?.endReason === "finished" ? `<button data-stats>Statistics</button>` : ""}
         <form class="goto"><label>Move #<input name="move" type="number" min="1" max="${g?.moves ?? 1}" inputmode="numeric"></label><button>Go</button></form>
       </div>
       ${!p ? `<div class="empty faint">Loading…</div>` : p.total === 0 ? `<div class="empty faint">Nothing matches these filters.</div>` : `<div class="scroll"><table class="vtable moves"><thead><tr><th class="num">#</th><th>Time</th><th>Player</th>${cols.map((c) => `<th class="col">${esc(c.label)}</th>`).join("")}<th>What happened</th></tr></thead>
@@ -221,6 +222,12 @@ export function openViewer({ api, overlayRoot, face, toast }) {
     const b = e.target.closest("button");
     const tr = e.target.closest("tr[data-log], tr[data-line]");
     if (b?.dataset.close !== undefined) return close();
+    if (b?.dataset.stats !== undefined) {
+      // The finished game's statistics window (D-136), over the viewer.
+      const st = await api("GET", `/history/${encodeURIComponent(v.log.id)}/${v.game}/statistics`).catch(() => null);
+      if (st) openStats(st, v.log.gameName);
+      return;
+    }
     if (b?.dataset.back !== undefined) {
       if (v.view === "step") {
         v.view = "moves";

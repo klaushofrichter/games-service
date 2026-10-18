@@ -362,7 +362,33 @@ def endings(browser, board):
     assert not board.evaluate("() => document.querySelector('.cf-coin')?.getAnimations().some((a) => a.playState === 'running')"), "Show result appeared before the coin landed"
     time.sleep(1.4)
     assert board.evaluate("() => window.gameTableSounds") == [], "no sounds with sound off"
+    # The statistics window (D-136): beside Show result, with the awards the host kept, turnable at the table.
+    summary = api("GET", "/state")["summary"]
+    assert summary["players"] and summary["play"], summary
+    board.wait_for_selector("#stats-button:not([hidden])")
+    board.click("#stats-button")
+    board.wait_for_selector(".overlay.statistics .stats-panel")
+    shown = board.locator(".overlay.statistics .award").count()
+    assert shown == len(summary["awards"]), (shown, summary["awards"])
+    if not summary["awards"]:
+        board.wait_for_selector(".overlay.statistics >> text=No awards in this game.")
+    assert board.locator(".overlay.statistics .stats-table.play tr").count() == 3, "moves and time for both players"
+    board.screenshot(path=os.path.join(OUT, "statistics-south.png"))
+    board.click(".overlay.statistics [data-face=east]")
+    board.wait_for_timeout(500)  # the turn animates
+    assert board.evaluate("() => document.querySelector('.stats-panel').classList.contains('sideways')"), "east: sideways"
+    assert "rotate(-90deg)" in board.evaluate("() => document.querySelector('.stats-panel').style.transform")
+    board.screenshot(path=os.path.join(OUT, "statistics-east.png"))
+    board.click(".overlay.statistics [data-face=north]")
+    assert "rotate(180deg)" in board.evaluate("() => document.querySelector('.stats-panel').style.transform")
+    board.click(".overlay.statistics [data-close-stats]")
+    board.wait_for_selector(".overlay.statistics", state="detached")
     board.click("#result-button")
+    # and from the result screen; Escape closes it
+    board.click("[data-stats]")
+    board.wait_for_selector(".overlay.statistics .stats-panel")
+    board.keyboard.press("Escape")
+    board.wait_for_selector(".overlay.statistics", state="detached")
     # a game ended from the lobby goes straight to the result, no held screen
     board.click("[data-again]")
     wait(lambda: api("GET", "/state")["phase"] == "ready", 5, "ready again")

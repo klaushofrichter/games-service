@@ -19,6 +19,7 @@ import {
 } from "../../../packages/protocol/src/index.ts";
 import { createRng, type GameEvent, type Intent, type SeatInfo } from "../../../packages/sdk/src/index.ts";
 import { HOW_TO_PLAY, settingsWithDefaults, type InstalledGame } from "./games.ts";
+import { withStatistics } from "./stats.ts";
 
 /** The URL a deck fetches a game's rules from (D-099), or null. */
 const howToPlayUrl = (g: InstalledGame) => (g.howToPlay ? `/games/${g.manifest.id}/${HOW_TO_PLAY}` : null);
@@ -1015,7 +1016,7 @@ export class Table extends EventEmitter {
     this.waitingFor.clear();
     // Extra games that changed while this one ran take effect now (D-097); the log below still names the code it ran.
     if (this.pendingExtra) queueMicrotask(() => this.applyPendingExtra());
-    this.summary = rt.summary;
+    this.summary = withStatistics(rt.summary, rt.log); // with the statistics window's data (D-136)
     const ms = Date.now() - this.gameStartedAt;
     if (terminated) this.metrics.gamesTerminated++;
     else this.metrics.gamesPlayed++;

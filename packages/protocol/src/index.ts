@@ -171,6 +171,30 @@ export interface GameSummary {
   highlights: Record<string, unknown>;
   /** Optional statistics the result screen shows as a table (D-091), e.g. per player: correct guesses, heads %. */
   table?: { columns: string[]; rows: (string | number)[][] };
+  /**
+   * Optional awards for the statistics window (D-136): a title for the players who stood out, e.g. "The Killer" for
+   * the most captures. The host drops awards that nobody or every player holds.
+   */
+  awards?: GameAward[];
+  /** Filled in by the host (D-136): the seats' names, for the awards. */
+  players?: { seat: number; name: string; ai: boolean }[];
+  /** Filled in by the host from the game log (D-136): moves and thinking time per player. */
+  play?: { columns: string[]; rows: (string | number)[][] };
+}
+
+/** One award in the statistics window (D-136). */
+export interface GameAward {
+  /** Stable id, e.g. "killer". */
+  id: string;
+  /** One emoji. */
+  icon: string;
+  title: string;
+  /** One short line, e.g. "Sent the most marbles home." */
+  blurb?: string;
+  /** The seats holding it (ties share it). */
+  seats: number[];
+  /** The value that won it, e.g. "5 captures". */
+  value?: string;
 }
 
 export interface LobbyState {
