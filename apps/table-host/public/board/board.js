@@ -18,6 +18,7 @@ const lobbyBtn = document.getElementById("lobby-button");
 const overlayRoot = document.getElementById("overlay-root");
 const gameLayer = document.getElementById("game-layer");
 const pauseLayer = document.getElementById("pause-layer");
+const awayLayer = document.getElementById("away-layer");
 const cornersEl = document.getElementById("corners");
 const settingsBtn = document.getElementById("settings-button");
 const flipBtn = document.getElementById("flip-button");
@@ -526,6 +527,9 @@ function openSettings() {
       <div class="group"><div class="eyebrow">Display</div>
         <div class="row"><span>Sound effects</span><button data-sound class="${state.display?.sound !== false ? "on" : ""}" role="switch" aria-checked="${state.display?.sound !== false}">${state.display?.sound !== false ? "On" : "Off"}</button></div>
         <div class="row"><span>Fullscreen</span>${fs ? `<button data-fs class="${document.fullscreenElement ? "on" : ""}">${document.fullscreenElement ? "Leave fullscreen" : "Fullscreen"}</button>` : `<span class="faint">not available in this browser</span>`}</div></div>
+      ${REMOTE ? "" : `<div class="group players-away"><div class="eyebrow">Players</div>
+        <div class="row"><span>A player whose phone is away for a minute leaves the game</span><button data-away-timeout class="${state.play?.awayTimeout ? "on" : ""}" role="switch" aria-checked="${!!state.play?.awayTimeout}">${state.play?.awayTimeout ? "On" : "Off"}</button></div>
+        <div class="faint" style="font-size:.7em;margin-top:6px">Off: their seat waits for them, and the board can hand it to an AI player. On: after a minute the game goes on without them, as the game does when someone leaves.</div></div>`}
       <div class="group"><div class="eyebrow">Joining</div>
         <div class="row"><span>The QR code and address for phones, to join or rejoin, also during a game</span><button data-join-code>Show join code…</button></div></div>
       ${playerColors()}
@@ -566,6 +570,7 @@ function openSettings() {
       (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()).catch(() => toast("Fullscreen was refused by the browser"));
     }
     if (b.dataset.sound !== undefined) return void act("POST", "/display", { sound: state.display?.sound === false });
+    if (b.dataset.awayTimeout !== undefined) return void act("POST", "/play", { awayTimeout: !state.play?.awayTimeout });
     if (b.dataset.accessCode !== undefined) return openCodePad();
     if (b.dataset.joinCode !== undefined) return openJoinCode();
     if (b.dataset.colorPlayer) return void act("POST", `/players/${encodeURIComponent(b.dataset.colorPlayer)}/color`, { color: b.dataset.color });
@@ -768,6 +773,7 @@ function render() {
   if (state.phase !== "finished") overlayRoot.querySelector(".overlay.statistics")?.remove();
 
   renderPause();
+  renderAway();
   renderCorners(showingGame && state.phase !== "paused");
   placeSettings(showingGame);
   seatsEl.hidden = showingGame;
@@ -1018,9 +1024,53 @@ function renderPlayerWait(p) {
     <div class="what"><span class="thinking-dots" aria-hidden="true"><i></i><i></i><i></i></span> ${list.length > 1 ? "are" : "is"} away</div>
     ${reasons.map((r) => `<p>${esc(r)}</p>`).join("")}
     <p>The game is paused and goes on as soon as ${list.length > 1 ? "they are" : `${esc(first?.name ?? "they")} is`} back.</p>
-    ${control ? `<div class="row"><button class="danger" data-pause="end">End game</button></div>` : ""}
+    ${control ? `<div class="row">${handToAiButtons(list)}<button class="danger" data-pause="end">End game</button></div>` : ""}
   </div>`;
 }
+
+/** Whether the running game has AI players, so an away player's seat can be handed to one (D-144). */
+const gameHasAi = () => !!games.find((x) => x.id === state.game?.id)?.ai;
+
+/** "Hand … to an AI" for away players (D-144): the table's own board only. */
+function handToAiButtons(list) {
+  if (REMOTE || !gameHasAi()) return "";
+  return list.map((w) => `<button data-hand-ai="${esc(w.playerId)}" data-hand-ai-name="${esc(w.name)}">Hand ${esc(w.name)} to an AI</button>`).join("");
+}
+
+/**
+ * Players away during a game whose seat waits for them (D-144): a card at the seat says so and offers to hand the seat
+ * to an AI player. The game is not paused; it waits by itself when it is their move.
+ */
+function renderAway() {
+  const list = state.phase === "active" && !REMOTE ? (state.away ?? []) : [];
+  awayLayer.hidden = !list.length;
+  const html = list
+    .map((w) => {
+      const who = state.players.find((x) => x.id === w.playerId);
+      const { x, y } = nearSeat(w.seat);
+      return `<div class="ai-wait-card away-card" data-away="${esc(w.playerId)}" style="left:${x}px;top:${y}px;transform:translate(-50%,-50%) rotate(${ROT[gameEdge()]}deg)">
+    <div class="who"><span class="dot" style="background:${who?.color ?? "var(--brass)"}"></span>${esc(w.name)}</div>
+    <div class="what">is away</div>
+    <p>${gameHasAi() ? "The seat waits for them. Or hand it to an AI player, and the game goes on without them." : "The seat waits for them."}</p>
+    ${gameHasAi() ? `<div class="row">${handToAiButtons([w])}</div>` : ""}
+  </div>`;
+    })
+    .join("");
+  if (awayLayer.dataset.html !== html) {
+    awayLayer.innerHTML = html;
+    awayLayer.dataset.html = html;
+  }
+}
+
+async function handToAi(id, name) {
+  if (await confirmDialog(`Hand ${name} to an AI?`, `An AI player takes over ${name}'s seat for the rest of this game. ${name} can't come back into this game, but can join the next one.`, "Hand to an AI"))
+    act("POST", `/players/${encodeURIComponent(id)}/replace-with-ai`);
+}
+for (const layer of [pauseLayer, awayLayer])
+  layer.addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-hand-ai]");
+    if (b) handToAi(b.dataset.handAi, b.dataset.handAiName);
+  });
 
 pauseLayer.addEventListener("click", async (e) => {
   const a = e.target.closest("button[data-pause]")?.dataset.pause;

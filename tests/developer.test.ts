@@ -104,6 +104,7 @@ describe("games without a player at the table (D-118)", () => {
 
   it("off: a phone that goes away still leaves, and the game carries on with the AIs", async () => {
     t = await testHost();
+    await t.ok("POST", "/play", { awayTimeout: true }); // the waiting time is a setting (D-144)
     const a = await t.joinDeck("Ann");
     await t.ok("POST", "/ai", {});
     await t.ok("POST", "/ai", {});

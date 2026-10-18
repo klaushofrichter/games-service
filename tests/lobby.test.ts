@@ -473,6 +473,7 @@ describe("disconnects and eviction", () => {
   });
 
   it("removes a disconnected player from a running dynamic game after the grace period", async () => {
+    await t.ok("POST", "/play", { awayTimeout: true }); // the waiting time is a setting (D-144)
     const a = await t.joinDeck("A");
     const b = await t.joinDeck("B");
     await t.ok("POST", "/game/select", { gameId: "coin-flip", settings: { rounds: 2, roundSeconds: 0 } });

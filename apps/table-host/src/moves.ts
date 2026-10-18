@@ -5,7 +5,7 @@ import type { GameDefinition, GameEvent, Intent, StepDescription, StepInfo } fro
 import type { Manifest } from "../../../packages/protocol/src/index.ts";
 import { feedInput, GameRuntime, VirtualClock, type AiMoveMeta, type LogRecord } from "./runtime.ts";
 
-export type RowKind = "start" | "move" | "timer" | "seatJoined" | "seatLeft" | "disconnected" | "reconnected" | "pause" | "resume" | "error" | "snapshot" | "gap" | "end";
+export type RowKind = "start" | "move" | "timer" | "seatJoined" | "seatLeft" | "disconnected" | "reconnected" | "aiTakeover" | "pause" | "resume" | "error" | "snapshot" | "gap" | "end";
 
 export interface MoveRow {
   /** Player moves (intents, refused ones too) are numbered from 1; every other row has null. */
@@ -93,6 +93,8 @@ function genericText(r: LogRecord, names: Record<number, string>): string {
       return `${names[r.seat] ?? `seat ${r.seat}`}'s phone went away${r.waiting ? ` · the game waits: ${r.waiting}` : ""}`;
     case "reconnected":
       return `${names[r.seat] ?? `seat ${r.seat}`}'s phone is back`;
+    case "aiTakeover":
+      return `${r.name} took over ${names[r.seat] ?? `seat ${r.seat}`}'s seat (the board handed it to an AI player)`;
     case "pause":
       return r.reason === "cloud" ? "Game paused: the connection to the service was lost"
         : r.reason === "player" ? "Game paused: waiting for a player to come back"
@@ -112,7 +114,7 @@ function genericText(r: LogRecord, names: Record<number, string>): string {
 
 /** The seat a record belongs to, for the player column. */
 function seatOf(r: LogRecord): number | null {
-  if (r.t === "intent" || r.t === "seatLeft" || r.t === "disconnected" || r.t === "reconnected") return r.seat;
+  if (r.t === "intent" || r.t === "seatLeft" || r.t === "disconnected" || r.t === "reconnected" || r.t === "aiTakeover") return r.seat;
   if (r.t === "seatJoined") return r.seat.seat;
   if (r.t === "pause" || r.t === "error") return r.seat ?? null;
   return null;
@@ -126,6 +128,7 @@ const KIND: Record<LogRecord["t"], RowKind> = {
   seatLeft: "seatLeft",
   disconnected: "disconnected",
   reconnected: "reconnected",
+  aiTakeover: "aiTakeover",
   pause: "pause",
   resume: "resume",
   error: "error",

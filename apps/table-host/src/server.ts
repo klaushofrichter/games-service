@@ -273,6 +273,8 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
       return json(res, 200, table.state());
     }
     if (m === "POST" && (match = path.match(/^\/players\/([\w-]+)\/color$/))) return (table.setColor(match[1], body.color), json(res, 200, table.state()));
+    // Hand an away player's seat to an AI player (D-144), from the table's board.
+    if (m === "POST" && (match = path.match(/^\/players\/([\w-]+)\/replace-with-ai$/))) return json(res, 200, { playerId: table.replaceWithAi(match[1]), state: table.state() });
     if (m === "DELETE" && (match = path.match(/^\/players\/([\w-]+)$/))) return (table.removePlayer(match[1], "evicted"), json(res, 200, table.state()));
     if (m === "POST" && path === "/game/select") {
       table.selectGame(String(body.gameId), (body.settings as Record<string, unknown>) ?? {});
@@ -281,6 +283,7 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
     if (m === "POST" && path === "/game/start") return (table.start(), json(res, 200, table.state()));
     if (m === "POST" && path === "/game/end") return (table.end(), json(res, 200, table.state()));
     if (m === "POST" && path === "/display") return (table.setDisplay(body), json(res, 200, table.state()));
+    if (m === "POST" && path === "/play") return (table.setPlay(body), json(res, 200, table.state()));
     if (m === "POST" && path === "/game/settings") return (table.updateSettings(body.settings), json(res, 200, table.state()));
     if (m === "POST" && path === "/game/prefs") return (table.setPrefs(body.prefs), json(res, 200, table.state()));
     if (m === "POST" && path === "/game/close") return (table.close(), json(res, 200, table.state()));

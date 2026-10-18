@@ -527,3 +527,26 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   out of turn in simultaneous phases (Loopy's exchange), where AI moves show at once on the board, so a deck is behind
   for milliseconds at most there. `tests/board-pacing.test.ts`: a phone gets an AI's move once the board has shown
   it, its own move at once.
+- **D-144 · 2026-10-18 · Klaus** — A player whose phone goes away during a game no longer leaves it after a minute by
+  default: their seat waits, and the board can hand the seat to an AI player. The old waiting time is a table setting.
+  *Why:* Klaus: "make the timeout to replace a player with an AI optional. On the board we can 'eject' a player to be
+  replaced with an AI manually." *Implementation (Claude):*
+  - **Setting.** *Settings › Players › A player whose phone is away for a minute leaves the game*, off by default
+    (`POST /api/v1/play {awayTimeout}`, the table's own board only; in memory, like the sound setting). On: as before,
+    the game's own rule for a player who leaves runs after the waiting time (`GRACE_MS`, Loopy puts its AI in the seat,
+    Hold'em folds the player out). Turned on or off during a game, it applies to players already away.
+  - **Away.** With it off, a player away during a game keeps the seat with no time limit; the game is not paused and
+    waits by itself when it is their move. After 15 s (a phone locking for a moment shows nothing) the state lists them
+    in `away` and the table's board shows a card at their seat: "Ben is away · The seat waits for them. Or hand it to an
+    AI player…" with **Hand Ben to an AI** for games with AI players. Games that can't go on without the player
+    (D-119) pause as before; their card gets the same button. Outside a game, away players leave after the waiting time.
+  - **Hand to an AI.** `POST /players/{id}/replace-with-ai` (the table's own board; only for a player who is away, in
+    a game with AI players), after a confirmation: a new AI player "Ben (AI)" with the game's default AI options takes
+    the seat and the colour, the human's session ends (their phone, back, is told the seat went to Ben (AI)), and a game
+    that waited for them goes on. It works for every game with AI players, without the game's leaving rule: to the game
+    the seat is simply played by an AI from then on. The log gets an `aiTakeover` record (seat, name, AI options; not
+    an input), shown in the Game Viewer.
+  - **Checks.** `tests/away.test.ts` (the seat waits past the waiting time, shown as away only after the delay,
+    handing to an AI with colour, log and the phone's message, a waiting D-119 game going on, the setting turned on
+    for a player already away); `scripts/e2e/away.py` (the card, the confirmation, Ben (AI) in the seat). Tests and
+    checks of the waiting time turn the setting on.

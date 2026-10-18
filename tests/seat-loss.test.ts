@@ -128,6 +128,7 @@ describe("a game that goes on without a player (D-119)", () => {
   it("goes on while a phone is away, and the player leaves after the waiting time", async () => {
     const { ann } = await partners("free");
     expect((await state()).needed).toEqual({});
+    await t.ok("POST", "/play", { awayTimeout: true }); // the waiting time is a setting (D-144)
     ann.close();
     await sleep(100);
     expect((await state()).phase).toBe("active");
@@ -154,6 +155,7 @@ describe("a game that goes on without a player (D-119)", () => {
 describe("games without the hook", () => {
   it("go on as before when a phone is away", async () => {
     t = await testHost();
+    await t.ok("POST", "/play", { awayTimeout: true }); // the waiting time is a setting (D-144)
     const a = await t.joinDeck("Ann");
     const b = await t.joinDeck("Ben");
     await t.ok("POST", "/game/select", { gameId: "coin-flip", settings: { rounds: 20, roundSeconds: 0 } });
