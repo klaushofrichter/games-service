@@ -107,8 +107,11 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
     const views = new Map(table.views().map((v) => [v.playerId, v]));
     // Timer deadlines plus the host's clock let clients draw countdowns without trusting their own clock.
     const timing = { timers: rt.timerDeadlines(), now: Date.now() };
-    const board = JSON.stringify(envelope("game", "board", { view: rt.boardView(), events, over: rt.over, ...timing }));
-    for (const c of targets) {
+    // A number the local board answers with "idle" once it has shown the message: AI players wait for it (D-137).
+    const list = [...targets];
+    const seq = list.some((c) => c.role === "board" && !c.remote) ? table.nextBoardMessage() : 0;
+    const board = JSON.stringify(envelope("game", "board", { view: rt.boardView(), events, over: rt.over, seq, ...timing }));
+    for (const c of list) {
       if (c.role === "board") sendText(c.ws, board);
       if (c.role === "deck") {
         const v = views.get(c.playerId);
@@ -408,6 +411,7 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
             if (!remote && !keyOk(p.key)) throw new TableError(401, "board needs the table key");
             const acceptBoard = () => {
               c.role = "board";
+              if (!remote) table.setLocalBoard(true); // AI players pace themselves on it (D-137)
               reply("welcome", { role: "board", remote }, msg.seq);
               send(ws, envelope("lobby", "state", forClient(remote, table.state())));
               if (table.phase === "active" || table.phase === "paused") sendGame([client], []);
@@ -473,6 +477,11 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
           table.setReady(c.playerId, !!msg.payload?.ready);
           return reply("ack", {}, msg.seq);
         }
+        if (c.role === "board" && msg.ch === "game" && msg.type === "idle") {
+          // The local board has shown game message `seq` (D-137); remote boards don't pace the game.
+          if (!c.remote) table.boardIdle(Number(msg.payload?.seq));
+          return;
+        }
         if (c.role === "board" && msg.ch === "game" && msg.type === "intent") {
           // A move made by touching the board (D-102): payload { playerId, name, payload }.
           const b = msg.payload ?? {};
@@ -493,8 +502,9 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
     });
 
     ws.on("close", () => {
-      clients.delete(client);
+      const listed = clients.delete(client); // a replaced board was taken off the list already, its successor stays
       const c = client as Client;
+      if (listed && c.role === "board" && !c.remote && ![...clients].some((o) => o.role === "board" && !o.remote)) table.setLocalBoard(false);
       if (c.role === "deck") {
         const id = c.playerId;
         const stillOpen = [...clients].some((o) => o.role === "deck" && o.playerId === id);

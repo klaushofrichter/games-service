@@ -343,7 +343,6 @@ let holdFinal = false;
 // background window) keeps playing them first. The game's board says when through its optional whenIdle().
 let finalSettled = true;
 let finalToken = 0;
-const FINAL_WAIT_MS = 120000; // a board that never settles still gets its button
 function settleFinal() {
   const token = ++finalToken;
   finalSettled = false;
@@ -354,7 +353,9 @@ function settleFinal() {
   } catch {
     idle = Promise.resolve();
   }
-  Promise.race([idle.catch(() => {}), new Promise((r) => setTimeout(r, FINAL_WAIT_MS))]).then(() => {
+  // No time limit (D-137): with AI players paced on this board it is never far behind, and a fixed limit showed the
+  // button over a game still being replayed.
+  idle.catch(() => {}).then(() => {
     if (token !== finalToken) return;
     finalSettled = true;
     if (state) render();
@@ -1114,7 +1115,10 @@ async function showGame() {
     if (game !== mine) return; // a newer game replaced this one while loading
     mine.inst = mod.mount(gameLayer, { gameId: state.game.id, assetUrl: (p) => `/games/${state.game.id}/assets/${p}`, act: boardAct, skipTimer });
   }
-  if (game.inst && gameMsg) game.inst.update(gameMsg.view, [], gameInfo());
+  if (game.inst && gameMsg) {
+    game.inst.update(gameMsg.view, [], gameInfo());
+    reportIdle(gameMsg.seq);
+  }
 }
 
 function closeGame() {
@@ -1493,6 +1497,26 @@ elsewhereLayer.addEventListener("click", (e) => {
   else connect();
 });
 
+/**
+ * Tell the table when this board has shown game message `seq` (D-137): its game's whenIdle (D-134), or at once for a
+ * game without one or while none is shown. AI players wait for it, so the board never falls behind the game.
+ * Remote boards don't pace the game.
+ */
+let idleToken = 0;
+function reportIdle(seq) {
+  if (REMOTE || !seq) return;
+  const token = ++idleToken;
+  let idle;
+  try {
+    idle = game?.inst && typeof game.inst.whenIdle === "function" ? Promise.resolve(game.inst.whenIdle()) : Promise.resolve();
+  } catch {
+    idle = Promise.resolve();
+  }
+  idle.catch(() => {}).then(() => {
+    if (token === idleToken && ws?.readyState === 1) ws.send(JSON.stringify({ v: 1, ch: "game", type: "idle", payload: { seq } }));
+  });
+}
+
 function connect() {
   ws = openTableSocket(REMOTE);
   ws.onopen = () => {
@@ -1524,6 +1548,7 @@ function connect() {
       gameMsg = { ...m.payload, receivedAt: Date.now() };
       if (game?.inst && state) game.inst.update(gameMsg.view, gameMsg.events ?? [], gameInfo());
       else if (state && (state.phase === "active" || state.phase === "paused")) showGame();
+      reportIdle(gameMsg.seq);
     }
   };
   ws.onclose = () => {
