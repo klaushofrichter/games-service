@@ -78,15 +78,17 @@ export function settingsWithDefaults(manifest: Manifest, given: Record<string, u
   const out: Record<string, unknown> = {};
   for (const s of manifest.settings) {
     let v = given[s.key] ?? s.default;
+    // Refusals name the setting as players see it (its label), not its key (D-146).
+    const name = s.label ?? `setting ${s.key}`;
     if (s.type === "int" || s.type === "number") {
       let n = Number(v);
-      if (!Number.isFinite(n)) throw new Error(`setting ${s.key} must be a number`);
+      if (!Number.isFinite(n)) throw new Error(`${name} must be a number`);
       if (s.type === "int") n = Math.round(n);
-      if (s.min !== undefined && n < s.min) throw new Error(`setting ${s.key} must be ≥ ${s.min}`);
-      if (s.max !== undefined && n > s.max) throw new Error(`setting ${s.key} must be ≤ ${s.max}`);
+      if (s.min !== undefined && n < s.min) throw new Error(`${name} must be ${s.min} or more`);
+      if (s.max !== undefined && n > s.max) throw new Error(`${name} must be ${s.max} or less`);
       v = n;
     } else if (s.type === "enum" && s.values && !s.values.includes(String(v))) {
-      throw new Error(`setting ${s.key} must be one of ${s.values.join(", ")}`);
+      throw new Error(`${name} must be one of ${s.values.join(", ")}`);
     }
     out[s.key] = v;
   }

@@ -564,3 +564,12 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   placement (their surface turns a quarter; the corner buttons would need their own layout). *Checks:*
   `scripts/e2e/remote.py` ends a Coin Flip game with the remote player north and checks the corners, the tools and the
   statistics window.
+- **D-146 · 2026-10-18 · Klaus** — A game setting typed out of range is caught in the settings window itself: a message
+  names the setting and its range ("Points to win the match can be from 1 to 100. 150 is too high.") and has to be
+  acknowledged with OK, and the window stays open on that field. *Why:* Klaus: the table refused the value only after
+  the window had closed, and it was unclear what was wrong with the setting. *Implementation (Claude):* `formDialog`
+  checks every number field (a number, whole for `int`, within `min`/`max`) before it closes; `noticeDialog` is a
+  message only its OK button closes (a tap beside it does not; Escape does). The table's own refusal names the setting
+  by its label instead of its key. The lobby's settings panel needed no change: its − and + stay in range. *Checks:*
+  `scripts/e2e/play.py dialogs` (Roulette's *Spins* at 51: the message, a tap beside it, OK, the field focused, no game
+  chosen); `tests/platform.test.ts`.
