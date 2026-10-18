@@ -353,7 +353,7 @@ function settleFinal() {
   } catch {
     idle = Promise.resolve();
   }
-  // No time limit (D-137): with AI players paced on this board it is never far behind, and a fixed limit showed the
+  // No time limit (D-141): with AI players paced on this board it is never far behind, and a fixed limit showed the
   // button over a game still being replayed.
   idle.catch(() => {}).then(() => {
     if (token !== finalToken) return;
@@ -361,7 +361,7 @@ function settleFinal() {
     if (state) render();
   });
 }
-/** The statistics window (D-136): it faces the board's front edge; at the table it can be turned to any edge. */
+/** The statistics window (D-140): it faces the board's front edge; at the table it can be turned to any edge. */
 function showStatistics() {
   if (!state?.summary || overlayRoot.querySelector(".overlay.statistics")) return;
   openStatistics({ summary: state.summary, gameName: state.game?.name, overlayRoot, edge: viewEdge(), turnable: !REMOTE });
@@ -762,7 +762,7 @@ function render() {
   lobbyBtn.className = state.game?.lobbyButton ?? "bottom-right";
   resultBtn.hidden = !holdFinal || !finalSettled;
   resultBtn.className = `primary ${state.game?.lobbyButton ?? "bottom-right"}`;
-  // Beside Show result, when the game has statistics (D-136).
+  // Beside Show result, when the game has statistics (D-140).
   statsBtn.hidden = resultBtn.hidden || !hasStatistics(state.summary);
   statsBtn.className = state.game?.lobbyButton ?? "bottom-right";
   if (state.phase !== "finished") overlayRoot.querySelector(".overlay.statistics")?.remove();
@@ -949,10 +949,10 @@ function summaryTable(t) {
 
 function renderFinished() {
   const s = state.summary;
-  center.innerHTML = `<section class="main">
+  center.innerHTML = `<section class="main finished">
       <div class="summary"><div class="eyebrow">${esc(state.game?.name ?? "Game")} · finished</div>
       <div class="big">${esc(s?.text ?? "Game over")}</div>
-      ${s?.table ? summaryTable(s.table) : ""}
+      ${s?.table ? `<div class="summary-scroll">${summaryTable(s.table)}</div>` : ""}
       <div class="toolbar"><button class="primary" data-again>Play again</button>${hasStatistics(s) ? `<button data-stats>Statistics</button>` : ""}<button data-close>Back to lobby</button></div></div>
     </section>${joinPanel()}`;
 }
@@ -1498,7 +1498,7 @@ elsewhereLayer.addEventListener("click", (e) => {
 });
 
 /**
- * Tell the table when this board has shown game message `seq` (D-137): its game's whenIdle (D-134), or at once for a
+ * Tell the table when this board has shown game message `seq` (D-141): its game's whenIdle (D-134), or at once for a
  * game without one or while none is shown. AI players wait for it, so the board never falls behind the game.
  * Remote boards don't pace the game.
  */

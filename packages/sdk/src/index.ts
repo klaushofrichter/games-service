@@ -174,7 +174,7 @@ export function isReject<S>(r: StepResult<S>): r is { reject: string } {
 }
 
 /**
- * An award for the seats with the highest score (D-136), or null when nobody stands out: everyone scores 0, or every
+ * An award for the seats with the highest score (D-140), or null when nobody stands out: everyone scores 0, or every
  * seat ties. `value(best)` labels the winning score, e.g. (n) => count(n, "capture").
  */
 export function mostAward(
@@ -190,7 +190,7 @@ export function mostAward(
   return { ...award, seats, ...(value ? { value: value(best) } : {}) };
 }
 
-/** An award for the seats with the lowest score (D-136), or null when every seat ties. */
+/** An award for the seats with the lowest score (D-140), or null when every seat ties. */
 export function leastAward(
   award: Omit<GameAward, "seats" | "value">,
   scores: { seat: number; score: number }[],

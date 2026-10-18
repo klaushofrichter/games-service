@@ -1,4 +1,4 @@
-// The statistics window's data (D-136): a game's own summary, with its awards checked, plus what the platform reads
+// The statistics window's data (D-140): a game's own summary, with its awards checked, plus what the platform reads
 // from the game log for every game: the players, their moves and their thinking time, and two awards for that.
 import type { GameAward, GameSummary } from "../../../packages/protocol/src/index.ts";
 import { leastAward, mostAward } from "../../../packages/sdk/src/index.ts";

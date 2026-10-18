@@ -1,4 +1,4 @@
-// AI players at the board's pace (D-137): with the table's board connected, an AI moves only once the board has
+// AI players at the board's pace (D-141): with the table's board connected, an AI moves only once the board has
 // shown everything sent so far, or the board stayed silent for the timeout. No board, or pacing off: no waiting.
 import { afterEach, describe, expect, it } from "vitest";
 import { Deck, testHost, until } from "./helpers.ts";
