@@ -215,6 +215,14 @@ try:
         print("all sounds:", {n: played.count(n) for n in sorted(set(played))})
         assert "holdem-chips" in played, played
         b.close()
+except BaseException as e:
+    # One line GitHub shows as an annotation on the e2e check, so a failure is readable without the job log.
+    import traceback
+    where = traceback.extract_tb(e.__traceback__)[-1]
+    here = [f for f in traceback.extract_tb(e.__traceback__) if f.filename.endswith("next_hand.py")]
+    line = here[-1].lineno if here else where.lineno
+    print(f"::error file=scripts/e2e/next_hand.py,line={line}::{type(e).__name__}: {str(e)[:900]}".replace("\n", " | "))
+    raise
 finally:
     host.terminate()
     cloud.terminate()
