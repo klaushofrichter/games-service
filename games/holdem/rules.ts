@@ -1,6 +1,6 @@
 // Fixed-limit Texas Hold'em. Hole cards and the deck never leave the host except to their owner;
 // the board shows shared cards, bets and the pot, and reveals hands only at showdown.
-import { count, defineGame, list, type GameContext, type GameEvent } from "../../packages/sdk/src/index.ts";
+import { count, defineGame, list, mostAward, type GameAward, type GameContext, type GameEvent } from "../../packages/sdk/src/index.ts";
 import { bestHand, compareScores, newDeck, rankOf, shuffle, suitOf, type Card } from "../../packages/sdk/src/cards.ts";
 
 export const STREETS = ["preflop", "flop", "turn", "river"] as const;
@@ -38,7 +38,20 @@ export interface State {
   lastAction: { seat: number; action: string; amount: number } | null;
   result: { winners: Winner[]; shown: Record<number, Card[]>; byFold: boolean } | null;
   over: boolean;
+  /** Counted during the game for the statistics window (D-136). */
+  stats: Record<number, SeatStats>;
 }
+
+export interface SeatStats {
+  peak: number; // most points held at once
+  biggestPot: number; // the most won in one hand
+  handsWon: number;
+  raises: number; // bets and raises
+  folds: number;
+  allIns: number;
+  bestHand: { score: number[]; name: string } | null; // the best hand shown at a showdown
+}
+const noStats = (points: number): SeatStats => ({ peak: points, biggestPot: 0, handsWon: 0, raises: 0, folds: 0, allIns: 0, bestHand: null });
 
 const sum = (r: Record<number, number>) => Object.values(r).reduce((a, b) => a + b, 0);
 const betSize = (s: State) => (s.street < 2 ? s.smallBet : s.smallBet * 2);
@@ -60,7 +73,10 @@ function pay(s: State, seat: number, amount: number): number {
   s.stacks[seat] -= paid;
   s.roundBet[seat] = (s.roundBet[seat] ?? 0) + paid;
   s.contrib[seat] = (s.contrib[seat] ?? 0) + paid;
-  if (s.stacks[seat] === 0) s.allIn[seat] = true;
+  if (s.stacks[seat] === 0 && !s.allIn[seat]) {
+    s.allIn[seat] = true;
+    if (paid > 0 && s.stats[seat]) s.stats[seat].allIns++;
+  }
   return paid;
 }
 
@@ -76,6 +92,7 @@ const clone = (s: State): State => ({
   dealt: [...s.dealt],
   inHand: [...s.inHand],
   needToAct: [...s.needToAct],
+  stats: Object.fromEntries(Object.entries(s.stats ?? {}).map(([k, v]) => [k, { ...v }])),
 });
 
 function startHand(prev: State, ctx: GameContext): { state: State; events: GameEvent[] } {
@@ -130,6 +147,10 @@ function awardPots(s: State): Winner[] {
   const won: Record<number, number> = {};
   const hands: Record<number, ReturnType<typeof bestHand>> = {};
   for (const x of s.inHand) hands[x] = bestHand([...s.holes[x], ...s.board]);
+  for (const x of s.inHand) {
+    const st = s.stats[x];
+    if (st && (!st.bestHand || compareScores(hands[x].score, st.bestHand.score) > 0)) st.bestHand = { score: hands[x].score, name: hands[x].name };
+  }
   let prev = 0;
   let lastWinners: number[] = [];
   for (const level of levels) {
@@ -169,6 +190,13 @@ function finishHand(s: State, ctx: GameContext, byFold: boolean): { state: State
     for (const x of s.inHand) shown[x] = s.holes[x];
   }
   s.result = { winners, shown, byFold };
+  for (const w of winners) {
+    const st = s.stats[w.seat];
+    if (!st) continue;
+    st.handsWon++;
+    st.biggestPot = Math.max(st.biggestPot, w.amount);
+  }
+  for (const x of s.seats) if (s.stats[x]) s.stats[x].peak = Math.max(s.stats[x].peak, s.stacks[x]);
   s.phase = "handOver";
   s.toAct = null;
   s.needToAct = [];
@@ -229,6 +257,7 @@ function act(prev: State, seat: number, action: string, ctx: GameContext) {
     case "fold":
       if (!legal.fold) return { reject: "nothing to call, you can check" };
       s.inHand = s.inHand.filter((x) => x !== seat);
+      if (s.stats[seat]) s.stats[seat].folds++;
       break;
     case "check":
       if (!legal.check) return { reject: `${toCall} to call` };
@@ -241,6 +270,7 @@ function act(prev: State, seat: number, action: string, ctx: GameContext) {
     case "bet": {
       if (legal.raise === null) return { reject: s.bets >= 4 ? "betting is capped this round" : "not enough points to raise" };
       amount = pay(s, seat, toCall + betSize(s));
+      if (s.stats[seat]) s.stats[seat].raises++;
       const now = s.roundBet[seat];
       if (now > s.currentBet) {
         const increase = now - s.currentBet;
@@ -313,6 +343,7 @@ export default defineGame<State>({
       lastAction: null,
       result: null,
       over: false,
+      stats: Object.fromEntries(seats.map((x) => [x, noStats(start)])),
     } as State;
     return startHand(s, ctx).state;
   },
@@ -389,6 +420,14 @@ export default defineGame<State>({
     return {
       text: winners.length === 1 ? `${winners[0]} wins with ${count(best, "point")} after ${count(s.hand, "hand")}.` : `${list(winners)} tie with ${count(best, "point")}.`,
       highlights: { winners, hands: s.hand, stacks: Object.fromEntries(s.seats.map((k) => [s.names[k], s.stacks[k]])) },
+      table: {
+        columns: ["Player", "Points", "Peak", "Hands won", "Biggest pot", "Bets & raises", "Folds", "Best hand"],
+        rows: ranked.map((x) => {
+          const st = s.stats[x] ?? noStats(0);
+          return [s.names[x], s.stacks[x], st.peak, st.handsWon, st.biggestPot, st.raises, st.folds, st.bestHand?.name ?? "–"];
+        }),
+      },
+      awards: awardsOf(s),
     };
   },
 
@@ -435,4 +474,25 @@ function publicView(s: State) {
     result: s.result,
     over: s.over,
   };
+}
+
+/** The statistics window's awards (D-136): who stood out; an award nobody or everybody would get is left out. */
+function awardsOf(s: State): GameAward[] {
+  const by = (f: (st: SeatStats) => number) => s.seats.map((seat) => ({ seat, score: f(s.stats[seat] ?? noStats(0)) }));
+  const shown = s.seats.filter((x) => s.stats[x]?.bestHand);
+  let best: GameAward | null = null;
+  if (shown.length >= 1) {
+    const top = shown.reduce((b, x) => (compareScores(s.stats[x].bestHand!.score, s.stats[b].bestHand!.score) > 0 ? x : b), shown[0]);
+    const holders = shown.filter((x) => compareScores(s.stats[x].bestHand!.score, s.stats[top].bestHand!.score) === 0);
+    if (holders.length < s.seats.length) best = { id: "best-of-all", icon: "🃏", title: "Best of All", blurb: "Showed the best hand of the game.", seats: holders, value: s.stats[top].bestHand!.name };
+  }
+  return [
+    best,
+    mostAward({ id: "rich", icon: "💰", title: "Rich", blurb: "Held the most points at any one time." }, by((st) => st.peak), (n) => `${n} points at the peak`),
+    mostAward({ id: "best-pot", icon: "🏺", title: "The Best Pot", blurb: "Won the biggest pot of the game." }, by((st) => st.biggestPot), (n) => `${n} points`),
+    mostAward({ id: "shark", icon: "🦈", title: "The Shark", blurb: "Won the most hands." }, by((st) => st.handsWon), (n) => count(n, "hand")),
+    mostAward({ id: "firestarter", icon: "🔥", title: "Firestarter", blurb: "Bet and raised the most." }, by((st) => st.raises), (n) => count(n, "bet or raise", "bets and raises")),
+    mostAward({ id: "careful", icon: "🐢", title: "Careful", blurb: "Folded the most." }, by((st) => st.folds), (n) => count(n, "fold")),
+    mostAward({ id: "all-in", icon: "🎲", title: "All In", blurb: "Went all in the most." }, by((st) => st.allIns), (n) => count(n, "time")),
+  ].filter((a): a is GameAward => a !== null);
 }
