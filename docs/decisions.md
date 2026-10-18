@@ -623,7 +623,10 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
     about 1.6 s each at the board's pace (D-141), a bet and Done each. Six needed about 10 s; with a shorter time to
     bet the last two never got a turn, every spin. Now, in `turnModel: "simultaneous"` games, an AI still waiting out
     its pause keeps it (it reads the game when the pause ends anyway); a move already being worked out is still
-    replaced, so no AI answers from an old view. Sequential games are unchanged. Measured: six AIs done in about 2 s,
+    replaced, so no AI answers from an old view. Sequential games are unchanged. A pause that ended without a
+    move (the game could not take one then) is not kept but scheduled afresh. One effect: an AI no longer starts its
+    pause over when someone else moves, so in Coin Flip it may guess a moment after a phone and the next round opens at
+    once; `viewer.py` now waits for the round to flip rather than for the phone's buttons to grey out. Measured: six AIs done in about 2 s,
     every seat betting every spin with 8 s to bet. Test: six AIs with a 1 s pause finish inside 5 s (fails before).
   - **AI variety.** Each AI has a pet even-money bet (`seat % 6`) for half its outside bets and a lucky number
     (`(7·seat + 11) % 37`) for 40 % of its number bets. *Conservative* now bets a number at the minimum 12 % of the

@@ -1266,7 +1266,9 @@ export class Table extends EventEmitter {
     // A move already being worked out is still replaced, so no AI answers from an old view.
     const keepWaiting = retryMs === undefined && this.runtime.manifest.turnModel === "simultaneous";
     if (keepWaiting) {
-      for (const [id, mv] of [...this.aiMoves]) if (mv.startedAt || !this.players.has(id)) this.cancelAiMove(id, mv);
+      // Kept: a pause still running (its timer set, the move not started). Anything else (a move being worked out, a
+      // pause that ended without a move because the game could not take one then) goes and is scheduled afresh.
+      for (const [id, mv] of [...this.aiMoves]) if (mv.startedAt || mv.timer === undefined || !this.players.has(id)) this.cancelAiMove(id, mv);
       if (this.stateDirty) {
         this.stateDirty = false;
         queueMicrotask(() => this.changed()); // a thinking marker went away
