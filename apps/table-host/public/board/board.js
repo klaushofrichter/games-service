@@ -56,9 +56,11 @@ function toast(msg) {
   setTimeout(() => t.remove(), 3500);
 }
 
-// Dialogs and overlays face the current front edge, like the rest of the board.
+// Dialogs and overlays face the current front edge, like the rest of the board. The overlay root lies outside the
+// turned surface, so on a remote board it is upright for its player already: there they face no edge (D-145).
+const overlayEdge = () => (REMOTE ? "south" : viewEdge());
 function faceFront(el) {
-  if (state) el.style.transform = `rotate(${ROT[viewEdge()]}deg)`;
+  if (state) el.style.transform = `rotate(${ROT[overlayEdge()]}deg)`;
   return el;
 }
 
@@ -365,7 +367,7 @@ function settleFinal() {
 /** The statistics window (D-140): it faces the board's front edge; at the table it can be turned to any edge. */
 function showStatistics() {
   if (!state?.summary || overlayRoot.querySelector(".overlay.statistics")) return;
-  openStatistics({ summary: state.summary, gameName: state.game?.name, overlayRoot, edge: viewEdge(), turnable: !REMOTE });
+  openStatistics({ summary: state.summary, gameName: state.game?.name, overlayRoot, edge: overlayEdge(), turnable: !REMOTE });
 }
 statsBtn.addEventListener("click", showStatistics);
 resultBtn.addEventListener("click", () => {
@@ -383,9 +385,11 @@ const FRONT_CORNERS = { south: ["bl", "br"], west: ["tl", "bl"], north: ["tr", "
 const LOBBY_CORNER = { "top-left": "tl", "top-right": "tr", "bottom-left": "bl", "bottom-right": "br" };
 function placeSettings(playing) {
   settingsBtn.hidden = REMOTE;
-  const front = playing ? "south" : viewEdge(); // D-127: fixed during a game, whichever way the game faces
+  // D-127: fixed during a game, whichever way the game faces. A remote board faces its player throughout (D-145).
+  const front = playing && !REMOTE ? "south" : viewEdge();
   let [corner, other] = FRONT_CORNERS[front];
-  if (playing && LOBBY_CORNER[state.game?.lobbyButton ?? "bottom-right"] === corner) corner = other;
+  // The corner the game's Lobby button actually takes on this board (turned on a remote north board, D-145).
+  if (playing && LOBBY_CORNER[cornerClass(state.game?.lobbyButton ?? "bottom-right").split(" ")[0]] === corner) corner = other;
   if (!REMOTE) {
     settingsBtn.className = `${corner} along-${front === "south" || front === "north" ? "x" : "y"}`;
     settingsBtn.querySelector("svg").style.transform = `rotate(${ROT[front]}deg)`;
@@ -738,6 +742,17 @@ function openCodePad() {
   overlayRoot.appendChild(o);
 }
 
+/**
+ * The game's corner for Lobby, Show result and Statistics (its manifest's `lobbyButton`), as a class. On a remote board
+ * turned to a north seat the surface stands on its head, so the corner is taken as its player sees it and the buttons
+ * turn with them (D-145): "top-right" is their top right, with upright text, and the tools stay at their bottom left.
+ */
+const CORNER_NAMES = ["top-left", "top-right", "bottom-right", "bottom-left"];
+function cornerClass(name) {
+  if (!REMOTE || remoteEdge() !== "north") return name;
+  return `${CORNER_NAMES[(CORNER_NAMES.indexOf(name) + 2) % 4]} turned`;
+}
+
 // ---------- center panel ----------
 function render() {
   if (!state) return;
@@ -764,12 +779,13 @@ function render() {
   lastPhase = state.phase;
   const showingGame = playing || holdFinal;
   lobbyBtn.hidden = !playing;
-  lobbyBtn.className = state.game?.lobbyButton ?? "bottom-right";
+  const gameCorner = cornerClass(state.game?.lobbyButton ?? "bottom-right");
+  lobbyBtn.className = gameCorner;
   resultBtn.hidden = !holdFinal || !finalSettled;
-  resultBtn.className = `primary ${state.game?.lobbyButton ?? "bottom-right"}`;
+  resultBtn.className = `primary ${gameCorner}`;
   // Beside Show result, when the game has statistics (D-140).
   statsBtn.hidden = resultBtn.hidden || !hasStatistics(state.summary);
-  statsBtn.className = state.game?.lobbyButton ?? "bottom-right";
+  statsBtn.className = gameCorner;
   if (state.phase !== "finished") overlayRoot.querySelector(".overlay.statistics")?.remove();
 
   renderPause();
@@ -1384,8 +1400,8 @@ function openGameLogs() {
     api,
     overlayRoot,
     toast,
-    face: (el) => (faceFront(el), viewEdge() === "east" || viewEdge() === "west"),
-    openStats: (summary, gameName) => openStatistics({ summary, gameName, overlayRoot, edge: viewEdge(), turnable: !REMOTE }),
+    face: (el) => (faceFront(el), overlayEdge() === "east" || overlayEdge() === "west"),
+    openStats: (summary, gameName) => openStatistics({ summary, gameName, overlayRoot, edge: overlayEdge(), turnable: !REMOTE }),
   });
 }
 
