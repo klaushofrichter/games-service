@@ -512,3 +512,17 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   columns) fits facing an edge; facing sideways it scrolls.
 - *Renumbered:* the statistics window and board pacing were recorded as D-136 and D-137 on 2026-10-18, numbers the
   Hold'em decisions already used. They are D-140 and D-141; code and docs follow.
+- **D-143 · 2026-10-18 · Klaus** — Phones follow the board, and an AI answering its own follow-up question doesn't
+  pause first. With AI players paced on the board (D-141), an AI player's move reaches the decks once the table's board
+  has shown it, so a phone says "Waiting for Rosa" while the board shows Rosa's move (it used to name the next AI
+  while the board still showed the one before) and "your turn" when the board gets to you. When the game asks the
+  same AI again in the same turn (Loopy: a card, then the marble to move; TAC, then its copied card), the platform's
+  AI pause (`aiDelayMs`) is skipped: it is one move, and the board shows each step anyway. *Why:* Klaus: phones
+  showed "Waiting for" names one AI ahead of the board, and around a TAC "the AI's get to think twice". *Implementation
+  (Claude):* game messages caused by an AI's intent are held per deck until the local board reports that message as
+  shown (`game idle`, D-141), until the board stays silent for the pacing timeout, or until the game no longer goes at
+  the board's pace (no local board, pacing off, game over); any other message to a deck (a human's move, a timer, a
+  pause) first sends what is held, in order. No local board or `BOARD_PACING=0`: nothing is held. A human can only act
+  out of turn in simultaneous phases (Loopy's exchange), where AI moves show at once on the board, so a deck is behind
+  for milliseconds at most there. `tests/board-pacing.test.ts`: a phone gets an AI's move once the board has shown
+  it, its own move at once.
