@@ -123,6 +123,8 @@ try:
         rdeck.locator("#ready").click()
         wait(lambda: all(x.get("ready") for x in a("GET", "/state")["players"]), 10, "both ready")
         a("POST", "/game/start")
+        # the board shows hand 1 before anyone acts (on a slow machine its module may still be loading)
+        board.locator(".he-hole .hc").first.wait_for(timeout=15000)
         seat = {x["seat"]: x["name"] for x in a("GET", "/state")["players"]}
 
         def act(name):
