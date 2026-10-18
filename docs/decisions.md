@@ -444,3 +444,25 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   Next hand) over a seat's cards. Known: on a remote board viewed from a side seat, the middle turns with the viewer
   and the shared cards run across the felt's short side, where they touch the east and west seats' cards; this was so
   before.
+- **D-138 · 2026-10-17 · Klaus** — Hold'em shows the street, the hand number and how many hands are left in two corners
+  of the board: upper left facing north, lower right facing south. The Lobby button moves to the top right. The middle
+  of the felt no longer has that line (it said *Hand 5 of 100 · turn*, readable from the south side only); it says
+  *Game over* at the end, when the corners are gone. *Implementation
+  (Claude):* the manifest's `lobbyButton` is `top-right`; the board's own buttons stay bottom left, so the other two
+  corners are free. Each corner shows *TURN · Hand 5 of 100 · 95 more to play* (*RESULT* during the result's pause,
+  *last hand* on the last), hidden once the game is over. "… to act" moved up under the pot (tighter pot line), clear of the south seat's cards. Hold'em
+  2026.10.17.3. Check: `scripts/e2e/next_hand.py` (both corners read preflop, hand 1 of 2, the north one turned 180°, the middle has no street line, neither
+  covers a seat plate or a button, Lobby top right, in 2/4/6/8-seat layouts).
+- **D-139 · 2026-10-17 · Klaus** — Hold'em gets sound effects: shuffling and dealing, chips for bets, and the like.
+  *Implementation (Claude):* made with Web Audio in `games/holdem/board.js`, no files, like Pachisi (D-102), through
+  the board kit's `playSound`, so they follow the table's sound setting (D-092). One sound per rules event, in order
+  within a step: `handStarted` a riffle (two halves of quick clicks and the bridge, 0.7 s) then one flick per card dealt
+  and two chip clicks for the blinds; `action` two knuckle taps on the felt for a check, a soft slide for a fold, chip
+  clacks for a call (2), a bet or raise (4) and all-in (9); `street` a snap per shared card (3 on the flop); `showdown`
+  or `wonByFold` the pot raked in, then a three-note chime. A board that comes up as the game starts misses the first
+  hand's events, so on its first update it plays the shuffle and deal for a fresh hand 1 (once per hand, however the
+  events arrive). Platform: `playSound` dropped every sound while a new audio context was still starting, so the first
+  sounds after a board loaded were silent in every game (CI caught it: Hold'em's first hand made no sound); it now
+  plays a sound once the context runs, if that happens within a second, so a board nobody has touched yet does not
+  release a pile of old sounds at the first tap. Check:
+  `scripts/e2e/next_hand.py` (each of the seven sounds plays, a shuffle for every hand, the first included).
