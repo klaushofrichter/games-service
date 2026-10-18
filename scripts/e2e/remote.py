@@ -234,6 +234,41 @@ try:
         deck.locator(".rules-modal .rules-close").click()
         deck.locator(".rules-modal").wait_for(state="detached")
         assert len(remote_ctx.pages) == tabs, "the terms opened a new tab"
+
+        # D-145: Rita remote on a north seat when a game ends by itself (Coin Flip, one round). Her board stands on its
+        # head; the game's corner (Coin Flip: bottom-right) is her bottom right, Show result and Statistics read
+        # upright, the tools stay at her bottom left, and the statistics window opens upright (the overlay root is not
+        # turned with the surface).
+        call(TABLE, "POST", "/api/v1/game/end", {}, {"x-table-key": "k"})
+        wait(lambda: state()["phase"] == "finished")
+        call(TABLE, "POST", "/api/v1/game/select", {"gameId": "coin-flip", "settings": {"rounds": 1, "roundSeconds": 5}}, {"x-table-key": "k"})
+        north = state()["seatEdges"].index("north")
+        call(TABLE, "POST", "/api/v1/seats/move", {"playerId": rita_id, "seat": north}, {"x-table-key": "k"})
+        bframe = remote.frame(url=re.compile(r".*/board/.*"))
+        wait(lambda: "rotate(-180deg)" in bframe.evaluate("() => document.getElementById('surface').style.transform"), 10)
+        local.click("#ready")
+        deck.locator("#ready").click()
+        wait(lambda: all(p["ready"] for p in state()["players"] if p["kind"] == "human"))
+        call(TABLE, "POST", "/api/v1/game/start", {}, {"x-table-key": "k"})
+        wait(lambda: state()["phase"] == "active")
+        local.locator("[data-guess=heads]").click()
+        deck.locator("[data-guess=tails]").click()
+        wait(lambda: state()["phase"] == "finished", 20, "the end of Coin Flip")
+        rboard.locator("#stats-button:not([hidden])").wait_for(timeout=15000)
+        # Where each button lands on Rita's screen, and which way it turns.
+        WHERE = """(id) => { const e = document.getElementById(id); const r = e.getBoundingClientRect();
+          return { x: (r.left + r.right) / 2 / innerWidth, y: (r.top + r.bottom) / 2 / innerHeight, cls: e.className }; }"""
+        res, sts, tools = (bframe.evaluate(WHERE, i) for i in ("result-button", "stats-button", "tools-button"))
+        assert res["x"] > 0.6 and res["y"] > 0.6 and "turned" in res["cls"], f"Show result is not at Rita's bottom right: {res}"
+        assert sts["x"] > 0.5 and sts["y"] > 0.6 and sts["x"] < res["x"] and "turned" in sts["cls"], f"Statistics is not beside Show result: {sts}"
+        assert tools["x"] < 0.3 and tools["y"] > 0.6, f"the tools are not at Rita's bottom left: {tools}"
+        remote.screenshot(path=os.path.join(OUT, "remote-north-finished.png"))
+        rboard.locator("#stats-button").click()
+        rboard.locator(".overlay.statistics .stats-panel").wait_for(timeout=5000)
+        turn = bframe.evaluate("() => document.querySelector('.overlay.statistics .stats-panel').style.transform")
+        assert turn in ("", "rotate(0deg)"), f"the statistics window is turned on Rita's screen: {turn}"
+        remote.screenshot(path=os.path.join(OUT, "remote-north-statistics.png"))
+        rboard.locator("[data-close-stats]").click()
         b.close()
 finally:
     host.terminate()

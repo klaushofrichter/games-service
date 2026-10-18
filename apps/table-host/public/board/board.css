@@ -408,6 +408,9 @@ button.copy:hover, button.copy.done { color: var(--brass); border-color: var(--b
 #stats-button.bottom-left { left: 260px; bottom: 38px; }
 #stats-button.top-right { right: 260px; top: 38px; }
 #stats-button.top-left { left: 260px; top: 38px; }
+/* A remote board turned to a north seat: the game's corner as its player sees it, text upright (D-145). */
+#lobby-button.turned, #result-button.turned, #stats-button.turned { transform: rotate(180deg); }
+#lobby-button.turned:active, #result-button.turned:active, #stats-button.turned:active { transform: rotate(180deg) scale(0.97); }
 .overlay.statistics { z-index: 42; }
 .overlay .panel.stats-panel { width: min(1100px, 92vw); max-height: 88vh; padding: 22px 28px 26px; }
 .overlay .panel.stats-panel.sideways { width: min(1100px, 88vh); max-height: 92vw; }
