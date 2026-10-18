@@ -453,3 +453,12 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   *last hand* on the last), hidden once the game is over. "… to act" moved up under the pot (tighter pot line), clear of the south seat's cards. Hold'em
   2026.10.17.3. Check: `scripts/e2e/next_hand.py` (both corners read preflop, hand 1 of 2, the north one turned 180°, the middle has no street line, neither
   covers a seat plate or a button, Lobby top right, in 2/4/6/8-seat layouts).
+- **D-139 · 2026-10-17 · Klaus** — Hold'em gets sound effects: shuffling and dealing, chips for bets, and the like.
+  *Implementation (Claude):* made with Web Audio in `games/holdem/board.js`, no files, like Pachisi (D-102), through
+  the board kit's `playSound`, so they follow the table's sound setting (D-092). One sound per rules event, in order
+  within a step: `handStarted` a riffle (two halves of quick clicks and the bridge, 0.7 s) then one flick per card dealt
+  and two chip clicks for the blinds; `action` two knuckle taps on the felt for a check, a soft slide for a fold, chip
+  clacks for a call (2), a bet or raise (4) and all-in (9); `street` a snap per shared card (3 on the flop); `showdown`
+  or `wonByFold` the pot raked in, then a three-note chime. A board that comes up as the game starts misses the first
+  hand's events, so on its first update it plays the shuffle and deal for a fresh hand 1. Check:
+  `scripts/e2e/next_hand.py` (each of the seven sounds plays, a shuffle for every hand, the first included).

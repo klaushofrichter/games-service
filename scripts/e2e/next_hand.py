@@ -86,7 +86,7 @@ try:
     time.sleep(1.0)
 
     with sync_playwright() as p:
-        b = p.chromium.launch(args=["--disable-features=WebRtcHideLocalIpsWithMdns"])
+        b = p.chromium.launch(args=["--disable-features=WebRtcHideLocalIpsWithMdns", "--autoplay-policy=no-user-gesture-required"])
         board = b.new_page(viewport={"width": 1920, "height": 1080})
         watch(board, "board")
         board.goto(TABLE + "/board/")
@@ -109,11 +109,20 @@ try:
         board.click(".invite button[data-x=close]")
 
         a("POST", "/game/select", {"gameId": "holdem", "settings": {"hands": 3, "turnSeconds": 0, "showdownSeconds": 30}})
+        # every sound the board plays (it keeps only the last 50)
+        board.evaluate("""() => { const all = (window.allSounds = []); const list = (window.gameTableSounds = []);
+          const push = list.push; list.push = function (...a) { all.push(...a); return push.apply(this, a); }; }""")
         ann.click("#ready")
         rdeck.locator("#ready").click()
         wait(lambda: all(x.get("ready") for x in a("GET", "/state")["players"]), 10, "both ready")
         a("POST", "/game/start")
         seat = {x["seat"]: x["name"] for x in a("GET", "/state")["players"]}
+
+        def act(name):
+            v = wait(lambda: (lambda v: v if v["phase"] == "betting" and v["toAct"] is not None else None)(view()), 10, "a turn")
+            d = ann if seat[v["toAct"]] == "Ann" else rdeck
+            d.locator(f".he-actions:not([hidden]) .he-{name}").click(timeout=10000)
+            wait(lambda: view()["lastAction"] and view()["lastAction"]["seat"] == v["toAct"], 10, f"the {name}")
 
         def fold():
             v = wait(lambda: (lambda v: v if v["phase"] == "betting" and v["toAct"] is not None else None)(view()), 10, "a turn")
@@ -149,11 +158,23 @@ try:
         nxt.wait_for(state="visible", timeout=5000)
         nxt.click()
         wait(lambda: view()["hand"] == 3 and view()["phase"] == "betting", 5, "hand 3 to start at once")
+        act("call")  # the small blind completes; the big blind checks: the flop comes
+        act("call")
+        wait(lambda: view()["street"] == "flop", 10, "the flop")
+        act("raise")  # a bet on the flop (nobody can fold while checking is free)
         fold()
         nxt.wait_for(state="visible", timeout=5000)
         assert nxt.inner_text().startswith("Finish"), nxt.inner_text()
         nxt.click()
         wait(lambda: view()["over"], 5, "the game to end")
+        # Sounds (they follow the table's sound setting, on by default): shuffle and deal for each hand after a skip,
+        # a fold, and the pot going to the winner.
+        board.wait_for_timeout(1500)
+        played = board.evaluate("() => window.allSounds")
+        print("sounds:", sorted(set(played)))
+        for want in ("holdem-shuffle", "holdem-deal", "holdem-chips", "holdem-check", "holdem-street", "holdem-fold", "holdem-win"):
+            assert want in played, f"no {want}: {played}"
+        assert played.count("holdem-shuffle") == 3, f"a shuffle for each of the three hands, the first included: {played}"
         to_lobby()
 
         # Cards, bets and the dealer button on the felt, for several layouts (Ann and Rita stay; AI fills the rest).
@@ -189,6 +210,10 @@ try:
             covered |= edges
             to_lobby()
         assert {"north", "south", "east", "west"} <= covered, covered
+        # AI players bet, call and check, and the flop comes: their sounds too
+        played = board.evaluate("() => window.allSounds")
+        print("all sounds:", {n: played.count(n) for n in sorted(set(played))})
+        assert "holdem-chips" in played, played
         b.close()
 finally:
     host.terminate()

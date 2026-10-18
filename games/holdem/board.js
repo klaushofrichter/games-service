@@ -1,9 +1,87 @@
 // Hold'em board UI: an oval felt with the shared cards and pot, each player's bet and face-down cards
 // on the felt in front of each seat, the dealer button, and revealed hands at showdown.
-import { esc, html, playerColor, remainingMs, seatPlates, useStyles } from "/shared/board-kit.js";
+import { esc, html, ping, playerColor, playSound, remainingMs, seatPlates, useStyles } from "/shared/board-kit.js";
 import { card } from "/games/holdem/assets/cards.js";
 
 const CX = 960, CY = 540; // board.css positions the felt and centre around this point
+
+// ---------- sounds (Web Audio, made here: no files to load; they follow the table's sound setting) ----------
+let noiseBuf = null;
+function noise(ctx) {
+  if (noiseBuf) return noiseBuf;
+  noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 0.5, ctx.sampleRate);
+  const d = noiseBuf.getChannelData(0);
+  for (let k = 0; k < d.length; k++) d[k] = Math.random() * 2 - 1;
+  return noiseBuf;
+}
+/** Filtered noise with a quick attack: `from`→`to` sweeps the filter (a card sliding), a fixed one knocks. */
+function burst(ctx, out, t, { from, to = from, q = 1, type = "bandpass", dur, gain }) {
+  const src = ctx.createBufferSource();
+  src.buffer = noise(ctx);
+  const f = ctx.createBiquadFilter();
+  f.type = type;
+  f.Q.value = q;
+  f.frequency.setValueAtTime(from, t);
+  if (to !== from) f.frequency.exponentialRampToValueAtTime(to, t + dur);
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(gain, t + 0.004);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  src.connect(f).connect(g).connect(out);
+  src.start(t, Math.random() * 0.4);
+  src.stop(t + dur + 0.02);
+}
+/** One card flicked across the felt. */
+const flick = (ctx, out, t, gain = 0.4) => burst(ctx, out, t, { from: 5200, to: 1800, q: 0.9, dur: 0.075, gain });
+/** One clay chip landing on others: a dry click with a short ring. */
+function clack(ctx, out, t, gain = 0.45) {
+  burst(ctx, out, t, { from: 3300 + Math.random() * 600, q: 7, dur: 0.03, gain });
+  ping(ctx, out, t, { freq: 4300 + Math.random() * 500, partials: [1, 1.71], decay: 0.06, gain: gain * 0.25 });
+}
+/** The riffle: two halves of quick card clicks, then the bridge settling. About 0.65 s. */
+function shuffleSound(ctx, t, out) {
+  for (const start of [0, 0.3]) for (let k = 0; k < 14; k++) burst(ctx, out, t + start + k * 0.016 + Math.random() * 0.005, { from: 5500, q: 2.5, dur: 0.022, gain: 0.16 });
+  burst(ctx, out, t + 0.58, { from: 2600, to: 900, q: 0.7, dur: 0.12, gain: 0.22 });
+}
+const SHUFFLE_S = 0.7;
+/** Dealing: two cards to each player in turn, then the blinds' chips. */
+function dealSound(cards) {
+  return (ctx, t, out) => {
+    const n = Math.min(cards, 16);
+    for (let k = 0; k < n; k++) flick(ctx, out, t + k * 0.075, 0.32);
+    clack(ctx, out, t + n * 0.075 + 0.1, 0.35);
+    clack(ctx, out, t + n * 0.075 + 0.16, 0.3);
+  };
+}
+/** Shared cards turned onto the felt: a snap per card (three on the flop). */
+function streetSound(cards) {
+  return (ctx, t, out) => {
+    for (let k = 0; k < cards; k++) {
+      flick(ctx, out, t + k * 0.13, 0.42);
+      burst(ctx, out, t + k * 0.13 + 0.06, { from: 900, q: 1.2, dur: 0.05, gain: 0.3 }); // it lands
+    }
+  };
+}
+/** Check: two knuckle taps on the felt. */
+function checkSound(ctx, t, out) {
+  for (const at of [0, 0.11]) burst(ctx, out, t + at, { from: 260, q: 2, type: "lowpass", dur: 0.07, gain: 0.7 });
+}
+/** Fold: the two cards pushed away, softly. */
+function foldSound(ctx, t, out) {
+  burst(ctx, out, t, { from: 3000, to: 900, q: 0.6, dur: 0.22, gain: 0.22 });
+}
+/** Chips pushed in: a few for a call, more for a bet or raise, a cascade for all-in. */
+function chipsSound(n) {
+  return (ctx, t, out) => {
+    for (let k = 0; k < n; k++) clack(ctx, out, t + k * (0.045 + Math.random() * 0.02), 0.42 - Math.min(k, 6) * 0.03);
+  };
+}
+/** The pot raked to the winner, then a small bright chime. */
+function winSound(ctx, t, out) {
+  burst(ctx, out, t, { from: 2400, to: 3800, q: 1.5, dur: 0.35, gain: 0.18 });
+  for (let k = 0; k < 9; k++) clack(ctx, out, t + 0.05 + k * 0.035 + Math.random() * 0.015, 0.3);
+  [1568, 2093, 2637].forEach((f, k) => ping(ctx, out, t + 0.45 + k * 0.08, { freq: f, partials: [1, 2.01], decay: 0.4, gain: 0.18 }));
+}
 
 export function mount(root, ctx = {}) {
   useStyles("/games/holdem/assets/cards.css");
@@ -52,10 +130,43 @@ export function mount(root, ctx = {}) {
     return [x, CY + (pos.edge === "north" ? -1 : 1) * (reach - inset)];
   };
 
+  // One sound per event, in the order they happen within a step: a move, the cards it brings, the pot going out.
+  let heard = false; // the first update: a board that comes up as the game starts missed its handStarted event
+  function sounds(events, v) {
+    let at = 0;
+    if (!heard && !events.length && v.hand === 1 && v.phase === "betting" && !v.lastAction && !v.board.length) {
+      events = [{ name: "handStarted" }];
+    }
+    heard = true;
+    const later = (ms, name, make) => (ms ? setTimeout(() => playSound(info, name, make), ms) : playSound(info, name, make));
+    for (const e of events) {
+      if (e.name === "handStarted") {
+        later(at, "holdem-shuffle", shuffleSound);
+        later(at + SHUFFLE_S * 1000, "holdem-deal", dealSound(2 * v.players.filter((p) => p.dealt).length));
+        at += 1500;
+      } else if (e.name === "action") {
+        const a = e.data?.action;
+        const allIn = v.players.find((p) => p.seat === e.data?.seat)?.allIn;
+        if (a === "fold") later(at, "holdem-fold", foldSound);
+        else if (a === "check") later(at, "holdem-check", checkSound);
+        else later(at, "holdem-chips", chipsSound(allIn ? 9 : a === "call" ? 2 : 4));
+        at += 350;
+      } else if (e.name === "street") {
+        const n = { flop: 3, turn: 1, river: 1 }[e.data?.street] ?? 0;
+        if (n) later(at, "holdem-street", streetSound(n));
+        at += 150 + n * 130;
+      } else if (e.name === "showdown" || e.name === "wonByFold") {
+        later(at, "holdem-win", winSound);
+        at += 900;
+      }
+    }
+  }
+
   return {
     update(v, events, i) {
       view = v;
       info = i;
+      sounds(events, v);
       const rot = i.rotation;
       const center = box.querySelector(".he-center");
       center.style.transform = `translate(-50%,-50%) rotate(${rot}deg)`;
