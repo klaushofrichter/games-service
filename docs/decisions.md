@@ -517,7 +517,8 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   has shown it, so a phone says "Waiting for Rosa" while the board shows Rosa's move (it used to name the next AI
   while the board still showed the one before) and "your turn" when the board gets to you. When the game asks the
   same AI again in the same turn (Loopy: a card, then the marble to move; TAC, then its copied card), the platform's
-  AI pause (`aiDelayMs`) is skipped: it is one move, and the board shows each step anyway. *Why:* Klaus: phones
+  AI pause (`aiDelayMs`) is skipped while the board paces the game: it is one move, and the board shows each step
+  anyway (without a board the pause is all that lets people follow). *Why:* Klaus: phones
   showed "Waiting for" names one AI ahead of the board, and around a TAC "the AI's get to think twice". *Implementation
   (Claude):* game messages caused by an AI's intent are held per deck until the local board reports that message as
   shown (`game idle`, D-141), until the board stays silent for the pacing timeout, or until the game no longer goes at

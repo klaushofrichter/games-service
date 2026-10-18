@@ -1121,9 +1121,10 @@ export class Table extends EventEmitter {
     for (const p of this.players.values()) {
       if (p.kind !== "ai" || p.seat === null) continue;
       const mv: AiMoveState = { seat: p.seat, startedAt: 0, deadline: 0, shown: false };
-      // No pause when this AI just moved and the game asks it again in the same turn (a card, then the marble to move):
-      // it is one move, and the board shows each step anyway (D-143).
-      const delay = retryMs ?? (p.seat === this.lastActorSeat ? 0 : this.config.aiDelayMs);
+      // No pause when this AI just moved and the game asks it again (a card, then the marble to move): it is one move,
+      // and the board shows each step anyway (D-143). Only with the board pacing the game; without it the pause is all
+      // that lets people follow.
+      const delay = retryMs ?? (p.seat === this.lastActorSeat && this.pacedByBoard ? 0 : this.config.aiDelayMs);
       mv.timer = setTimeout(() => this.thinkAi(p, mv, retryMs !== undefined), delay);
       this.aiMoves.set(p.id, mv);
     }
