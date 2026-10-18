@@ -57,7 +57,19 @@ export function audio() {
 export function playSound(info, name, make) {
   if (info?.sound === false) return;
   const ctx = audio();
-  if (!ctx || ctx.state !== "running") return;
+  if (!ctx) return;
+  // A new audio context starts suspended and resumes a moment later: play once it runs instead of dropping the
+  // first sounds after the board loads (Hold'em's first shuffle, D-139). Only if it runs within a second, so a board
+  // that may not play sound yet (nobody has touched it) does not let a pile of old sounds out at the first tap.
+  if (ctx.state !== "running") {
+    const asked = performance.now();
+    ctx.resume().then(() => ctx.state === "running" && performance.now() - asked < 1000 && start(ctx, name, make), () => {});
+    return;
+  }
+  start(ctx, name, make);
+}
+
+function start(ctx, name, make) {
   const out = ctx.createGain();
   out.gain.value = 0.5;
   out.connect(ctx.destination);
