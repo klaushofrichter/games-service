@@ -45,6 +45,10 @@ export interface TableConfig {
   publicUrl: string; // e.g. http://192.168.1.20:8080
   graceMs: number; // how long a disconnected seat is held
   aiDelayMs: number; // pause before an AI acts, so people can follow
+  /** AI players wait until the table's board has shown everything (D-137); off for fast tests (BOARD_PACING=0). */
+  boardPacing?: boolean;
+  /** An AI waits at most this long for a board that does not answer (D-137). */
+  boardPaceTimeoutMs?: number;
   joinTokenTtlMs: number;
   requireCloud: boolean; // phase 1a dev mode may run without the cloud
   maxRemotePlayers: number;
@@ -1106,8 +1110,42 @@ export class Table extends EventEmitter {
     }
   }
 
+  // ---------- AI players at the board's pace (D-137) ----------
+  // The table's one local board (D-132) answers each game message with "idle" once it has shown it (its game's
+  // whenIdle, D-134). An AI player starts its move only when the board has shown everything sent so far, or the board
+  // has been silent for boardPaceTimeoutMs. Without a local board (tests, a table run headless) or with pacing off,
+  // AI players don't wait. Remote boards never hold the game up.
+  private boardSent = 0; // the last game message number sent to the local board
+  private boardShown = 0; // the last one it reported as shown
+  private boardSentAt = 0;
+  private localBoard = false;
+  /** The number for the next game message to the boards. */
+  nextBoardMessage() {
+    this.boardSent++;
+    this.boardSentAt = Date.now();
+    return this.boardSent;
+  }
+  /** The local board has shown game message `n`. */
+  boardIdle(n: number) {
+    if (!Number.isInteger(n) || n <= this.boardShown || n > this.boardSent) return;
+    this.boardShown = n;
+  }
+  /** Whether a local board is connected. */
+  setLocalBoard(connected: boolean) {
+    this.localBoard = connected;
+    if (!connected) this.boardShown = this.boardSent;
+  }
+  private waitingForBoard() {
+    if (!this.config.boardPacing || !this.localBoard || this.boardShown >= this.boardSent) return false;
+    return Date.now() - this.boardSentAt < (this.config.boardPaceTimeoutMs ?? 20_000);
+  }
+
   private thinkAi(p: Player, mv: AiMoveState, retried: boolean) {
     mv.timer = undefined;
+    if (this.aiMoves.get(p.id) === mv && this.waitingForBoard()) {
+      mv.timer = setTimeout(() => this.thinkAi(p, mv, retried), 50); // the board is still showing the last moves
+      return;
+    }
     const rt = this.runtime;
     const game = this.runningGame;
     if (this.aiMoves.get(p.id) !== mv || this.phase !== "active" || !rt || !game || !this.players.has(p.id) || rt.over || p.seat === null) return;

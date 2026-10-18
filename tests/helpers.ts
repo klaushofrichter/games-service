@@ -8,7 +8,7 @@ import type { Envelope, LobbyState } from "../packages/protocol/src/index.ts";
 
 export async function testHost(o: HostOptions = {}) {
   const dataDir = await mkdtemp(join(tmpdir(), "gametable-"));
-  const host = await startHost({ port: 0, host: "127.0.0.1", tableKey: "test-key", dataDir, graceMs: 300, aiDelayMs: 5, ...o });
+  const host = await startHost({ port: 0, host: "127.0.0.1", tableKey: "test-key", dataDir, graceMs: 300, aiDelayMs: 5, boardPacing: false, ...o });
   const base = `http://127.0.0.1:${host.port}`;
   const decks: Deck[] = [];
 
