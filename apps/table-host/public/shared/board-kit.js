@@ -8,7 +8,7 @@ export const H = 1080;
 export const ROT = { south: 0, west: 90, north: 180, east: -90 };
 
 /** One color per seat, distinct on the dark felt and for common color-vision deficiencies. */
-export const SEAT_COLORS = ["#e8b04a", "#5fb7e8", "#e8735f", "#7fd18b", "#c38be8", "#dde3ea", "#5fe0c8", "#e88fbf"];
+export const SEAT_COLORS = ["#f2d24b", "#5fb7e8", "#e5484d", "#7fd18b", "#9d6bf0", "#dde3ea", "#f08a3c", "#ef8fcf"];
 export const seatColor = (seat) => SEAT_COLORS[seat % SEAT_COLORS.length];
 
 /**
