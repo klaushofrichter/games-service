@@ -125,6 +125,11 @@ def pachisi(browser, board):
     rows.nth(1).locator(".swatch").nth(4).click()
     wait_for(decks[1], ".pc-tokens .card > div:first-child", purple)
     board.wait_for_function("() => document.querySelectorAll('.player-colors .swatch.on').length === 3")
+    # The board redraws the rows after the swap reaches it, which can be a moment after Mira's phone: wait for it.
+    for _ in range(50):
+        if rows.nth(0).locator(".swatch.on").get_attribute("style") != klaus_before:
+            break
+        time.sleep(0.1)
     assert rows.nth(0).locator(".swatch.on").get_attribute("style") != klaus_before, "picking a taken colour swaps it"
     # on the board: each player's card has a border and a dot before the name in their colour
     time.sleep(0.3)
