@@ -157,7 +157,80 @@ describe("AI simulation", () => {
   });
 });
 
+describe("statistics (D-150)", () => {
+  it("ends with a player table, the wheel's facts and awards", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "roulette-sim-"));
+    const logs = new LogStore(dir);
+    const r = await runSimulation({ ...game, dir: "" }, { players: 6, games: 3, seed: 7, settings: { rounds: 30 }, aiOptions: { style: "aggressive" } }, logs, "test");
+    const { games } = await LogStore.unzip((await logs.read(r.logId))!);
+    for (const log of games) {
+      const summary = (log.at(-1) as any).summary;
+      expect(summary.table.columns).toEqual(["Player", "Points", "Net", "Bets", "Spins won", "Biggest win", "Best streak"]);
+      expect(summary.table.rows).toHaveLength(6);
+      const f = summary.highlights.facts;
+      expect(f.spins).toBe(summary.highlights.spins.length);
+      expect(f.reds + f.blacks + f.zeros).toBe(f.spins);
+      expect(summary.text).toMatch(/Over \d+ spins: \d+ red, \d+ black/);
+      expect(summary.awards.length).toBeGreaterThan(3);
+      for (const a of summary.awards) expect(a.seats.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("counts runs of a colour and bets by type", () => {
+    const { rt, clock, state } = start(game, 2, { rounds: 3 }, 9);
+    for (let k = 0; k < 3; k++) {
+      rt.submit(0, { name: "placeBet", payload: { type: "odd", amount: 10 } }, "human");
+      rt.submit(0, { name: "placeBet", payload: { type: "straight", target: 0, amount: 10 } }, "human");
+      clock.advance();
+      clock.advance();
+    }
+    const st = (state() as any).stats;
+    expect(st[0].byType).toEqual({ odd: 3, straight: 3 });
+    expect(st[0].zero).toBe(3);
+    expect(st[1].sitOut).toBe(3);
+    expect(rt.summary?.awards?.map((a) => a.id)).toEqual(expect.arrayContaining(["odd-man", "zero-hero", "wallflower"]));
+    expect(expectReplay(game, rt)).toBe(true);
+  });
+
+  it("gives AI players some variety: numbers too, not only even-money chances", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "roulette-sim-"));
+    const logs = new LogStore(dir);
+    const r = await runSimulation({ ...game, dir: "" }, { players: 4, games: 4, seed: 3, settings: { rounds: 20 }, aiOptions: { style: "conservative" } }, logs, "test");
+    const { games } = await LogStore.unzip((await logs.read(r.logId))!);
+    const types = new Set<string>();
+    for (const log of games) for (const rec of log as any[]) if (rec.t === "intent" && rec.accepted && rec.intent.name === "placeBet") types.add(rec.intent.payload.type);
+    expect(types).toContain("straight");
+    expect([...types].some((t) => t === "dozen" || t === "column")).toBe(true);
+  });
+});
+
 describe("through the table host", () => {
+  it("lets six AI players bet at the same time, not one after another (D-150)", async () => {
+    // With one second's pause before each AI move, six AIs in a row (a bet and Done each) would need about 12 s;
+    // at the same time they are done in about 2, well inside the 5 s to bet.
+    const t = await testHost({ aiDelayMs: 1000, allowNoLocalPlayer: true });
+    try {
+      await t.ok("POST", "/layout", { seats: 6 });
+      for (let k = 0; k < 6; k++) await t.ok("POST", "/ai", {});
+      await t.ok("POST", "/game/select", { gameId: "roulette", settings: { rounds: 1, bettingSeconds: 5, resultSeconds: 2 } });
+      await t.ok("POST", "/game/start");
+      const t0 = Date.now();
+      let board: any;
+      for (;;) {
+        board = await t.ok("GET", "/game/board");
+        if (board.view.phase === "result" || Date.now() - t0 > 8000) break;
+        await sleep(100);
+      }
+      expect(board.view.phase).toBe("result");
+      const staked = Object.values(board.view.last.results as Record<string, { staked: number }>).map((x) => x.staked);
+      expect(staked).toHaveLength(6);
+      expect(staked.every((x) => x > 0)).toBe(true);
+      expect(Date.now() - t0).toBeLessThan(4500); // everyone said Done before the timer ran out
+    } finally {
+      await t.close();
+    }
+  });
+
   it("plays a round from two decks and an AI seat, with private views and a countdown", async () => {
     const t = await testHost();
     try {

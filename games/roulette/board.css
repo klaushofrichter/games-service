@@ -9,10 +9,22 @@
 .rl-spin { transform-origin: 300px 300px; transition: transform 5.2s cubic-bezier(.12,.68,.18,1); }
 .rl-ball { transition: opacity .4s; }
 .rl-side { display: flex; flex-direction: column; gap: 18px; }
-.rl-status { display: flex; align-items: baseline; gap: 24px; min-height: 64px; }
-.rl-status .big { font-family: var(--display); font-size: 48px; color: var(--ink); }
-.rl-status .clock { font-family: var(--mono); font-size: 34px; color: var(--brass); margin-left: auto; }
-.rl-status .clock.hurry { color: var(--ruby); }
+/* A fixed height for the status row and the hint line below the layout: the side column keeps one size in every
+   phase, so the grid never re-centres it and the layout stays put (D-150). */
+.rl-status { display: flex; align-items: center; gap: 24px; height: 80px; }
+.rl-status .eyebrow { white-space: nowrap; }
+.rl-status .big { font-family: var(--display); font-size: 48px; line-height: 1; color: var(--ink); white-space: nowrap; }
+.rl-clock { position: relative; width: 76px; height: 76px; margin-left: auto; flex: none; transition: opacity .3s; }
+.rl-clock.off { opacity: 0; }
+.rl-clock svg { display: block; }
+.rl-clock circle { fill: none; stroke-width: 6; }
+.rl-clock .track { stroke: rgba(243, 238, 226, .14); fill: rgba(0, 0, 0, .25); }
+.rl-clock .left { stroke: var(--brass); stroke-linecap: round; transition: stroke-dashoffset .2s linear, stroke .3s; }
+.rl-clock .secs { position: absolute; inset: 0; display: grid; place-items: center; font-family: var(--text); font-size: 28px;
+  font-weight: 700; font-variant-numeric: tabular-nums; color: var(--ink); }
+.rl-clock.hurry .left { stroke: var(--ruby); }
+.rl-clock.hurry .secs { color: var(--ruby); animation: rl-beat 1s ease-out infinite; }
+@keyframes rl-beat { from { transform: scale(1.15); } to { transform: scale(1); } }
 .rl-layout text { font-family: var(--text); fill: var(--ink); pointer-events: none; }
 .rl-layout .num { font-family: var(--display); font-size: 28px; font-weight: 600; }
 .rl-layout .lbl { font-size: 20px; letter-spacing: .04em; }
@@ -32,4 +44,4 @@
 .rl-history span { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: 17px; border: 2px solid rgba(255,255,255,.25); }
 .rl-history .red { background: #a8322a; } .rl-history .black { background: #191a1c; } .rl-history .green { background: #1f7a4d; }
 .rl-history span:last-child { border-color: var(--brass); }
-.rl-legend { color: var(--ink-soft); font-size: 20px; }
+.rl-legend { color: var(--ink-soft); font-size: 20px; line-height: 28px; height: 28px; }

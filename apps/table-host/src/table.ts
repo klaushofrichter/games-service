@@ -1260,9 +1260,21 @@ export class Table extends EventEmitter {
    */
   private scheduleAi(retryMs?: number) {
     if (this.phase !== "active" || !this.runtime) return;
-    this.stopAllAi();
+    // In a game everyone plays at once (Roulette), an AI still waiting for its pause keeps its place (D-150): it reads
+    // the game as it is when the pause ends anyway. Restarting every waiting AI at each move let the first in line
+    // cancel all the others, so the AIs bet one after another in join order and the last ones ran out of time.
+    // A move already being worked out is still replaced, so no AI answers from an old view.
+    const keepWaiting = retryMs === undefined && this.runtime.manifest.turnModel === "simultaneous";
+    if (keepWaiting) {
+      for (const [id, mv] of [...this.aiMoves]) if (mv.startedAt || !this.players.has(id)) this.cancelAiMove(id, mv);
+      if (this.stateDirty) {
+        this.stateDirty = false;
+        queueMicrotask(() => this.changed()); // a thinking marker went away
+      }
+    } else this.stopAllAi();
     for (const p of this.players.values()) {
       if (p.kind !== "ai" || p.seat === null) continue;
+      if (keepWaiting && this.aiMoves.has(p.id)) continue;
       const mv: AiMoveState = { seat: p.seat, startedAt: 0, deadline: 0, shown: false };
       // No pause when this AI just moved and the game asks it again (a card, then the marble to move): it is one move,
       // and the board shows each step anyway (D-143). Only with the board pacing the game; without it the pause is all
