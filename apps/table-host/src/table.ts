@@ -45,9 +45,9 @@ export interface TableConfig {
   publicUrl: string; // e.g. http://192.168.1.20:8080
   graceMs: number; // how long a disconnected seat is held
   aiDelayMs: number; // pause before an AI acts, so people can follow
-  /** AI players wait until the table's board has shown everything (D-137); off for fast tests (BOARD_PACING=0). */
+  /** AI players wait until the table's board has shown everything (D-141); off for fast tests (BOARD_PACING=0). */
   boardPacing?: boolean;
-  /** An AI waits at most this long for a board that does not answer (D-137). */
+  /** An AI waits at most this long for a board that does not answer (D-141). */
   boardPaceTimeoutMs?: number;
   joinTokenTtlMs: number;
   requireCloud: boolean; // phase 1a dev mode may run without the cloud
@@ -1020,7 +1020,7 @@ export class Table extends EventEmitter {
     this.waitingFor.clear();
     // Extra games that changed while this one ran take effect now (D-097); the log below still names the code it ran.
     if (this.pendingExtra) queueMicrotask(() => this.applyPendingExtra());
-    this.summary = withStatistics(rt.summary, rt.log); // with the statistics window's data (D-136)
+    this.summary = withStatistics(rt.summary, rt.log); // with the statistics window's data (D-140)
     const ms = Date.now() - this.gameStartedAt;
     if (terminated) this.metrics.gamesTerminated++;
     else this.metrics.gamesPlayed++;
@@ -1110,7 +1110,7 @@ export class Table extends EventEmitter {
     }
   }
 
-  // ---------- AI players at the board's pace (D-137) ----------
+  // ---------- AI players at the board's pace (D-141) ----------
   // The table's one local board (D-132) answers each game message with "idle" once it has shown it (its game's
   // whenIdle, D-134). An AI player starts its move only when the board has shown everything sent so far, or the board
   // has been silent for boardPaceTimeoutMs. Without a local board (tests, a table run headless) or with pacing off,

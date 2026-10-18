@@ -362,7 +362,7 @@ def endings(browser, board):
     assert not board.evaluate("() => document.querySelector('.cf-coin')?.getAnimations().some((a) => a.playState === 'running')"), "Show result appeared before the coin landed"
     time.sleep(1.4)
     assert board.evaluate("() => window.gameTableSounds") == [], "no sounds with sound off"
-    # The statistics window (D-136): beside Show result, with the awards the host kept, turnable at the table.
+    # The statistics window (D-140): beside Show result, with the awards the host kept, turnable at the table.
     summary = api("GET", "/state")["summary"]
     assert summary["players"] and summary["play"], summary
     board.wait_for_selector("#stats-button:not([hidden])")

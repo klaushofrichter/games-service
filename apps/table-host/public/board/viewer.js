@@ -223,7 +223,7 @@ export function openViewer({ api, overlayRoot, face, toast, openStats }) {
     const tr = e.target.closest("tr[data-log], tr[data-line]");
     if (b?.dataset.close !== undefined) return close();
     if (b?.dataset.stats !== undefined) {
-      // The finished game's statistics window (D-136), over the viewer.
+      // The finished game's statistics window (D-140), over the viewer.
       const st = await api("GET", `/history/${encodeURIComponent(v.log.id)}/${v.game}/statistics`).catch(() => null);
       if (st) openStats(st, v.log.gameName);
       return;

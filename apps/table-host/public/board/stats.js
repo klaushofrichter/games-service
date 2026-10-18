@@ -1,4 +1,4 @@
-// The statistics window (D-136): a finished game's awards and statistics on the board, scrollable. The game sends
+// The statistics window (D-140): a finished game's awards and statistics on the board, scrollable. The game sends
 // the data (its summary's `awards` and `table`); the host adds `players` and `play` from the log. Used by the board
 // (after a game, and on the result screen) and by the Game Viewer.
 import { esc, ROT } from "/shared/board-kit.js";

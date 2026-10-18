@@ -172,17 +172,17 @@ export interface GameSummary {
   /** Optional statistics the result screen shows as a table (D-091), e.g. per player: correct guesses, heads %. */
   table?: { columns: string[]; rows: (string | number)[][] };
   /**
-   * Optional awards for the statistics window (D-136): a title for the players who stood out, e.g. "The Killer" for
+   * Optional awards for the statistics window (D-140): a title for the players who stood out, e.g. "The Killer" for
    * the most captures. The host drops awards that nobody or every player holds.
    */
   awards?: GameAward[];
-  /** Filled in by the host (D-136): the seats' names, for the awards. */
+  /** Filled in by the host (D-140): the seats' names, for the awards. */
   players?: { seat: number; name: string; ai: boolean }[];
-  /** Filled in by the host from the game log (D-136): moves and thinking time per player. */
+  /** Filled in by the host from the game log (D-140): moves and thinking time per player. */
   play?: { columns: string[]; rows: (string | number)[][] };
 }
 
-/** One award in the statistics window (D-136). */
+/** One award in the statistics window (D-140). */
 export interface GameAward {
   /** Stable id, e.g. "killer". */
   id: string;

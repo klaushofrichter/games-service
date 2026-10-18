@@ -6,6 +6,8 @@ page is the history. Leave it empty if there is nothing to add beyond the commit
 
 ## [Unreleased]
 
+- The finished screen keeps to the middle of the board (D-142): a long statistics table (six-player Loopy)
+  scrolls in a smaller font instead of running over the seats.
 - Hold'em sounds (D-139): a riffle shuffle and the deal at each hand, chips for calls, bets and raises (a cascade
   for all-in), knuckle taps for a check, a soft slide for a fold, a snap per shared card, and the pot raked in with a
   chime for the winner. They follow the table's sound setting.

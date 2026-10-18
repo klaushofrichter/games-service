@@ -469,7 +469,7 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
 
 ## The statistics window (18 Oct 2026)
 
-- **D-136 · 2026-10-18 · Klaus** — A finished game's awards and statistics in a window on the board, for every game
+- **D-140 · 2026-10-18 · Klaus** — A finished game's awards and statistics in a window on the board, for every game
   that sends them. *Why:* the C# Loopy ended with trophies (*The Killer*, *The Piñata*, …) and per-player counts; this
   is worth having for all games, drawn the same way.
   - **Data.** A game's summary may carry `awards: { id, icon, title, blurb?, seats, value? }[]`; the SDK's `mostAward`
@@ -491,7 +491,7 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   - **Checks.** `tests/statistics.test.ts` (the helpers, the host's checks, moves and pace without pauses, Coin Flip
     and Hold'em awards, the history endpoint); `scripts/e2e/play.py endings` (the button, the awards shown, turning to
     east and north, the result screen's button, Escape).
-- **D-137 · 2026-10-18 · Klaus** — AI players play at the board's pace: an AI moves only once the table's board has
+- **D-141 · 2026-10-18 · Klaus** — AI players play at the board's pace: an AI moves only once the table's board has
   shown the moves before. *Why:* AI players moved faster than Loopy's board animates a turn, so in a game of mostly AI
   players the board fell behind every round (measured: 8 rounds behind after two minutes); the game ended on the
   table in round 20 while the board showed round 9, and *Show result* appeared there after D-134's two-minute limit.
@@ -503,3 +503,12 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   *Show result* is removed (Klaus: speculative). Measured with a Loopy game of four AI players: board and table on the
   same round throughout. `tests/board-pacing.test.ts`: waiting for a silent board until the timeout, going on as each
   move is shown, no waiting without a board or with pacing off, a board that goes away.
+- **D-142 · 2026-10-18 · Klaus** — The finished screen fits in the center panel: the game's statistics table scrolls
+  (both ways) in a smaller font, so a six-player Loopy table no longer runs over the seats at the board's edge.
+  *Why:* Klaus: "the six player Loopy game uses too much space for the Game summary. We should use scrollbars, and
+  possibly smaller font." *Implementation (Claude):* the summary is a column bounded by the center panel (also
+  sideways); the result text and the buttons stay in view, the table sits in a scroll box with its header row and
+  player column kept in place. Table text 18 px (was 26), headers 11 px, tighter cells, no wrapping in cells: a six-player Loopy table (10
+  columns) fits facing an edge; facing sideways it scrolls.
+- *Renumbered:* the statistics window and board pacing were recorded as D-136 and D-137 on 2026-10-18, numbers the
+  Hold'em decisions already used. They are D-140 and D-141; code and docs follow.
