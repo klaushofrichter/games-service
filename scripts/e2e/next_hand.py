@@ -109,6 +109,13 @@ try:
         board.click(".invite button[data-x=close]")
 
         a("POST", "/game/select", {"gameId": "holdem", "settings": {"hands": 3, "turnSeconds": 0, "showdownSeconds": 30}})
+        # The board's audio running before the game starts: a headless browser without a sound device can take a while to
+        # start it, and a sound asked for meanwhile is dropped (the board kit waits a second at most).
+        took = board.evaluate("""async () => { const t0 = performance.now(); const { audio } = await import('/shared/board-kit.js');
+          for (let k = 0; k < 100; k++) { const c = audio(); if (c && c.state === 'running') return Math.round(performance.now() - t0);
+            await new Promise((r) => setTimeout(r, 100)); } return -1; }""")
+        print(f"board audio running after {took} ms")
+        assert took >= 0, "the board's audio never started"
         # every sound the board plays (it keeps only the last 50)
         board.evaluate("""() => { const all = (window.allSounds = []); const list = (window.gameTableSounds = []);
           const push = list.push; list.push = function (...a) { all.push(...a); return push.apply(this, a); }; }""")
@@ -174,7 +181,7 @@ try:
         print("sounds:", sorted(set(played)))
         for want in ("holdem-shuffle", "holdem-deal", "holdem-chips", "holdem-check", "holdem-street", "holdem-fold", "holdem-win"):
             assert want in played, f"no {want}: {played}"
-        assert played.count("holdem-shuffle") == 3, f"a shuffle for each of the three hands, the first included: {played}"
+        assert played.count("holdem-shuffle") == 3, f"a shuffle for each of the three hands, the first included (audio ran after {took} ms): {played}"
         to_lobby()
 
         # Cards, bets and the dealer button on the felt, for several layouts (Ann and Rita stay; AI fills the rest).
