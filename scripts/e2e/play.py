@@ -459,6 +459,23 @@ def dialogs(browser, board):
     board.wait_for_selector(".overlay.settings", state="detached")
     pick_game(board, "roulette")
     board.wait_for_selector(".dialog.form")
+    # D-146: a number out of range says so in a message to acknowledge, before the form closes; a tap beside the
+    # message does not close it, OK does, and the form is still open with the field to correct.
+    board.fill(".dialog [name=rounds]", "51")
+    board.click(".dialog.form [data-x=yes]")
+    note = board.locator(".dialog-backdrop.notice .dialog")
+    note.wait_for(timeout=5000)
+    text = note.inner_text()
+    assert "Spins" in text and "1 to 50" in text and "too high" in text, text
+    shot(board, "settings-out-of-range")
+    board.mouse.click(30, 30)  # beside the message
+    time.sleep(0.3)
+    assert note.count() == 1, "a tap beside the message closed it"
+    note.locator("[data-x=ok]").click()
+    board.wait_for_selector(".dialog-backdrop.notice", state="detached")
+    assert board.locator(".dialog.form").count() == 1, "the form closed after the message"
+    assert board.evaluate("document.activeElement?.name") == "rounds", "the field to correct is not focused"
+    assert api("GET", "/state")["phase"] != "ready", "a game was chosen with the setting out of range"
     board.fill(".dialog [name=rounds]", "4")
     shot(board, "settings-dialog")
     board.click(".dialog [data-x=yes]")

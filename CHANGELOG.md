@@ -6,6 +6,8 @@ page is the history. Leave it empty if there is nothing to add beyond the commit
 
 ## [Unreleased]
 
+- A game setting typed out of range (D-146) is caught in the settings window: a message names the setting and what it
+  can be, waits for OK, and the window stays open on that field.
 - A remote player on a north seat (D-145): *Show result*, *Statistics* and *Lobby* sit in the game's corner as they
   see it, with upright text, the tools stay at their lower left, and the statistics window and other dialogs open the
   right way up on their screen.
