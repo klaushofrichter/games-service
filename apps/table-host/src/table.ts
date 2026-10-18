@@ -29,6 +29,18 @@ import { baseMeta, countRecords, rebuild, verifyGame, verifySummary } from "./ga
 import { AiCancelled, AiWorker, aiMove, isPromise, usesWorker } from "./ai.ts";
 import type { LogStore, PlayerMeta, RunningLog } from "./logs.ts";
 
+/** The longest player name (D-148): longer ones are cut. Room for "Alexandra 12" on every seat plate and result table. */
+export const MAX_NAME = 12;
+
+/** Spaces tidied, control characters dropped, cut to MAX_NAME characters (not UTF-16 units, so emoji stay whole). */
+export function trimName(raw: unknown): string {
+  const n = String(raw ?? "").normalize("NFC").replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202e\u2060-\u206f]/g, "").replace(/\s+/g, " ").trim();
+  return Array.from(n).slice(0, MAX_NAME).join("").trim();
+}
+
+/** What makes two names the same (D-148): case, accents as typed (é ≠ e), and spacing don't matter beyond that. */
+const nameKey = (n: string) => n.normalize("NFKC").toLocaleLowerCase("en").replace(/\s+/g, " ").trim();
+
 export class TableError extends Error {
   readonly status: number;
   /** A machine-readable reason where a client acts on it, e.g. "no-seat" (D-129). */
@@ -395,7 +407,8 @@ export class Table extends EventEmitter {
     // A seat is taken when a player joins (D-129): with none free, nobody joins to stand around without one.
     const noSeat = this.noFreeSeat();
     if (noSeat) throw new TableError(409, noSeat, "no-seat");
-    const name = this.cleanName(rawName);
+    // Names are unique at the table (D-148); a remote player can't retype on the invite page, so theirs gets a number.
+    const name = location === "remote" ? this.freeName(rawName) : this.cleanName(rawName);
     const id = newId("p");
     const sessionToken = randomBytes(24).toString("base64url");
     const p: Player = { id, name, kind: "human", location, seat: null, connected: true, ready: false, sessionToken, remoteSession };
@@ -405,10 +418,52 @@ export class Table extends EventEmitter {
     return { playerId: id, sessionToken };
   }
 
-  private cleanName(raw: unknown): string {
-    const n = String(raw ?? "").replace(/\s+/g, " ").trim().slice(0, 24);
-    if (n) return n;
-    return `Player ${this.players.size + 1}`;
+  /**
+   * A player's name (D-148): spaces tidied, control characters dropped, cut to MAX_NAME characters, and unique at the
+   * table ignoring case (refused with code "name-taken" otherwise). Empty: the next free "Player N". "(AI)" at the end
+   * is for AI players.
+   */
+  private cleanName(raw: unknown, exceptId?: string): string {
+    const n = trimName(raw);
+    if (!n) {
+      let i = this.players.size + 1;
+      while (this.nameTaken(`Player ${i}`)) i++;
+      return `Player ${i}`;
+    }
+    if (/\(\s*ai\s*\)$/i.test(n)) throw new TableError(400, "names ending in (AI) are for AI players; choose another name", "name-invalid");
+    if (this.nameTaken(n, exceptId)) throw new TableError(409, `${n} is already at this table; choose another name`, "name-taken");
+    return n;
+  }
+
+  /** A remote player's name: as cleanName, but a taken one gets a number ("Ann 2") instead of being refused. */
+  private freeName(raw: unknown): string {
+    let base = trimName(raw).replace(/\s*\(\s*ai\s*\)$/i, "").trim();
+    if (!base) return this.cleanName("");
+    if (!this.nameTaken(base)) return base;
+    for (let i = 2; ; i++) {
+      const suffix = ` ${i}`;
+      const n = Array.from(base).slice(0, MAX_NAME - suffix.length).join("").trim() + suffix;
+      if (!this.nameTaken(n)) return n;
+    }
+  }
+
+  private nameTaken(n: string, exceptId?: string): boolean {
+    const k = nameKey(n);
+    return [...this.players.values()].some((p) => p.id !== exceptId && nameKey(p.name) === k);
+  }
+
+  /** A player changes their own name on the phone (D-148), not during a game: games use the names they started with. */
+  rename(playerId: string, raw: unknown) {
+    const p = this.mustPlayer(playerId);
+    if (p.kind !== "human") throw new TableError(409, "AI players keep their names; remove one and add another for a new name");
+    if (this.phase === "active" || this.phase === "paused" || this.phase === "terminating")
+      throw new TableError(409, "names can be changed between games, not during one");
+    if (!trimName(raw)) throw new TableError(400, "a name needs at least one character", "name-invalid");
+    const n = this.cleanName(raw, p.id);
+    if (n === p.name) return p;
+    p.name = n;
+    this.changed();
+    return p;
   }
 
   resume(sessionToken: string): PlayerInfo {
