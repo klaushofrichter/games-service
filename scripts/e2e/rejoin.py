@@ -45,6 +45,7 @@ try:
         ann.click("#ready")
         ben.click("#ready")
         wait(lambda: all(pl["ready"] for pl in players().values()), 10, "everyone ready")
+        a("POST", "/play", {"awayTimeout": True})  # the waiting time is a setting, off by default (D-144)
         a("POST", "/game/start", {})
         ben.wait_for_selector("[data-guess=heads]")
 

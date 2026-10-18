@@ -264,6 +264,13 @@ export interface LobbyState {
   /** The table's display choices from the board's settings (D-092), followed by every board, remote ones too. */
   display: { sound: boolean };
   /**
+   * D-144: `awayTimeout` — a player whose phone stays away during a game leaves it after the waiting time (on), or
+   * their seat waits (off, the default). `away`: players away that long during the game whose seat waits; the board
+   * offers to hand their seat to an AI player.
+   */
+  play: { awayTimeout: boolean };
+  away: { playerId: string; name: string; seat: number; since: number }[];
+  /**
    * The developer setting (D-118): games without a player at the table. `protectedPlayer`: the one player the board
    * may not remove while it is off (the last one at the table, while a game is chosen or running).
    */

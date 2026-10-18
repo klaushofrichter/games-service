@@ -171,6 +171,8 @@ export class Table extends EventEmitter {
         .filter(([, m]) => m.shown)
         .map(([playerId, m]) => ({ playerId, seat: m.seat, since: m.startedAt, deadline: m.deadline })),
       display: { sound: this.sound },
+      play: { awayTimeout: this.awayTimeout },
+      away: this.awayPlayers(),
       developer: { allowNoLocalPlayer: this.allowNoLocalPlayer, protectedPlayer: this.protectedPlayer()?.id ?? null },
       noSeat: this.noFreeSeat(),
       remote: { boardControl: this.remoteBoardControl, maxPlayers: this.config.maxRemotePlayers, players: this.humans().filter((p) => p.location === "remote").length },
@@ -411,12 +413,15 @@ export class Table extends EventEmitter {
 
   resume(sessionToken: string): PlayerInfo {
     const p = [...this.players.values()].find((x) => x.sessionToken && x.sessionToken === sessionToken);
+    if (!p && this.handedToAi.has(sessionToken))
+      throw new TableError(403, `your seat was handed to ${this.handedToAi.get(sessionToken)} while you were away; scan the QR code to join the next game`);
     if (!p) throw new TableError(403, "session expired; scan the QR code to join again (during a game: Settings › Show join code on the board)");
     if (p.graceTimer) clearTimeout(p.graceTimer);
     p.graceTimer = undefined;
     const wasAway = !p.connected;
     p.connected = true;
     if (wasAway && this.inRunningGame(p)) this.runtime!.noteConnection(p.seat!, true);
+    this.awaySince.delete(p.id);
     if (this.waitingFor.delete(p.id)) this.syncPlayerPause(); // the game goes on when everyone it needs is back
     this.changed();
     return p;
@@ -440,6 +445,10 @@ export class Table extends EventEmitter {
     if (need !== true) {
       this.waitingFor.set(p.id, { seat: p.seat!, text: need.wait, since: Date.now() });
       this.syncPlayerPause();
+    } else if (inGame && !this.awayTimeout) {
+      // The seat waits (D-144); after a moment the board shows the player as away, with the choice to hand the seat to an AI.
+      this.awaySince.set(p.id, Date.now());
+      setTimeout(() => this.awaySince.has(p.id) && this.changed(), Table.AWAY_SHOW_MS + 50);
     } else p.graceTimer = setTimeout(() => this.removePlayer(playerId, "left"), this.config.graceMs);
     this.changed();
   }
@@ -681,6 +690,7 @@ export class Table extends EventEmitter {
     }
     this.players.delete(playerId);
     this.waitingFor.delete(playerId);
+    this.awaySince.delete(playerId);
     this.emit("removed", playerId, reason);
     if ((this.phase === "active" || this.phase === "paused") && this.runtime && p.seat !== null) {
       // may end the game -> onGameOver; a game that needed them ends with its reason (D-119)
@@ -880,6 +890,77 @@ export class Table extends EventEmitter {
     return this.prefs.get(id)!;
   }
 
+  /**
+   * Whether a player whose phone stays away during a game leaves it after the waiting time (graceMs), as before D-144.
+   * Off (the default): their seat waits for them, and the board can hand it to an AI player (replaceWithAi). In memory,
+   * like the sound setting.
+   */
+  private awayTimeout = false;
+
+  setPlay(d: unknown) {
+    const v = (d as { awayTimeout?: unknown } | null)?.awayTimeout;
+    if (typeof v !== "boolean") throw new TableError(400, "awayTimeout must be true or false");
+    if (v === this.awayTimeout) return;
+    this.awayTimeout = v;
+    // Players already away follow the new setting: the waiting time starts now, or their seat waits after all.
+    for (const p of this.players.values()) {
+      if (p.kind !== "human" || p.connected || !this.inRunningGame(p) || this.waitingFor.has(p.id)) continue;
+      if (v && !p.graceTimer) p.graceTimer = setTimeout(() => this.removePlayer(p.id, "left"), this.config.graceMs);
+      if (!v && p.graceTimer) {
+        clearTimeout(p.graceTimer);
+        p.graceTimer = undefined;
+      }
+    }
+    this.changed();
+  }
+
+  /** Sessions of players whose seat went to an AI (D-144): their phone, back, is told why instead of "session expired". */
+  private handedToAi = new Map<string, string>();
+  /** Players away during the game whose seat waits for them (D-144): the board offers to hand it to an AI player. */
+  private awaySince = new Map<string, number>();
+  /** The board shows an away player only after this long, so a phone that locks for a moment doesn't flash a card. */
+  static AWAY_SHOW_MS = 15_000;
+
+  private awayPlayers(): { playerId: string; name: string; seat: number; since: number }[] {
+    const now = Date.now();
+    return [...this.awaySince]
+      .map(([id, since]) => ({ p: this.players.get(id), since }))
+      .filter((x): x is { p: Player; since: number } => !!x.p && !x.p.connected && this.inRunningGame(x.p) && !this.waitingFor.has(x.p.id) && now - x.since >= Table.AWAY_SHOW_MS)
+      .map(({ p, since }) => ({ playerId: p.id, name: p.name, seat: p.seat!, since }));
+  }
+
+  /**
+   * Hand the seat of a player who is away to a new AI player (D-144), from the board: the game goes on with the AI in
+   * the seat (its moves are ordinary AI moves), the player's session ends, the seat keeps its colour.
+   */
+  replaceWithAi(playerId: string) {
+    const p = this.mustPlayer(playerId);
+    const rt = this.runtime;
+    const game = this.runningGame;
+    if (p.kind !== "human") throw new TableError(400, `${p.name} is not a person`);
+    if (!rt || !game || !this.inRunningGame(p)) throw new TableError(409, `${p.name} is not playing in a running game`);
+    if (p.connected) throw new TableError(409, `${p.name}'s phone is connected; only a player who is away can be handed to an AI`);
+    if (!game.manifest.ai.supported) throw new TableError(409, `${game.manifest.name} has no AI players`);
+    const seat = p.seat!;
+    const color = this.colors().get(p.id);
+    const taken = new Set([...this.players.values()].map((x) => x.name));
+    const name = taken.has(`${p.name} (AI)`) ? this.aiName() : `${p.name} (AI)`;
+    const aiOptions = aiDefaults(game.manifest, {});
+    const ai: Player = { id: newId("ai"), name, kind: "ai", location: "local", seat, connected: true, ready: true, sessionToken: null, aiSeed: randomInt(2 ** 31), aiOptions, chosenColor: color, keptColor: color };
+    if (p.graceTimer) clearTimeout(p.graceTimer);
+    if (p.sessionToken) this.handedToAi.set(p.sessionToken, ai.name);
+    this.players.delete(p.id);
+    this.waitingFor.delete(p.id);
+    this.awaySince.delete(p.id);
+    this.players.set(ai.id, ai);
+    rt.aiTakeover(seat, name, aiOptions);
+    this.emit("removed", p.id, "replaced");
+    this.syncPlayerPause(); // a game that waited for them goes on
+    this.scheduleAi();
+    this.changed();
+    return ai.id;
+  }
+
   setDisplay(d: unknown) {
     const sound = (d as { sound?: unknown } | null)?.sound;
     if (typeof sound !== "boolean") throw new TableError(400, "sound must be true or false");
@@ -953,6 +1034,7 @@ export class Table extends EventEmitter {
     this.runningGame = game;
     this.gameStartedAt = Date.now();
     this.lastActorSeat = null;
+    this.handedToAi.clear();
     this.beginLog(rt, game, settings, aiOptions);
     this.leftColors.clear();
     this.phase = "active";
@@ -1019,6 +1101,12 @@ export class Table extends EventEmitter {
       if (p && !p.connected && !p.graceTimer) p.graceTimer = setTimeout(() => this.removePlayer(id, "left"), this.config.graceMs);
     }
     this.waitingFor.clear();
+    // Seats that waited for away players (D-144) are released the usual way too.
+    for (const id of this.awaySince.keys()) {
+      const p = this.players.get(id);
+      if (p && !p.connected && !p.graceTimer) p.graceTimer = setTimeout(() => this.removePlayer(id, "left"), this.config.graceMs);
+    }
+    this.awaySince.clear();
     // Extra games that changed while this one ran take effect now (D-097); the log below still names the code it ran.
     if (this.pendingExtra) queueMicrotask(() => this.applyPendingExtra());
     this.summary = withStatistics(rt.summary, rt.log); // with the statistics window's data (D-140)

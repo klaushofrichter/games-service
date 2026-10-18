@@ -26,6 +26,9 @@ export type LogRecord =
   | { t: "snapshot"; at: number; inputs: number; state: unknown }
   // Not inputs either (D-119): a player's phone went away or came back; `waiting`: the game can't go on without them.
   | { t: "disconnected"; at: number; seat: number; waiting?: string }
+  // An AI player took over the seat of a player who was away (D-144), with its options; not an input either: its moves
+  // are logged as intents like any AI player's.
+  | { t: "aiTakeover"; at: number; seat: number; name: string; aiOptions: Record<string, unknown> }
   | { t: "reconnected"; at: number; seat: number }
   // Not inputs either (D-120): the game stood still. `reason` "cloud" (the service connection was lost), "ai" (an AI
   // player ran over its time, `seat`) or "player" (waiting for a player who went away, D-119); resume `reason` "cloud",
@@ -401,6 +404,13 @@ export class GameRuntime {
   noteConnection(seat: number, connected: boolean, waiting?: string) {
     if (this.over) return;
     this.record(connected ? { t: "reconnected", at: this.clock.now(), seat } : { t: "disconnected", at: this.clock.now(), seat, ...(waiting ? { waiting } : {}) });
+  }
+
+  /** An AI player plays this seat from now on (D-144): its options, and a log record. */
+  aiTakeover(seat: number, name: string, aiOptions: Record<string, unknown>) {
+    if (this.over) return;
+    (this.opts as { aiOptions?: Record<number, Record<string, unknown>> }).aiOptions = { ...(this.opts.aiOptions ?? {}), [seat]: aiOptions };
+    this.record({ t: "aiTakeover", at: this.clock.now(), seat, name, aiOptions });
   }
 
   /** Returns true if the game ended because of it. */

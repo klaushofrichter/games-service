@@ -6,6 +6,8 @@ page is the history. Leave it empty if there is nothing to add beyond the commit
 
 ## [Unreleased]
 
+- A player whose phone goes away during a game keeps their seat (D-144): after a moment the board shows them as
+  away with **Hand … to an AI**. Leaving after a minute, as before, is a setting (Settings › Players).
 - Phones follow the board (D-143): "Waiting for …" names the AI the board is showing, and "your turn" comes when
   the board gets to you. An AI answering its own follow-up question in the same turn (a card, then the marble) no
   longer pauses first.
