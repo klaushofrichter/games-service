@@ -24,7 +24,7 @@ const host = await startHost({
   dataDir: env.DATA_DIR,
   graceMs: num(env.GRACE_MS),
   aiDelayMs: num(env.AI_DELAY_MS),
-  boardPacing: env.BOARD_PACING === "0" ? false : undefined, // BOARD_PACING=0: AI players don't wait for the board (D-137)
+  boardPacing: env.BOARD_PACING === "0" ? false : undefined, // BOARD_PACING=0: AI players don't wait for the board (D-141)
   requireCloud: env.REQUIRE_CLOUD === "1",
   allowRemoteBoard: env.ALLOW_REMOTE_BOARD === "1",
   maxRemotePlayers: num(env.MAX_REMOTE_PLAYERS),

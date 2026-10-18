@@ -1,4 +1,4 @@
-// The statistics window's data (D-136): awards from the game, checked by the host, and what the log tells about pace.
+// The statistics window's data (D-140): awards from the game, checked by the host, and what the log tells about pace.
 import { beforeAll, describe, expect, it } from "vitest";
 import { leastAward, mostAward } from "../packages/sdk/src/index.ts";
 import { withStatistics } from "../apps/table-host/src/stats.ts";

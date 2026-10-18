@@ -178,10 +178,20 @@ pre.raw { font-family: var(--mono); font-size: 0.7em; color: var(--ink-soft); ba
 #result-button.bottom-left { left: 38px; bottom: 38px; }
 #result-button.top-right { right: 38px; top: 38px; }
 #result-button.top-left { left: 38px; top: 38px; }
-.summary-table { margin: 20px 0 8px; border-collapse: collapse; font-size: 26px; }
-.summary-table th { font-size: 15px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-soft); font-weight: 500; padding: 4px 22px; }
-.summary-table td { padding: 8px 22px; text-align: center; border-top: 1px solid var(--felt-line); }
-.summary-table td:first-child, .summary-table th:first-child { text-align: left; padding-left: 0; }
+/* The finished screen stays inside the center panel (D-142): a long statistics table scrolls (both ways, header row
+   kept), the result text and the buttons stay in view, and the seats around the edge are never covered. */
+#center:has(> .main.finished) { grid-template-rows: minmax(0, 1fr); grid-template-columns: minmax(0, 1fr) 330px; }
+#center.sideways:has(> .main.finished) { grid-template-rows: minmax(0, 1fr) auto; grid-template-columns: minmax(0, 1fr); }
+.main.finished { min-height: 0; min-width: 0; }
+.main.finished .summary { min-width: 0; }
+.main.finished .summary { display: flex; flex-direction: column; min-height: 0; max-height: 100%; box-sizing: border-box; }
+.main.finished .summary .big { font-size: 1.6em; line-height: 1.2; }
+.summary-scroll { min-height: 0; flex: 0 1 auto; overflow: auto; margin: 10px 0 6px; overscroll-behavior: contain; scrollbar-color: var(--brass-deep) transparent; scrollbar-width: thin; }
+.summary-table { border-collapse: collapse; font-size: 18px; }
+.summary-table th { position: sticky; top: 0; background: #0f2a24; font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-soft); font-weight: 500; padding: 4px 8px 6px; vertical-align: bottom; }
+.summary-table td { padding: 6px 8px; text-align: center; border-top: 1px solid var(--felt-line); white-space: nowrap; }
+.summary-table td:first-child, .summary-table th:first-child { text-align: left; padding-left: 0; position: sticky; left: 0; background: #0f2a24; z-index: 1; }
+.summary-table th:first-child { z-index: 2; }
 
 .overlay {
   position: fixed; inset: 0; z-index: 40; background: rgba(4, 10, 9, 0.6);
@@ -388,7 +398,7 @@ button.copy:hover, button.copy.done { color: var(--brass); border-color: var(--b
 #elsewhere-layer button { font-size: 20px; padding: 12px 24px; }
 #elsewhere-layer .note { margin: 8px 0 0; }
 
-/* The statistics window (D-136). Its button sits beside Show result, toward the middle of that edge. */
+/* The statistics window (D-140). Its button sits beside Show result, toward the middle of that edge. */
 #stats-button { position: absolute; z-index: 20; font-size: 0.9em; }
 #stats-button.bottom-right { right: 260px; bottom: 38px; }
 #stats-button.bottom-left { left: 260px; bottom: 38px; }

@@ -202,7 +202,7 @@ export default defineGame<State>({
           return [state.names[s], state.scores[s] ?? 0, st.heads, st.tails, st.headsPct === null ? "–" : `${st.headsPct}%`];
         }),
       },
-      // The statistics window's awards (D-136); one that nobody or everybody would get is left out.
+      // The statistics window's awards (D-140); one that nobody or everybody would get is left out.
       awards: [
         mostAward({ id: "sharpshooter", icon: "🎯", title: "Sharpshooter", blurb: "Guessed right most often." }, state.active.map((s) => ({ seat: s, score: state.scores[s] ?? 0 })), (n) => count(n, "correct guess", "correct guesses")),
         mostAward({ id: "heads-fan", icon: "🙂", title: "Heads Fan", blurb: "Called heads most often." }, state.active.map((s) => ({ seat: s, score: stats(state, s).heads })), (n) => count(n, "heads call")),

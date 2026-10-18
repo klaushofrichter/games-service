@@ -38,7 +38,7 @@ export interface State {
   lastAction: { seat: number; action: string; amount: number } | null;
   result: { winners: Winner[]; shown: Record<number, Card[]>; byFold: boolean } | null;
   over: boolean;
-  /** Counted during the game for the statistics window (D-136). */
+  /** Counted during the game for the statistics window (D-140). */
   stats: Record<number, SeatStats>;
 }
 
@@ -476,7 +476,7 @@ function publicView(s: State) {
   };
 }
 
-/** The statistics window's awards (D-136): who stood out; an award nobody or everybody would get is left out. */
+/** The statistics window's awards (D-140): who stood out; an award nobody or everybody would get is left out. */
 function awardsOf(s: State): GameAward[] {
   const by = (f: (st: SeatStats) => number) => s.seats.map((seat) => ({ seat, score: f(s.stats[seat] ?? noStats(0)) }));
   const shown = s.seats.filter((x) => s.stats[x]?.bestHand);
