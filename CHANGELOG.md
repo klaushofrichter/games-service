@@ -9,6 +9,8 @@ page is the history. Leave it empty if there is nothing to add beyond the commit
 - Hold'em sounds (D-139): a riffle shuffle and the deal at each hand, chips for calls, bets and raises (a cascade
   for all-in), knuckle taps for a check, a soft slide for a fold, a snap per shared card, and the pot raked in with a
   chime for the winner. They follow the table's sound setting.
+- Board sounds no longer go missing right after the board loads (all games): they used to be dropped while the
+  browser's audio was still starting.
 - Hold'em: the street (flop, river…), the hand number and how many hands are left show in two corners of the board
   (D-138), upper left facing north and lower right facing south, instead of one line in the middle that faced south. The Lobby button moved to the top
   right. "… to act" sits right under the pot, clear of the south seat's cards.

@@ -460,5 +460,9 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   and two chip clicks for the blinds; `action` two knuckle taps on the felt for a check, a soft slide for a fold, chip
   clacks for a call (2), a bet or raise (4) and all-in (9); `street` a snap per shared card (3 on the flop); `showdown`
   or `wonByFold` the pot raked in, then a three-note chime. A board that comes up as the game starts misses the first
-  hand's events, so on its first update it plays the shuffle and deal for a fresh hand 1. Check:
+  hand's events, so on its first update it plays the shuffle and deal for a fresh hand 1 (once per hand, however the
+  events arrive). Platform: `playSound` dropped every sound while a new audio context was still starting, so the first
+  sounds after a board loaded were silent in every game (CI caught it: Hold'em's first hand made no sound); it now
+  plays a sound once the context runs, if that happens within a second, so a board nobody has touched yet does not
+  release a pile of old sounds at the first tap. Check:
   `scripts/e2e/next_hand.py` (each of the seven sounds plays, a shuffle for every hand, the first included).
