@@ -56,6 +56,8 @@ since the start with paused time left out (games use it for clocks; replay uses 
   `boardView`, `isOver`, `canContinueWithout`; `seat` if it was one player's view). Only the first 20 are recorded; `counts.errors` has all.
 - `disconnected`: a player's phone went away (`seat`); `waiting` is the game's text when it could not go on without
   them (the game was paused until they were back). `reconnected`: the phone came back. Not inputs; replay skips them.
+- `aiTakeover`: the board handed an away player's seat to an AI player (`seat`, the AI's `name` and `aiOptions`,
+  D-144); its moves follow as ordinary intents `by: "ai"`. Not an input; replay skips it.
 - `pause`: the game stood still, `reason` `cloud` (the connection to the service was lost), `ai` (an AI player, `seat`,
   ran over its time) or `player` (waiting for a player who went away). `resume`: it went on, `reason` `cloud`, `ai` (the
   AI answered), `playNow` (the AI's quick move was played) or `player` (everyone is back). Not inputs; replay skips them.
@@ -78,7 +80,7 @@ The same game as rows a person or an LLM can follow, one JSON object per line, a
 Each row has:
 
 - `line`: the record's line in `game-NNN.jsonl` (the `start` record is line 1), to find the raw record.
-- `kind`: `move`, `timer`, `seatJoined`, `seatLeft`, `disconnected`, `reconnected`, `pause`, `resume`, `error`,
+- `kind`: `move`, `timer`, `seatJoined`, `seatLeft`, `disconnected`, `reconnected`, `aiTakeover`, `pause`, `resume`, `error`,
   `snapshot`, `start`, `end`, or `gap`: no record for at least two minutes without a pause to explain it (its `line` is
   the record after the silence).
 - `at` (as in the record) and `t` (milliseconds since the start); `seat` and `player` (name); for moves `by`, `intent`,
