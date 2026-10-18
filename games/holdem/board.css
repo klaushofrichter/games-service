@@ -5,6 +5,7 @@
 .he-pot { margin-top: 16px; font-family: var(--display); font-size: 36px; line-height: 1; color: var(--ink); }
 .he-pot b { color: var(--brass); }
 .he-pot:empty { display: none; } /* at a result: Next hand takes its place, clear of the south seat's cards */
+.he-street:empty { display: none; } /* only "Game over": the street is in the corners (D-138) */
 .he-street { font-size: 20px; letter-spacing: .2em; text-transform: uppercase; color: var(--brass); margin-bottom: 18px; }
 .he-msg { font-size: 26px; color: var(--ink); min-height: 34px; margin-top: 4px; } /* close under the pot, clear of the south seat's cards */
 .he-spot { position:absolute; transform: translate(-50%,-50%); display:flex; flex-direction:column; align-items:center; gap:8px; transition: transform .5s; }
@@ -22,7 +23,7 @@
   border: 1px solid rgba(214,169,74,.35); text-align: center; pointer-events: none; }
 .he-count-north { left: 38px; top: 38px; transform: rotate(180deg); }
 .he-count-south { right: 38px; bottom: 38px; }
-.he-count-k { font-size: 15px; letter-spacing: .25em; text-transform: uppercase; color: var(--brass); }
-.he-count-v { font-family: var(--display); font-size: 40px; line-height: 1.1; color: var(--ink); }
+.he-count-k { font-size: 18px; font-weight: 700; letter-spacing: .25em; text-transform: uppercase; color: var(--brass); }
+.he-count-v { font-family: var(--display); font-size: 34px; line-height: 1.1; color: var(--ink); }
 .he-count-v span { font-size: 22px; color: var(--ink-soft); }
 .he-count-r { font-size: 17px; color: var(--ink-soft); }

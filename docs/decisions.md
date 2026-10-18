@@ -444,11 +444,12 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   Next hand) over a seat's cards. Known: on a remote board viewed from a side seat, the middle turns with the viewer
   and the shared cards run across the felt's short side, where they touch the east and west seats' cards; this was so
   before.
-- **D-138 · 2026-10-17 · Klaus** — Hold'em shows the hand number and how many hands are left in two corners of the
-  board: upper left facing north, lower right facing south. The Lobby button moves to the top right. The middle of the
-  felt names the street only (it said *Hand 5 of 100 · turn*, readable from the south side only). *Implementation
+- **D-138 · 2026-10-17 · Klaus** — Hold'em shows the street, the hand number and how many hands are left in two corners
+  of the board: upper left facing north, lower right facing south. The Lobby button moves to the top right. The middle
+  of the felt no longer has that line (it said *Hand 5 of 100 · turn*, readable from the south side only); it says
+  *Game over* at the end, when the corners are gone. *Implementation
   (Claude):* the manifest's `lobbyButton` is `top-right`; the board's own buttons stay bottom left, so the other two
-  corners are free. Each corner shows *HAND · 5 of 100 · 95 more to play* (*last hand* on the last), hidden once the
-  game is over. "… to act" moved up under the pot (tighter pot line), clear of the south seat's cards. Hold'em
-  2026.10.17.3. Check: `scripts/e2e/next_hand.py` (both counts read hand 1 of 2, the north one turned 180°, neither
+  corners are free. Each corner shows *TURN · Hand 5 of 100 · 95 more to play* (*RESULT* during the result's pause,
+  *last hand* on the last), hidden once the game is over. "… to act" moved up under the pot (tighter pot line), clear of the south seat's cards. Hold'em
+  2026.10.17.3. Check: `scripts/e2e/next_hand.py` (both corners read preflop, hand 1 of 2, the north one turned 180°, the middle has no street line, neither
   covers a seat plate or a button, Lobby top right, in 2/4/6/8-seat layouts).

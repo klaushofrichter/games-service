@@ -60,15 +60,15 @@ export function mount(root, ctx = {}) {
       const center = box.querySelector(".he-center");
       center.style.transform = `translate(-50%,-50%) rotate(${rot}deg)`;
       const name = (seat) => v.players.find((p) => p.seat === seat)?.name ?? "?";
-      // Which hand this is and how many follow, in two corners: upper left facing north, lower right facing south.
+      // The street, which hand this is and how many follow, in two corners: upper left facing north, lower right facing south.
       const left = v.hands - v.hand;
       const more = left === 0 ? "last hand" : `${left} more to play`;
       for (const el of box.querySelectorAll(".he-count")) {
         el.hidden = v.over || !v.hand;
-        el.innerHTML = `<div class="he-count-k">Hand</div><div class="he-count-v">${v.hand}<span> of ${v.hands}</span></div><div class="he-count-r">${more}</div>`;
+        el.innerHTML = `<div class="he-count-k">${v.phase === "handOver" ? "result" : esc(v.street)}</div><div class="he-count-v">Hand ${v.hand}<span> of ${v.hands}</span></div><div class="he-count-r">${more}</div>`;
       }
-      // The hand number is in the corners, facing both sides; the middle names the street only.
-      center.querySelector(".he-street").textContent = v.over ? "Game over" : v.phase === "handOver" ? "result" : v.street;
+      // The hand and the street are in the corners, facing both sides; the middle says only "Game over" at the end.
+      center.querySelector(".he-street").textContent = v.over ? "Game over" : "";
 
       const winners = new Set((v.result?.winners ?? []).map((w) => w.seat));
       const newCards = v.board.length > lastBoardLen;

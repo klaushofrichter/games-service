@@ -6,8 +6,8 @@ page is the history. Leave it empty if there is nothing to add beyond the commit
 
 ## [Unreleased]
 
-- Hold'em: the hand number and how many hands are left show in two corners of the board (D-138), upper left facing
-  north and lower right facing south; the middle of the felt names the street only. The Lobby button moved to the top
+- Hold'em: the street (flop, river…), the hand number and how many hands are left show in two corners of the board
+  (D-138), upper left facing north and lower right facing south, instead of one line in the middle that faced south. The Lobby button moved to the top
   right. "… to act" sits right under the pot, clear of the south seat's cards.
 - Hold'em: **Next hand** on the board under each hand's result (D-136), with the seconds left, starts the next hand
   at once instead of waiting out *Seconds to show each result* (**Finish** after the last hand). Remote boards show it

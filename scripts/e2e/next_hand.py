@@ -177,7 +177,8 @@ try:
             # The hand count (upper left facing north, lower right facing south), clear of plates and buttons;
             # the Lobby button top right.
             c = board.evaluate(CORNERS)
-            assert c["texts"] == ["HAND1of21moretoplay"] * 2, c  # hand 1 of 2 (whitespace removed, "Hand" in capitals)
+            assert c["texts"] == ["PREFLOPHand1of21moretoplay"] * 2, c  # street, hand 1 of 2 (whitespace removed)
+            assert board.locator(".he-street").inner_text() == "", "the street is in the corners, not the middle"
             assert c["north"].startswith("matrix(-1"), f"the upper-left count should face north: {c['north']}"
             assert c["lobby"] == "top-right", c
             assert not c["bad"], f"{seats} seats: {c['bad']}"
