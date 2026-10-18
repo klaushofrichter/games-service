@@ -24,11 +24,11 @@ describe("player colour on the deck badge", () => {
 
   it("uses the player's colour from the table, else the seat's (D-106)", () => {
     expect(playerColor({ players: [{ id: "p1", seat: 2 }] }, 2)).toBe(SEAT_COLORS[2]);
-    expect(playerColor({ players: [{ id: "p1", seat: 2, color: "#5fe0c8" }] }, 2)).toBe("#5fe0c8");
+    expect(playerColor({ players: [{ id: "p1", seat: 2, color: "#f08a3c" }] }, 2)).toBe("#f08a3c");
     expect(playerColor({ players: [{ id: "p1", seat: 2, color: "javascript:x" }] }, 2)).toBe(SEAT_COLORS[2]);
     expect(playerColor({ players: [] }, 5)).toBe(SEAT_COLORS[5]); // an empty seat
     // a game's prefs no longer carry colours
-    expect(playerColor({ players: [{ id: "p1", seat: 2 }], prefs: { colors: { p1: "#5fe0c8" } } }, 2)).toBe(SEAT_COLORS[2]);
+    expect(playerColor({ players: [{ id: "p1", seat: 2 }], prefs: { colors: { p1: "#f08a3c" } } }, 2)).toBe(SEAT_COLORS[2]);
   });
 });
 

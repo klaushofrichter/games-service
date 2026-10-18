@@ -117,6 +117,44 @@ function confirmDialog(title, text, okLabel = "Confirm") {
 }
 
 /**
+ * A message that must be acknowledged (D-146): only its OK button closes it, not a tap beside it. Escape, which the board
+ * sends as a click on the backdrop (not a tap by a person), closes it too.
+ */
+function noticeDialog(title, text, okLabel = "OK") {
+  return new Promise((resolve) => {
+    const d = document.createElement("div");
+    d.className = "dialog-backdrop notice";
+    d.innerHTML = `<div class="dialog" role="alertdialog" aria-modal="true"><h2>${esc(title)}</h2><div class="muted">${esc(text)}</div>
+      <div class="actions"><button class="primary" data-x="ok">${esc(okLabel)}</button></div></div>`;
+    d.addEventListener("click", (e) => {
+      if (e.target.dataset?.x === "ok" || (e.target === d && !e.isTrusted)) {
+        d.remove();
+        resolve();
+      }
+    });
+    faceFront(d.querySelector(".dialog"));
+    overlayRoot.appendChild(d);
+    d.querySelector("[data-x=ok]").focus();
+  });
+}
+
+/**
+ * Why a number typed into a form field is not allowed, in the field's own words, or null when it is (D-146). The table
+ * checks again, but its refusal would come only after the form has closed.
+ */
+function numberProblem(f, raw) {
+  const name = f.label ?? f.key;
+  const lo = f.min !== undefined;
+  const hi = f.max !== undefined;
+  const range = lo && hi ? `from ${f.min} to ${f.max}` : lo ? `${f.min} or more` : hi ? `${f.max} or less` : "";
+  const n = Number(raw);
+  if (String(raw).trim() === "" || !Number.isFinite(n)) return `${name} needs a number${range ? `, ${range}` : ""}.`;
+  if (f.type === "int" && !Number.isInteger(n)) return `${name} needs a whole number${range ? `, ${range}` : ""}.`;
+  if ((lo && n < f.min) || (hi && n > f.max)) return `${name} can be ${range}. ${n} is too ${lo && n < f.min ? "low" : "high"}.`;
+  return null;
+}
+
+/**
  * A small form for manifest-described fields (game settings, AI options). Resolves with the values,
  * or null when cancelled. With `removeLabel`, a red button on the left resolves with "remove" (D-103).
  */
@@ -139,6 +177,19 @@ function formDialog(title, intro, fields, values = {}, okLabel = "OK", removeLab
       if (!x && e.target !== d) return;
       let out = x === "remove" ? "remove" : null;
       if (x === "yes") {
+        // A number out of range says so in a message to acknowledge, and the form stays open on that field (D-146).
+        for (const f of fields) {
+          if (f.type !== "int" && f.type !== "number") continue;
+          const el = d.querySelector(`[name="${f.key}"]`);
+          const problem = numberProblem(f, el.value);
+          if (problem) {
+            noticeDialog("Check this setting", problem).then(() => {
+              el.focus();
+              el.select?.();
+            });
+            return;
+          }
+        }
         out = {};
         for (const f of fields) {
           const el = d.querySelector(`[name="${f.key}"]`);

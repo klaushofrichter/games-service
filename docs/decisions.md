@@ -564,3 +564,17 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   placement (their surface turns a quarter; the corner buttons would need their own layout). *Checks:*
   `scripts/e2e/remote.py` ends a Coin Flip game with the remote player north and checks the corners, the tools and the
   statistics window.
+- **D-146 · 2026-10-18 · Klaus** — A game setting typed out of range is caught in the settings window itself: a message
+  names the setting and its range ("Points to win the match can be from 1 to 100. 150 is too high.") and has to be
+  acknowledged with OK, and the window stays open on that field. *Why:* Klaus: the table refused the value only after
+  the window had closed, and it was unclear what was wrong with the setting. *Implementation (Claude):* `formDialog`
+  checks every number field (a number, whole for `int`, within `min`/`max`) before it closes; `noticeDialog` is a
+  message only its OK button closes (a tap beside it does not; Escape does). The table's own refusal names the setting
+  by its label instead of its key. The lobby's settings panel needed no change: its − and + stay in range. *Checks:*
+  `scripts/e2e/play.py dialogs` (Roulette's *Spins* at 51: the message, a tap beside it, OK, the field focused, no game
+  chosen); `tests/platform.test.ts`.
+
+
+## The classic colour set (18 Oct 2026)
+
+- **D-147 · 2026-10-18 · Klaus** — Player colours become the classic set: yellow, sky, red, green, purple, pearl, orange, pink. Green and teal (colours 4 and 7) were too close; measured, they were the nearest pair, and for red-green colour blindness sky and violet were nearly identical. *Implementation (Claude):* refines D-106 and D-124. `PLAYER_COLORS` (protocol) and `SEAT_COLORS` (board kit): `#f2d24b`, `#5fb7e8`, `#e5484d`, `#7fd18b`, `#9d6bf0`, `#dde3ea`, `#f08a3c`, `#ef8fcf`. Compared in CAM02-UCS with simulated colour-vision deficiencies: the closest pair for normal vision goes from 15.3 (green/teal) to 22.3 (red/orange); for deuteranopia from 1.9 (sky/violet) to 12.3; protanopia 6.3, tritanopia 9.8. Pearl stays the one neutral. Badges pick dark or white letters by contrast (`inkOn`), so the light colours need nothing else. Colours are not stored across restarts; a choice made before the update falls back to the seat's colour.

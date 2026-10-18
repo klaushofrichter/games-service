@@ -147,8 +147,11 @@ describe("game settings", () => {
   });
 
   it("refuses values outside the declared range or set", () => {
-    expect(() => settingsWithDefaults(m, { rounds: 0 })).toThrow(/≥ 1/);
-    expect(() => settingsWithDefaults(m, { rounds: 11 })).toThrow(/≤ 10/);
+    // The refusal names the setting by its label when it has one, else by its key (D-146).
+    const label = m.settings.find((x) => x.key === "rounds")?.label;
+    const name = label ?? "setting rounds";
+    expect(() => settingsWithDefaults(m, { rounds: 0 })).toThrow(`${name} must be 1 or more`);
+    expect(() => settingsWithDefaults(m, { rounds: 11 })).toThrow(`${name} must be 10 or less`);
     expect(() => settingsWithDefaults(m, { rounds: "many" })).toThrow(/number/);
     expect(() => settingsWithDefaults(m, { speed: "warp" })).toThrow(/one of slow, fast/);
   });
