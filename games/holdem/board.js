@@ -10,7 +10,8 @@ export function mount(root, ctx = {}) {
   useStyles("/games/holdem/board.css");
   const box = html(`<div style="position:absolute;inset:0"><div class="he-felt"></div><div class="he-spots"></div>
     <div class="he-dealer">D</div><div class="he-center"><div class="he-street"></div><div class="he-board"></div><div class="he-pot"></div><div class="he-msg"></div>
-    <button class="primary he-next" hidden></button></div></div>`);
+    <button class="primary he-next" hidden></button></div>
+    <div class="he-count he-count-north" hidden></div><div class="he-count he-count-south" hidden></div></div>`);
   root.appendChild(box);
   let info = null;
   let view = null;
@@ -59,7 +60,15 @@ export function mount(root, ctx = {}) {
       const center = box.querySelector(".he-center");
       center.style.transform = `translate(-50%,-50%) rotate(${rot}deg)`;
       const name = (seat) => v.players.find((p) => p.seat === seat)?.name ?? "?";
-      center.querySelector(".he-street").textContent = v.over ? "Game over" : `Hand ${v.hand} of ${v.hands} · ${v.phase === "handOver" ? "result" : v.street}`;
+      // Which hand this is and how many follow, in two corners: upper left facing north, lower right facing south.
+      const left = v.hands - v.hand;
+      const more = left === 0 ? "last hand" : `${left} more to play`;
+      for (const el of box.querySelectorAll(".he-count")) {
+        el.hidden = v.over || !v.hand;
+        el.innerHTML = `<div class="he-count-k">Hand</div><div class="he-count-v">${v.hand}<span> of ${v.hands}</span></div><div class="he-count-r">${more}</div>`;
+      }
+      // The hand number is in the corners, facing both sides; the middle names the street only.
+      center.querySelector(".he-street").textContent = v.over ? "Game over" : v.phase === "handOver" ? "result" : v.street;
 
       const winners = new Set((v.result?.winners ?? []).map((w) => w.seat));
       const newCards = v.board.length > lastBoardLen;

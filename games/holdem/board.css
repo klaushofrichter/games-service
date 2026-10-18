@@ -17,3 +17,12 @@
 .he-act { font-size: 20px; color: var(--ink-soft); }
 .he-clock { font-family: var(--mono); font-size: 26px; color: var(--brass); }
 .he-next { margin-top: 12px; min-width: 240px; min-height: 50px; font-size: 22px; }
+/* The hand count in two free corners (the Lobby button is top right, the board's buttons bottom left). */
+.he-count { position:absolute; min-width: 200px; padding: 12px 20px; border-radius: 16px; background: rgba(6,20,15,.55);
+  border: 1px solid rgba(214,169,74,.35); text-align: center; pointer-events: none; }
+.he-count-north { left: 38px; top: 38px; transform: rotate(180deg); }
+.he-count-south { right: 38px; bottom: 38px; }
+.he-count-k { font-size: 15px; letter-spacing: .25em; text-transform: uppercase; color: var(--brass); }
+.he-count-v { font-family: var(--display); font-size: 40px; line-height: 1.1; color: var(--ink); }
+.he-count-v span { font-size: 22px; color: var(--ink-soft); }
+.he-count-r { font-size: 17px; color: var(--ink-soft); }

@@ -90,7 +90,7 @@
   "skipTimers": [
     "next"
   ],
-  "lobbyButton": "bottom-right",
+  "lobbyButton": "top-right",
   "deck": {
     "minWidth": 320,
     "orientation": "portrait"
