@@ -8,6 +8,9 @@ page is the history. Leave it empty if there is nothing to add beyond the commit
 
 - A game setting typed out of range (D-146) is caught in the settings window: a message names the setting and what it
   can be, waits for OK, and the window stays open on that field.
+- Player names (D-148): at most 12 characters, and each name once at a table (ignoring upper and lower case); a
+  taken name is refused on the phone with the reason, and a remote player's gets a number ("Ann 2"). **Change name**
+  on the phone, between games.
 - Player colours are the classic set (D-147): yellow, sky, red, green, purple, pearl, orange and pink. Green and teal were
   too close, and sky and violet looked the same to red-green colour-blind players.
 - A remote player on a north seat (D-145): *Show result*, *Statistics* and *Lobby* sit in the game's corner as they

@@ -518,6 +518,11 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
           return;
         }
         if (c.role !== "deck" && c.role !== "board") throw new TableError(401, "say hello first");
+        if (c.role === "deck" && msg.ch === "lobby" && msg.type === "rename") {
+          // A player changes their own name (D-148).
+          table.rename(c.playerId, msg.payload?.name);
+          return reply("ack", {}, msg.seq);
+        }
         if (c.role === "deck" && msg.ch === "lobby" && msg.type === "ready") {
           table.setReady(c.playerId, !!msg.payload?.ready);
           return reply("ack", {}, msg.seq);

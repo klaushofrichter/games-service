@@ -94,3 +94,6 @@ body.in-game #top { gap: 8px; }
 .tabs .pdot { margin: 0; flex: none; }
 .tabs .tab-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tabs .tab-seat { flex: none; font-family: var(--display); font-weight: 700; color: var(--brass); }
+/* A refused name (D-148): taken at this table, or not allowed. */
+.join-error { color: #f1a197; font-size: .85em; min-height: 1.1em; }
+.join-error:empty { display: none; }
