@@ -550,3 +550,17 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
     handing to an AI with colour, log and the phone's message, a waiting D-119 game going on, the setting turned on
     for a player already away); `scripts/e2e/away.py` (the card, the confirmation, Ben (AI) in the seat). Tests and
     checks of the waiting time turn the setting on.
+- **D-145 · 2026-10-18 · Klaus** — A remote player on a north seat gets the game's corner buttons where they look for
+  them: *Lobby*, *Show result* and *Statistics* in the game's corner (its `lobbyButton`) as that player sees it, with
+  upright text, and the tools at their own bottom left, also during and after a game. The statistics window opens
+  upright on their screen. *Why:* Klaus: with a remote player north (Chess, Backgammon), *Statistics* sat at the
+  remote player's lower left and opened upside down. *Implementation (Claude):* a remote board turns its surface so its
+  player's seat is at the bottom (D-059); the buttons live on that surface, so the game's corner landed opposite, and
+  the overlay root lies outside the surface, so turning a dialog toward the player's edge turned it over. Now
+  `cornerClass()` maps the game's corner by half a turn on a north remote board (class `turned` keeps the text upright),
+  the tools follow the player's edge during a game as they already did in the lobby (D-127 keeps them fixed on the
+  table's own board only), and overlays and dialogs on a remote board face no edge (`overlayEdge()`), which fixes every
+  dialog there, not just the statistics. The table's own board is unchanged. East and west remote seats keep today's
+  placement (their surface turns a quarter; the corner buttons would need their own layout). *Checks:*
+  `scripts/e2e/remote.py` ends a Coin Flip game with the remote player north and checks the corners, the tools and the
+  statistics window.
