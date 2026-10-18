@@ -952,6 +952,7 @@ export class Table extends EventEmitter {
     this.runtime = rt;
     this.runningGame = game;
     this.gameStartedAt = Date.now();
+    this.lastActorSeat = null;
     this.beginLog(rt, game, settings, aiOptions);
     this.leftColors.clear();
     this.phase = "active";
@@ -1062,8 +1063,21 @@ export class Table extends EventEmitter {
     if (this.phase !== "active" || !this.runtime) throw new TableError(409, "no game is running");
     if (p.seat === null || !this.runtime.seats.some((s) => s.seat === p.seat)) throw new TableError(409, "you are not playing in this game");
     if (!intent || typeof intent.name !== "string") throw new TableError(400, "intent needs a name");
-    return this.runtime.submit(p.seat, { name: intent.name, payload: intent.payload }, p.kind === "ai" ? "ai" : "human", p.kind === "ai" ? ai : undefined);
+    this.changeByAi = p.kind === "ai";
+    let r: ReturnType<GameRuntime["submit"]>;
+    try {
+      r = this.runtime.submit(p.seat, { name: intent.name, payload: intent.payload }, p.kind === "ai" ? "ai" : "human", p.kind === "ai" ? ai : undefined);
+    } finally {
+      this.changeByAi = false;
+    }
+    if (r.ok) this.lastActorSeat = p.seat;
+    return r;
   }
+
+  /** True while the game changes because of an AI player's move: decks see it once the board has shown it (D-143). */
+  changeByAi = false;
+  /** The seat that made the last accepted move: an AI answering its own follow-up question doesn't pause first (D-143). */
+  private lastActorSeat: number | null = null;
 
   /**
    * An intent sent by touching the board for a player (D-102). Only names the running game lists in `boardIntents`.
@@ -1079,7 +1093,9 @@ export class Table extends EventEmitter {
     if (remoteSession === null ? p.kind !== "human" || p.location !== "local" : p.remoteSession !== remoteSession)
       throw new TableError(403, remoteSession === null ? "only players at the table can move from the board" : "you can only move your own pieces");
     if (p.seat === null || !this.runtime.seats.some((s) => s.seat === p.seat)) throw new TableError(409, `${p.name} is not playing in this game`);
-    return this.runtime.submit(p.seat, { name: intent.name, payload: intent.payload }, "board");
+    const r = this.runtime.submit(p.seat, { name: intent.name, payload: intent.payload }, "board");
+    if (r.ok) this.lastActorSeat = p.seat;
+    return r;
   }
 
   /**
@@ -1105,7 +1121,11 @@ export class Table extends EventEmitter {
     for (const p of this.players.values()) {
       if (p.kind !== "ai" || p.seat === null) continue;
       const mv: AiMoveState = { seat: p.seat, startedAt: 0, deadline: 0, shown: false };
-      mv.timer = setTimeout(() => this.thinkAi(p, mv, retryMs !== undefined), retryMs ?? this.config.aiDelayMs);
+      // No pause when this AI just moved and the game asks it again (a card, then the marble to move): it is one move,
+      // and the board shows each step anyway (D-143). Only with the board pacing the game; without it the pause is all
+      // that lets people follow.
+      const delay = retryMs ?? (p.seat === this.lastActorSeat && this.pacedByBoard ? 0 : this.config.aiDelayMs);
+      mv.timer = setTimeout(() => this.thinkAi(p, mv, retryMs !== undefined), delay);
       this.aiMoves.set(p.id, mv);
     }
   }
@@ -1129,15 +1149,31 @@ export class Table extends EventEmitter {
   boardIdle(n: number) {
     if (!Number.isInteger(n) || n <= this.boardShown || n > this.boardSent) return;
     this.boardShown = n;
+    this.emit("boardShown", n);
   }
   /** Whether a local board is connected. */
   setLocalBoard(connected: boolean) {
     this.localBoard = connected;
-    if (!connected) this.boardShown = this.boardSent;
+    if (!connected) {
+      this.boardShown = this.boardSent;
+      this.emit("boardShown", this.boardShown);
+    }
+  }
+  /** The last game message the local board has shown (D-141). */
+  get shownOnBoard() {
+    return this.boardShown;
+  }
+  /** Whether the game goes at the local board's pace now: pacing on and a local board connected (D-141, D-143). */
+  get pacedByBoard() {
+    return !!this.config.boardPacing && this.localBoard;
+  }
+  /** How long anything waits for a board that does not answer (D-141). */
+  get boardPaceTimeoutMs() {
+    return this.config.boardPaceTimeoutMs ?? 20_000;
   }
   private waitingForBoard() {
     if (!this.config.boardPacing || !this.localBoard || this.boardShown >= this.boardSent) return false;
-    return Date.now() - this.boardSentAt < (this.config.boardPaceTimeoutMs ?? 20_000);
+    return Date.now() - this.boardSentAt < this.boardPaceTimeoutMs;
   }
 
   private thinkAi(p: Player, mv: AiMoveState, retried: boolean) {

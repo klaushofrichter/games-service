@@ -111,15 +111,57 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
     const list = [...targets];
     const seq = list.some((c) => c.role === "board" && !c.remote) ? table.nextBoardMessage() : 0;
     const board = JSON.stringify(envelope("game", "board", { view: rt.boardView(), events, over: rt.over, seq, ...timing }));
+    // An AI player's move reaches the decks once the local board has shown it (D-143), so a phone says "Waiting for
+    // Rosa" while the board shows Rosa's move, not the move before. Everything else goes at once, after what is held.
+    const hold = seq > 0 && table.changeByAi && table.pacedByBoard && !rt.over;
     for (const c of list) {
       if (c.role === "board") sendText(c.ws, board);
       if (c.role === "deck") {
         const v = views.get(c.playerId);
-        if (v) send(c.ws, envelope("game", "view", { seat: v.seat, view: v.view, events, over: rt.over, ...timing }));
+        if (!v) continue;
+        const text = JSON.stringify(envelope("game", "view", { seat: v.seat, view: v.view, events, over: rt.over, ...timing }));
+        if (hold) holdForBoard(c, seq, text);
+        else {
+          releaseHeld(c);
+          sendText(c.ws, text);
+        }
       }
     }
   };
   table.on("game", (events: GameEvent[]) => sendGame(clients, events));
+
+  // ---------- decks follow the board (D-143) ----------
+  const held = new Map<Client, { seq: number; at: number; text: string }[]>();
+  let heldTimer: ReturnType<typeof setInterval> | undefined;
+  /** Keep a deck's game message until the local board has shown board message `seq` (or stops answering). */
+  function holdForBoard(c: Client, seq: number, text: string) {
+    const q = held.get(c) ?? [];
+    q.push({ seq, at: Date.now(), text });
+    held.set(c, q);
+    heldTimer ??= setInterval(releaseShown, 500); // the timeout for a board that does not answer
+  }
+  /** Send a deck everything held for it, in order. */
+  function releaseHeld(c: Client) {
+    const q = held.get(c);
+    if (!q) return;
+    held.delete(c);
+    for (const m of q) sendText(c.ws, m.text);
+  }
+  /** Send what the board has shown by now; all of it when the game no longer goes at the board's pace. */
+  function releaseShown() {
+    const shown = table.shownOnBoard;
+    const paced = table.pacedByBoard && table.runtime && !table.runtime.over;
+    const late = Date.now() - table.boardPaceTimeoutMs;
+    for (const [c, q] of held) {
+      while (q.length && (!paced || q[0].seq <= shown || q[0].at < late)) sendText(c.ws, q.shift()!.text);
+      if (!q.length) held.delete(c);
+    }
+    if (!held.size && heldTimer) {
+      clearInterval(heldTimer);
+      heldTimer = undefined;
+    }
+  }
+  table.on("boardShown", releaseShown);
 
   table.on("removed", (playerId: string, reason: string) => {
     for (const c of clients) {
@@ -504,6 +546,7 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
     ws.on("close", () => {
       const listed = clients.delete(client); // a replaced board was taken off the list already, its successor stays
       const c = client as Client;
+      held.delete(c);
       if (listed && c.role === "board" && !c.remote && ![...clients].some((o) => o.role === "board" && !o.remote)) table.setLocalBoard(false);
       if (c.role === "deck") {
         const id = c.playerId;

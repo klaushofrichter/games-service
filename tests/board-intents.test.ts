@@ -22,7 +22,8 @@ beforeEach(async () => {
   await ben.request("lobby", "ready", { ready: true });
   t.host.table.setReady(rita.playerId, true);
   await t.ok("POST", "/game/start");
-  ids = Object.fromEntries(t.host.table.state().players.map((p) => [p.name.startsWith("Ann") || p.name.startsWith("Ben") || p.name.startsWith("Rita") ? p.name : "ai", { id: p.id, seat: p.seat! }]));
+  // By kind, not by name: an AI player may be called Anna or Ben (a flaky failure when it was matched by name).
+  ids = Object.fromEntries(t.host.table.state().players.map((p) => [p.kind === "ai" ? "ai" : p.name, { id: p.id, seat: p.seat! }]));
   board = await Deck.connect(t.base, { role: "board", key: "test-key" } as never);
 });
 afterEach(async () => {

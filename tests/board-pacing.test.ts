@@ -70,4 +70,34 @@ describe("AI players at the board's pace", () => {
     b.close();
     await until(() => t!.host.table.state().phase === "finished", 5000);
   });
+
+  it("a deck sees an AI player's move once the board has shown it; its own moves at once (D-143)", async () => {
+    t = await testHost({ boardPacing: true, boardPaceTimeoutMs: 60_000 });
+    const ann = await t.joinDeck("Ann");
+    open.push(ann);
+    await t.ok("POST", "/ai", {});
+    await t.ok("POST", "/game/select", { gameId: "coin-flip", settings: { rounds: 3, roundSeconds: 0 } });
+    const b = await board(false);
+    const seqs: number[] = [];
+    b.ws.on("message", (raw) => {
+      const m = JSON.parse(String(raw));
+      if (m.ch === "game" && m.type === "board" && m.payload.seq) seqs.push(m.payload.seq);
+    });
+    await ann.request("lobby", "ready", { ready: true });
+    await t!.ok("POST", "/game/start");
+    const views = () => ann.messages.filter((m) => m.ch === "game" && m.type === "view").length;
+    await until(() => views() > 0 && seqs.length > 0);
+    const before = views();
+    b.send("game", "idle", { seq: seqs.at(-1) }); // the board has shown the start: the AI guesses
+    await until(() => aiMoves() === 1);
+    await until(() => seqs.length >= 2);
+    await new Promise((r) => setTimeout(r, 150));
+    expect(views()).toBe(before); // the board has not shown the AI's guess yet: the phone doesn't have it either
+    b.send("game", "idle", { seq: seqs.at(-1) });
+    await until(() => views() === before + 1);
+    // Ann's own guess reaches her at once, whatever the board is doing.
+    const r = await ann.request("game", "intent", { name: "guess", payload: "heads" });
+    expect(r.type).toBe("ack");
+    await until(() => views() === before + 2);
+  });
 });

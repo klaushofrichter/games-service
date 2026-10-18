@@ -6,6 +6,9 @@ page is the history. Leave it empty if there is nothing to add beyond the commit
 
 ## [Unreleased]
 
+- Phones follow the board (D-143): "Waiting for …" names the AI the board is showing, and "your turn" comes when
+  the board gets to you. An AI answering its own follow-up question in the same turn (a card, then the marble) no
+  longer pauses first.
 - The finished screen keeps to the middle of the board (D-142): a long statistics table (six-player Loopy)
   scrolls in a smaller font instead of running over the seats.
 - Hold'em sounds (D-139): a riffle shuffle and the deal at each hand, chips for calls, bets and raises (a cascade
