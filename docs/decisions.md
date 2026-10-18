@@ -491,3 +491,15 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   - **Checks.** `tests/statistics.test.ts` (the helpers, the host's checks, moves and pace without pauses, Coin Flip
     and Hold'em awards, the history endpoint); `scripts/e2e/play.py endings` (the button, the awards shown, turning to
     east and north, the result screen's button, Escape).
+- **D-137 · 2026-10-18 · Klaus** — AI players play at the board's pace: an AI moves only once the table's board has
+  shown the moves before. *Why:* AI players moved faster than Loopy's board animates a turn, so in a game of mostly AI
+  players the board fell behind every round (measured: 8 rounds behind after two minutes); the game ended on the
+  table in round 20 while the board showed round 9, and *Show result* appeared there after D-134's two-minute limit.
+  *Implementation (Claude):* every game message to the local board (D-132) carries `seq`; the board answers
+  `game idle {seq}` once it has shown it (its game's `whenIdle`, D-134, or at once without one). An AI move starts when
+  the board has shown everything sent, or the board stayed silent for 20 s (a stuck window cannot freeze the game).
+  Without a local board (headless tests, simulations) or with `BOARD_PACING=0` (fast test runs, Klaus: "preserve a mode
+  for faster testing in CI") AI players don't wait; remote boards never hold the game up. D-134's two-minute limit on
+  *Show result* is removed (Klaus: speculative). Measured with a Loopy game of four AI players: board and table on the
+  same round throughout. `tests/board-pacing.test.ts`: waiting for a silent board until the timeout, going on as each
+  move is shown, no waiting without a board or with pacing off, a board that goes away.
