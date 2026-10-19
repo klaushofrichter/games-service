@@ -770,7 +770,6 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   excluded as far as the law allows) and *Software* (MIT, link to the repository; games from other authors under
   their own terms). Not reviewed by a lawyer.
 - **D-164 · 2026-10-19 · Klaus** — The board's invite dialog closes by itself when its invite brings a player, with a short note "*Rita* joined through the invite". *Implementation (Claude):* the service knows an invite only by its hash; it keeps that hash with the remote session and sends it to the table with the connection offer. The table remembers the invites it asked for (by hash, the last 32) and, when a remote player joins through one, lists it in `state.remote.joined` (`{invite, name}`, the last 8). The dialog closes when its own invite appears there, so another invite being used leaves it open; the board's name keyboard (D-155) closes with it. The board-control switch stays in the invite dialog. Checks: `tests/remote.test.ts` (the joined invite), `scripts/e2e/remote.py` (the dialog closes and says who joined) and `next_hand.py`.
-- **D-164 · 2026-10-19 · Klaus** — A runbook sets up Game Table on one machine with Docker, independent of
 - **D-165 · 2026-10-19 · Klaus** — A runbook sets up Game Table on one machine with Docker, independent of
   games.skylar.technology, without DNS or HTTPS, written to be followed by a coding agent. *Why:* Klaus: "this runbook
   should be independent of the "games.skylar.technology" service, and ideally not require a DNS entry and HTTPS. The
