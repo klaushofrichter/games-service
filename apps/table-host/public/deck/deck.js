@@ -193,12 +193,18 @@ function renderTop() {
   body.style.display = inGame && tab === "table" ? "none" : "";
 }
 
-/** The player's name, the Rules button and the seat badge: the header outside a game, the top of the own tab in one. */
+/**
+ * The player's name, the Rules button and the seat badge: the header outside a game, the top of the own tab in one.
+ * *Change name* (outside a game) has a row of its own under the name (D-156), so a 12-character name keeps its room
+ * on a narrow deck, such as a remote player's deck window.
+ */
 function whoHtml(p, inGame) {
+  const rules = state.game?.howToPlay ? `<button type="button" class="rules-btn" data-rules aria-haspopup="dialog">Rules</button>` : "";
+  const rename = inGame || p?.kind !== "human" ? "" : `<button type="button" class="rules-btn" data-rename aria-haspopup="dialog">Change name</button>`;
+  // Outside a game both buttons go under the name; in a game Rules stays beside it (no Change name there).
+  const below = rename ? `<div class="who-actions">${rename}${rules}</div>` : "";
   return `<div class="who"><div><div class="eyebrow">${esc(state.tableName)}${inGame ? ` · ${esc(state.game?.name)}` : ""}</div><h1>${esc(p?.name ?? "")}</h1></div>
-      <div class="who-side">${inGame || p?.kind !== "human" ? "" : `<button type="button" class="rules-btn" data-rename aria-haspopup="dialog">Change name</button>`}
-      ${state.game?.howToPlay ? `<button type="button" class="rules-btn" data-rules aria-haspopup="dialog">Rules</button>` : ""}
-      ${p?.seat == null ? "" : seatBadgeHtml(p)}</div></div>`;
+      <div class="who-side">${below ? "" : rules}${p?.seat == null ? "" : seatBadgeHtml(p)}</div></div>${below}`;
 }
 
 function setTab(t) {
