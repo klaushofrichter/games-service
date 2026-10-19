@@ -97,6 +97,8 @@ export class Table extends EventEmitter {
   private players = new Map<string, Player>();
   layout: SeatLayout = 4;
   frontEdge: Edge = "south";
+  /** The edge games face on the table's board (D-101, D-151): the last north or south the table faced. */
+  gameFacing: "north" | "south" = "south";
   phase: Phase = "idle";
   private selected: { game: InstalledGame; settings: Record<string, unknown> } | null = null;
   /** Sound effects on the boards (D-092); on until someone turns them off in the board's settings. */
@@ -155,6 +157,7 @@ export class Table extends EventEmitter {
       layout: this.layout,
       seatEdges: seatEdges(this.layout),
       frontEdge: this.frontEdge,
+      gameFacing: this.gameFacing,
       players: this.playerInfos(),
       phase: this.phase,
       game: this.selected
@@ -610,6 +613,7 @@ export class Table extends EventEmitter {
     if (!["north", "east", "south", "west"].includes(edge)) throw new TableError(400, "edge must be north, east, south or west");
     if (this.frontEdge === edge) return;
     this.frontEdge = edge as Edge;
+    if (edge === "north" || edge === "south") this.gameFacing = edge;
     this.changed();
   }
 
