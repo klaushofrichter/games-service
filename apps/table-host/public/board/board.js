@@ -915,8 +915,8 @@ function joinPanel() {
     <button data-new-code style="font-size:.7em">New code</button>
   </aside>`;
   return `<aside class="join">
-    <div class="eyebrow">Scan to join</div>
-    <img src="/qr.svg?u=${encodeURIComponent(state.joinUrl)}" alt="QR code to join this table">
+    <div class="eyebrow">Scan to join locally</div>
+    <img src="/qr.svg?u=${encodeURIComponent(state.joinUrl)}" alt="QR code to join this table locally">
     <div>${linkLine(state.joinUrl)}<div class="code" style="text-align:center;margin-top:6px">${esc(code)}</div></div>
     <div class="faint" style="font-size:.7em;text-align:center">Everyone at the table scans this same code</div>
     <button data-new-code style="font-size:.7em">New code</button>
