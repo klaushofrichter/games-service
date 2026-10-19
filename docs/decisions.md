@@ -750,3 +750,10 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
     examples are the games here. `tests/developer-docs.test.ts` keeps the guide in step with the code (every hook,
     manifest field and `info` field documented) and checks that no private repository is named; `tests/cloud.test.ts`
     checks the three public routes.
+- **D-161 · 2026-10-19 · Klaus** — `klaushofrichter/extra-games` is public, the example of a game repository, and it and
+  this repository refer to each other. *Why:* Klaus: "Extra-games … can be a public example of a game package. … We can
+  use this as example in the platform repos"; "The repositories games-service and extra games should refer to each
+  other." *Implementation (Claude):* the README (intro, *Writing a game*, *Extra-game repositories*), the developer
+  guide (top and *A game repository of your own*) and `llms.txt` link to it as the example to copy; its README links
+  back to the guide (extra-games E-017). The other game repositories stay private and unnamed in the documentation
+  (D-160); `tests/developer-docs.test.ts` checks both. The console no longer needs `GAME_REPO_TOKEN` for extra-games.

@@ -25,6 +25,7 @@ Key rules for every game: rules are pure and deterministic (randomness only from
 - [Pachisi](https://github.com/klaushofrichter/games-service/tree/main/games/pachisi): turns, dice, captures, moves made by touching the board, `describe` for the Game Viewer
 - [Hold'em](https://github.com/klaushofrichter/games-service/tree/main/games/holdem): private cards, AI styles, awards, a skippable wait, sounds
 - [Roulette](https://github.com/klaushofrichter/games-service/tree/main/games/roulette): simultaneous betting, AI styles
+- [Example game repository](https://github.com/klaushofrichter/extra-games): Chess, Liar's Dice and Backgammon in a repository of their own (public), tested against games-service with CI; the layout to copy for a new game repository
 
 ## Testing
 

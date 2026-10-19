@@ -9,6 +9,8 @@ request.
   the SDK, the cloud service at `https://games.skylar.technology`.
 - **Short index for language models:** [`/llms.txt`](../../llms.txt), also served at
   `https://games.skylar.technology/llms.txt`; this whole page at `https://games.skylar.technology/llms-full.txt`.
+- **Example game repository:** [`klaushofrichter/extra-games`](https://github.com/klaushofrichter/extra-games) (public): Chess, Liar's Dice and Backgammon in a repository of their own, with
+  the test setup and CI against this repository (section 15).
 - **Reference games in this repository:** `games/coin-flip` (the smallest complete game: simultaneous turns, timers,
   statistics, players joining mid-game), `games/pachisi` (turns, dice, moves made by touching the board),
   `games/holdem` (private cards, AI styles, a skippable wait, sounds), `games/roulette` (simultaneous betting, AI
@@ -446,7 +448,9 @@ Tests use Vitest and run against the real host code.
 ## 15. A game repository of your own
 
 Games can live in their own GitHub repository (private or public). The service fetches its `games/` folder as one
-bundle, and an administrator ticks the repository for the tables that should get its games.
+bundle, and an administrator ticks the repository for the tables that should get its games. [`klaushofrichter/extra-games`](https://github.com/klaushofrichter/extra-games) is a working
+example of everything below: copy its `scripts/games-service.sh`, `games-service.ref`, `tsconfig.json`,
+`vitest.config.ts`, tests and CI workflow.
 
 ```
 my-games/

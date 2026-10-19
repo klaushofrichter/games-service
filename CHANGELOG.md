@@ -6,6 +6,8 @@ page is the history. Leave it empty if there is nothing to add beyond the commit
 
 ## [Unreleased]
 
+- The public example of a game repository, [`klaushofrichter/extra-games`](https://github.com/klaushofrichter/extra-games)
+  (Chess, Liar's Dice, Backgammon), is linked from the README, the developer guide and `llms.txt` (D-161).
 - **Developer guide for game authors and LLMs** (D-160): `docs/developers/game-development.md`, published at
   `https://games.skylar.technology/llms.txt` (index), `/docs/game-development.md` and `/llms-full.txt`.
 - **Exchange a player during a game** (D-159): Settings › Players › Exchange… puts someone at the table (QR code), a
