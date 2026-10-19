@@ -785,6 +785,7 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   the README, `AGENTS.md` and `llms.txt`; the `e2e` job runs the runbook as written (setup, build, simulation, a
   browser game over the LAN address, Part B, the cloud profile).
 - **D-165 · 2026-10-19 · Klaus** — In the board's settings, a player's name is the way to exchange them during a game;
+- **D-166 · 2026-10-19 · Klaus** — In the board's settings, a player's name is the way to exchange them during a game;
   the *Exchange…* buttons are gone, and the colours sit right-aligned. An exchange for a remote player shows the
   invite's QR code next to its link. *Why:* Klaus: "remove the "Exchange" button, and make the player name clickable
   instead. Show the color choices right aligned. Add a subtitle note to that section …"; "When showing the link for a

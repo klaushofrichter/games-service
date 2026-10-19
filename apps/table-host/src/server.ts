@@ -415,7 +415,7 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
       }
       if (path === "/qr.svg") {
         // ?exchange: the open exchange's code instead of the table's join code (D-159). A remote player's invite also
-        // on a remote board with board control, which sees the link anyway (D-165); a seat's join code only here.
+        // on a remote board with board control, which sees the link anyway (D-166); a seat's join code only here.
         const ex = table.state().exchange;
         if (url.searchParams.get("exchange") !== null && ex?.kind === "remote" && ex.url) {
           if (remoteOf(req) ? !table.remoteControlAllowed() : !boardAllowed(req)) return json(res, 403, { error: "board only" });

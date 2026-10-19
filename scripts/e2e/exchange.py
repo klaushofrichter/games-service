@@ -1,7 +1,7 @@
 """Browser check: exchanging a seat's player during a game (D-159).
   python3 scripts/e2e/exchange.py out/
 
-A Table Host of its own (port 8137). Ann and Ben play Coin Flip. On the board, Settings › Players › Ben (the name, D-165):
+A Table Host of its own (port 8137). Ann and Ben play Coin Flip. On the board, Settings › Players › Ben (the name, D-166):
 "Someone at the table" shows a QR code and its link, and the window waits; a new phone opens the link, joins as Cleo
 and takes Ben's seat (colour kept), and the window closes by itself. Then Cleo's name, "An AI player", confirmed:
 "Cleo (AI)" plays the seat. The board can't remove a player of the running game. Ben's phone is told why it lost the seat.

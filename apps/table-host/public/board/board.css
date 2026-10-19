@@ -463,7 +463,7 @@ button.copy:hover, button.copy.done { color: var(--brass); border-color: var(--b
 .stats-note { color: var(--ink-soft); font-size: 17px; margin: 14px 0 0; }
 
 /* Exchanging a seat's player (D-159). */
-/* The player's name: a plain label, or during a game the way into the exchange window (D-165). */
+/* The player's name: a plain label, or during a game the way into the exchange window (D-166). */
 .player-colors .pname { display: inline-flex; align-items: center; min-width: 0; font: inherit; color: inherit; text-align: left; }
 .player-colors button.pname { background: none; border: 0; padding: 6px 10px 6px 0; border-radius: 8px; cursor: pointer; text-decoration: underline; text-decoration-color: var(--felt-line); text-underline-offset: 4px; }
 .player-colors button.pname:hover, .player-colors button.pname:focus-visible { color: var(--brass); text-decoration-color: currentColor; }

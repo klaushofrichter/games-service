@@ -575,7 +575,7 @@ function openSettings() {
       return `<span class="value">${esc(v)}</span>`;
     };
     // Player colours (D-106): a table setting for every seated player, used in the lobby and by every game. During a
-    // game the name opens the player's exchange window (D-159, D-165); the colours stay right-aligned.
+    // game the name opens the player's exchange window (D-159, D-166); the colours stay right-aligned.
     const playerColors = () => {
       const seated = state.players.filter((p) => p.seat !== null).sort((a, b) => a.seat - b.seat);
       if (!seated.length) return "";

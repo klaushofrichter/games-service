@@ -1,4 +1,4 @@
-"""Browser check (D-165): exchanging a player for a remote player shows the invite as a link and as a QR code.
+"""Browser check (D-166): exchanging a player for a remote player shows the invite as a link and as a QR code.
 A cloud service and a Table Host of their own (ports 8195/8196). Ann and Ben play Coin Flip; on the board Settings ›
 Players › Ann (the name), "A remote player": the window shows the invite's QR code and link.
   python3 scripts/e2e/exchange_remote.py out/

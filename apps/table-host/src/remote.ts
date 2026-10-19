@@ -135,7 +135,7 @@ class Session {
     if (f.k === "req" && typeof f.path === "string" && Number.isInteger(f.id)) {
       const method = String(f.method ?? "GET").toUpperCase();
       // Only the paths a remote board or deck needs; everything else stays on the table.
-      // Plus /qr.svg, which the host answers for a remote board only with an open remote exchange's invite (D-165).
+      // Plus /qr.svg, which the host answers for a remote board only with an open remote exchange's invite (D-166).
       if (!/^\/((board|deck|shared|games|api\/v1)(\/|$)|qr\.svg(\?|$))/.test(f.path)) return this.reply(f.id, 404, "application/json", Buffer.from('{"error":"not found"}'));
       await new Promise<void>((resolve) => {
         const res = fakeResponse((status, type, body) => {

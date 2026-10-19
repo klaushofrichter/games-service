@@ -222,7 +222,7 @@ describe("remote play", { timeout: 60_000 }, () => {
     await t.ok("POST", "/game/start");
     await deck.next((m) => m.ch === "game" && m.type === "view");
     // An open exchange for a remote player (D-159): its invite as a QR code on the table's board and on a remote
-    // board with board control, which sees the link anyway (D-165); never a seat's join code.
+    // board with board control, which sees the link anyway (D-166); never a seat's join code.
     const seat = t.host.table.state().players.find((p) => p.name === "Ana")!.seat!;
     t.host.table.exchange(seat, "remote", "https://games.example/i/QRQRQRQR");
     const qrLocal = await fetch(`${t.base}/qr.svg?exchange=1`);
