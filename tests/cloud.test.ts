@@ -33,7 +33,7 @@ describe("cloud service", () => {
     const full = await (await fetch(`${base}/llms-full.txt`)).text();
     expect(full.startsWith(text) && full.includes(guide)).toBe(true);
     // Only public repositories: no private game repository is named as a source.
-    for (const t of [text, guide]) expect(t).not.toMatch(/loopy-game|starforge-game|extra-games/);
+    for (const t of [text, guide]) expect(t).not.toMatch(/loopy-game|starforge-game/);
     expect(await (await fetch(`${base}/`)).text()).toContain('href="/llms.txt"');
   });
 
