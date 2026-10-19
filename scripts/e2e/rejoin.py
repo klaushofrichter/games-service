@@ -4,7 +4,7 @@
 A Table Host of its own (port 8097, a 1.5 s waiting time). Ann and Ben join by phone and play Coin Flip. Ben's phone
 goes away for good (its browser closed, so its session is gone too); his seat waits and the game goes on. On a new
 phone page Ben is told to scan the code. On the board, Settings › Show join code shows the QR code and the address
-during the game; then Settings › Players › Exchange… Ben, "Someone at the table", shows the seat's own code: Ben's
+during the game; then Settings › Players › Ben (the name), "Someone at the table", shows the seat's own code: Ben's
 phone opens it, joins with his name, takes his seat back and can guess again.
 """
 import os, sys
@@ -72,7 +72,7 @@ try:
         board.click(".overlay.join-code [data-close-overlay]")
         board.wait_for_selector(".overlay.join-code", state="detached")
 
-        # Back into his own seat: Settings › Players › Exchange… Ben, someone at the table (D-159). Ben "scans" its
+        # Back into his own seat: Settings › Players › Ben (the name), someone at the table (D-159). Ben "scans" its
         # code, joins with his name and plays his seat again.
         board.click(f".overlay.settings [data-exchange='{players()['Ben']['id']}']")
         board.click(".overlay.exchange [data-ex=local]")

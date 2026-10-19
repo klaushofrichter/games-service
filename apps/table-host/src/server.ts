@@ -414,9 +414,14 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
         return res.end();
       }
       if (path === "/qr.svg") {
-        if (!boardAllowed(req) || remoteOf(req)) return json(res, 403, { error: "board only" });
-        // ?exchange: the open local seat exchange's code instead of the table's join code (D-159).
+        // ?exchange: the open exchange's code instead of the table's join code (D-159). A remote player's invite also
+        // on a remote board with board control, which sees the link anyway (D-166); a seat's join code only here.
         const ex = table.state().exchange;
+        if (url.searchParams.get("exchange") !== null && ex?.kind === "remote" && ex.url) {
+          if (remoteOf(req) ? !table.remoteControlAllowed() : !boardAllowed(req)) return json(res, 403, { error: "board only" });
+          return await qrSvg(res, ex.url);
+        }
+        if (!boardAllowed(req) || remoteOf(req)) return json(res, 403, { error: "board only" });
         if (url.searchParams.get("exchange") !== null) return ex?.kind === "local" ? await qrSvg(res, ex.url) : json(res, 404, { error: "no exchange is open" });
         return await qrSvg(res, table.currentJoin().url);
       }
