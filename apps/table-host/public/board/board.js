@@ -1761,6 +1761,13 @@ async function openInvite() {
   });
   const draw = () => {
     const r = state.remote ?? { boardControl: true, maxPlayers: 4, players: 0 };
+    // The invited player has joined (D-164): the link is used up, so the dialog closes by itself.
+    const joined = r.joined?.find((j) => j.invite === inv.token);
+    if (joined) {
+      if (namePad) namePad.remove(), (namePad = null);
+      close();
+      return toast(`${joined.name} joined through the invite`);
+    }
     o.innerHTML = `<div class="panel invite"><h2>Invite a remote player</h2>
       <div class="muted">Send this link by email or chat. It works once, for one player, until ${esc(until)}.</div>
       <div class="invite-name"><span>Player's name <span class="faint">(optional, they can change it)</span></span>
