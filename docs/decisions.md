@@ -601,3 +601,40 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
     and the board had no `whenIdle()` (D-134). It now has one that resolves at the reveal, and a new round's betting
     reveals the last spin at once, so a late reveal can't overwrite "Place your bets".
   - Hold'em, Pachisi and every statistics window already fitted (the statistics window scrolls).
+
+## Roulette at a full AI table (18 Oct 2026)
+
+- **D-150 · 2026-10-18 · Klaus** — Roulette with six AI players (the developer setting, D-118): the betting layout
+  shifted down at "No more bets" and back at "Place your bets"; the countdown ("1  s") looked poor; "Bet from your
+  phone" showed with no phone at the table; Roulette had no sounds; two of six AIs never bet in 50 spins; AIs only bet
+  even-money chances; and the end had no statistics. Klaus asked for awards in the spirit of "Odd Man".
+  - **Layout.** The side column is centred in the table's grid, and the hint line under the layout was emptied outside
+    betting, so the column got shorter and moved. The status row and the hint line now have fixed heights.
+  - **Countdown.** A 76 px ring in the status row that empties with the time to bet (`bettingSeconds`), the seconds in
+    its middle; brass, red and beating under 6 s. Faded out, not removed, when nobody can bet, so it never moves the row.
+  - **Hint.** "Bet from your phone…" only while a human sits at the table (`info.players`, `kind: "human"`).
+  - **Sounds** (Web Audio, as Hold'em, D-139, through `playSound`, D-092): `betPlaced` a chip and a tap (a step's AI
+    bets 90 ms apart, at most 8); `betsCleared` a slide and a click; `bettingOpen` two bell tones; a tick per second in
+    the last five; `wheelSpun` 5.2 s timed to the wheel's ease-out: a low rumble fading, the ball's rattle slowing,
+    then seven bounces into a pocket; the reveal a chime, a four-note fanfare when anyone came out ahead (only after a
+    live spin, not when a board comes up mid-result).
+  - **AIs that never bet: a platform fix.** `scheduleAi` cancelled and restarted every AI's pending move on each
+    change. All pauses were equal, so the first AI's move cancelled the others: AIs moved one at a time in join order,
+    about 1.6 s each at the board's pace (D-141), a bet and Done each. Six needed about 10 s; with a shorter time to
+    bet the last two never got a turn, every spin. Now, in `turnModel: "simultaneous"` games, an AI still waiting out
+    its pause keeps it (it reads the game when the pause ends anyway); a move already being worked out is still
+    replaced, so no AI answers from an old view. Sequential games are unchanged. A pause that ended without a
+    move (the game could not take one then) is not kept but scheduled afresh. One effect: an AI no longer starts its
+    pause over when someone else moves, so in Coin Flip it may guess a moment after a phone and the next round opens at
+    once; `viewer.py` now waits for the round to flip rather than for the phone's buttons to grey out. Measured: six AIs done in about 2 s,
+    every seat betting every spin with 8 s to bet. Test: six AIs with a 1 s pause finish inside 5 s (fails before).
+  - **AI variety.** Each AI has a pet even-money bet (`seat % 6`) for half its outside bets and a lucky number
+    (`(7·seat + 11) % 37`) for 40 % of its number bets. *Conservative* now bets a number at the minimum 12 % of the
+    time and a dozen or column 18 %; *aggressive* and *erratic* as before, with the pet and lucky number.
+  - **Statistics** (D-140): per seat, counted at each spin (`stats` in the state): bets by type, single-number hits,
+    bets on zero, points staked, spins played, won and sat out, longest winning streak, biggest gain on one spin.
+    *Table:* Player, Points, Net, Bets, Spins won, Biggest win, Best streak. *Wheel facts* (in the summary's text and
+    `highlights.facts`): red and black counts, longest red and black streaks, zeros, the hottest number (twice or
+    more). *Awards* (`mostAward`, so a tie of everyone or nobody is left out): High Roller, Jackpot, Bullseye, Hot
+    Hand, Lucky Charm, Number Cruncher, Zero Hero, Odd Man, Even Steven, Seeing Red, Night Owl (black), Low Rider
+    (1–18), High Flyer (19–36), By the Dozen (dozens and columns), Wallflower (sat out most).
