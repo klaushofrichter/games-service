@@ -757,3 +757,7 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   guide (top and *A game repository of your own*) and `llms.txt` link to it as the example to copy; its README links
   back to the guide (extra-games E-017). The other game repositories stay private and unnamed in the documentation
   (D-160); `tests/developer-docs.test.ts` checks both. The console no longer needs `GAME_REPO_TOKEN` for extra-games.
+- **D-162 · 2026-10-19 · Klaus** — This repository is under the MIT licence, like extra-games (E-018). *Why:* Klaus: "I
+  want to use MIT for the public repos." *Implementation (Claude):* `LICENSE` (Copyright (c) 2026 Klaus Hofrichter),
+  `"license": "MIT"` in `package.json`, a *Licence* section in the README. The repository holds no third-party images,
+  sounds or fonts, so the one licence covers everything in it; packages from npm keep their own.

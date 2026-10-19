@@ -1,5 +1,6 @@
 {
   "name": "games-service",
+  "license": "MIT",
   "private": true,
   "description": "Game Table platform: table host, lobby, SDK, cloud service and example games",
   "type": "module",
