@@ -189,6 +189,7 @@ export class CloudLink {
       }
       if (msg.type !== "offer" || !this.gateway) return;
       try {
+        if (this.table.remoteBanned(String(msg.session))) throw new Error("you were removed from this table"); // D-168
         const sdp = await this.gateway.answer(String(msg.session), String(msg.sdp), msg.iceServers ?? [], typeof msg.invite === "string" ? msg.invite : undefined);
         ws.send(JSON.stringify({ type: "answer", session: msg.session, sdp }));
       } catch (err) {

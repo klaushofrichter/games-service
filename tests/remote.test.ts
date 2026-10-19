@@ -284,9 +284,11 @@ describe("remote play", { timeout: 60_000 }, () => {
 
   it("limits the number of remote players", async () => {
     const t = await pairedHost({ maxRemotePlayers: 1 });
-    const p1 = await RemotePeer.connect((await t.ok("POST", "/invites")).token);
+    const [i1, i2] = [await t.ok("POST", "/invites"), await t.ok("POST", "/invites")];
+    const p1 = await RemotePeer.connect(i1.token);
     await (await p1.socket({ name: "One" })).next((m) => m.type === "welcome");
-    const p2 = await RemotePeer.connect((await t.ok("POST", "/invites")).token);
+    expect((await t.api("POST", "/invites")).status).toBe(409); // full: no more invites (D-168)
+    const p2 = await RemotePeer.connect(i2.token);
     const d2 = await p2.socket({ name: "Two" });
     const err = await d2.next((m) => m.type === "error");
     expect(err.payload.message).toMatch(/no room for more remote players/);
@@ -419,5 +421,95 @@ describe("remote play", { timeout: 60_000 }, () => {
     await pairedHost();
     await expect(RemotePeer.connect("NOPE1234")).rejects.toThrow(/404/);
     expect((await fetch(`${base}/i/NOPE1234`)).status).toBe(404);
+  });
+
+  describe("watchers (D-168)", () => {
+    const helloError = (sock: Awaited<ReturnType<RemotePeer["socket"]>>) => sock.next((m) => m.type === "error");
+
+    it("a watch invite shows the board without a seat; the deck is refused; a removed watcher can't come back", async () => {
+      const t = await pairedHost();
+      const inv = await t.ok("POST", "/invites", { watch: true });
+      expect(inv.url).toMatch(/[?&]watch=1/);
+      const peer = await RemotePeer.connect(inv.token);
+      const rb = await peer.socket({ role: "board", name: "Wanda" });
+      await rb.next((m) => m.type === "welcome");
+      await until(() => t.host.table.state().watchers.length === 1);
+      const [w] = t.host.table.state().watchers;
+      expect(w.name).toBe("Wanda");
+      expect(t.host.table.state().remote.joined.at(-1)).toEqual({ invite: inv.token, name: "Wanda" }); // the invite dialog closes
+      await until(() => rb.lastState()?.remote.watching === true);
+      expect(rb.lastState().remote).toMatchObject({ boardControl: false, watching: true, mayJoin: false });
+      expect((await helloError(await peer.socket({ name: "Wanda" }))).payload.message).toMatch(/watching/);
+      expect(t.host.table.state().players).toHaveLength(0);
+      expect((await peer.json("POST", "/api/v1/layout", { seats: 6 })).status).toBe(403);
+      // removed: the board is told and closed, the browser's connection ends, and the session can't reconnect
+      await t.ok("DELETE", `/watchers/${w.id}`);
+      await until(() => rb.s.closed);
+      expect(rb.s.msgs.some((m) => m.type === "removed")).toBe(true);
+      expect(t.host.table.state().watchers).toEqual([]);
+      await expect(RemotePeer.reconnect(peer.session)).rejects.toThrow(/removed/);
+      expect((await t.api("DELETE", `/watchers/${w.id}`)).status).toBe(404);
+    });
+
+    it("remote players and watchers together stay within the remote places", async () => {
+      const t = await pairedHost({ maxRemotePlayers: 1 });
+      const peer = await RemotePeer.connect((await t.ok("POST", "/invites", { watch: true })).token);
+      await (await peer.socket({ role: "board", name: "Wanda" })).next((m) => m.type === "welcome");
+      await until(() => t.host.table.state().watchers.length === 1);
+      const full = await t.api("POST", "/invites");
+      expect(full.status).toBe(409);
+      expect((await t.api("POST", "/invites", { watch: true })).status).toBe(409);
+    });
+
+    it("a remote player who is removed keeps watching; in the lobby the table can let them play again", async () => {
+      const t = await pairedHost();
+      const peer = await RemotePeer.connect((await t.ok("POST", "/invites")).token);
+      const rb = await peer.socket({ role: "board", name: "Rita" });
+      await rb.next((m) => m.type === "welcome");
+      await until(() => rb.lastState());
+      expect(rb.lastState().remote.mayJoin).toBe(true); // invited to play: the page opens the deck
+      expect(t.host.table.state().watchers).toEqual([]); // not a watcher while joining
+      await (await peer.socket({ name: "Rita" })).next((m) => m.type === "welcome");
+      const rita = t.host.table.state().players.find((p) => p.name === "Rita")!;
+      await t.ok("DELETE", `/players/${rita.id}`);
+      await until(() => t.host.table.state().watchers.length === 1);
+      const [w] = t.host.table.state().watchers;
+      expect(w.name).toBe("Rita");
+      await until(() => rb.lastState()?.remote.mayJoin === false);
+      expect((await helloError(await peer.socket({ name: "Rita" }))).payload.message).toMatch(/watching/);
+      await t.ok("POST", `/watchers/${w.id}/play`);
+      await until(() => rb.lastState()?.remote.mayJoin === true);
+      await (await peer.socket({ name: "Rita" })).next((m) => m.type === "welcome");
+      expect(t.host.table.state().players.find((p) => p.name === "Rita")).toMatchObject({ location: "remote" });
+      expect(t.host.table.state().watchers).toEqual([]);
+    });
+
+    it("during a game a seat is exchanged for a watcher, and an exchanged remote player becomes a watcher", async () => {
+      const t = await pairedHost();
+      const ann = await t.joinDeck("Ann");
+      await t.ok("POST", "/ai", {});
+      await t.ok("POST", "/game/select", { gameId: "coin-flip", settings: { rounds: 20, roundSeconds: 0 } });
+      await ann.request("lobby", "ready", { ready: true });
+      await t.ok("POST", "/game/start");
+      const peer = await RemotePeer.connect((await t.ok("POST", "/invites", { watch: true })).token);
+      const rb = await peer.socket({ role: "board", name: "Wanda" });
+      await rb.next((m) => m.type === "welcome");
+      await until(() => t.host.table.state().watchers.length === 1);
+      const [w] = t.host.table.state().watchers;
+      const aiSeat = t.host.table.state().players.find((p) => p.kind === "ai")!.seat!;
+      const r = await t.ok("POST", "/exchange", { seat: aiSeat, kind: "watcher", watcher: w.id });
+      expect(r.state.exchange).toMatchObject({ seat: aiSeat, kind: "remote", watcher: { id: w.id, name: "Wanda" } });
+      await until(() => rb.lastState()?.remote.mayJoin === true);
+      await (await peer.socket({ name: "Wanda" })).next((m) => m.type === "welcome");
+      let s = t.host.table.state();
+      expect(s.players.find((p) => p.seat === aiSeat)).toMatchObject({ name: "Wanda", location: "remote", kind: "human" });
+      expect(s.watchers).toEqual([]);
+      expect(s.exchange).toBeNull();
+      // and back: an AI takes Wanda's seat, and Wanda watches again (her board stays, without control)
+      await t.ok("POST", "/exchange", { seat: aiSeat, kind: "ai" });
+      await until(() => t.host.table.state().watchers.length === 1);
+      await until(() => rb.lastState()?.remote.mayJoin === false);
+      expect(rb.lastState().remote).toMatchObject({ watching: true, boardControl: false });
+    });
   });
 });

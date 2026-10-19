@@ -29,6 +29,10 @@
   /* (an iframe doesn't stretch between left and right: it needs an explicit size) */
   #board { position: absolute; top: 0; left: 0; width: calc(100% - 412px); height: 100%; border: 0; background: var(--felt-deep); }
   #play.deck-min #board { width: 100%; }
+  /* Watching (D-168): the board alone, the whole window, a small note at the top. */
+  #play.watching #board { width: 100% !important; height: 100% !important; }
+  #play.watching #deck-wrap { display: none; }
+  #watch-note { position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); background: rgba(0,0,0,.65); color: var(--soft); padding: 6px 14px; border-radius: 999px; font-size: .8em; pointer-events: none; }
   /* Top right, as tall as the deck's content up to the window (D-095): fitDeck() sets the height, so a scrollbar
      appears only when the content is taller than the window. */
   #deck-wrap { position: absolute; right: 16px; top: 16px; width: 380px; height: min(640px, calc(100% - 32px)); max-height: calc(100% - 32px); display: flex; flex-direction: column;
@@ -66,6 +70,7 @@
   <iframe id="board" title="Game board" allow="autoplay; fullscreen"></iframe>
   <div id="deck-wrap"><div id="deck-bar"><span>Your deck · private</span><button id="deck-min" type="button">Hide</button></div><iframe id="deck" title="Your deck"></iframe></div>
   <div id="status" hidden></div>
+  <div id="watch-note" hidden>Watching · close this window to leave</div>
 </div>
 <script>
 (() => {
@@ -92,6 +97,13 @@
   };
   // The table may suggest a name in the link (?name=, D-155); the player can change it.
   const suggested = cleanName(new URLSearchParams(location.search).get("name"));
+  // An invite to watch (D-168): only the wording here; the table knows the invite and decides.
+  const WATCH = new URLSearchParams(location.search).get("watch") === "1";
+  if (WATCH) {
+    $("title").textContent = "Watch the game table";
+    document.querySelector("#join p").textContent = "You're invited to watch a game table. You'll see the board as the players do; you take no seat. No account needed — any name works.";
+    document.querySelector("#join button[type=submit]").textContent = "Watch";
+  }
 
   let saved = store.get() || {};
   let name = saved.name || "";
@@ -269,14 +281,44 @@
     dc = pc = signal = null;
   }
 
+  const frameQuery = (extra) => `?remote=1&gtp=${encodeURIComponent(PAGE)}${extra}`;
   function start() {
-    // (Re)load the board and the deck so their sockets reopen over the new channel.
+    // (Re)load the board so its socket reopens over the new channel; the board says whether a deck belongs here
+    // (D-168): a player's, or one let in to play. A watcher has none.
     show("play"); // first, so the frames load at their real size
-    const q = (extra) => `?remote=1&gtp=${encodeURIComponent(PAGE)}${extra}`;
-    $("board").src = `/board/${q(`&inv=${encodeURIComponent(CODE)}`)}`;
-    $("deck").src = `/deck/${q(`&inv=${encodeURIComponent(CODE)}&name=${encodeURIComponent(name)}`)}`;
+    $("board").src = `/board/${frameQuery(`&inv=${encodeURIComponent(CODE)}&name=${encodeURIComponent(name)}`)}`;
+    deckShown = false;
+    $("deck").src = "about:blank";
+    $("play").classList.toggle("watching", WATCH);
     playing = true;
   }
+
+  let deckShown = false;
+  function seat(mayJoin, watching) {
+    $("play").classList.toggle("watching", !mayJoin);
+    $("watch-note").hidden = mayJoin || !watching;
+    if (mayJoin && !deckShown) {
+      deckShown = true;
+      $("deck").src = `/deck/${frameQuery(`&inv=${encodeURIComponent(CODE)}&name=${encodeURIComponent(name)}`)}`;
+    } else if (!mayJoin && deckShown) {
+      deckShown = false;
+      $("deck").src = "about:blank";
+    }
+  }
+
+  window.addEventListener("message", (e) => {
+    if (e.origin !== location.origin || e.source !== $("board").contentWindow) return;
+    const d = e.data || {};
+    if (d.type === "gt-seat") seat(!!d.mayJoin, !!d.watching);
+    if (d.type === "gt-removed") {
+      // Removed by the table (D-168): no reconnecting; this invite is done here.
+      playing = false;
+      teardown();
+      gen++;
+      store.set({});
+      wait("You were removed", "The table has removed you from watching. Ask for a new invite to come back.");
+    }
+  });
 
   // The table pings every few seconds; silence means the connection is gone even if nobody said so.
   setInterval(() => {

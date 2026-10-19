@@ -10,6 +10,9 @@ page is the history. Leave it empty if there is nothing to add beyond the commit
   with the built-in games on one machine, phones on the LAN, no cloud service, DNS or HTTPS; written for coding agents.
 - Settings › Players during a game: tap a player's name to exchange them (no more *Exchange…* buttons); an exchange
   for a remote player shows the invite's QR code too (D-166).
+- **Remote watchers** (D-168): *Watch only* invites someone to see the board without a seat; exchanged remote players
+  keep watching. An eye on the board shows who watches, with Remove; a watcher can take a seat through the exchange
+  (or *Let play* in the lobby). Remote players and watchers together: at most four.
 - Fix: a remote player who was exchanged, left or was removed could still operate the table from their board; that
   board now only watches (D-167).
 - games-service and extra-games are under the MIT licence (D-162); the terms of service say so and that there is no

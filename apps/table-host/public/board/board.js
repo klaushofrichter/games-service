@@ -23,6 +23,7 @@ const cornersEl = document.getElementById("corners");
 const settingsBtn = document.getElementById("settings-button");
 const flipBtn = document.getElementById("flip-button");
 const toolsBtn = document.getElementById("tools-button");
+const watchBtn = document.getElementById("watchers-button");
 const viewBtn = document.getElementById("view-button");
 const resultBtn = document.getElementById("result-button");
 const statsBtn = document.getElementById("stats-button");
@@ -466,13 +467,21 @@ function placeSettings(playing) {
  */
 function placeTools(playing, front, gearCorner) {
   toolsBtn.hidden = REMOTE && !state.remote?.boardControl;
-  if (toolsBtn.hidden) return;
+  if (toolsBtn.hidden) return placeAlong(watchBtn, REMOTE ? 102 : 172, front, gearCorner, placeWatchers());
   // The developer setting (D-118) marks it while it is on, so nobody forgets it.
   toolsBtn.classList.toggle("dev", !!state.developer?.allowNoLocalPlayer && !REMOTE);
   const flipInside = playing && !REMOTE && gearCorner !== FRONT_CORNERS[front][0]; // the turn button at 172 px
   const along = REMOTE ? 102 : flipInside ? 242 : 172;
   const alongX = front === "south" || front === "north";
-  const st = toolsBtn.style;
+  placeAlong(toolsBtn, along, front, gearCorner, true);
+  placeAlong(watchBtn, along + 70, front, gearCorner, placeWatchers());
+}
+
+/** Put a round corner button `along` px from the gear's corner, along the edge the board faces, turned to it. */
+function placeAlong(btn, along, front, gearCorner, shown) {
+  if (!shown) return;
+  const alongX = front === "south" || front === "north";
+  const st = btn.style;
   st.left = st.right = st.top = st.bottom = "";
   if (alongX) {
     st[gearCorner[1] === "l" ? "left" : "right"] = `${along}px`;
@@ -481,8 +490,64 @@ function placeTools(playing, front, gearCorner) {
     st[gearCorner[0] === "t" ? "top" : "bottom"] = `${along}px`;
     st[gearCorner[1] === "l" ? "left" : "right"] = "32px";
   }
-  toolsBtn.querySelector("svg").style.transform = `rotate(${ROT[front]}deg)`;
+  btn.firstElementChild.style.transform = `rotate(${ROT[front]}deg)`;
 }
+
+// ---------- remote watchers (D-168) ----------
+const EYE = `<svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="3" fill="currentColor"/></svg>`;
+/** The eye beside the tools, with how many watch, only while someone does; it opens the list (D-168). */
+function placeWatchers() {
+  const n = state.watchers?.length ?? 0;
+  watchBtn.hidden = !n;
+  if (!n) return false;
+  const html = `<span class="inner">${EYE}<span class="n">${n}</span></span>`;
+  if (watchBtn.dataset.html !== html) (watchBtn.innerHTML = html), (watchBtn.dataset.html = html);
+  watchBtn.setAttribute("aria-label", `${n} watching`);
+  return true;
+}
+/** Who may manage watchers here: the table's board, or a remote player's board with board control. */
+const canManageWatchers = () => !REMOTE || (!!state.remote?.boardControl && !state.remote?.watching);
+const lobbyPhase = () => !["active", "paused", "terminating"].includes(state.phase);
+/** A watcher's row: the name, and Remove (and in the lobby "Let play") where this board may. */
+function watcherRows() {
+  return (state.watchers ?? [])
+    .map((w) => `<div class="row"><span class="pname"><span class="eye-dot">${EYE}</span>${esc(w.name)}</span><span class="row-actions">${
+      canManageWatchers()
+        ? `${lobbyPhase() && !state.noSeat ? `<button data-watcher-play="${esc(w.id)}">Let play</button>` : ""}<button class="danger" data-watcher-remove="${esc(w.id)}">Remove</button>`
+        : ""
+    }</span></div>`)
+    .join("");
+}
+const WATCHER_NOTE = "Watchers see the board, never a phone's private view. They leave by closing their window; a removed watcher can't come back with that invite.";
+async function watcherAction(b) {
+  const w = (state.watchers ?? []).find((x) => x.id === (b.dataset.watcherRemove ?? b.dataset.watcherPlay));
+  if (!w) return false;
+  if (b.dataset.watcherRemove) {
+    if (await confirmDialog(`Remove ${w.name}?`, `${w.name} stops watching, and can't come back with this invite.`, "Remove")) act("DELETE", `/watchers/${w.id}`);
+  } else act("POST", `/watchers/${w.id}/play`);
+  return true;
+}
+function openWatchers() {
+  const o = document.createElement("div");
+  o.className = "overlay watchers";
+  const draw = () => {
+    if (!(state.watchers ?? []).length) return close();
+    setPanel(o, `<div class="panel watchers-panel"><h2>Watching</h2>
+      <div class="group player-colors">${watcherRows()}</div>
+      <p class="faint" style="font-size:.75em">${WATCHER_NOTE}${lobbyPhase() ? "" : " During a game, a watcher can take a seat through Settings › Players: tap a player's name."}</p>
+      <div class="actions settings-actions"><button class="primary" data-close-overlay>Done</button></div></div>`);
+  };
+  const close = () => (unsub(), o.remove());
+  const unsub = onState(draw);
+  o.addEventListener("click", async (e) => {
+    const b = e.target.closest("button");
+    if (e.target === o || b?.dataset.closeOverlay !== undefined) return close();
+    if (b) await watcherAction(b);
+  });
+  draw();
+  overlayRoot.appendChild(o);
+}
+watchBtn.addEventListener("click", () => openWatchers());
 
 /**
  * The turn button sits to the left of the gear (D-101), as seen from the south edge, and like the gear it does not move
@@ -604,6 +669,7 @@ function openSettings() {
       <div class="group"><div class="eyebrow">Joining</div>
         <div class="row"><span>The QR code and address for phones, to join or rejoin, also during a game</span><button data-join-code>Show join code…</button></div></div>
       ${playerColors()}
+      ${(state.watchers ?? []).length ? `<div class="group player-colors watchers-group"><div class="eyebrow">Watching</div>${watcherRows()}<div class="faint group-note">${WATCHER_NOTE}</div></div>` : ""}
       ${gameSettings}
       ${items.length ? `<div class="group game-settings"><div class="eyebrow">${esc(state.game.name)}</div>${items.map((it, k) => `<div class="row"><span>${esc(it.label)}</span>${control(it, k)}</div>`).join("")}</div>` : ""}
       ${serviceSettings()}
@@ -644,6 +710,7 @@ function openSettings() {
     if (b.dataset.accessCode !== undefined) return openCodePad();
     if (b.dataset.joinCode !== undefined) return openJoinCode();
     if (b.dataset.colorPlayer) return void act("POST", `/players/${encodeURIComponent(b.dataset.colorPlayer)}/color`, { color: b.dataset.color });
+    if (b.dataset.watcherRemove || b.dataset.watcherPlay) return void watcherAction(b);
     if (b.dataset.exchange) return void openExchange(b.dataset.exchange);
     if (b.dataset.setting) {
       const f = gameFields().find((x) => x.key === b.dataset.setting);
@@ -909,6 +976,14 @@ document.addEventListener("click", async (e) => {
 function fullAttr() {
   return state.noSeat ? `disabled title="${esc(state.noSeat)}"` : "";
 }
+/** Invite: a player while a seat is free, else a watcher (D-168); off when the remote places are taken. */
+function inviteButton(label) {
+  const full = (state.remote?.players ?? 0) + (state.watchers?.length ?? 0) >= (state.remote?.maxPlayers ?? 4);
+  if (full) return `<button data-invite disabled title="All remote places are taken (players and watchers)">${label}</button>`;
+  // During a game a person comes in only through an exchange (D-159), so the lobby's invite is for watching.
+  const why = inRunningGame() ? "During a game, a remote player comes in through an exchange" : state.noSeat;
+  return why ? `<button data-invite="watch" title="${esc(why)}: invite someone to watch">Invite a watcher…</button>` : `<button data-invite>${label}</button>`;
+}
 
 function joinPanel() {
   if (REMOTE) return "";
@@ -940,7 +1015,7 @@ function toolbar() {
   // Left: the table's seat layout. Right: managing players (D-086).
   return `<div class="toolbar">
     ${seatButtons()}
-    ${REMOTE ? "" : `<div class="right"><button data-add-ai ${fullAttr()}>+ AI player</button><button data-invite ${fullAttr()}>Invite remote player…</button></div>`}
+    ${REMOTE ? "" : `<div class="right"><button data-add-ai ${fullAttr()}>+ AI player</button>${inviteButton("Invite remote player…")}</div>`}
   </div>
   ${REMOTE || !sel ? "" : `<div class="toolbar selected"><div class="right"><span class="faint">${esc(sel.name)}</span>
     ${sel.kind === "ai" ? `<button data-config="${sel.id}">Configure</button>` : ""}
@@ -1162,6 +1237,7 @@ function openExchange(playerId) {
       const choices = [
         REMOTE ? "" : `<button class="choice" data-ex="local"><b>Someone at the table</b><span>A QR code to scan with their phone</span></button>`,
         `<button class="choice" data-ex="remote" ${online ? "" : "disabled"}><b>A remote player</b><span>${online ? "An invite link to send" : "Needs the connection to the Game Table service"}</span></button>`,
+        ...(state.watchers ?? []).map((w) => `<button class="choice" data-ex="watcher" data-watcher="${esc(w.id)}"><b>${esc(w.name)}, watching</b><span>Takes the seat from their own window</span></button>`),
         g?.ai && cur.kind !== "ai" ? `<button class="choice" data-ex="ai"><b>An AI player</b><span>Takes over at once</span></button>` : "",
         cur.kind === "ai" && (g?.aiOptions?.length ?? 0) ? `<button class="choice" data-ex="ai-options"><b>How ${esc(cur.name)} plays</b><span>Change this AI player's settings</span></button>` : "",
       ].join("");
@@ -1172,6 +1248,11 @@ function openExchange(playerId) {
         <div class="actions settings-actions"><button class="primary" data-close-overlay>Cancel</button></div></div>`);
     } else {
       const local = x.kind === "local";
+      if (x.watcher)
+        return setPanel(o, `<div class="panel exchange-panel">${head}
+        <p class="muted">${esc(x.watcher.name)}'s window opens a deck; ${esc(x.watcher.name)} takes over ${esc(cur.name)}'s seat from there.</p>
+        <p class="exchange-wait"><span class="thinking-dots" aria-hidden="true"><i></i><i></i><i></i></span> Waiting for ${esc(x.watcher.name)}…</p>
+        <div class="actions settings-actions"><button data-ex-cancel>Cancel</button></div></div>`);
       setPanel(o, `<div class="panel exchange-panel">${head}
         ${local ? `<div class="join-big"><img src="/qr.svg?exchange=1&s=${x.since}" alt="QR code to take over this seat">${linkLine(x.url)}</div>
           <p class="muted">Scan this with the new player's phone. They type their name and take over ${esc(cur.name)}'s seat.</p>`
@@ -1202,7 +1283,7 @@ function openExchange(playerId) {
     }
     if (kind === "ai" && !(await confirmDialog(`Exchange ${cur.name} for an AI player?`, `An AI player takes over ${cur.name}'s seat for the rest of this game.`, "Exchange"))) return;
     error = "";
-    const r = await api("POST", "/exchange", { seat, kind }).catch((err) => ((error = err?.message ?? "That did not work"), null));
+    const r = await api("POST", "/exchange", { seat, kind, ...(kind === "watcher" ? { watcher: b.dataset.watcher } : {}) }).catch((err) => ((error = err?.message ?? "That did not work"), null));
     if (r && kind === "ai") {
       toast(`An AI player took over ${cur.name}'s seat`);
       return close();
@@ -1395,7 +1476,7 @@ center.addEventListener("click", async (e) => {
   else if ("close" in d) act("POST", "/game/close");
   else if ("stats" in d) showStatistics();
   else if ("again" in d) act("POST", "/game/select", { gameId: state.game.id, settings: state.game.settings });
-  else if ("invite" in d) openInvite();
+  else if ("invite" in d) openInvite(d.invite === "watch");
   else if ("newCode" in d && (await confirmDialog("New join code?", "The current QR code stops working. Players already at the table stay in.", "New code"))) act("POST", "/join/new");
 });
 
@@ -1444,7 +1525,7 @@ function openLobbyOverlay() {
         .join("") || `<div class="faint">Nobody yet</div>`}</div>
       ${REMOTE ? "" : `<div class="group"><div class="eyebrow">View</div><div class="row"><span>Lobby and menus face</span>
         <span class="seg">${EDGE_ORDER.map((e) => `<button data-face="${e}" class="${state.frontEdge === e ? "on" : ""}">${e[0].toUpperCase() + e.slice(1)}</button>`).join("")}</span></div></div>`}
-      <div class="group">${REMOTE ? "" : `<div class="row"><span>Remote players${state.remote?.players ? ` · ${state.remote.players} joined` : ""}</span><button data-invite ${fullAttr()}>Invite…</button></div>`}
+      <div class="group">${REMOTE ? "" : `<div class="row"><span>Remote players${state.remote?.players ? ` · ${state.remote.players} joined` : ""}${state.watchers?.length ? ` · ${state.watchers.length} watching` : ""}</span>${inviteButton("Invite…")}</div>`}
         <div class="row"><span>Terms of service</span><button data-terms>Open</button></div></div>
       <div class="actions" style="display:flex;justify-content:space-between;margin-top:20px">
         <button class="danger" data-end>End game</button><button class="primary" data-close-overlay>Back to game</button></div></div>`);
@@ -1456,7 +1537,7 @@ function openLobbyOverlay() {
     if (e.target === o || b?.dataset.closeOverlay !== undefined) return (unsub(), o.remove());
     if (!b) return;
     if (b.dataset.face) act("POST", "/face", { edge: b.dataset.face });
-    if (b.dataset.invite !== undefined) openInvite();
+    if (b.dataset.invite !== undefined) openInvite(b.dataset.invite === "watch");
     if (b.dataset.terms !== undefined) openTerms();
     if (b.dataset.exchange) return void openExchange(b.dataset.exchange); // a running game keeps its players (D-159)
     if (b.dataset.remove) {
@@ -1723,10 +1804,11 @@ function openNamePad(initial, done) {
 }
 
 // ---------- remote invites (phase 1c) ----------
-async function openInvite() {
+async function openInvite(watch = false) {
+  const title = watch ? "Invite a watcher" : "Invite a remote player";
   const o = document.createElement("div");
   o.className = "overlay";
-  o.innerHTML = `<div class="panel"><h2>Invite a remote player</h2><div class="muted">Creating an invite…</div></div>`;
+  o.innerHTML = `<div class="panel"><h2>${title}</h2><div class="muted">Creating an invite…</div></div>`;
   faceFront(o.querySelector(".panel"));
   overlayRoot.appendChild(o);
   const close = () => (unsub?.(), o.remove());
@@ -1734,14 +1816,16 @@ async function openInvite() {
   o.addEventListener("click", (e) => {
     const b = e.target.closest("button");
     if (e.target === o || b?.dataset.x === "close") return close();
-    if (b?.dataset.x === "another") return (close(), openInvite());
+    if (b?.dataset.x === "another") return (close(), openInvite(watch));
   });
   o.addEventListener("change", (e) => {
     if (e.target.name === "control") act("POST", "/remote", { boardControl: e.target.checked });
+    // Watch only (D-168): a new invite of the other kind; the one shown stays valid until it expires.
+    if (e.target.name === "watch") (close(), openInvite(e.target.checked));
   });
   let inv;
   try {
-    inv = await api("POST", "/invites");
+    inv = await api("POST", "/invites", { watch });
   } catch {
     return close();
   }
@@ -1777,18 +1861,19 @@ async function openInvite() {
     if (joined) {
       if (namePad) namePad.remove(), (namePad = null);
       close();
-      return toast(`${joined.name} joined through the invite`);
+      return toast(watch ? `${joined.name} is watching` : `${joined.name} joined through the invite`);
     }
-    o.innerHTML = `<div class="panel invite"><h2>Invite a remote player</h2>
-      <div class="muted">Send this link by email or chat. It works once, for one player, until ${esc(until)}.</div>
-      <div class="invite-name"><span>Player's name <span class="faint">(optional, they can change it)</span></span>
+    o.innerHTML = `<div class="panel invite"><h2>${title}</h2>
+      <div class="muted">Send this link by email or chat. It works once, for one ${watch ? "watcher" : "player"}, until ${esc(until)}.${watch ? " A watcher sees the board, takes no seat and has no deck." : ""}</div>
+      <label class="invite-control invite-watch"><input type="checkbox" name="watch" ${watch ? "checked" : ""}> Watch only: the board, without a seat</label>
+      <div class="invite-name"><span>${watch ? "Watcher's" : "Player's"} name <span class="faint">(optional, they can change it)</span></span>
         <button data-x="name" class="name-value ${guest ? "" : "empty"}">${guest ? esc(guest) : "Add a name…"}</button>
         ${guest ? `<button data-x="noname" aria-label="Remove the name">✕</button>` : ""}</div>
       <div class="invite-body"><div class="qr">${qr}</div>
         <div>${linkLine(link())}<div class="code">${esc(inv.token)}</div>
-        <div class="faint" style="margin-top:10px">${r.players} of ${r.maxPlayers} remote seats in use</div></div></div>
-      <label class="invite-control"><input type="checkbox" name="control" ${r.boardControl ? "checked" : ""}>
-        Remote players can use the board controls (pick games, start, end)</label>
+        <div class="faint" style="margin-top:10px">${r.players + (state.watchers?.length ?? 0)} of ${r.maxPlayers} remote places in use (players and watchers)</div></div></div>
+      ${watch ? "" : `<label class="invite-control"><input type="checkbox" name="control" ${r.boardControl ? "checked" : ""}>
+        Remote players can use the board controls (pick games, start, end)</label>`}
       <div class="actions" style="display:flex;justify-content:flex-end;gap:12px;margin-top:16px">
         <button data-x="another">Another invite</button><button class="primary" data-x="close">Done</button></div></div>`;
     faceFront(o.querySelector(".panel"));
@@ -1891,15 +1976,33 @@ function reportIdle(seq) {
   });
 }
 
+/** A message to the invite page that holds this remote board (same origin), D-168. */
+let lastTold = "";
+function tellPage(msg) {
+  const k = JSON.stringify(msg);
+  if (k === lastTold || window.parent === window) return;
+  lastTold = k;
+  try {
+    window.parent.postMessage(msg, location.origin);
+  } catch {}
+}
+
 function connect() {
   ws = openTableSocket(REMOTE);
   ws.onopen = () => {
-    const hello = REMOTE ? { role: "board" } : { role: "board", key: KEY, tab: TAB, ...(takeover ? { takeover: true } : {}) };
+    // A remote board names its browser's person (from the invite page), for the watchers list (D-168).
+    const hello = REMOTE ? { role: "board", name: new URLSearchParams(location.search).get("name") ?? "" } : { role: "board", key: KEY, tab: TAB, ...(takeover ? { takeover: true } : {}) };
     takeover = false;
     ws.send(JSON.stringify({ v: 1, ch: "system", type: "hello", payload: hello }));
   };
   ws.onmessage = async (ev) => {
     const m = JSON.parse(ev.data);
+    // A removed watcher (D-168): the invite page closes the connection and says so.
+    if (REMOTE && m.ch === "system" && m.type === "removed") {
+      elsewhere = "removed";
+      tellPage({ type: "gt-removed", message: m.payload?.message ?? "" });
+      return;
+    }
     if (m.ch === "system" && (m.type === "elsewhere" || m.type === "replaced")) {
       renderElsewhere(m.type, m.payload ?? {});
       if (m.type === "elsewhere") ws.close();
@@ -1918,6 +2021,8 @@ function connect() {
       if (state.phase !== "active" && state.phase !== "paused" && state.phase !== "terminating") await refreshGames();
       render();
       stateListeners.forEach((f) => f());
+      // The invite page shows the deck only to a player or to one let in to play; else it is a watcher's (D-168).
+      if (REMOTE) tellPage({ type: "gt-seat", mayJoin: state.remote?.mayJoin !== false, watching: !!state.remote?.watching });
     } else if (m.ch === "game" && m.type === "board") {
       gameMsg = { ...m.payload, receivedAt: Date.now() };
       if (game?.inst && state) game.inst.update(gameMsg.view, gameMsg.events ?? [], gameInfo());

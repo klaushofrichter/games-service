@@ -198,6 +198,7 @@ export class Table extends EventEmitter {
         players: this.humans().filter((p) => p.location === "remote").length,
         joined: this.invitesJoined,
       },
+      watchers: this.watchers(),
     };
   }
 
@@ -417,33 +418,149 @@ export class Table extends EventEmitter {
       this.resume(existing.sessionToken);
       return { playerId: existing.id, sessionToken: existing.sessionToken };
     }
+    // A watcher plays only when the table lets them (D-168): an exchange for them, or "Let play" in the lobby.
+    const v = this.visitors.get(remoteSession);
+    if (v?.banned) throw new TableError(403, "you were removed from this table");
+    if (v && (v.watch || v.wasPlayer) && !v.promoted && this.exchangeOpen?.session !== remoteSession) throw new TableError(403, "you are watching this table; the table can let you play");
+    if (!v && invite && this.invitesMade.get(invite)?.watch) throw new TableError(403, "this invite is for watching");
     const r = this.join("", rawName, "remote", remoteSession);
+    const visitor = this.visitor(remoteSession);
+    visitor.wasPlayer = true;
+    visitor.promoted = false;
+    visitor.name = this.players.get(r.playerId)?.name ?? visitor.name;
     // The board's open invite dialog closes when its invite brings a player (D-164).
-    const token = invite ? this.invitesMade.get(invite) : undefined;
-    if (token) {
+    const made = invite ? this.invitesMade.get(invite) : undefined;
+    if (made) {
       this.invitesMade.delete(invite!);
-      this.invitesJoined = [...this.invitesJoined, { invite: token, name: this.players.get(r.playerId)?.name ?? "" }].slice(-8);
-      this.changed();
+      this.invitesJoined = [...this.invitesJoined, { invite: made.token, name: this.players.get(r.playerId)?.name ?? "" }].slice(-8);
     }
+    this.changed();
     return r;
   }
 
-  /** Invites this table asked for, by sha256 of the code (the service names an invite only by its hash), D-164. */
-  private invitesMade = new Map<string, string>();
-  /** Invites that brought a player, newest last: the board closes that invite's dialog. */
+  /** Invites this table asked for, by sha256 of the code (the service names an invite only by its hash), D-164; `watch`: for a watcher (D-168). */
+  private invitesMade = new Map<string, { token: string; watch: boolean }>();
+  /** Invites that brought a player or a watcher, newest last: the board closes that invite's dialog. */
   private invitesJoined: { invite: string; name: string }[] = [];
-  inviteCreated(token: string) {
-    this.invitesMade.set(createHash("sha256").update(token).digest("hex"), token);
+  inviteCreated(token: string, watch = false) {
+    this.invitesMade.set(createHash("sha256").update(token).digest("hex"), { token, watch });
     while (this.invitesMade.size > 32) this.invitesMade.delete(this.invitesMade.keys().next().value!);
+  }
+
+  // ---------- remote watchers (D-168) ----------
+  /**
+   * Remote browsers the table knows, by their cloud session (never shown): their board windows, a name, and how they
+   * may join. A watcher is one with a board open and no player: invited to watch, or a remote player who was
+   * exchanged, left or was removed. Watchers see the board (never a phone's private view), count against the remote
+   * places, may be removed (and cannot come back on that invite), and may be let in to play.
+   */
+  private visitors = new Map<string, { id: string; name: string; watch: boolean; wasPlayer: boolean; promoted: boolean; boards: number; banned: boolean }>();
+
+  private visitor(session: string) {
+    let v = this.visitors.get(session);
+    if (!v) {
+      v = { id: newId("w"), name: "", watch: false, wasPlayer: false, promoted: false, boards: 0, banned: false };
+      this.visitors.set(session, v);
+      // Bounded: forget the oldest that have neither a board nor a player (removed ones are kept).
+      for (const [s, x] of this.visitors) {
+        if (this.visitors.size <= 64) break;
+        if (!x.boards && !x.banned && !this.hasRemotePlayer(s)) this.visitors.delete(s);
+      }
+    }
+    return v;
+  }
+
+  private isWatcher(session: string) {
+    const v = this.visitors.get(session);
+    return !!v && !v.banned && v.boards > 0 && (v.watch || v.wasPlayer) && !this.hasRemotePlayer(session);
+  }
+
+  watchers(): { id: string; name: string }[] {
+    return [...this.visitors.entries()].filter(([s]) => this.isWatcher(s)).map(([, v]) => ({ id: v.id, name: v.name || "Guest" }));
+  }
+
+  /** Remote players and watchers, without `except`'s session: together at most `maxRemotePlayers` (D-168). */
+  remoteCount(except?: string) {
+    const players = this.humans().filter((p) => p.location === "remote" && p.remoteSession !== except).length;
+    return players + [...this.visitors.keys()].filter((s) => s !== except && this.isWatcher(s)).length;
+  }
+
+  remoteFull() {
+    return this.remoteCount() >= this.config.maxRemotePlayers;
+  }
+
+  remoteBanned(session: string) {
+    return !!this.visitors.get(session)?.banned;
+  }
+
+  /** Whether this remote browser should show its deck: it has a player, may become one, or was invited to play. */
+  mayJoin(session: string) {
+    if (this.hasRemotePlayer(session)) return true;
+    const v = this.visitors.get(session);
+    return !v || (!v.banned && (v.promoted || this.exchangeOpen?.session === session || (!v.watch && !v.wasPlayer)));
+  }
+
+  /** A remote board window opened (`invite`: the hash its browser came through; `name`: from the invite page). */
+  remoteBoardOpened(session: string, invite?: string, name?: unknown) {
+    const v = this.visitor(session);
+    if (v.banned) throw new TableError(403, "you were removed from this table");
+    const made = invite ? this.invitesMade.get(invite) : undefined;
+    if (made?.watch) v.watch = true;
+    if (!v.name && typeof name === "string") v.name = this.freeName(name);
+    if (v.watch && !v.boards && !this.hasRemotePlayer(session) && this.remoteCount(session) >= this.config.maxRemotePlayers)
+      throw new TableError(409, "the table has no room for more remote players or watchers");
+    v.boards++;
+    if (made?.watch) {
+      this.invitesMade.delete(invite!);
+      this.invitesJoined = [...this.invitesJoined, { invite: made.token, name: v.name || "Guest" }].slice(-8);
+    }
+    this.changed();
+  }
+
+  remoteBoardClosed(session: string) {
+    const v = this.visitors.get(session);
+    if (!v || !v.boards) return;
+    v.boards--;
+    this.changed();
+  }
+
+  private watcherSession(id: unknown) {
+    for (const [s, v] of this.visitors) if (v.id === id && this.isWatcher(s)) return s;
+    throw new TableError(404, "no such watcher");
+  }
+
+  /** Remove a watcher: their board closes and their browser cannot come back on that invite (D-168). */
+  removeWatcher(id: unknown) {
+    const s = this.watcherSession(id);
+    const v = this.visitors.get(s)!;
+    v.banned = true;
+    v.promoted = false;
+    if (this.exchangeOpen?.session === s) this.exchangeOpen = null;
+    this.emit("remote-evict", s);
+    this.changed();
+  }
+
+  /** In the lobby, let a watcher take a free seat: their page opens the deck and they join as a player (D-168). */
+  letWatcherPlay(id: unknown) {
+    const s = this.watcherSession(id);
+    if (this.phase === "active" || this.phase === "paused" || this.phase === "terminating")
+      throw new TableError(409, "during a game, exchange a player for the watcher instead");
+    const noSeat = this.noFreeSeat();
+    if (noSeat) throw new TableError(409, noSeat, "no-seat");
+    this.visitors.get(s)!.promoted = true;
+    this.changed();
   }
 
   join(joinToken: string, rawName: unknown, location: "local" | "remote" = "local", remoteSession?: string) {
     // Someone taking over a seat during a game (D-159): with the open exchange's code, or as the remote player it invited.
     const exchange =
-      (location === "local" && joinToken && this.isExchangeToken(joinToken)) || (location === "remote" && this.exchangeOpen?.kind === "remote") ? this.exchangeOpen : null;
+      (location === "local" && joinToken && this.isExchangeToken(joinToken)) ||
+      (location === "remote" && this.exchangeOpen?.kind === "remote" && (!this.exchangeOpen.session || this.exchangeOpen.session === remoteSession))
+        ? this.exchangeOpen
+        : null;
     if (exchange) {
       const old = this.seated().find((q) => q.seat === exchange.seat);
-      if (location === "remote" && old?.location !== "remote" && this.humans().filter((q) => q.location === "remote").length >= this.config.maxRemotePlayers)
+      if (location === "remote" && old?.location !== "remote" && !(remoteSession && this.isWatcher(remoteSession)) && this.remoteCount(remoteSession) >= this.config.maxRemotePlayers)
         throw new TableError(409, "the table has no room for more remote players");
       // The seat's old player goes, so their name is free (Ann back on a new phone keeps "Ann").
       const name = location === "remote" ? this.freeName(rawName) : this.cleanName(rawName, old?.id);
@@ -456,7 +573,7 @@ export class Table extends EventEmitter {
     }
     if (location === "local" && (!joinToken || joinToken.toUpperCase() !== this.currentJoin().token))
       throw new TableError(403, "join code is invalid or expired; scan the QR code again");
-    if (location === "remote" && this.humans().filter((p) => p.location === "remote").length >= this.config.maxRemotePlayers)
+    if (location === "remote" && this.remoteCount(remoteSession) >= this.config.maxRemotePlayers)
       throw new TableError(409, "the table has no room for more remote players");
     // A seat is taken when a player joins (D-129): with none free, nobody joins to stand around without one.
     const noSeat = this.noFreeSeat();
@@ -516,6 +633,8 @@ export class Table extends EventEmitter {
     const n = this.cleanName(raw, p.id);
     if (n === p.name) return p;
     p.name = n;
+    const v = p.remoteSession ? this.visitors.get(p.remoteSession) : undefined;
+    if (v) v.name = n;
     this.changed();
     return p;
   }
@@ -1063,14 +1182,14 @@ export class Table extends EventEmitter {
    * invite (remote). One at a time; a new one replaces it. Gone when someone takes the seat, it is cancelled, or the
    * game ends.
    */
-  private exchangeOpen: { seat: number; kind: "local" | "remote"; token: string; url: string; since: number } | null = null;
+  private exchangeOpen: { seat: number; kind: "local" | "remote"; token: string; url: string; since: number; session?: string } | null = null;
 
   /**
    * Exchange the player in `seat` of the running game (D-159): `ai` at once (a new AI player; an AI seat changes its
    * options instead), `local` or `remote` opens an exchange that ends when the new player joins (`url` for a remote
    * player is the invite's). The game keeps all its seats; whoever had the seat goes, a person's phone is told why.
    */
-  exchange(seat: number, kind: "ai" | "local" | "remote", url?: string): { playerId?: string; url?: string } {
+  exchange(seat: number, kind: "ai" | "local" | "remote" | "watcher", url?: string, watcher?: unknown): { playerId?: string; url?: string } {
     const rt = this.runtime;
     const game = this.runningGame;
     if (!rt || !game || rt.over || (this.phase !== "active" && this.phase !== "paused")) throw new TableError(409, "no game is running");
@@ -1086,6 +1205,13 @@ export class Table extends EventEmitter {
       this.players.set(ai.id, ai);
       this.takeSeat(ai, seat);
       return { playerId: ai.id };
+    }
+    if (kind === "watcher") {
+      // A watcher takes the seat (D-168): their page opens the deck, and their deck's hello takes it.
+      const session = this.watcherSession(watcher);
+      this.exchangeOpen = { seat, kind: "remote", token: "", url: "", since: Date.now(), session };
+      this.changed();
+      return {};
     }
     if (kind === "remote" && !url) throw new TableError(400, "a remote exchange needs an invite");
     const token = kind === "local" ? this.freshToken() : "";
@@ -1117,7 +1243,8 @@ export class Table extends EventEmitter {
     const x = this.exchangeOpen;
     if (!x) return null;
     const p = this.seated().find((q) => q.seat === x.seat);
-    return { seat: x.seat, kind: x.kind, url: x.url, since: x.since, playerId: p?.id ?? null, name: p?.name ?? null };
+    const w = x.session ? this.visitors.get(x.session) : undefined;
+    return { seat: x.seat, kind: x.kind, url: x.url, since: x.since, playerId: p?.id ?? null, name: p?.name ?? null, watcher: w ? { id: w.id, name: w.name || "Guest" } : null };
   }
 
   /**

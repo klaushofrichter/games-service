@@ -106,7 +106,7 @@ try:
         wait(lambda: state()["layout"] == 6)
         # the board-control switch is in the invite dialog: a new invite shows it (and counts Rita)
         board.click("button[data-invite]")
-        board.wait_for_selector(".invite-body >> text=1 of 4 remote seats in use")
+        board.wait_for_selector(".invite-body >> text=1 of 4 remote places in use")
         board.uncheck(".invite input[name=control]")
         wait(lambda: not state()["remote"]["boardControl"])
         rboard.locator("text=view only").wait_for(timeout=10000)
