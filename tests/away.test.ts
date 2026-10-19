@@ -5,6 +5,7 @@ import { join } from "node:path";
 import JSZip from "jszip";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Table } from "../apps/table-host/src/table.ts";
+import { withStatistics } from "../apps/table-host/src/stats.ts";
 import { Deck, sleep, testHost, until } from "./helpers.ts";
 
 const GAMES = join(import.meta.dirname, "fixtures", "seat-games");
@@ -34,9 +35,9 @@ async function partners(mode: "teams" | "free") {
 }
 
 describe("players away during a game (D-144)", () => {
-  it("off (the default): the seat waits past the waiting time, and the board shows the player as away", async () => {
+  it("the seat waits past the waiting time, and the board shows the player as away", async () => {
     const { ann } = await partners("free");
-    expect((await state()).play).toEqual({ awayTimeout: false });
+    expect((await state()).play).toBeUndefined(); // no waiting-time setting any more (D-159)
     ann.close();
     await sleep(60);
     expect((await state()).away).toEqual([]); // not at once: a phone that locks for a moment shows nothing
@@ -52,32 +53,36 @@ describe("players away during a game (D-144)", () => {
     again.close();
   });
 
-  it("hands an away player's seat to an AI: the colour stays, the phone is told why, the log has it", async () => {
+  it("exchanges a player for an AI (D-159), connected or away: the colour stays, the phone is told why, the log has it", async () => {
     const { ann } = await partners("free");
     const before = await state();
     const color = before.players.find((p: any) => p.id === ann.playerId).color;
     const seat = before.players.find((p: any) => p.id === ann.playerId).seat;
-    expect((await t.api("POST", `/players/${ann.playerId}/replace-with-ai`)).status).toBe(409); // connected: no
-    ann.close();
-    await until(async () => ((await state()).players.find((p: any) => p.id === ann.playerId)?.connected === false ? true : null));
-    const r = await t.ok("POST", `/players/${ann.playerId}/replace-with-ai`);
+    // Connected: Ann's phone hears at once that the seat went to an AI player.
+    const told = ann.next((m) => m.ch === "system" && m.type === "removed");
+    const r = await t.ok("POST", "/exchange", { seat, kind: "ai" });
+    expect((await told).payload).toEqual({ reason: "replaced" });
     const ai = r.state.players.find((p: any) => p.id === r.playerId);
     expect(ai).toMatchObject({ kind: "ai", name: "Ann (AI)", seat, color });
     expect(r.state.players.some((p: any) => p.id === ann.playerId)).toBe(false);
     expect(r.state.away).toEqual([]);
     const log = t.host.table.runtime!.log;
-    expect(log.at(-1)).toMatchObject({ t: "aiTakeover", seat, name: "Ann (AI)" });
+    expect(log.at(-1)).toMatchObject({ t: "seatChanged", seat: { seat, name: "Ann (AI)", kind: "ai" }, aiOptions: expect.any(Object) });
+    expect((await t.api("POST", "/exchange", { seat, kind: "ai" })).status).toBe(409); // an AI already: options instead
     // The phone, back, hears why.
     await expect(Deck.connect(t.base, { sessionToken: ann.sessionToken })).rejects.toThrow(/handed to Ann \(AI\)/);
+    // The seat's player in the statistics: the last one, marked (D-159).
+    expect(withStatistics({ text: "x", highlights: {} }, log)!.players!.find((p) => p.seat === seat)).toEqual({ seat, name: "Ann (AI)", ai: true, changed: true });
     // The seat is an AI player's now: it plays there (Partners' AI moves with behaviour "play").
     await t.ok("POST", "/game/end");
     await until(async () => ((await t.ok("GET", "/logs")).length ? true : null));
     const [l] = await t.ok("GET", "/logs");
     const zip = await JSZip.loadAsync((await t.api("GET", `/logs/${l.id}.zip`)).body);
     const records = (await zip.file("game-001.jsonl")!.async("string")).trim().split("\n").map((x) => JSON.parse(x));
-    expect(records.some((x: any) => x.t === "aiTakeover" && x.seat === seat)).toBe(true);
+    expect(records.some((x: any) => x.t === "seatChanged" && x.seat.seat === seat)).toBe(true);
     const moves = (await zip.file("game-001.moves.jsonl")!.async("string")).trim().split("\n").map((x) => JSON.parse(x));
-    expect(moves.some((m: any) => m.kind === "aiTakeover")).toBe(true);
+    expect(moves.some((m: any) => m.kind === "seatChanged" && /Ann \(AI\) took over Ann's seat/.test(m.text))).toBe(true);
+    expect(JSON.parse(await zip.file("run.json")!.async("string")).verify).toMatchObject({ ok: 1 }); // replays exactly
   });
 
   it("a game that waited for the player (D-119) goes on once the seat is an AI's", async () => {
@@ -89,15 +94,41 @@ describe("players away during a game (D-144)", () => {
     expect(r.state.pause).toBeNull();
   });
 
-  it("on: the player leaves after the waiting time, as before; turning it on starts the waiting time for players already away", async () => {
+  it("exchanges a player for someone at the table: the seat waits for the exchange's code until they join (D-159)", async () => {
     const { ann } = await partners("free");
-    ann.close();
-    await sleep(500);
-    expect((await state()).players.some((p: any) => p.id === ann.playerId)).toBe(true);
-    await t.ok("POST", "/play", { awayTimeout: true });
-    expect((await state()).play).toEqual({ awayTimeout: true });
-    await until(async () => ((await state()).players.some((p: any) => p.id === ann.playerId) ? null : true), 3000);
-    expect((await t.api("POST", "/play", { awayTimeout: "yes" })).status).toBe(400);
+    const seat = (await state()).players.find((p: any) => p.id === ann.playerId).seat;
+    const r = await t.ok("POST", "/exchange", { seat, kind: "local" });
+    expect(r.url).toMatch(/\/j\/[A-Z0-9]{8}$/);
+    expect(r.state.exchange).toMatchObject({ seat, kind: "local", url: r.url, playerId: ann.playerId, name: "Ann" });
+    const token = r.url.split("/").pop();
+    expect(token).not.toBe((await t.ok("GET", "/join")).token);
+    // The table's join code seats nobody in a running game that is full; the exchange's code takes Ann's seat.
+    const cleo = await Deck.connect(t.base, { joinToken: token, name: "Cleo" });
+    const s = await state();
+    expect(s.exchange).toBeNull();
+    expect(s.players.find((p: any) => p.id === cleo.playerId)).toMatchObject({ name: "Cleo", seat, kind: "human" });
+    expect(s.players.some((p: any) => p.id === ann.playerId)).toBe(false);
+    expect(t.host.table.runtime!.seats.find((x) => x.seat === seat)).toMatchObject({ name: "Cleo", kind: "human" });
+    // The code worked once.
+    await expect(Deck.connect(t.base, { joinToken: token, name: "Dan" })).rejects.toThrow();
+    cleo.close();
+  });
+
+  it("exchanges for a remote player: the next remote player takes the seat; an exchange can be cancelled; it ends with the game", async () => {
+    const { ben } = await partners("free");
+    const seat = (await state()).players.find((p: any) => p.id === ben.playerId).seat;
+    t.host.table.exchange(seat, "remote", "https://games.example/i/ABCDEFGH");
+    expect((await state()).exchange).toMatchObject({ seat, kind: "remote", url: "https://games.example/i/ABCDEFGH" });
+    await t.ok("DELETE", "/exchange");
+    expect((await state()).exchange).toBeNull();
+    t.host.table.exchange(seat, "remote", "https://games.example/i/ABCDEFGH");
+    const rita = t.host.table.joinRemote("Rita", "sess-rita");
+    expect(t.host.table.state().players.find((p) => p.id === rita.playerId)).toMatchObject({ seat, location: "remote" });
+    expect(t.host.table.state().players.some((p) => p.id === ben.playerId)).toBe(false);
+    t.host.table.exchange(seat === 0 ? 1 : 0, "local");
+    await t.ok("POST", "/game/end");
+    expect((await state()).exchange).toBeNull();
+    expect((await t.api("POST", "/exchange", { seat, kind: "ai" })).status).toBe(409); // no game running
   });
 
   it("a player leaves from the phone (D-158): before a game they leave the table; in one the seat is offered to an AI at once", async () => {

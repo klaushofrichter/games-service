@@ -44,7 +44,7 @@ const REMOTE_DENIED = /^\/(join|simulation|logs|saves|invites|remote|qr|cloud|de
  * save, or resume — those stay with the people at the table. "Play now" for an AI that is out of time (D-112) and
  * skipping a game's wait (D-136) are moves of the running game, so remote players with board control may tap them too.
  */
-const REMOTE_ACTIONS = /^\/(layout|game\/(select|start|end|close|play-now|skip-timer))$/;
+const REMOTE_ACTIONS = /^\/(layout|exchange|game\/(select|start|end|close|play-now|skip-timer|settings)|players\/[\w-]+\/(color|ai-options))$/;
 
 const MIME: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
@@ -86,7 +86,9 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
   const send = (ws: WebSocket, e: Envelope) => sendText(ws, JSON.stringify(e));
 
   // Remote clients never see the local join code (it would let them join as if they sat at the table).
-  const forClient = (remote: boolean | undefined, state: ReturnType<Table["state"]>) => (remote ? { ...state, joinUrl: "" } : state);
+  // Remote boards get no local join codes: neither the table's nor a local seat exchange's (D-159).
+  const forClient = (remote: boolean | undefined, state: ReturnType<Table["state"]>) =>
+    remote ? { ...state, joinUrl: "", exchange: state.exchange && state.exchange.kind === "local" ? { ...state.exchange, url: "" } : state.exchange } : state;
 
   table.on("state", (state) => {
     // Serialised once per kind of client (at the table, remote), not once per client.
@@ -281,6 +283,22 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
       return json(res, 200, table.state());
     }
     if (m === "POST" && (match = path.match(/^\/players\/([\w-]+)\/color$/))) return (table.setColor(match[1], body.color), json(res, 200, table.state()));
+    // Exchange a seat's player during a game (D-159): an AI at once, or open an exchange for a person (a local code or
+    // a remote invite) that ends when they join; cancel it.
+    if (m === "POST" && path === "/exchange") {
+      const seat = Number(body.seat);
+      const kind = String(body.kind);
+      if (kind !== "ai" && kind !== "local" && kind !== "remote") throw new TableError(400, "kind must be ai, local or remote");
+      if (remote && kind === "local") throw new TableError(403, "a remote board can exchange for a remote player or an AI");
+      let url: string | undefined;
+      if (kind === "remote") {
+        if (!opts.createInvite) throw new TableError(409, "remote play needs the Game Table service (CLOUD_URL)");
+        if (table.cloud.status !== "online") throw new TableError(409, "the table is not connected to the service right now");
+        url = (await opts.createInvite()).url;
+      }
+      return json(res, 200, { ...table.exchange(seat, kind, url), state: table.state() });
+    }
+    if (m === "DELETE" && path === "/exchange") return (table.cancelExchange(), json(res, 200, table.state()));
     // Hand an away player's seat to an AI player (D-144), from the table's board.
     if (m === "POST" && (match = path.match(/^\/players\/([\w-]+)\/replace-with-ai$/))) return json(res, 200, { playerId: table.replaceWithAi(match[1]), state: table.state() });
     if (m === "DELETE" && (match = path.match(/^\/players\/([\w-]+)$/))) return (table.removePlayer(match[1], "evicted"), json(res, 200, table.state()));
@@ -291,7 +309,6 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
     if (m === "POST" && path === "/game/start") return (table.start(), json(res, 200, table.state()));
     if (m === "POST" && path === "/game/end") return (table.end(), json(res, 200, table.state()));
     if (m === "POST" && path === "/display") return (table.setDisplay(body), json(res, 200, table.state()));
-    if (m === "POST" && path === "/play") return (table.setPlay(body), json(res, 200, table.state()));
     if (m === "POST" && path === "/game/settings") return (table.updateSettings(body.settings), json(res, 200, table.state()));
     if (m === "POST" && path === "/game/prefs") return (table.setPrefs(body.prefs), json(res, 200, table.state()));
     if (m === "POST" && path === "/game/close") return (table.close(), json(res, 200, table.state()));
@@ -383,6 +400,7 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
       let match: RegExpMatchArray | null;
       // A phone that scanned the QR code asks first whether there is a seat for it (D-129); only with the current code.
       if ((match = path.match(/^\/j\/([A-Za-z0-9]{4,12})\/seat$/))) {
+        if (!remoteOf(req) && table.isExchangeToken(match[1])) return json(res, 200, { free: true, message: null, exchange: true }); // D-159
         if (remoteOf(req) || match[1].toUpperCase() !== table.currentJoin().token) return json(res, 403, { error: "join code is invalid or expired; scan the QR code again" });
         const noSeat = table.noFreeSeat();
         return json(res, 200, { free: !noSeat, message: noSeat });
@@ -393,6 +411,9 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
       }
       if (path === "/qr.svg") {
         if (!boardAllowed(req) || remoteOf(req)) return json(res, 403, { error: "board only" });
+        // ?exchange: the open local seat exchange's code instead of the table's join code (D-159).
+        const ex = table.state().exchange;
+        if (url.searchParams.get("exchange") !== null) return ex?.kind === "local" ? await qrSvg(res, ex.url) : json(res, 404, { error: "no exchange is open" });
         return await qrSvg(res, table.currentJoin().url);
       }
       if (path === "/board" || path === "/board/" || path === "/board/index.html") {

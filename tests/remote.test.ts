@@ -203,15 +203,15 @@ describe("remote play", { timeout: 60_000 }, () => {
       ["DELETE", `/api/v1/players/${ana.id}`, undefined],
       ["POST", "/api/v1/ai", {}],
       ["POST", "/api/v1/seats/move", { playerId: ana.id, seat: 3 }],
-      ["POST", `/api/v1/players/${ana.id}/color`, { color: "#f08a3c" }], // colours are the table's settings (D-106)
       ["POST", "/api/v1/game/save", {}],
       ["POST", "/api/v1/game/resume", {}],
-      ["POST", `/api/v1/players/${ana.id}/ai-options`, { options: {} }],
     ] as const) {
       const r = await peer.json(m, p, b);
       expect(r.status, `${m} ${p}`).toBe(403);
       expect(r.body.error).toMatch(/only players at the table/);
     }
+    // With board control a remote board operates the settings too (D-159): the players' colours.
+    expect((await peer.json("POST", `/api/v1/players/${ana.id}/color`, { color: "#f08a3c" })).status).toBe(200);
     expect(t.host.table.state().players.map((p) => p.name).sort()).toEqual(["Ana", "Rita"]);
     expect((await peer.json("POST", "/api/v1/game/select", { gameId: "coin-flip", settings: { rounds: 1, roundSeconds: 0 } })).status).toBe(200);
     await a.request("lobby", "ready", { ready: true });

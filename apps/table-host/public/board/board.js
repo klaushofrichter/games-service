@@ -578,9 +578,9 @@ function openSettings() {
     const playerColors = () => {
       const seated = state.players.filter((p) => p.seat !== null).sort((a, b) => a.seat - b.seat);
       if (!seated.length) return "";
-      return `<div class="group player-colors"><div class="eyebrow">Player colours</div>
+      return `<div class="group player-colors"><div class="eyebrow">${inRunningGame() ? "Players" : "Player colours"}</div>
         ${seated.map((p) => `<div class="row"><span><span class="pdot" style="background:${esc(p.color ?? "")}"></span>${esc(p.name)}</span><span class="swatches">${SEAT_COLORS.map((c, i) =>
-          `<button class="swatch ${c === p.color ? "on" : ""}" style="--c:${c}" data-color-player="${esc(p.id)}" data-color="${c}" aria-label="${esc(p.name)}: colour ${i + 1}"></button>`).join("")}</span></div>`).join("")}
+          `<button class="swatch ${c === p.color ? "on" : ""}" style="--c:${c}" data-color-player="${esc(p.id)}" data-color="${c}" aria-label="${esc(p.name)}: colour ${i + 1}"></button>`).join("")}</span>${canExchange(p) ? `<button class="exchange-btn" data-exchange="${esc(p.id)}">Exchange…</button>` : ""}</div>`).join("")}
         <div class="faint" style="font-size:.7em;margin-top:6px">Picking a colour someone else has swaps the two.</div></div>`;
     };
     const gameSettings = fields.length
@@ -592,9 +592,6 @@ function openSettings() {
       <div class="group"><div class="eyebrow">Display</div>
         <div class="row"><span>Sound effects</span><button data-sound class="${state.display?.sound !== false ? "on" : ""}" role="switch" aria-checked="${state.display?.sound !== false}">${state.display?.sound !== false ? "On" : "Off"}</button></div>
         <div class="row"><span>Fullscreen</span>${fs ? `<button data-fs class="${document.fullscreenElement ? "on" : ""}">${document.fullscreenElement ? "Leave fullscreen" : "Fullscreen"}</button>` : `<span class="faint">not available in this browser</span>`}</div></div>
-      ${REMOTE ? "" : `<div class="group players-away"><div class="eyebrow">Players</div>
-        <div class="row"><span>A player whose phone is away for a minute leaves the game</span><button data-away-timeout class="${state.play?.awayTimeout ? "on" : ""}" role="switch" aria-checked="${!!state.play?.awayTimeout}">${state.play?.awayTimeout ? "On" : "Off"}</button></div>
-        <div class="faint" style="font-size:.7em;margin-top:6px">Off: their seat waits for them, and the board can hand it to an AI player. On: after a minute the game goes on without them, as the game does when someone leaves.</div></div>`}
       <div class="group"><div class="eyebrow">Joining</div>
         <div class="row"><span>The QR code and address for phones, to join or rejoin, also during a game</span><button data-join-code>Show join code…</button></div></div>
       ${playerColors()}
@@ -635,10 +632,10 @@ function openSettings() {
       (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()).catch(() => toast("Fullscreen was refused by the browser"));
     }
     if (b.dataset.sound !== undefined) return void act("POST", "/display", { sound: state.display?.sound === false });
-    if (b.dataset.awayTimeout !== undefined) return void act("POST", "/play", { awayTimeout: !state.play?.awayTimeout });
     if (b.dataset.accessCode !== undefined) return openCodePad();
     if (b.dataset.joinCode !== undefined) return openJoinCode();
     if (b.dataset.colorPlayer) return void act("POST", `/players/${encodeURIComponent(b.dataset.colorPlayer)}/color`, { color: b.dataset.color });
+    if (b.dataset.exchange) return void openExchange(b.dataset.exchange);
     if (b.dataset.setting) {
       const f = gameFields().find((x) => x.key === b.dataset.setting);
       if (!f) return;
@@ -1101,7 +1098,7 @@ function renderPlayerWait(p) {
     <div class="who">${names || "A player"}</div>
     <div class="what">${list.every((w) => w.left) ? "left the game" : `<span class="thinking-dots" aria-hidden="true"><i></i><i></i><i></i></span> ${list.length > 1 ? "are" : "is"} away`}</div>
     ${reasons.map((r) => `<p>${esc(r)}</p>`).join("")}
-    <p>${list.every((w) => w.left) ? `The game is paused.${gameHasAi() && !REMOTE ? " Hand the seat to an AI player, or end the game." : ""}` : `The game is paused and goes on as soon as ${list.length > 1 ? "they are" : `${esc(first?.name ?? "they")} is`} back.`}</p>
+    <p>${list.every((w) => w.left) ? "The game is paused. Exchange them for another player, or end the game." : `The game is paused and goes on as soon as ${list.length > 1 ? "they are" : `${esc(first?.name ?? "they")} is`} back, or when they are exchanged.`}</p>
     ${control ? `<div class="row">${handToAiButtons(list)}<button class="danger" data-pause="end">End game</button></div>` : ""}
   </div>`;
 }
@@ -1109,18 +1106,109 @@ function renderPlayerWait(p) {
 /** Whether the running game has AI players, so an away player's seat can be handed to one (D-144). */
 const gameHasAi = () => !!games.find((x) => x.id === state.game?.id)?.ai;
 
-/** "Hand … to an AI" for away players (D-144): the table's own board only. */
+/** "Exchange …" for away players (D-144, D-159): opens the exchange dialog (an AI, someone at the table, a remote player). */
 function handToAiButtons(list) {
-  if (REMOTE || !gameHasAi()) return "";
-  return list.map((w) => `<button data-hand-ai="${esc(w.playerId)}" data-hand-ai-name="${esc(w.name)}">Hand ${esc(w.name)} to an AI</button>`).join("");
+  if (REMOTE && !state.remote?.boardControl) return "";
+  return list.map((w) => `<button data-exchange-away="${esc(w.playerId)}">Exchange ${esc(w.name)}…</button>`).join("");
+}
+
+const inRunningGame = () => state.phase === "active" || state.phase === "paused";
+/** Who may be exchanged here (D-159): a seated player of the running game; a remote board only with board control. */
+const canExchange = (p) => inRunningGame() && p.seat !== null && (!REMOTE || !!state.remote?.boardControl);
+
+/**
+ * Exchange a seat's player during a game (D-159). The seat keeps its cards and score; another player plays it from now
+ * on: an AI player at once, or a person who joins with a QR code (at the table) or an invite (remote). The window stays
+ * open until the new player has taken the seat, or it is cancelled. For an AI player: how it plays, instead.
+ */
+function openExchange(playerId) {
+  const first = state.players.find((x) => x.id === playerId);
+  if (!first || first.seat === null) return;
+  const seat = first.seat;
+  const o = document.createElement("div");
+  o.className = "overlay exchange";
+  let waiting = false; // an exchange for a person is open
+  let error = "";
+  const close = () => (unsub(), o.remove());
+  const draw = () => {
+    if (!state || !inRunningGame()) return close();
+    const now = state.players.find((q) => q.seat === seat);
+    const x = state.exchange && state.exchange.seat === seat ? state.exchange : null;
+    if (waiting && !x) {
+      // Taken (someone else is in the seat now) or cancelled elsewhere.
+      if (now && now.id !== playerId) {
+        toast(`${now.name} took over ${first.name}'s seat`);
+        return close();
+      }
+      waiting = false;
+    }
+    if (x) waiting = true;
+    const g = games.find((q) => q.id === state.game?.id);
+    const cur = now ?? first;
+    const dot = `<span class="pdot" style="background:${esc(cur.color ?? "")}"></span>`;
+    const head = `<h2>${dot}Exchange ${esc(cur.name)}</h2>`;
+    if (!waiting) {
+      const online = state.cloud?.status === "online";
+      const choices = [
+        REMOTE ? "" : `<button class="choice" data-ex="local"><b>Someone at the table</b><span>A QR code to scan with their phone</span></button>`,
+        `<button class="choice" data-ex="remote" ${online ? "" : "disabled"}><b>A remote player</b><span>${online ? "An invite link to send" : "Needs the connection to the Game Table service"}</span></button>`,
+        g?.ai && cur.kind !== "ai" ? `<button class="choice" data-ex="ai"><b>An AI player</b><span>Takes over at once</span></button>` : "",
+        cur.kind === "ai" && (g?.aiOptions?.length ?? 0) ? `<button class="choice" data-ex="ai-options"><b>How ${esc(cur.name)} plays</b><span>Change this AI player's settings</span></button>` : "",
+      ].join("");
+      setPanel(o, `<div class="panel exchange-panel">${head}
+        <p class="muted">The seat keeps its cards and score; from now on another player plays it.${cur.kind === "human" && cur.connected ? ` ${esc(cur.name)}'s phone is connected: ${esc(cur.name)} loses the seat.` : ""}</p>
+        <div class="choices">${choices}</div>
+        ${error ? `<p class="exchange-error">${esc(error)}</p>` : ""}
+        <div class="actions settings-actions"><button class="primary" data-close-overlay>Cancel</button></div></div>`);
+    } else {
+      const local = x.kind === "local";
+      setPanel(o, `<div class="panel exchange-panel">${head}
+        ${local ? `<div class="join-big"><img src="/qr.svg?exchange=1&s=${x.since}" alt="QR code to take over this seat">${linkLine(x.url)}</div>
+          <p class="muted">Scan this with the new player's phone. They type their name and take over ${esc(cur.name)}'s seat.</p>`
+          : `${x.url ? linkLine(x.url) : ""}<p class="muted">Send this invite to the remote player. When they open it, they take over ${esc(cur.name)}'s seat.</p>`}
+        <p class="exchange-wait"><span class="thinking-dots" aria-hidden="true"><i></i><i></i><i></i></span> Waiting for the new player to join…</p>
+        <div class="actions settings-actions"><button data-ex-cancel>Cancel</button></div></div>`);
+    }
+  };
+  const unsub = onState(draw);
+  o.addEventListener("click", async (e) => {
+    const b = e.target.closest("button");
+    if (e.target === o && !waiting) return close();
+    if (!b) return;
+    if (b.dataset.closeOverlay !== undefined) return close();
+    if (b.dataset.exCancel !== undefined) {
+      await api("DELETE", "/exchange").catch(() => {});
+      return close();
+    }
+    const kind = b.dataset.ex;
+    if (!kind) return;
+    const cur = state.players.find((q) => q.seat === seat) ?? first;
+    if (kind === "ai-options") {
+      const g = games.find((q) => q.id === state.game?.id);
+      const opts = await formDialog(`${cur.name} · ${g?.name ?? ""}`, "How this AI player plays from its next move on.", g?.aiOptions ?? [], cur.aiOptions ?? {}, "Save");
+      if (opts) act("POST", `/players/${cur.id}/ai-options`, { options: opts });
+      return close();
+    }
+    if (kind === "ai" && !(await confirmDialog(`Exchange ${cur.name} for an AI player?`, `An AI player takes over ${cur.name}'s seat for the rest of this game.`, "Exchange"))) return;
+    error = "";
+    const r = await api("POST", "/exchange", { seat, kind }).catch((err) => ((error = err?.message ?? "That did not work"), null));
+    if (r && kind === "ai") {
+      toast(`An AI player took over ${cur.name}'s seat`);
+      return close();
+    }
+    if (r) waiting = true;
+    draw();
+  });
+  draw();
+  overlayRoot.appendChild(o);
 }
 
 /**
- * Players away during a game whose seat waits for them (D-144): a card at the seat says so and offers to hand the seat
- * to an AI player. The game is not paused; it waits by itself when it is their move.
+ * Players away during a game whose seat waits for them (D-144): a card at the seat says so and offers to exchange them
+ * (D-159). The game is not paused; it waits by itself when it is their move.
  */
 function renderAway() {
-  const list = state.phase === "active" && !REMOTE ? (state.away ?? []) : [];
+  const list = state.phase === "active" && (!REMOTE || state.remote?.boardControl) ? (state.away ?? []) : [];
   awayLayer.hidden = !list.length;
   const html = list
     .map((w) => {
@@ -1129,8 +1217,8 @@ function renderAway() {
       return `<div class="ai-wait-card away-card" data-away="${esc(w.playerId)}" style="left:${x}px;top:${y}px;transform:translate(-50%,-50%) rotate(${ROT[gameEdge()]}deg)">
     <div class="who"><span class="dot" style="background:${who?.color ?? "var(--brass)"}"></span>${esc(w.name)}</div>
     <div class="what">${w.left ? "left the game" : "is away"}</div>
-    <p>${w.left ? (gameHasAi() ? "Hand the seat to an AI player, and the game goes on." : "The seat stays empty.") : gameHasAi() ? "The seat waits for them. Or hand it to an AI player, and the game goes on without them." : "The seat waits for them."}</p>
-    ${gameHasAi() ? `<div class="row">${handToAiButtons([w])}</div>` : ""}
+    <p>${w.left ? "Exchange them for another player, and the game goes on." : "The seat waits for them. Or exchange them for another player, and the game goes on."}</p>
+    ${handToAiButtons([w]) ? `<div class="row">${handToAiButtons([w])}</div>` : ""}
   </div>`;
     })
     .join("");
@@ -1140,14 +1228,10 @@ function renderAway() {
   }
 }
 
-async function handToAi(id, name) {
-  if (await confirmDialog(`Hand ${name} to an AI?`, `An AI player takes over ${name}'s seat for the rest of this game. ${name} can't come back into this game, but can join the next one.`, "Hand to an AI"))
-    act("POST", `/players/${encodeURIComponent(id)}/replace-with-ai`);
-}
 for (const layer of [pauseLayer, awayLayer])
   layer.addEventListener("click", (e) => {
-    const b = e.target.closest("button[data-hand-ai]");
-    if (b) handToAi(b.dataset.handAi, b.dataset.handAiName);
+    const b = e.target.closest("button[data-exchange-away]");
+    if (b) openExchange(b.dataset.exchangeAway);
   });
 
 pauseLayer.addEventListener("click", async (e) => {
@@ -1345,7 +1429,7 @@ function openLobbyOverlay() {
     setPanel(o, `<div class="panel"><h2>Lobby</h2>
       <div class="group"><div class="eyebrow">Players</div>${state.players
         .map((p) => `<div class="row"><span>${esc(p.name)} <span class="faint">· ${p.seat === null ? "no seat" : `${esc(seatName(state.seatEdges, p.seat))} seat`}${p.connected ? "" : " · reconnecting"}</span></span>
-          ${REMOTE ? "" : `<button class="danger" data-remove="${p.id}">Remove</button>`}</div>`)
+          ${canExchange(p) ? `<button data-exchange="${p.id}">Exchange…</button>` : REMOTE ? "" : `<button class="danger" data-remove="${p.id}">Remove</button>`}</div>`)
         .join("") || `<div class="faint">Nobody yet</div>`}</div>
       ${REMOTE ? "" : `<div class="group"><div class="eyebrow">View</div><div class="row"><span>Lobby and menus face</span>
         <span class="seg">${EDGE_ORDER.map((e) => `<button data-face="${e}" class="${state.frontEdge === e ? "on" : ""}">${e[0].toUpperCase() + e.slice(1)}</button>`).join("")}</span></div></div>`}
@@ -1363,6 +1447,7 @@ function openLobbyOverlay() {
     if (b.dataset.face) act("POST", "/face", { edge: b.dataset.face });
     if (b.dataset.invite !== undefined) openInvite();
     if (b.dataset.terms !== undefined) openTerms();
+    if (b.dataset.exchange) return void openExchange(b.dataset.exchange); // a running game keeps its players (D-159)
     if (b.dataset.remove) {
       const p = state.players.find((x) => x.id === b.dataset.remove);
       if (cannotRemove(p)) return;

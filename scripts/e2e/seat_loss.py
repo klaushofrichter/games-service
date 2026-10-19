@@ -3,8 +3,8 @@
 
 A Table Host of its own (port 8095). Ann and Ben on phones, two AI players, Partners in "teams" mode. Ann's phone goes
 away: the board shows a card at her seat with the game's reason and End game, the game stays visible, and Ben's
-phone says whom the game waits for. Ann's phone comes back: the card goes and the game goes on. Then Remove for Ben
-says that this ends the game, and it does, with the game's reason.
+phone says whom the game waits for. Ann's phone comes back: the card goes and the game goes on. Then the lobby offers
+Exchange (no Remove) for Ben, and an AI player takes his seat; the game goes on (D-159).
 """
 import os, sys
 from playwright.sync_api import sync_playwright
@@ -64,15 +64,16 @@ try:
         wait(lambda: a("GET", "/state")["phase"] == "active", 10, "the game to go on")
         board.wait_for_selector(".player-wait", state="detached")
 
-        # Remove Ben: the board says it ends the game, and it does with the game's reason.
+        # The lobby during the game offers no Remove for a player of the game, only Exchange (D-159): Ben for an AI
+        # player, and the team game goes on.
         ben_id = next(pl["id"] for pl in a("GET", "/state")["players"] if pl["name"] == "Ben")
         board.click("#lobby-button")
-        board.click(f"[data-remove='{ben_id}']")
-        board.wait_for_selector(f'.dialog:has-text("This ends the game: {REASON}")')
-        board.screenshot(path=os.path.join(OUT, "seat-loss-remove.png"))
+        assert board.locator(f"[data-remove='{ben_id}']").count() == 0
+        board.click(f"[data-exchange='{ben_id}']")
+        board.click(".overlay.exchange [data-ex=ai]")
         board.click(".dialog button[data-x=yes]")
-        wait(lambda: a("GET", "/state")["phase"] == "finished", 10, "the game to end")
-        assert a("GET", "/state")["summary"]["text"] == REASON
+        wait(lambda: any(pl["name"] == "Ben (AI)" for pl in a("GET", "/state")["players"]), 10, "Ben (AI) in the seat")
+        assert a("GET", "/state")["phase"] == "active"
         br.close()
     if errors:
         raise AssertionError("browser errors:\n" + "\n".join(errors))

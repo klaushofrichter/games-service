@@ -1,7 +1,7 @@
 {
   "id": "pachisi",
   "name": "Pachisi",
-  "version": "2026.10.17.1",
+  "version": "2026.10.19.1",
   "sdk": "^0.1",
   "description": "Race your tokens around the board and home. Roll a 6 to leave the start; land on someone to send them back.",
   "players": { "min": 2, "max": 4 },

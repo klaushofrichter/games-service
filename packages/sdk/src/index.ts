@@ -66,7 +66,7 @@ export interface SeatLeftEnd {
  * reveal everything. `names` maps seats to player names.
  */
 export interface StepInfo<S = unknown> {
-  kind: "intent" | "timer" | "seatJoined" | "seatLeft";
+  kind: "intent" | "timer" | "seatJoined" | "seatLeft" | "seatChanged";
   /** The seat that moved, joined or left; null for a timer. */
   seat: number | null;
   intent?: Intent;
@@ -107,6 +107,13 @@ export interface GameDefinition<S = unknown> {
   isOver(state: S): GameSummary | null;
   onTimer?(state: S, id: string, ctx: GameContext): StepResult<S>;
   onSeatJoined?(state: S, seat: SeatInfo, ctx: GameContext): StepResult<S>;
+  /**
+   * Another player took over a seat during the game (D-159): the board exchanged them for a person at the table, a
+   * remote player or an AI player. The seat, its cards and its score stay; `seat` has the new player's name and kind.
+   * Games that keep names (or whether a seat is an AI) in their state update them here; without it, the game shows
+   * the name it started with. An input like any other: logged and replayed.
+   */
+  onSeatChanged?(state: S, seat: SeatInfo, ctx: GameContext): StepResult<S>;
   /**
    * A seat left for good. Return "end" to end the game, or `{ end: { text } }` to end it with the game's own reason
    * (D-119), e.g. "Team North–South was broken." Otherwise the new state.

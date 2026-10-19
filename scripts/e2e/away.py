@@ -3,7 +3,7 @@
 
 A Table Host of its own (port 8131, a 1.5 s waiting time, which is off by default). Ann and Ben play Coin Flip; Ben's
 phone goes away. His seat waits past the waiting time; after a moment the board shows a card at his seat, "Ben is away",
-with "Hand Ben to an AI". Tapping it asks first; confirmed, "Ben (AI)" takes the seat and the card is gone. Then Ann
+with "Exchange Ben…". In it, "An AI player" asks first; confirmed, "Ben (AI)" takes the seat and the card is gone. Then Ann
 leaves from her phone (D-158), and the board shows "Ann left the game" at once.
 """
 import os, sys
@@ -39,7 +39,6 @@ try:
         wait(lambda: all(pl["ready"] for pl in a("GET", "/state")["players"]), 10, "everyone ready")
         a("POST", "/game/start", {})
         ben.wait_for_selector("[data-guess=heads]")
-        assert a("GET", "/state")["play"] == {"awayTimeout": False}, "the waiting time is off by default"
         ben_ctx.close()
         board.wait_for_selector("#away-layer .away-card", timeout=25000)
         st = a("GET", "/state")
@@ -47,9 +46,10 @@ try:
         assert "Ben" in board.locator("#away-layer .away-card").inner_text()
         board.wait_for_timeout(500)
         board.screenshot(path=os.path.join(OUT, "away-card.png"))
-        board.click("#away-layer [data-hand-ai]")
-        board.wait_for_selector("text=Hand Ben to an AI?")
-        board.locator("button", has_text="Hand to an AI").last.click()
+        board.click("#away-layer [data-exchange-away]")  # Exchange Ben… (D-159)
+        board.click(".overlay.exchange [data-ex=ai]")
+        board.wait_for_selector("text=Exchange Ben for an AI player?")
+        board.locator(".dialog button.primary").last.click()
         wait(lambda: any(pl["name"] == "Ben (AI)" and pl["kind"] == "ai" for pl in a("GET", "/state")["players"]), 10, "Ben (AI) in the seat")
         board.wait_for_selector("#away-layer .away-card", state="detached", timeout=5000)
         assert a("GET", "/state")["phase"] == "active"
@@ -62,6 +62,7 @@ try:
         ann.click(".leave-confirm")
         ann.wait_for_selector("text=You left the game")
         board.wait_for_selector("#away-layer .away-card:has-text('left the game')", timeout=5000)
+        assert board.locator("#away-layer [data-exchange-away]").count() == 1
         board.screenshot(path=os.path.join(OUT, "left-card.png"))
         br.close()
 finally:
