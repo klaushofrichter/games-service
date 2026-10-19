@@ -784,7 +784,6 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   `localhost`, because browsers allow its service worker only in a secure context (checked in Chromium). Linked from
   the README, `AGENTS.md` and `llms.txt`; the `e2e` job runs the runbook as written (setup, build, simulation, a
   browser game over the LAN address, Part B, the cloud profile).
-- **D-165 · 2026-10-19 · Klaus** — In the board's settings, a player's name is the way to exchange them during a game;
 - **D-166 · 2026-10-19 · Klaus** — In the board's settings, a player's name is the way to exchange them during a game;
   the *Exchange…* buttons are gone, and the colours sit right-aligned. An exchange for a remote player shows the
   invite's QR code next to its link. *Why:* Klaus: "remove the "Exchange" button, and make the player name clickable
@@ -798,3 +797,41 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   anyway); a seat's join code stays on the table. The remote channel passes `/qr.svg` through for that. The in-game
   lobby's player list and the away card keep their *Exchange…* buttons. Checks: `tests/remote.test.ts`,
   `scripts/e2e/exchange_remote.py`.
+- **D-167 · 2026-10-19 · Klaus** — A remote board operates the table only while its browser has a player at the table.
+  A remote player who was exchanged, left or was removed kept a board with full board control, also in the lobby after
+  the game. *Why:* Klaus: "when the game ends, the exchanged remote player can see the lobby. So that player still has
+  some connection that is not cleaned up. This player can also operate the lobby." *Implementation (Claude):*
+  `Table.remoteControlAllowed(session)` also needs `hasRemotePlayer(session)`; the HTTP API checks it for every remote
+  change and for the Game Viewer ("you are no longer a player at this table"); such a board's state has
+  `remote.boardControl: false` and `remote.watching: true`, so its controls hide and the lobby says "watching". A
+  remote board before its player has joined has no control either. The board keeps watching; making that a proper
+  watch mode (listed, counted, removable, convertible to a player) is the next step.
+- **D-168 · 2026-10-19 · Klaus** — Remote **watchers**: someone invited to watch sees the board without a seat or a deck;
+  a remote player who is exchanged or leaves becomes a watcher. Remote players and watchers together stay within the
+  remote places (4 by default). The board shows an eye with the number of watchers while there are any; tapping it
+  lists them and removes them; a watcher can be made a player through the exchange. *Why:* Klaus: "We could add a
+  "viewer" mode, where we invite a remote player to watch only … We would add a checkmark "watch only" on the invite
+  modal … active remote players + remote watchers is no more than 4 … a way to evict remote watchers … "convert" a
+  watcher to a player through the "exchange""; on the questions: an exchanged remote player converts to a watcher, one
+  who leaves too ("we need a way to actually leave. Probably close the window is good enough, or eviction"), and "show
+  that there are watchers … That icon on the board can also be used to tap and see who is watching, and offer
+  eviction from that place." *Implementation (Claude):*
+  - **Table:** remote browsers ("visitors", by cloud session, never shown) with their board windows, a name, and
+    whether they came on a watch invite, were a player, may join, or were removed. A watcher has a board open and no
+    player, and either a watch invite or a past seat. `watchers: {id, name}[]` in the lobby state; a remote board's
+    state says `remote.watching` and `remote.mayJoin`. The invite's watch flag stays on the table (it knows its
+    invites by hash, D-164): the cloud service is unchanged, the link's `?watch=1` only words the invite page.
+  - **Limits:** `remoteCount` (remote players + watchers) against `maxRemotePlayers`, for invites (refused when full,
+    `remote-full`), watch boards and remote joins. A watch invite needs no free seat; during a game, and when the
+    seats are full, the board's invite button invites a watcher.
+  - **Removing:** `DELETE /watchers/{id}` (the table's board, or a remote board with control): the watcher's board
+    gets `system.removed`, the host ends their WebRTC session after half a second, and the table refuses that session's
+    reconnects ("you were removed from this table"); the invite page says so and stops reconnecting.
+  - **Letting play:** in a game an exchange of kind `watcher` (`{seat, kind: "watcher", watcher: id}`) lets that
+    session's deck take the seat; in the lobby `POST /watchers/{id}/play` lets it join for a free seat. The invite page
+    opens the deck when its board says `mayJoin` (it no longer loads the deck before the board).
+  - **Board:** the eye button beside the tools, its list (Remove, and Let play in the lobby), a *Watching* group in
+    Settings, watchers as choices in the exchange window, *Watch only* in the invite dialog, "watching" in a remote
+    watcher's lobby line, "Wanda is watching" when a watch invite is used.
+  - **Checks:** `tests/remote.test.ts` (watch invite, refused deck, removal and refused reconnect, limits, converted
+    players and Let play, exchange for a watcher and back), `scripts/e2e/watch.py` (the whole flow in browsers).

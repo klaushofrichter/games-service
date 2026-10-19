@@ -2,7 +2,7 @@
   python3 scripts/e2e/seats_full.py out/
 
 A Table Host of its own (port 8096), two seats. Ann joins by phone and an AI player takes the other seat: + AI player
-and Invite are greyed out, and the board's QR panel says there is no free seat. A second phone that scans the code
+is greyed out, Invite becomes "Invite a watcher…" (D-168), and the board's QR panel says there is no free seat. A second phone that scans the code
 sees why instead of the name form; when the AI player is removed on the board, that phone shows the form by itself
 and Ben takes the seat.
 """
@@ -37,7 +37,7 @@ try:
 
         # Full: the board's buttons are greyed out with the reason, and the QR panel says so.
         board.wait_for_selector("button[data-add-ai][disabled]")
-        board.wait_for_selector("button[data-invite][disabled]")
+        board.wait_for_selector("button[data-invite=watch]:not([disabled]):has-text('Invite a watcher')")  # D-168
         assert "Choose more seats" in board.get_attribute("button[data-add-ai]", "title")
         board.wait_for_selector("aside.join.full :text('No free seat')")
         assert "Choose more seats on the board" in board.inner_text("aside.join.full")

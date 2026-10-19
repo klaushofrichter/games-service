@@ -480,3 +480,19 @@ button.copy:hover, button.copy.done { color: var(--brass); border-color: var(--b
 .overlay.exchange .join-big img { width: 300px; height: 300px; }
 .overlay.exchange .exchange-wait { display: flex; align-items: center; gap: 12px; justify-content: center; color: var(--ink); }
 .overlay.exchange .exchange-error { color: #f1a197; }
+
+/* Remote watchers (D-168): an eye with their number, placed like the tools button by board.js. */
+#watchers-button {
+  position: absolute; z-index: 21; width: 58px; height: 58px; padding: 0; border-radius: 50%;
+  display: grid; place-items: center; color: var(--brass); background: rgba(10, 29, 25, 0.75); border: 1px solid var(--brass-deep);
+}
+#watchers-button .inner { display: grid; place-items: center; position: relative; transition: transform .3s; }
+#watchers-button .n {
+  position: absolute; top: -16px; right: -20px; min-width: 20px; padding: 1px 5px; border-radius: 10px;
+  font: 700 12px/1.4 system-ui, sans-serif; color: #10251f; background: var(--brass);
+}
+.watchers-group .eye-dot svg, .overlay.watchers .eye-dot svg { width: 1em; height: 1em; margin-right: .5em; vertical-align: -.12em; color: var(--brass); }
+.player-colors .row-actions { display: flex; gap: 10px; margin-left: auto; }
+.player-colors .row-actions button { font-size: .8em; padding: 6px 14px; }
+.overlay.watchers .watchers-panel { width: 560px; }
+.invite-watch { margin: 10px 0 4px; }

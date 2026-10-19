@@ -267,7 +267,11 @@ export interface LobbyState {
   aiThinking: { playerId: string; seat: number; since: number; deadline: number }[];
   /** Remote play: whether remote boards may act, and how many remote players fit. */
   /** `joined`: invites (codes) that brought a player, newest last, with that player's name (D-164). */
-  remote: { boardControl: boolean; maxPlayers: number; players: number; joined: { invite: string; name: string }[] };
+  /**
+   * `watching`: only in the state a remote board gets whose browser has no player at the table (D-167, D-168);
+   * `mayJoin`: only for remote boards, whether their page shows the deck (a player, or one let in to play).
+   */
+  remote: { boardControl: boolean; maxPlayers: number; players: number; joined: { invite: string; name: string }[]; watching?: boolean; mayJoin?: boolean };
   /** The table's display choices from the board's settings (D-092), followed by every board, remote ones too. */
   display: { sound: boolean };
   /**
@@ -279,7 +283,10 @@ export interface LobbyState {
    * The seat exchange the board has open (D-159): seat `seat` (now `name`'s) waits for a person to join with `url`, at
    * the table (`local`, a QR code) or remotely (an invite). Null when none is open.
    */
-  exchange: { seat: number; kind: "local" | "remote"; url: string; since: number; playerId: string | null; name: string | null } | null;
+  /** `watcher`: the exchange is for that watcher, who takes the seat from their own page (D-168). */
+  exchange: { seat: number; kind: "local" | "remote"; url: string; since: number; playerId: string | null; name: string | null; watcher?: { id: string; name: string } | null } | null;
+  /** Remote watchers (D-168): browsers that see the board without a player, by an id of their own and a name. */
+  watchers: { id: string; name: string }[];
   /**
    * The developer setting (D-118): games without a player at the table. `protectedPlayer`: the one player the board
    * may not remove while it is off (the last one at the table, while a game is chosen or running).
