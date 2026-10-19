@@ -6,6 +6,8 @@ page is the history. Leave it empty if there is nothing to add beyond the commit
 
 ## [Unreleased]
 
+- **Run Game Table locally with Docker** (D-164): `docs/runbooks/local-docker.md` and `deploy/local/`: the Table Host
+  with the built-in games on one machine, phones on the LAN, no cloud service, DNS or HTTPS; written for coding agents.
 - games-service and extra-games are under the MIT licence (D-162); the terms of service say so and that there is no
   warranty (D-163).
 - The public example of a game repository, [`klaushofrichter/extra-games`](https://github.com/klaushofrichter/extra-games)

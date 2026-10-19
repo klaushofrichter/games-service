@@ -1,0 +1,54 @@
+# Game Table on one machine with Docker, without games.skylar.technology, DNS or HTTPS.
+# Runbook: docs/runbooks/local-docker.md. Short form:
+#   deploy/local/setup.sh                                   # writes deploy/local/.env (LAN address, table key)
+#   docker compose -f deploy/local/docker-compose.yml up -d --build
+# Board: http://localhost:8080/board/ on this machine; phones scan the board's QR code (same WiFi).
+# With --profile cloud also a local cloud service (remote play on this machine, extra-game repositories).
+services:
+  table-host:
+    # Built from this checkout. TABLE_HOST_IMAGE=ghcr.io/klaushofrichter/games-table-host:latest with `up --no-build`
+    # runs the published image instead (linux/amd64 only).
+    image: ${TABLE_HOST_IMAGE:-game-table/table-host:local}
+    build: { context: ../.., dockerfile: deploy/table-host.Dockerfile }
+    restart: unless-stopped
+    ports: ["${PORT:-8080}:8080"]
+    environment:
+      TABLE_NAME: ${TABLE_NAME:-Game Table}
+      TABLE_KEY: ${TABLE_KEY:?run deploy/local/setup.sh or set TABLE_KEY in deploy/local/.env}
+      # The address phones use (the QR code): this machine's LAN address. Inside the container the host's own
+      # address is unknown, so it must be given.
+      PUBLIC_URL: ${PUBLIC_URL:?run deploy/local/setup.sh or set PUBLIC_URL=http://<LAN address>:8080 in deploy/local/.env}
+      # The board is opened from a browser on this machine, which reaches the container from outside its loopback.
+      ALLOW_REMOTE_BOARD: "1"
+      SHOW_TEST_GAMES: "0"
+      AI_DELAY_MS: ${AI_DELAY_MS:-800}
+      # Empty: no cloud service. With --profile cloud, setup.sh --cloud sets http://cloud:8081.
+      CLOUD_URL: ${CLOUD_URL:-}
+      TABLE_CODE: ${TABLE_CODE:-}
+    volumes:
+      - table-data:/data # logs, saves, the table's identity
+      # The games. Default: the built-in ones of this checkout. Point GAMES at a folder with more game folders
+      # (runbook, "More games"); it must be mounted at /app/games so the games find the SDK.
+      - ${GAMES:-../../games}:/app/games:ro
+
+  cloud:
+    profiles: [cloud]
+    image: ${CLOUD_IMAGE:-game-table/cloud:local}
+    build: { context: ../.., dockerfile: deploy/cloud.Dockerfile }
+    restart: unless-stopped
+    ports: ["${CLOUD_PORT:-8081}:8081"]
+    environment:
+      # Plain http: the console signs in with ADMIN_TOKEN, no Google sign-in needed.
+      PUBLIC_URL: ${CLOUD_PUBLIC_URL:-http://localhost:8081}
+      # setup.sh --cloud writes it (16+ characters); the service refuses to start without it.
+      ADMIN_TOKEN: ${ADMIN_TOKEN:-}
+      DATA_DIR: /data
+      # Only the public example repository, not the hosted service's list.
+      GAME_REPOS_FILE: none
+      GAME_REPOS: ${GAME_REPOS:-klaushofrichter/extra-games@production}
+      ICE_SERVERS: ${ICE_SERVERS:-[]}
+    volumes: ["cloud-data:/data"]
+
+volumes:
+  table-data:
+  cloud-data:

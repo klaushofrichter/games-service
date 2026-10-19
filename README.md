@@ -26,7 +26,10 @@ TABLE_KEY=dev npm run host
 
 Open `http://localhost:8080/board/` on the table PC (full screen, 1920 × 1080 or 4K). Phones on the same WiFi scan the QR code, or type the URL shown under it. When no seat is free, the QR panel and the phone say so, and *+ AI player* and *Invite* are greyed out (D-129): choose more seats on the board, or remove a player. During a game the lobby's QR panel is not shown: *Settings › Show join code* shows the QR code and the address, so a phone that lost its seat can rejoin (D-130).
 
-With Docker: `docker compose -f deploy/docker-compose.yml up --build` starts a cloud service and a table host. The table shows a 6-character pairing code; approve it in the admin portal at `http://localhost:8081/admin` (in local development it asks for `ADMIN_TOKEN`: `change-me-dev-admin-token` unless you set your own), or with
+**On one machine with Docker, without the cloud service, DNS or HTTPS:** [`docs/runbooks/local-docker.md`](docs/runbooks/local-docker.md),
+written for people and for coding agents (`deploy/local/`).
+
+For development with a local cloud service: `docker compose -f deploy/docker-compose.yml up --build` starts a cloud service and a table host. The table shows a 6-character pairing code; approve it in the admin portal at `http://localhost:8081/admin` (in local development it asks for `ADMIN_TOKEN`: `change-me-dev-admin-token` unless you set your own), or with
 
 ```sh
 curl -X POST -H "Authorization: Bearer ${ADMIN_TOKEN:-change-me-dev-admin-token}" http://localhost:8081/admin/api/tables/pair/<CODE>
@@ -61,9 +64,9 @@ Or skip the pairing code: create an access code in the console (*Access codes*) 
 | `scripts/release-notes.sh`, `release.sh` | The release step of the deploy |
 | `scripts/soak.ts` | AI-only soak run over every game and player count |
 | `scripts/mac-table.sh` | A Table Host on a Mac against the live service (see above) |
-| `docs/` | Decision log; the request to the kube-setup session for the cluster side; `runbooks/` for resetting and restoring the service's state |
+| `docs/` | Decision log; the request to the kube-setup session for the cluster side; `runbooks/` for running a table locally with Docker and for resetting and restoring the service's state |
 | `tests/` | Vitest suites that drive a real host through the board control API and fake decks |
-| `deploy/` | Dockerfiles, docker-compose, the table PC kit |
+| `deploy/` | Dockerfiles, docker-compose, the local Docker setup (`local/`), the table PC kit |
 | `.github/` | The three workflows, Dependabot, the CodeQL gate and its accepted-findings list |
 
 ## Table Host configuration

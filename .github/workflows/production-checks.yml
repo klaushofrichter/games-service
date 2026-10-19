@@ -73,6 +73,33 @@ jobs:
       - run: pip install -r scripts/e2e/requirements.txt
       - run: python -m playwright install --with-deps chromium
       - run: scripts/e2e/run-all.sh e2e-out
+      # The local Docker runbook (docs/runbooks/local-docker.md, D-164), as written: its setup script and compose file,
+      # the image built from this checkout, the board and a phone over plain http on the runner's LAN address, more
+      # games from a folder (Part B), and the cloud profile (Part C).
+      - name: Local Docker runbook
+        run: |
+          set -euo pipefail
+          C="docker compose -f deploy/local/docker-compose.yml"
+          ok() { for i in $(seq 1 60); do curl -fs "$1" > /dev/null && return 0; sleep 1; done; $C logs; return 1; }
+          deploy/local/setup.sh
+          set -a; . deploy/local/.env; set +a
+          case "$PUBLIC_URL" in http://127.*|http://localhost*) echo "::error::setup.sh chose $PUBLIC_URL"; exit 1;; esac
+          $C up -d --build
+          ok http://localhost:8080/health && ok "$PUBLIC_URL/health"
+          curl -fs -H "X-Table-Key: $TABLE_KEY" -X POST "$PUBLIC_URL/api/v1/simulation" \
+            -d '{"gameId":"coin-flip","players":4,"games":20,"seed":42}' | grep -q '"endReasons":{"finished":20},"verified":true'
+          BASE="$PUBLIC_URL" python3 scripts/e2e/play.py coinflip e2e-out/local-docker
+          git clone -q --depth 1 -b production https://github.com/klaushofrichter/extra-games ../extra-games
+          mkdir -p ../table-games && cp -r games/* ../extra-games/games/* ../table-games/
+          echo "GAMES=$(cd ../table-games && pwd)" >> deploy/local/.env
+          $C up -d && sleep 3 && ok "$PUBLIC_URL/health"
+          games=$(curl -fs -H "X-Table-Key: $TABLE_KEY" "$PUBLIC_URL/api/v1/games" | grep -o '"id":"[a-z-]*"' | tr '\n' ' ')
+          for g in coin-flip holdem pachisi roulette backgammon chess liars-dice; do
+            case "$games" in *"\"$g\""*) ;; *) echo "::error::$g missing: $games"; exit 1;; esac
+          done
+          $C down && rm deploy/local/.env && deploy/local/setup.sh --cloud
+          $C up -d --build && ok http://localhost:8081/health && ok http://localhost:8080/health
+          $C down -v
       - if: always()
         uses: actions/upload-artifact@v7
         with:
