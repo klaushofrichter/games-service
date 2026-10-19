@@ -221,6 +221,24 @@ describe("remote play", { timeout: 60_000 }, () => {
     await until(() => t.host.table.state().players.every((p) => p.ready));
     await t.ok("POST", "/game/start");
     await deck.next((m) => m.ch === "game" && m.type === "view");
+    // An open exchange for a remote player (D-159): its invite as a QR code on the table's board and on a remote
+    // board with board control, which sees the link anyway (D-166); never a seat's join code.
+    const seat = t.host.table.state().players.find((p) => p.name === "Ana")!.seat!;
+    t.host.table.exchange(seat, "remote", "https://games.example/i/QRQRQRQR");
+    const qrLocal = await fetch(`${t.base}/qr.svg?exchange=1`);
+    expect(qrLocal.status).toBe(200);
+    expect(await qrLocal.text()).toContain("<svg");
+    const qrRemote = await peer.request("GET", "/qr.svg?exchange=1");
+    expect(qrRemote.status).toBe(200);
+    expect(qrRemote.body.toString()).toContain("<svg");
+    await t.ok("POST", "/remote", { boardControl: false });
+    expect((await peer.request("GET", "/qr.svg?exchange=1")).status).toBe(403);
+    await t.ok("POST", "/remote", { boardControl: true });
+    await t.ok("DELETE", "/exchange");
+    t.host.table.exchange(seat, "local");
+    expect((await peer.request("GET", "/qr.svg?exchange=1")).status).toBe(403); // a seat's join code stays on the table
+    expect((await fetch(`${t.base}/qr.svg?exchange=1`)).status).toBe(200);
+    await t.ok("DELETE", "/exchange");
     await a.request("game", "intent", { name: "guess", payload: "heads" });
     deck.send("game", "intent", { name: "guess", payload: "tails" }, 3);
     await until(() => t.host.table.phase === "finished");
