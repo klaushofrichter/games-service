@@ -303,3 +303,7 @@ python3 scripts/e2e/layout.py out/         # decks at 4 phone sizes x 3 games, t
 - Tables authenticate to the cloud with an issued bearer token, not yet a key pair or certificate.
 - Host-side AI configuration (`ai.hostConfig`, e.g. API keys) is parsed but has no screen yet. For language models it will also hold the model, the effort and a cost limit per game (D-112).
 - werift waits up to 5 s for STUN during connection setup when STUN is unreachable.
+
+## Licence
+
+[MIT](LICENSE). Copyright (c) 2026 Klaus Hofrichter.
