@@ -289,6 +289,7 @@ const viewEdge = () => remoteEdge() ?? state.frontEdge;
 let lastFacing = "south";
 function gameEdge() {
   if (REMOTE) return viewEdge();
+  if (state.gameFacing) return state.gameFacing; // the table keeps it (D-151)
   if (state.frontEdge === "north" || state.frontEdge === "south") lastFacing = state.frontEdge;
   return lastFacing;
 }

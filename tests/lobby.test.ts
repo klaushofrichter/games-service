@@ -203,6 +203,14 @@ describe("seats and orientation", () => {
     expect((await t.api("POST", "/face", { edge: "up" })).status).toBe(400);
   });
 
+  it("keeps the game's facing: the last north or south the table faced (D-151)", async () => {
+    expect((await t.ok("GET", "/state")).gameFacing).toBe("south");
+    expect((await t.ok("POST", "/face", { edge: "north" })).gameFacing).toBe("north");
+    const s = await t.ok("POST", "/face", { edge: "east" });
+    expect([s.frontEdge, s.gameFacing]).toEqual(["east", "north"]);
+    expect((await t.ok("POST", "/rotate", { degrees: 90 })).gameFacing).toBe("south"); // east + 90 = south
+  });
+
   it("names the edge of every seat for each layout", async () => {
     expect((await t.ok("POST", "/layout", { seats: 8 })).seatEdges).toEqual(["south", "south", "south", "north", "north", "north", "east", "west"]);
     expect((await t.ok("POST", "/layout", { seats: 6 })).seatEdges).toEqual(["south", "south", "north", "north", "east", "west"]);

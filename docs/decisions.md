@@ -638,3 +638,11 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
     more). *Awards* (`mostAward`, so a tie of everyone or nobody is left out): High Roller, Jackpot, Bullseye, Hot
     Hand, Lucky Charm, Number Cruncher, Zero Hero, Odd Man, Even Steven, Seeing Red, Night Owl (black), Low Rider
     (1–18), High Flyer (19–36), By the Dozen (dozens and columns), Wallflower (sat out most).
+
+## How a phone sees the board (19 Oct 2026)
+
+- **D-151 · 2026-10-19 · Klaus** — A game's phone can show the board the way its player sees it, at the table and remotely, in every rotation. Klaus asked Starforge (a programming race on a factory map) to carry everything learnt about the deck and the board's rotations, remote players included: a robot's "north" on the phone must be the direction the player sees as up the table. *Implementation (Claude):*
+  - **The table keeps the game's facing.** `gameFacing` (`"north" | "south"`) in the lobby state: the last north or south the table faced (D-101). Turning the lobby east or west leaves it; the board's `gameEdge()` reads it instead of tracking it itself, so a phone that joins later knows it too.
+  - **Deck `info`** gains `seatEdges` (as the board has them), `viewEdge` (the table edge the player looks from) and `boardEdge` (the edge the game faces on the board that player sees). At the table: `viewEdge` = the seat's edge, `boardEdge` = `gameFacing`. A remote player has their own board, turned to their seat (D-059), or upright when an east or west seat chose the full width (D-101): there both are that board's edge, so the phone reads it upright. A phone turns a map by `ROT[boardEdge]`-relative angles; Starforge's `viewAngle()` is the worked example.
+  - A remote player toggling the full width re-renders the game on their phone (`storage` event), so the map follows at once.
+  - **Checks.** `tests/lobby.test.ts` (the facing kept through east, west and rotations).

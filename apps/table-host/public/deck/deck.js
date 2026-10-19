@@ -456,10 +456,32 @@ function renderLobby(p) {
 // ---------- the game's own deck UI ----------
 let game = null; // { key, inst }
 
+/**
+ * How this player sees the game's board (D-151): `viewEdge`, the table edge they look from (their seat's at the table;
+ * on a remote player's own board, the edge at the bottom of their screen, D-059/D-101), and `boardEdge`, the edge the
+ * game faces on that board (the table's facing, or the remote board's own). With them a game can turn a map on the
+ * phone the way the player sees the board: a direction on the phone is the same direction on the table.
+ */
+function boardView() {
+  const seat = self()?.seat ?? null;
+  const own = seat === null ? null : (state.seatEdges?.[seat] ?? null);
+  if (REMOTE) {
+    let landscape = false;
+    try {
+      landscape = localStorage.getItem(`gametable.remote.${params.get("inv") ?? ""}.landscape`) === "1";
+    } catch {}
+    const edge = own && (own === "east" || own === "west") && landscape ? "south" : (own ?? state.frontEdge ?? "south");
+    return { viewEdge: edge, boardEdge: edge };
+  }
+  return { viewEdge: own ?? "south", boardEdge: state.gameFacing ?? "south" };
+}
+
 function info() {
   return {
     seat: gameMsg?.seat,
     me: self(),
+    seatEdges: state.seatEdges ?? [],
+    ...boardView(),
     players: state.players,
     seatColors: state.seatColors ?? {}, // seats whose player left keep their colour (D-125)
     settings: state.game?.settings ?? {},
@@ -503,6 +525,11 @@ async function showGame() {
   }
   game.inst?.update(gameMsg.view, gameMsg.events ?? [], info());
 }
+
+// A remote player switching their board between turned and full width (D-101) changes how they see it: tell the game.
+addEventListener("storage", (e) => {
+  if (REMOTE && e.key?.endsWith(".landscape") && gameMsg) game?.inst?.update(gameMsg.view, [], info());
+});
 
 function closeGame() {
   if (!game) return;
