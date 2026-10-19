@@ -798,3 +798,12 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   anyway); a seat's join code stays on the table. The remote channel passes `/qr.svg` through for that. The in-game
   lobby's player list and the away card keep their *Exchange…* buttons. Checks: `tests/remote.test.ts`,
   `scripts/e2e/exchange_remote.py`.
+- **D-167 · 2026-10-19 · Klaus** — A remote board operates the table only while its browser has a player at the table.
+  A remote player who was exchanged, left or was removed kept a board with full board control, also in the lobby after
+  the game. *Why:* Klaus: "when the game ends, the exchanged remote player can see the lobby. So that player still has
+  some connection that is not cleaned up. This player can also operate the lobby." *Implementation (Claude):*
+  `Table.remoteControlAllowed(session)` also needs `hasRemotePlayer(session)`; the HTTP API checks it for every remote
+  change and for the Game Viewer ("you are no longer a player at this table"); such a board's state has
+  `remote.boardControl: false` and `remote.watching: true`, so its controls hide and the lobby says "watching". A
+  remote board before its player has joined has no control either. The board keeps watching; making that a proper
+  watch mode (listed, counted, removable, convertible to a player) is the next step.

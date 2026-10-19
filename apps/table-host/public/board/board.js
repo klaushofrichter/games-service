@@ -987,6 +987,7 @@ function tileHint(g) {
 
 function remoteNote() {
   const r = state.remote;
+  if (REMOTE && r?.watching) return ` · <span class="faint">watching — you are not a player at this table</span>`; // D-167
   if (REMOTE) return r && !r.boardControl ? ` · <span class="faint">view only — the table has switched off board control for remote players</span>` : "";
   return r?.players ? ` · ${r.players} remote` : "";
 }
