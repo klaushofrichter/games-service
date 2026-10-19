@@ -531,6 +531,12 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
           table.rename(c.playerId, msg.payload?.name);
           return reply("ack", {}, msg.seq);
         }
+        if (c.role === "deck" && msg.ch === "lobby" && msg.type === "leave") {
+          // A player leaves from their phone (D-158): the table, or the running game (the seat can go to an AI).
+          reply("ack", {}, msg.seq);
+          table.leave(c.playerId);
+          return;
+        }
         if (c.role === "deck" && msg.ch === "lobby" && msg.type === "ready") {
           table.setReady(c.playerId, !!msg.payload?.ready);
           return reply("ack", {}, msg.seq);

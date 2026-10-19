@@ -6,6 +6,8 @@ page is the history. Leave it empty if there is nothing to add beyond the commit
 
 ## [Unreleased]
 
+- **Leave the game** on the phone (D-158): on the Ready screen and on the own tab during a game; in a game the board
+  then offers to hand the seat to an AI player.
 - *Advanced › Developer › Live status…* (D-157) shows what holds a game up: the board's progress, each AI player
   (pause, waiting for the board, thinking), phones held back, and recent AI answers.
 - Roulette (D-150): the betting layout no longer jumps between "Place your bets" and "No more bets"; the countdown is a

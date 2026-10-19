@@ -103,3 +103,8 @@ body.in-game #top { gap: 8px; }
 /* A refused name (D-148): taken at this table, or not allowed. */
 .join-error { color: #f1a197; font-size: .85em; min-height: 1.1em; }
 .join-error:empty { display: none; }
+
+/* Leave the game (D-158): quiet, below everything else, and a confirmation in a sheet. */
+.leave-row { margin: 18px 0 6px; }
+.leave-btn { background: transparent; border: 1px solid rgba(241, 161, 151, .45); color: #f1a197; }
+.leave-confirm { background: #b8473b; border-color: #b8473b; color: #fff; }
