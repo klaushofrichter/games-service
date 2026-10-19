@@ -14,7 +14,10 @@ h1 { font-family: var(--display); font-weight: 600; font-size: 1.9em; margin: 4p
 .who { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
 .who .badge { width: 54px; height: 54px; border-radius: 14px; display: grid; place-items: center; background: var(--brass); color: #1b1407; font-family: var(--display); font-size: 1.6em; font-weight: 700; flex: none; }
 .list { display: flex; flex-direction: column; }
-.list .row { display: flex; justify-content: space-between; padding: 9px 0; border-bottom: 1px solid var(--felt-line); font-size: 0.95em; }
+.list .row { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; column-gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--felt-line); font-size: 0.95em; }
+/* A name keeps its dot and stays on one line; on a narrow deck the seat and status move under it, to the right (D-156). */
+.list .row > span:first-child { white-space: nowrap; }
+.list .row > span:last-child { margin-left: auto; text-align: right; }
 .list .row:last-child { border-bottom: 0; }
 .me { color: var(--brass); }
 /* The player's colour before each name in "At the table" (D-104); a hollow ring for someone without a seat. */
@@ -50,6 +53,7 @@ pre { font-family: var(--mono); font-size: 0.75em; white-space: pre-wrap; color:
 
 /* Game rules (D-099): a Rules button in the header, and a full-height sheet over the deck. */
 .who-side { display: flex; align-items: center; gap: 8px; flex: none; }
+.who-actions { display: flex; gap: 8px; margin-top: -4px; }
 /* The name gives way on the narrowest phones, so the Rules button and the badge always fit (320 px, D-065). */
 .who > div:first-child { min-width: 0; flex: 1; }
 .who h1 { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
