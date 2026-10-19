@@ -12,7 +12,7 @@
 
 Game Table platform: a touchscreen **board** lying flat on a table, players' phones as private **decks**, a Linux **Table Host** that runs the games, and a **cloud service** at `games.skylar.technology` that enrolls tables, collects metrics and logs, and (from phase 1c) brokers remote players.
 
-This repository implements phases 1a, 1b and 1c of the *Game Table — Concept & Architecture* document: lobby, seats, game selection, the game runtime with replayable logs, AI-only simulation, the board control API, pause on a lost service connection, the admin portal, a table PC kit, **remote play** over WebRTC, automated tests, and four playable games with their own board and phone UIs and rules for players: **Roulette**, **Pachisi**, **Hold'em** and **Coin Flip**. More games can come from other repositories, private ones included (*Extra-game repositories* below). Decisions are recorded in [`docs/decisions.md`](docs/decisions.md).
+This repository implements phases 1a, 1b and 1c of the *Game Table — Concept & Architecture* document: lobby, seats, game selection, the game runtime with replayable logs, AI-only simulation, the board control API, pause on a lost service connection, the admin portal, a table PC kit, **remote play** over WebRTC, automated tests, and four playable games with their own board and phone UIs and rules for players: **Roulette**, **Pachisi**, **Hold'em** and **Coin Flip**. More games can come from other repositories, private ones included (*Extra-game repositories* below); [`klaushofrichter/extra-games`](https://github.com/klaushofrichter/extra-games) is the public example, with Chess, Liar's Dice and Backgammon. Decisions are recorded in [`docs/decisions.md`](docs/decisions.md).
 
 ## Quick start
 
@@ -115,7 +115,7 @@ Decks speak JSON envelopes over `/ws`: `system.hello {joinToken, name}` or `{ses
 the folder, the manifest, every rules hook and its exact behaviour, what the platform does about players (joining,
 phones going away, leaving, exchanging a player), AI players, the end-of-game summary and awards, the board and phone
 UI modules with everything they receive, rules for players, logs and replay, versions, testing, and a game repository
-of your own, with a checklist. It is written for people and for language models; [`llms.txt`](llms.txt) is its index
+of your own, with a checklist. [`klaushofrichter/extra-games`](https://github.com/klaushofrichter/extra-games) is a complete example of games written against it in a repository of their own. It is written for people and for language models; [`llms.txt`](llms.txt) is its index
 for LLMs, served at `https://games.skylar.technology/llms.txt` (and the whole guide at `/llms-full.txt`).
 
 In short: a game is a folder with `manifest.json`, `rules.ts` (pure, deterministic functions on a JSON state:
@@ -128,7 +128,9 @@ replay; a game never reimplements them. Start from `games/coin-flip`.
 ## Extra-game repositories
 
 Games can also come from other GitHub repositories, private ones included (D-097), for private games and early
-releases. The repositories the service lists are in `deploy/game-repos.json`.
+releases. The repositories the service lists are in `deploy/game-repos.json`. The public example is [`klaushofrichter/extra-games`](https://github.com/klaushofrichter/extra-games): three
+complete games, tested against this repository, with CI and browser checks; copy its layout for a repository of your
+own.
 
 - **The list:** [`deploy/game-repos.json`](deploy/game-repos.json) is baked into the cloud image, so these
   repositories are back after every restart (D-098); change it by PR. In the console they are marked *deploy config*.

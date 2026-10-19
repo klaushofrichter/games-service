@@ -35,10 +35,11 @@ describe("the developer guide (D-160)", () => {
     for (const f of [...board, ...deck, "viewEdge", "boardEdge"]) expect(guide, f).toMatch(new RegExp(`\`${f}\``));
   });
 
-  it("llms.txt follows llmstxt.org and points to the guide, naming no private repository", () => {
+  it("llms.txt follows llmstxt.org, points to the guide and the public example repository, and names no private one", () => {
     const llms = read("llms.txt");
     expect(llms).toMatch(/^# Game Table\n\n> .+\n/);
     expect(llms).toContain("/docs/game-development.md");
-    for (const t of [llms, guide]) expect(t).not.toMatch(/loopy|starforge|extra-games/i);
+    for (const t of [llms, guide]) expect(t).toContain("https://github.com/klaushofrichter/extra-games"); // public (D-161)
+    for (const t of [llms, guide]) expect(t).not.toMatch(/loopy|starforge/i);
   });
 });
