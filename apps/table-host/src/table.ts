@@ -77,6 +77,8 @@ interface Player extends PlayerInfo {
   graceTimer?: NodeJS.Timeout;
   aiSeed?: number;
   chosenColor?: string; // picked in the board's settings (D-106)
+  /** Left the running game from their phone (D-158): the seat waits for the board to hand it to an AI player. */
+  leftGame?: boolean;
   /** The colour the player got when first seated (their seat's, else a free one); it moves with them (D-117). */
   keptColor?: string;
 }
@@ -222,7 +224,7 @@ export class Table extends EventEmitter {
   private waitingFor = new Map<string, { seat: number; text: string; since: number }>();
 
   private playerPause(): NonNullable<LobbyState["pause"]> {
-    const players = [...this.waitingFor].map(([playerId, w]) => ({ playerId, name: this.players.get(playerId)?.name ?? "a player", seat: w.seat, since: w.since, text: w.text }));
+    const players = [...this.waitingFor].map(([playerId, w]) => ({ playerId, name: this.players.get(playerId)?.name ?? "a player", seat: w.seat, since: w.since, text: w.text, ...(this.players.get(playerId)?.leftGame ? { left: true } : {}) }));
     const since = this.pause?.reason === "player" ? this.pause.since : Date.now();
     return { reason: "player", since, canSave: !!this.selected?.game.manifest.saveGame, players };
   }
@@ -471,8 +473,7 @@ export class Table extends EventEmitter {
 
   resume(sessionToken: string): PlayerInfo {
     const p = [...this.players.values()].find((x) => x.sessionToken && x.sessionToken === sessionToken);
-    if (!p && this.handedToAi.has(sessionToken))
-      throw new TableError(403, `your seat was handed to ${this.handedToAi.get(sessionToken)} while you were away; scan the QR code to join the next game`);
+    if (!p && this.endedSessions.has(sessionToken)) throw new TableError(403, this.endedSessions.get(sessionToken)!);
     if (!p) throw new TableError(403, "session expired; scan the QR code to join again (during a game: Settings › Show join code on the board)");
     if (p.graceTimer) clearTimeout(p.graceTimer);
     p.graceTimer = undefined;
@@ -713,7 +714,7 @@ export class Table extends EventEmitter {
 
   private playerInfos(): PlayerInfo[] {
     const colors = this.colors();
-    return [...this.players.values()].map(({ sessionToken, graceTimer, aiSeed, remoteSession, chosenColor, keptColor, ...info }) => ({ ...info, color: colors.get(info.id) ?? null }));
+    return [...this.players.values()].map(({ sessionToken, graceTimer, aiSeed, remoteSession, chosenColor, keptColor, leftGame, ...info }) => ({ ...info, color: colors.get(info.id) ?? null }));
   }
 
   /**
@@ -973,19 +974,41 @@ export class Table extends EventEmitter {
     this.changed();
   }
 
-  /** Sessions of players whose seat went to an AI (D-144): their phone, back, is told why instead of "session expired". */
-  private handedToAi = new Map<string, string>();
+  /**
+   * Sessions that ended during a game, with what to tell the phone if it comes back instead of "session expired": the
+   * seat went to an AI player (D-144), or the player left the game (D-158).
+   */
+  private endedSessions = new Map<string, string>();
   /** Players away during the game whose seat waits for them (D-144): the board offers to hand it to an AI player. */
   private awaySince = new Map<string, number>();
   /** The board shows an away player only after this long, so a phone that locks for a moment doesn't flash a card. */
   static AWAY_SHOW_MS = 15_000;
 
-  private awayPlayers(): { playerId: string; name: string; seat: number; since: number }[] {
+  private awayPlayers(): { playerId: string; name: string; seat: number; since: number; left?: boolean }[] {
     const now = Date.now();
     return [...this.awaySince]
       .map(([id, since]) => ({ p: this.players.get(id), since }))
       .filter((x): x is { p: Player; since: number } => !!x.p && !x.p.connected && this.inRunningGame(x.p) && !this.waitingFor.has(x.p.id) && now - x.since >= Table.AWAY_SHOW_MS)
-      .map(({ p, since }) => ({ playerId: p.id, name: p.name, seat: p.seat!, since }));
+      .map(({ p, since }) => ({ playerId: p.id, name: p.name, seat: p.seat!, since, ...(p.leftGame ? { left: true } : {}) }));
+  }
+
+  /**
+   * A player leaves from their phone (D-158). Outside a game they leave the table. In a running game their phone is
+   * done (the session ends) and the seat is handled like an away player's at once: it waits and the board offers to
+   * hand it to an AI player (or, with the waiting-time setting on, the game's leaving rule runs after it; a game that
+   * can't go on without them pauses, D-119).
+   */
+  leave(playerId: string) {
+    const p = this.mustPlayer(playerId);
+    if (p.kind !== "human") throw new TableError(400, "only people leave by themselves");
+    if (!this.inRunningGame(p)) return this.removePlayer(playerId, "left");
+    p.leftGame = true;
+    if (p.sessionToken) this.endedSessions.set(p.sessionToken, "you left this game; scan the QR code on the board to join the next one");
+    p.sessionToken = null;
+    this.emit("removed", p.id, "left"); // the phone shows that it left
+    this.disconnected(p.id);
+    if (this.awaySince.has(p.id)) this.awaySince.set(p.id, Date.now() - Table.AWAY_SHOW_MS); // shown at once, no grace for a phone lock
+    this.changed();
   }
 
   /**
@@ -1007,7 +1030,8 @@ export class Table extends EventEmitter {
     const aiOptions = aiDefaults(game.manifest, {});
     const ai: Player = { id: newId("ai"), name, kind: "ai", location: "local", seat, connected: true, ready: true, sessionToken: null, aiSeed: randomInt(2 ** 31), aiOptions, chosenColor: color, keptColor: color };
     if (p.graceTimer) clearTimeout(p.graceTimer);
-    if (p.sessionToken) this.handedToAi.set(p.sessionToken, ai.name);
+    if (p.sessionToken && !this.endedSessions.has(p.sessionToken))
+      this.endedSessions.set(p.sessionToken, `your seat was handed to ${ai.name} while you were away; scan the QR code to join the next game`);
     this.players.delete(p.id);
     this.waitingFor.delete(p.id);
     this.awaySince.delete(p.id);
@@ -1094,7 +1118,7 @@ export class Table extends EventEmitter {
     this.gameStartedAt = Date.now();
     this.lastActorSeat = null;
     this.aiTrace = [];
-    this.handedToAi.clear();
+    this.endedSessions.clear();
     this.beginLog(rt, game, settings, aiOptions);
     this.leftColors.clear();
     this.phase = "active";

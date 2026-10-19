@@ -99,4 +99,31 @@ describe("players away during a game (D-144)", () => {
     await until(async () => ((await state()).players.some((p: any) => p.id === ann.playerId) ? null : true), 3000);
     expect((await t.api("POST", "/play", { awayTimeout: "yes" })).status).toBe(400);
   });
+
+  it("a player leaves from the phone (D-158): before a game they leave the table; in one the seat is offered to an AI at once", async () => {
+    t = await testHost({ gamesDir: GAMES, showTestGames: true });
+    const cleo = await t.joinDeck("Cleo");
+    await cleo.request("lobby", "leave", {});
+    await until(async () => ((await state()).players.some((p: any) => p.id === cleo.playerId) ? null : true));
+    await t.close();
+    const { ann } = await partners("free");
+    const removed = ann.next((m) => m.ch === "system" && m.type === "removed");
+    expect((await ann.request("lobby", "leave", {})).type).toBe("ack");
+    expect((await removed).payload).toEqual({ reason: "left" });
+    const s = await until(async () => ((await state()).away.length ? await state() : null));
+    expect(s.away).toMatchObject([{ playerId: ann.playerId, left: true }]); // no wait for a phone lock
+    expect(s.phase).toBe("active");
+    await expect(Deck.connect(t.base, { sessionToken: ann.sessionToken })).rejects.toThrow(/you left this game/);
+    const r = await t.ok("POST", `/players/${ann.playerId}/replace-with-ai`);
+    expect(r.state.players.find((p: any) => p.id === r.playerId)).toMatchObject({ name: "Ann (AI)", kind: "ai" });
+  });
+
+  it("leaving a game that can't go on without the player (D-119) pauses it with the player marked as left", async () => {
+    const { ann } = await partners("teams");
+    await ann.request("lobby", "leave", {});
+    const s = await until(async () => ((await state()).phase === "paused" ? await state() : null));
+    expect(s.pause.players).toMatchObject([{ playerId: ann.playerId, left: true }]);
+    await t.ok("POST", `/players/${ann.playerId}/replace-with-ai`);
+    expect((await state()).phase).toBe("active");
+  });
 });

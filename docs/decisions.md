@@ -683,3 +683,17 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   - **afterBoard.** A game message a phone gets only after the board has shown it (D-143) carries `afterBoard: true`;
     the deck passes it to the game as `info.shownOnBoard`, so a game that stages moves on the phone can skip that.
   - **Checks.** `tests/board-pacing.test.ts`: the flag on a held message and not on the player's own, and the status.
+- **D-158 · 2026-10-19 · Klaus** — A player can leave from their phone, at the table and remotely: **Leave the game**
+  on the Ready screen and on the own tab during a game, after a confirmation. *Why:* Klaus: "That should trigger the
+  option to replace the leaving player." *Implementation (Claude):*
+  - **Before a game** (the Ready screen): the player leaves the table (as when the board removes them, but by
+    themselves); their phone says "You left the table".
+  - **During a game** (the own tab, D-123): their session ends ("You left the game"; the phone, back, is told so) and
+    the seat is handled like an away player's at once (D-144): it waits, and the board shows "Ann left the game ·
+    Hand the seat to an AI player, and the game goes on" with **Hand Ann to an AI**, without the 15 s delay for a
+    phone that locks. With the waiting-time setting on, the game's leaving rule runs after it as for an away player;
+    a game that can't go on without them (D-119) pauses with the same button and End game.
+  - **Protocol.** Deck message `lobby.leave`; `away[]` and the player pause's `players[]` mark them `left: true`.
+  - **Checks.** `tests/away.test.ts` (leaving the table before a game; leaving a game: the removal message, `left`
+    at once, the session's message, handing to an AI; a D-119 game pausing); `scripts/e2e/away.py` (the button, the
+    confirmation, the phone's message, the board's card).

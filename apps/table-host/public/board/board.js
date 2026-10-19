@@ -1099,9 +1099,9 @@ function renderPlayerWait(p) {
   const reasons = [...new Set(list.map((w) => w.text).filter(Boolean))];
   pauseLayer.innerHTML = `<div class="ai-wait-card player-wait" data-player-wait="${esc(list.map((w) => w.playerId).join(" "))}" style="left:${x}px;top:${y}px;transform:translate(-50%,-50%) rotate(${ROT[gameEdge()]}deg)">
     <div class="who">${names || "A player"}</div>
-    <div class="what"><span class="thinking-dots" aria-hidden="true"><i></i><i></i><i></i></span> ${list.length > 1 ? "are" : "is"} away</div>
+    <div class="what">${list.every((w) => w.left) ? "left the game" : `<span class="thinking-dots" aria-hidden="true"><i></i><i></i><i></i></span> ${list.length > 1 ? "are" : "is"} away`}</div>
     ${reasons.map((r) => `<p>${esc(r)}</p>`).join("")}
-    <p>The game is paused and goes on as soon as ${list.length > 1 ? "they are" : `${esc(first?.name ?? "they")} is`} back.</p>
+    <p>${list.every((w) => w.left) ? `The game is paused.${gameHasAi() && !REMOTE ? " Hand the seat to an AI player, or end the game." : ""}` : `The game is paused and goes on as soon as ${list.length > 1 ? "they are" : `${esc(first?.name ?? "they")} is`} back.`}</p>
     ${control ? `<div class="row">${handToAiButtons(list)}<button class="danger" data-pause="end">End game</button></div>` : ""}
   </div>`;
 }
@@ -1128,8 +1128,8 @@ function renderAway() {
       const { x, y } = nearSeat(w.seat);
       return `<div class="ai-wait-card away-card" data-away="${esc(w.playerId)}" style="left:${x}px;top:${y}px;transform:translate(-50%,-50%) rotate(${ROT[gameEdge()]}deg)">
     <div class="who"><span class="dot" style="background:${who?.color ?? "var(--brass)"}"></span>${esc(w.name)}</div>
-    <div class="what">is away</div>
-    <p>${gameHasAi() ? "The seat waits for them. Or hand it to an AI player, and the game goes on without them." : "The seat waits for them."}</p>
+    <div class="what">${w.left ? "left the game" : "is away"}</div>
+    <p>${w.left ? (gameHasAi() ? "Hand the seat to an AI player, and the game goes on." : "The seat stays empty.") : gameHasAi() ? "The seat waits for them. Or hand it to an AI player, and the game goes on without them." : "The seat waits for them."}</p>
     ${gameHasAi() ? `<div class="row">${handToAiButtons([w])}</div>` : ""}
   </div>`;
     })
