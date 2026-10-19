@@ -43,7 +43,8 @@ request.
 - **The Table Host** (a PC under the table) runs the lobby and the game's rules, keeps the log, and serves the board
   and phone pages over the local network.
 - **Remote players** join through an invite from the cloud service. They get the same board (turned towards their own
-  seat) and the same phone page, through a peer-to-peer channel to the table.
+  seat) and the same phone page, through a peer-to-peer channel to the table. **Watchers** get the board only: no seat,
+  no phone page, not in `info.players`; a game needs to do nothing for them, beyond keeping secrets out of `boardView`.
 - **AI players** sit in seats like people. The platform asks the game's `ai()` for their moves.
 - Up to 8 seats, on the four edges of the table (`north`, `east`, `south`, `west`). Seat layouts have 2, 4, 6 or 8
   seats.

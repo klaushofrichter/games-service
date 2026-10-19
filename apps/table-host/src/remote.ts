@@ -232,6 +232,12 @@ export class RemoteGateway {
     s.close();
   }
 
+  /** End one browser's connection (a removed watcher, D-168). */
+  end(session: string) {
+    const s = this.sessions.get(session);
+    if (s) setTimeout(() => this.drop(session, s), 500); // the board's "removed" message goes first
+  }
+
   close() {
     for (const s of this.sessions.values()) s.close();
     this.sessions.clear();

@@ -66,6 +66,7 @@ export async function startHost(o: HostOptions = {}) {
     setAccessCode: o.cloudUrl ? (code) => cloud!.setAccessCode(code) : undefined,
   });
   const gateway = new RemoteGateway(server.handler, server.attachSocket);
+  table.on("remote-evict", (session: string) => gateway.end(session)); // a removed watcher (D-168)
   if (!config.publicUrl) config.publicUrl = `http://${lanAddress()}:${server.port}`;
   await logs.prune();
   // Tables run for weeks: prune once a day too, not only at start.

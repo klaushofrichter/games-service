@@ -58,7 +58,7 @@ Or skip the pairing code: create an access code in the console (*Access codes*) 
 | `games/coin-flip` | Guess heads or tails, 1–8 players, simultaneous, AI, players can join mid-game, optional time limit, per-player statistics |
 | `games/quartet` | Test game (hidden unless `SHOW_TEST_GAMES=1`): exactly 4 humans, no AI, sequential turns, ends if a player leaves |
 | `apps/cloud/src/game-repos.ts`, `apps/table-host/src/extra-games.ts`, `packages/protocol/src/bundle.ts` | Extra-game repositories: fetching and packing on the service, installing on tables, the bundle format |
-| `scripts/e2e/` | Browser end-to-end checks (Playwright): `run-all.sh` runs them all, `play.py` per game, `layout.py`, `admin.py` for the portal and sign-in, `codes.py` for access codes and a service restart, `remote.py` for remote play, `extra.py` for extra-game repositories, `logs.py` for game logs, `viewer.py` for the Game Viewer; shared helpers in `common.py` |
+| `scripts/e2e/` | Browser end-to-end checks (Playwright): `run-all.sh` runs them all, `play.py` per game, `layout.py`, `admin.py` for the portal and sign-in, `codes.py` for access codes and a service restart, `remote.py` for remote play, `watch.py` for watchers, `extra.py` for extra-game repositories, `logs.py` for game logs, `viewer.py` for the Game Viewer; shared helpers in `common.py` |
 | `scripts/game-log.ts` | Reads a game log zip from the command line: an overview, a range of moves, one move in full with the state before and after (D-120) |
 | `scripts/sync-secrets.sh` | Puts the values from your local `.env` into GitHub and the cluster, without printing them |
 | `scripts/release-notes.sh`, `release.sh` | The release step of the deploy |
@@ -185,7 +185,8 @@ A remote player gets an invite link (`https://games.skylar.technology/i/CODE`) f
 - The service's `ICE_SERVERS` (JSON) sets STUN/TURN for both sides; without it, Google's public STUN is used. Add a TURN server for players behind strict NATs.
 - The table needs outbound UDP; the table PC kit uses host networking. In bridged Docker (the dev `docker-compose.yml`) remote play only works with a TURN server.
 - The remote board turns so the remote player's own seat is at the bottom of their screen. On an east or west seat, *Use the full width* shows the board upright instead (their seat at the side), and *Put my seat at the bottom* turns it back; the choice stays in that browser (D-101).
-- `POST /api/v1/remote {"boardControl": false}` (or the checkbox in the invite dialog) makes the board read-only for remote players.
+- `POST /api/v1/remote {"boardControl": false}` (or the checkbox in the invite dialog) makes the board read-only for remote players. It is one switch for all of them, and a remote board has control only while its browser has a player at the table (D-167).
+- **Watchers (D-168):** *Watch only* in the invite dialog (`POST /api/v1/invites {"watch": true}`; during a game, and when the seats are full, the board's invite is for watching) brings someone who sees the board, takes no seat and has no deck. A remote player who is exchanged, leaves or is removed keeps watching too. Remote players and watchers together stay within `MAX_REMOTE_PLAYERS`. The board shows an eye with their number while anyone watches: tap it for the list, *Remove* (`DELETE /api/v1/watchers/{id}`; their window closes and that invite can't bring them back) and, in the lobby, *Let play* (`POST /api/v1/watchers/{id}/play`). During a game, Settings › Players › a player's name offers each watcher as the one to take the seat. Watchers leave by closing their window. They are listed in the lobby state as `watchers`.
 
 ## Game logs
 
