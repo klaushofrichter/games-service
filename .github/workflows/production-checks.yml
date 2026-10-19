@@ -79,6 +79,9 @@ jobs:
       - name: Local Docker runbook
         run: |
           set -euo pipefail
+          # Job logs are not always at hand: name the failing line in an annotation.
+          trap 'echo "::error::local Docker runbook: line $LINENO: $BASH_COMMAND (exit $?)"' ERR
+          echo "::notice::$(docker --version); $(docker compose version 2>&1 | head -1); ip: $(command -v ip || echo none)"
           C="docker compose -f deploy/local/docker-compose.yml"
           ok() { for i in $(seq 1 60); do curl -fs "$1" > /dev/null && return 0; sleep 1; done; $C logs; return 1; }
           deploy/local/setup.sh
