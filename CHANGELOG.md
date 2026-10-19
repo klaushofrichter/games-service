@@ -6,6 +6,8 @@ page is the history. Leave it empty if there is nothing to add beyond the commit
 
 ## [Unreleased]
 
+- Fix: a remote player who was exchanged, left or was removed could still operate the table from their board; that
+  board now only watches (D-167).
 - games-service and extra-games are under the MIT licence (D-162); the terms of service say so and that there is no
   warranty (D-163).
 - The public example of a game repository, [`klaushofrichter/extra-games`](https://github.com/klaushofrichter/extra-games)

@@ -770,3 +770,12 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   excluded as far as the law allows) and *Software* (MIT, link to the repository; games from other authors under
   their own terms). Not reviewed by a lawyer.
 - **D-164 · 2026-10-19 · Klaus** — The board's invite dialog closes by itself when its invite brings a player, with a short note "*Rita* joined through the invite". *Implementation (Claude):* the service knows an invite only by its hash; it keeps that hash with the remote session and sends it to the table with the connection offer. The table remembers the invites it asked for (by hash, the last 32) and, when a remote player joins through one, lists it in `state.remote.joined` (`{invite, name}`, the last 8). The dialog closes when its own invite appears there, so another invite being used leaves it open; the board's name keyboard (D-155) closes with it. The board-control switch stays in the invite dialog. Checks: `tests/remote.test.ts` (the joined invite), `scripts/e2e/remote.py` (the dialog closes and says who joined) and `next_hand.py`.
+- **D-167 · 2026-10-19 · Klaus** — A remote board operates the table only while its browser has a player at the table.
+  A remote player who was exchanged, left or was removed kept a board with full board control, also in the lobby after
+  the game. *Why:* Klaus: "when the game ends, the exchanged remote player can see the lobby. So that player still has
+  some connection that is not cleaned up. This player can also operate the lobby." *Implementation (Claude):*
+  `Table.remoteControlAllowed(session)` also needs `hasRemotePlayer(session)`; the HTTP API checks it for every remote
+  change and for the Game Viewer ("you are no longer a player at this table"); such a board's state has
+  `remote.boardControl: false` and `remote.watching: true`, so its controls hide and the lobby says "watching". A
+  remote board before its player has joined has no control either. The board keeps watching; making that a proper
+  watch mode (listed, counted, removable, convertible to a player) is the next step.

@@ -232,6 +232,7 @@ describe("remote play", { timeout: 60_000 }, () => {
   it("lets the table switch off board control for remote players", async () => {
     const t = await pairedHost();
     const peer = await RemotePeer.connect((await t.ok("POST", "/invites")).token);
+    await (await peer.socket({ name: "Rita" })).next((m) => m.type === "welcome"); // board control is for players (D-167)
     expect((await peer.json("POST", "/api/v1/layout", { seats: 6 })).status).toBe(200);
     // "Play now" for an AI out of time (D-112) is open to remote boards with control: here nobody is waited for (409)
     expect((await peer.json("POST", "/api/v1/game/play-now")).status).toBe(409);
@@ -345,6 +346,31 @@ describe("remote play", { timeout: 60_000 }, () => {
     expect((await s.next((m) => m.type === "welcome")).payload.remote).toBe(true);
     await until(() => s.lastState());
     expect(s.lastState().joinUrl).toBe("");
+  });
+
+  it("takes board control from a remote board whose player is gone: it keeps watching, read-only (D-167)", async () => {
+    const t = await pairedHost();
+    const peer = await RemotePeer.connect((await t.ok("POST", "/invites")).token);
+    const rb = await peer.socket({ role: "board" });
+    await rb.next((m) => m.type === "welcome");
+    // before the remote player has joined, the board does not operate the table
+    expect((await peer.json("POST", "/api/v1/layout", { seats: 6 })).status).toBe(403);
+    const deck = await peer.socket({ name: "Rita" });
+    await deck.next((m) => m.type === "welcome");
+    await until(() => rb.lastState()?.remote.boardControl === true);
+    expect((await peer.json("POST", "/api/v1/layout", { seats: 6 })).status).toBe(200);
+    expect((await peer.json("GET", "/api/v1/history")).status).toBe(200);
+    // Rita is removed (in a game: exchanged, D-159): her browser keeps the board, without control
+    const rita = t.host.table.state().players.find((p) => p.name === "Rita")!;
+    await t.ok("DELETE", `/players/${rita.id}`);
+    await until(() => rb.lastState()?.remote.boardControl === false);
+    const denied = await peer.json("POST", "/api/v1/layout", { seats: 4 });
+    expect(denied.status).toBe(403);
+    expect(denied.body.error).toMatch(/no longer a player/);
+    expect((await peer.json("POST", "/api/v1/game/select", { gameId: "coin-flip" })).status).toBe(403);
+    expect((await peer.json("GET", "/api/v1/history")).status).toBe(403);
+    expect((await peer.json("GET", "/api/v1/state")).body.remote).toMatchObject({ boardControl: false, watching: true });
+    expect(t.host.table.state().remote.boardControl).toBe(true); // the table's switch is unchanged
   });
 
   it("serves one board per remote player: a newer window replaces the older one (D-133)", async () => {

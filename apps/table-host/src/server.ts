@@ -89,17 +89,23 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
 
   // Remote clients never see the local join code (it would let them join as if they sat at the table).
   // Remote boards get no local join codes: neither the table's nor a local seat exchange's (D-159).
-  const forClient = (remote: boolean | undefined, state: ReturnType<Table["state"]>) =>
-    remote ? { ...state, joinUrl: "", exchange: state.exchange && state.exchange.kind === "local" ? { ...state.exchange, url: "" } : state.exchange } : state;
+  // A remote board whose browser has no player at the table (exchanged, left, removed) sees board control as off (D-167).
+  const forClient = (remote: boolean | undefined, state: ReturnType<Table["state"]>, session?: string) => {
+    if (!remote) return state;
+    const s = { ...state, joinUrl: "", exchange: state.exchange && state.exchange.kind === "local" ? { ...state.exchange, url: "" } : state.exchange };
+    return session !== undefined && !table.hasRemotePlayer(session) ? { ...s, remote: { ...s.remote, boardControl: false, watching: true } } : s;
+  };
+  /** The serialised state is shared by clients that see the same: the table's, remote ones, remote boards without a player. */
+  const stateKind = (c: Client) => (!c.remote ? "local" : c.session !== undefined && !table.hasRemotePlayer(c.session) ? "orphan" : "remote");
 
   table.on("state", (state) => {
     // Serialised once per kind of client (at the table, remote), not once per client.
-    const text = new Map<boolean, string>();
+    const text = new Map<string, string>();
     for (const c of clients) {
       if (c.role === "pending") continue;
-      const remote = !!c.remote;
-      let t = text.get(remote);
-      if (t === undefined) text.set(remote, (t = JSON.stringify(envelope("lobby", "state", forClient(remote, state), { stateRev: state.stateRev }))));
+      const kind = stateKind(c);
+      let t = text.get(kind);
+      if (t === undefined) text.set(kind, (t = JSON.stringify(envelope("lobby", "state", forClient(!!c.remote, state, c.session), { stateRev: state.stateRev }))));
       sendText(c.ws, t);
     }
   });
@@ -221,6 +227,8 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
     }
   };
 
+  const noControl = (session: string) =>
+    table.hasRemotePlayer(session) ? "board control is switched off for remote players" : "you are no longer a player at this table";
   const api = async (req: IncomingMessage, res: ServerResponse, path: string, qs: URLSearchParams) => {
     const remote = remoteOf(req);
     const m = req.method ?? "GET";
@@ -229,17 +237,17 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
       // The Game Viewer (D-120): finished games, read-only, for remote players the table gives board control.
       if (/^\/history(\/|$)/.test(path)) {
         if (m !== "GET") return json(res, 405, { error: "the game viewer is read-only" });
-        if (!table.remoteControlAllowed()) return json(res, 403, { error: "board control is switched off for remote players" });
+        if (!table.remoteControlAllowed(remote.session)) return json(res, 403, { error: noControl(remote.session) });
       } else if (REMOTE_DENIED.test(path)) return json(res, 403, { error: "not available to remote players" });
       if (m !== "GET") {
         if (!REMOTE_ACTIONS.test(path)) return json(res, 403, { error: "only players at the table can do that" });
-        if (!table.remoteControlAllowed()) return json(res, 403, { error: "board control is switched off for remote players" });
+        if (!table.remoteControlAllowed(remote.session)) return json(res, 403, { error: noControl(remote.session) });
       }
     } else if (!keyOk(req.headers["x-table-key"])) return json(res, 401, { error: "missing or wrong X-Table-Key" });
     const body = m === "GET" || m === "DELETE" ? {} : await readBody(req);
     let match: RegExpMatchArray | null;
 
-    if (m === "GET" && path === "/state") return json(res, 200, forClient(!!remote, table.state()));
+    if (m === "GET" && path === "/state") return json(res, 200, forClient(!!remote, table.state(), remote?.session));
     if (m === "GET" && path === "/connections" && !remote) return json(res, 200, connections());
     // Live status for finding problems (D-157): AI players, the board's pacing, what each phone is held back.
     if (m === "GET" && path === "/debug" && !remote) {
@@ -491,7 +499,7 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
               c.role = "board";
               if (!remote) table.setLocalBoard(true); // AI players pace themselves on it (D-141)
               reply("welcome", { role: "board", remote }, msg.seq);
-              send(ws, envelope("lobby", "state", forClient(remote, table.state())));
+              send(ws, envelope("lobby", "state", forClient(remote, table.state(), c.session)));
               if (table.phase === "active" || table.phase === "paused") sendGame([client], []);
             };
             if (remote) {
@@ -546,7 +554,7 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
             c.playerId = playerId;
             reply("welcome", { role: "deck", playerId, sessionToken }, msg.seq);
           }
-          send(ws, envelope("lobby", "state", forClient(remote, table.state())));
+          send(ws, envelope("lobby", "state", forClient(remote, table.state(), c.session)));
           if (table.phase === "active" || table.phase === "paused") sendGame([client], []);
           return;
         }

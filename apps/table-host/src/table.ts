@@ -389,11 +389,22 @@ export class Table extends EventEmitter {
     this.changed();
   }
 
-  /** Remote boards may act unless switched off at the table or by the running game's manifest (D-006). */
-  remoteControlAllowed(): boolean {
+  /**
+   * Remote boards may act unless switched off at the table or by the running game's manifest (D-006). With `session`:
+   * that remote browser's board, which acts only while the browser has a player at the table (D-167); one whose
+   * player was exchanged, left or was removed keeps watching, without control.
+   */
+  remoteControlAllowed(session?: string): boolean {
     if (!this.remoteBoardControl) return false;
+    if (session !== undefined && !this.hasRemotePlayer(session)) return false;
     const m = this.selected?.game.manifest;
     return !(m && (this.phase === "active" || this.phase === "paused") && !m.remoteBoardControl);
+  }
+
+  /** Whether a remote browser (its cloud session) has a player at the table, seated or not (D-167). */
+  hasRemotePlayer(session: string): boolean {
+    for (const p of this.players.values()) if (p.remoteSession === session) return true;
+    return false;
   }
 
   /**
