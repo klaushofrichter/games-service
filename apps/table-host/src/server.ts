@@ -253,7 +253,8 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
     }
     if (m === "GET" && path === "/qr") {
       const text = qs.get("text") ?? "";
-      if (!/^https?:\/\/[\w.:/-]+$/.test(text) || text.length > 200) throw new TableError(400, "text must be a URL");
+      // A URL, with a query for an invite's name (D-155: 12 characters, each up to 12 bytes percent-encoded).
+      if (!/^https?:\/\/[\w.:/-]+(\?[\w.~%+=&-]*)?$/.test(text) || text.length > 400) throw new TableError(400, "text must be a URL");
       return await qrSvg(res, text);
     }
     if (m === "GET" && path === "/join") return json(res, 200, table.currentJoin());

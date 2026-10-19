@@ -221,6 +221,7 @@ pre.raw { font-family: var(--mono); font-size: 0.7em; color: var(--ink-soft); ba
 .invite-body .qr svg { width: 220px; height: 220px; display: block; border-radius: 10px; background: #fff; padding: 6px; }
 .invite-body .url { font-family: var(--mono); font-size: 0.8em; word-break: break-all; }
 .invite-body .code { font-family: var(--mono); font-size: 1.6em; letter-spacing: 0.18em; color: var(--brass); margin-top: 8px; }
+.overlay .invite-control { flex-direction: row; font-size: 1em; }
 .invite-control { display: flex; align-items: center; gap: 14px; padding-top: 14px; border-top: 1px solid var(--felt-line); cursor: pointer; }
 .invite-control input { width: 26px; height: 26px; accent-color: var(--brass); flex: none; }
 
@@ -437,3 +438,22 @@ button.copy:hover, button.copy.done { color: var(--brass); border-color: var(--b
 .stats-table th { font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-soft); font-weight: 500; padding: 4px 12px; text-align: center; }
 .stats-table td { padding: 7px 12px; text-align: center; border-top: 1px solid var(--felt-line); }
 .stats-table td:first-child, .stats-table th:first-child { text-align: left; padding-left: 0; white-space: nowrap; }
+
+/* Invite: an optional name for the player (D-155), and the board's keyboard for it. */
+.invite-name { display: flex; align-items: center; gap: 12px; margin-top: 16px; }
+.invite-name > span { flex: 1; }
+.invite-name .name-value { min-width: 220px; font-weight: 600; }
+.invite-name .name-value.empty { font-weight: 400; color: var(--ink-soft); }
+.overlay.name-pad { z-index: 46; }
+.overlay.name-pad .panel { width: 760px; }
+.name-pad .name-field { position: relative; margin: 6px 0 18px; }
+.name-pad .name-field input { width: 100%; box-sizing: border-box; font: 600 30px var(--display, inherit); padding: 12px 70px 12px 16px;
+  border-radius: 12px; border: 1px solid var(--felt-line); background: rgba(0, 0, 0, .25); color: inherit; }
+.name-pad .name-field .count { position: absolute; right: 16px; top: 50%; translate: 0 -50%; color: var(--ink-soft); font-size: .8em; }
+.name-pad .keys { display: grid; gap: 8px; }
+.name-pad .keys .row { display: flex; justify-content: center; gap: 8px; padding: 0; border: 0; }
+.name-pad .keys button { flex: 0 0 62px; height: 58px; padding: 0; font: 600 22px inherit; border-radius: 12px; }
+.name-pad .keys button.wide { flex-basis: 96px; }
+.name-pad .keys button.space { flex: 1 1 auto; font-size: 16px; }
+.name-pad .keys button[aria-pressed="true"] { background: var(--brass-deep); color: #1b1407; }
+.name-pad .actions { display: flex; gap: 12px; margin-top: 18px; }
