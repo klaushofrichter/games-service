@@ -95,9 +95,17 @@ describe("AI players at the board's pace", () => {
     expect(views()).toBe(before); // the board has not shown the AI's guess yet: the phone doesn't have it either
     b.send("game", "idle", { seq: seqs.at(-1) });
     await until(() => views() === before + 1);
+    // Marked as shown on the board already, so a game's phone need not stage it again (D-157).
+    expect(ann.messages.filter((m) => m.ch === "game" && m.type === "view").at(-1)!.payload.afterBoard).toBe(true);
     // Ann's own guess reaches her at once, whatever the board is doing.
     const r = await ann.request("game", "intent", { name: "guess", payload: "heads" });
     expect(r.type).toBe("ack");
     await until(() => views() === before + 2);
+    expect(ann.messages.filter((m) => m.ch === "game" && m.type === "view").at(-1)!.payload.afterBoard).toBeUndefined();
+    // The live status (D-157): the board's progress, the AI players, what each phone is held back.
+    const d = await t!.ok("GET", "/debug");
+    expect(d.pacing).toMatchObject({ on: true, localBoard: true });
+    expect(Array.isArray(d.ai) && Array.isArray(d.decks) && Array.isArray(d.trace)).toBe(true);
+    expect(d.trace.some((x: { what: string }) => /^moves: guess/.test(x.what))).toBe(true);
   });
 });

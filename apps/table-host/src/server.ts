@@ -119,7 +119,8 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
       if (c.role === "deck") {
         const v = views.get(c.playerId);
         if (!v) continue;
-        const text = JSON.stringify(envelope("game", "view", { seat: v.seat, view: v.view, events, over: rt.over, ...timing }));
+        // afterBoard: the phone gets this once the board has shown it, so it need not stage the moves again (D-157).
+        const text = JSON.stringify(envelope("game", "view", { seat: v.seat, view: v.view, events, over: rt.over, ...(hold ? { afterBoard: true } : {}), ...timing }));
         if (hold) holdForBoard(c, seq, text);
         else {
           releaseHeld(c);
@@ -236,6 +237,12 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
 
     if (m === "GET" && path === "/state") return json(res, 200, forClient(!!remote, table.state()));
     if (m === "GET" && path === "/connections" && !remote) return json(res, 200, connections());
+    // Live status for finding problems (D-157): AI players, the board's pacing, what each phone is held back.
+    if (m === "GET" && path === "/debug" && !remote) {
+      const now = Date.now();
+      const decks = [...held].map(([c, q]) => ({ player: c.role === "deck" ? (table.player(c.playerId)?.name ?? c.playerId) : "?", held: q.length, oldestSeq: q[0]?.seq ?? null, oldestMsAgo: q[0] ? now - q[0].at : null }));
+      return json(res, 200, { ...table.debugStatus(), decks });
+    }
     if (m === "POST" && path === "/developer") return (table.setDeveloper(body), json(res, 200, table.state()));
     if (m === "POST" && path === "/remote") return (table.setRemoteBoardControl(!!body.boardControl), json(res, 200, table.state()));
     if (m === "POST" && path === "/invites") {

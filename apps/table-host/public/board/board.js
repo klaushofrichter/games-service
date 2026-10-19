@@ -57,7 +57,7 @@ function toast(msg) {
 }
 
 // Dialogs and overlays face the current front edge, like the rest of the board. The overlay root lies outside the
-// turned surface, so on a remote board it is upright for its player already: there they face no edge (D-145).
+// turned surface, so on a remote board it is upright for its player already: there they face no edge (D-157).
 const overlayEdge = () => (REMOTE ? "south" : viewEdge());
 function faceFront(el) {
   if (state) el.style.transform = `rotate(${ROT[overlayEdge()]}deg)`;
@@ -446,10 +446,10 @@ const FRONT_CORNERS = { south: ["bl", "br"], west: ["tl", "bl"], north: ["tr", "
 const LOBBY_CORNER = { "top-left": "tl", "top-right": "tr", "bottom-left": "bl", "bottom-right": "br" };
 function placeSettings(playing) {
   settingsBtn.hidden = REMOTE;
-  // D-127: fixed during a game, whichever way the game faces. A remote board faces its player throughout (D-145).
+  // D-127: fixed during a game, whichever way the game faces. A remote board faces its player throughout (D-157).
   const front = playing && !REMOTE ? "south" : viewEdge();
   let [corner, other] = FRONT_CORNERS[front];
-  // The corner the game's Lobby button actually takes on this board (turned on a remote north board, D-145).
+  // The corner the game's Lobby button actually takes on this board (turned on a remote north board, D-157).
   if (playing && LOBBY_CORNER[cornerClass(state.game?.lobbyButton ?? "bottom-right").split(" ")[0]] === corner) corner = other;
   if (!REMOTE) {
     settingsBtn.className = `${corner} along-${front === "south" || front === "north" ? "x" : "y"}`;
@@ -806,7 +806,7 @@ function openCodePad() {
 /**
  * The game's corner for Lobby, Show result and Statistics (its manifest's `lobbyButton`), as a class. On a remote board
  * turned to a north seat the surface stands on its head, so the corner is taken as its player sees it and the buttons
- * turn with them (D-145): "top-right" is their top right, with upright text, and the tools stay at their bottom left.
+ * turn with them (D-157): "top-right" is their top right, with upright text, and the tools stay at their bottom left.
  */
 const CORNER_NAMES = ["top-left", "top-right", "bottom-right", "bottom-left"];
 function cornerClass(name) {
@@ -1426,7 +1426,8 @@ function openAdvanced() {
         <div class="row"><span>Finished games on this table, move by move</span><button data-adv="logs">Game logs…</button></div></div>
       ${REMOTE ? "" : `<div class="group developer"><div class="eyebrow">Developer</div>
         <div class="row"><span>Games without a player at the table</span><button data-adv="no-local" data-dev-no-local class="${dev ? "on" : ""}" role="switch" aria-checked="${dev}">${dev ? "On" : "Off"}</button></div>
-        <div class="faint" style="font-size:.7em;margin-top:6px">For testing: games with remote and AI players only, or AI players only. Off again when the table restarts.</div></div>`}
+        <div class="faint" style="font-size:.7em;margin-top:6px">For testing: games with remote and AI players only, or AI players only. Off again when the table restarts.</div>
+        <div class="row" style="margin-top:10px"><span>What holds the game up right now: AI players, the board, the phones</span><button data-adv="live">Live status…</button></div></div>`}
       <div class="actions settings-actions"><button class="primary" data-close-overlay>Done</button></div></div>`);
   };
   draw();
@@ -1450,7 +1451,49 @@ function openAdvanced() {
     const a = b?.dataset.adv;
     if (a === "sim") return (close(), openSimulation());
     if (a === "logs") return (close(), openGameLogs());
+    if (a === "live") return (close(), openLiveStatus());
     if (a === "no-local") act("POST", "/developer", { allowNoLocalPlayer: !state.developer?.allowNoLocalPlayer });
+  });
+  overlayRoot.appendChild(o);
+}
+
+// ---------- live status (D-157) ----------
+/**
+ * What holds a game up, refreshed twice a second: each AI player's move in the making (pause before acting, waiting for
+ * the board, thinking), how far the board has shown the game, what each phone is still held back (D-143), and the AI
+ * players' recent answers. For finding problems; the table's own board only.
+ */
+function openLiveStatus() {
+  const o = document.createElement("div");
+  o.className = "overlay live-status";
+  const s = (ms) => (ms === null || ms === undefined ? "–" : ms < 1000 ? `${ms} ms` : `${(ms / 1000).toFixed(1)} s`);
+  const draw = (d) => {
+    if (!d) return;
+    const p = d.pacing;
+    const behind = p.sent - p.shown;
+    const html = `<div class="panel"><h2>Live status</h2>
+      <p class="muted" style="font-size:.8em;margin-top:-6px">Game ${esc(d.phase)}${d.pause ? ` · paused (${esc(d.pause)})` : ""}</p>
+      <div class="group"><div class="eyebrow">Board</div>
+        <div class="row"><span>${p.on ? (p.localBoard ? "AI players and phones follow this board" : "No board at the table: nothing waits") : "Pacing off (BOARD_PACING=0)"}</span><span>${behind > 0 ? `<b>${behind} message${behind > 1 ? "s" : ""} still to show</b>, the last sent ${s(p.sentMsAgo)} ago` : "has shown everything"}</span></div></div>
+      <div class="group"><div class="eyebrow">AI players</div>
+        ${d.ai.length ? d.ai.map((a) => `<div class="row"><span>${esc(a.name)}</span><span>${esc(a.state)} · ${s(a.ms)}</span></div>`).join("") : `<div class="row"><span>No AI player is asked right now</span></div>`}</div>
+      <div class="group"><div class="eyebrow">Phones held back until the board shows the AI moves</div>
+        ${d.decks.length ? d.decks.map((x) => `<div class="row"><span>${esc(x.player)}</span><span>${x.held} message${x.held > 1 ? "s" : ""}, the oldest ${s(x.oldestMsAgo)}</span></div>`).join("") : `<div class="row"><span>None: every phone has the latest</span></div>`}</div>
+      <div class="group"><div class="eyebrow">Recent AI answers</div>
+        <div class="live-trace">${d.trace.length ? d.trace.slice().reverse().map((t) => `<div>${s(t.msAgo)} ago · ${esc(t.name)}: ${esc(t.what)}</div>`).join("") : "none yet"}</div></div>
+      <div class="actions settings-actions"><button class="primary" data-close-overlay>Done</button></div></div>`;
+    setPanel(o, html);
+  };
+  let stop = false;
+  const poll = async () => {
+    if (stop) return;
+    draw(await api("GET", "/debug").catch(() => null));
+    setTimeout(poll, 500);
+  };
+  poll();
+  o.addEventListener("click", (e) => {
+    const b = e.target.closest("button");
+    if (e.target === o || b?.dataset.closeOverlay !== undefined) (stop = true), o.remove();
   });
   overlayRoot.appendChild(o);
 }
