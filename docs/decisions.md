@@ -761,3 +761,11 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   want to use MIT for the public repos." *Implementation (Claude):* `LICENSE` (Copyright (c) 2026 Klaus Hofrichter),
   `"license": "MIT"` in `package.json`, a *Licence* section in the README. The repository holds no third-party images,
   sounds or fonts, so the one licence covers everything in it; packages from npm keep their own.
+- **D-163 · 2026-10-19 · Klaus** — The terms of service name the MIT licence and say that there is no warranty or
+  guarantee for anything. *Why:* Klaus: "These can mention the MIT license, and obviously that there is no warranty or
+  guarantee for anything." *Implementation (Claude):* `apps/table-host/public/shared/terms.md`, reviewed and no longer
+  marked as a draft, has sections *Playing* (no real-world value, no gambling for money, AI players shown as such),
+  *What is recorded* (logs and saved games, 90 days by default, remote play through the service), *No warranty*
+  (as is: availability, errors, correct rules or results, kept logs and saves, fitness; terms may change; liability
+  excluded as far as the law allows) and *Software* (MIT, link to the repository; games from other authors under
+  their own terms). Not reviewed by a lawyer.

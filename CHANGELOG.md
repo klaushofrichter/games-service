@@ -6,7 +6,8 @@ page is the history. Leave it empty if there is nothing to add beyond the commit
 
 ## [Unreleased]
 
-- games-service and extra-games are under the MIT licence (D-162).
+- games-service and extra-games are under the MIT licence (D-162); the terms of service say so and that there is no
+  warranty (D-163).
 - The public example of a game repository, [`klaushofrichter/extra-games`](https://github.com/klaushofrichter/extra-games)
   (Chess, Liar's Dice, Backgammon), is linked from the README, the developer guide and `llms.txt` (D-161).
 - **Developer guide for game authors and LLMs** (D-160): `docs/developers/game-development.md`, published at
