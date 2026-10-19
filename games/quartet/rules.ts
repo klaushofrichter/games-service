@@ -24,6 +24,9 @@ export default defineGame<State>({
     const next = { ...state, passes: state.passes + 1, turn: (state.turn + 1) % state.order.length };
     return { state: next, events: [{ name: "tokenPassed", data: { from: seat, to: next.order[next.turn] } }] };
   },
+  onSeatChanged(state, seat) {
+    return { state: { ...state, names: { ...state.names, [seat.seat]: seat.name } } };
+  },
   onSeatLeft() {
     return "end";
   },

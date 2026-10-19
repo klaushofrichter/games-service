@@ -20,6 +20,9 @@ export type LogRecord =
   | { t: "intent"; at: number; gt?: number; seat: number; by: "human" | "ai" | "board"; intent: Intent; accepted: boolean; reason?: string; events?: GameEvent[]; ai?: AiMoveMeta; error?: LoggedError }
   | { t: "timer"; at: number; gt?: number; id: string; early?: boolean; events?: GameEvent[]; error?: LoggedError }
   | { t: "seatJoined"; at: number; gt?: number; seat: SeatInfo; events?: GameEvent[]; error?: LoggedError }
+  // Another player took over a seat (D-159): an input (the game's onSeatChanged may change its state); `aiOptions` when
+  // the new player is an AI.
+  | { t: "seatChanged"; at: number; gt?: number; seat: SeatInfo; aiOptions?: Record<string, unknown>; events?: GameEvent[]; error?: LoggedError }
   | { t: "seatLeft"; at: number; gt?: number; seat: number; ended: boolean; events?: GameEvent[]; error?: LoggedError }
   // Not inputs: replay skips them (D-116). An error outside the input steps (a view, the end check); a copy of the state.
   | { t: "error"; at: number; where: string; seat?: number; error: LoggedError }
@@ -29,6 +32,8 @@ export type LogRecord =
   // An AI player took over the seat of a player who was away (D-144), with its options; not an input either: its moves
   // are logged as intents like any AI player's.
   | { t: "aiTakeover"; at: number; seat: number; name: string; aiOptions: Record<string, unknown> }
+  // An AI player's options changed during the game (D-159); not an input.
+  | { t: "aiOptions"; at: number; seat: number; aiOptions: Record<string, unknown> }
   | { t: "reconnected"; at: number; seat: number }
   // Not inputs either (D-120): the game stood still. `reason` "cloud" (the service connection was lost), "ai" (an AI
   // player ran over its time, `seat`) or "player" (waiting for a player who went away, D-119); resume `reason` "cloud",
@@ -384,6 +389,29 @@ export class GameRuntime {
     this.afterStep(events);
   }
 
+  /** Another player plays this seat from now on (D-159): the seat list, the AI options, and the game's onSeatChanged. */
+  seatChanged(seat: SeatInfo, aiOptions?: Record<string, unknown>) {
+    if (this.over) return;
+    const gt = this.beginStep();
+    this.seats = this.seats.map((s) => (s.seat === seat.seat ? { ...seat, edge: seat.edge ?? s.edge } : s));
+    if (aiOptions) (this.opts as { aiOptions?: Record<number, Record<string, unknown>> }).aiOptions = { ...(this.opts.aiOptions ?? {}), [seat.seat]: aiOptions };
+    const info = this.seats.find((s) => s.seat === seat.seat) ?? seat;
+    const extra = aiOptions ? { aiOptions } : {};
+    const events = this.guarded(
+      () => (this.def.onSeatChanged ? this.apply(this.def.onSeatChanged(this.state, info, this.ctx())) : []),
+      (error) => ({ t: "seatChanged", at: this.clock.now(), gt, seat: info, ...extra, error }),
+    );
+    this.record({ t: "seatChanged", at: this.clock.now(), gt, seat: info, ...extra, events });
+    this.inputDone();
+    this.afterStep(events);
+  }
+
+  /** An AI player's options changed during the game (D-159): not an input, only what it decides from now on. */
+  setAiOptions(seat: number, aiOptions: Record<string, unknown>) {
+    (this.opts as { aiOptions?: Record<number, Record<string, unknown>> }).aiOptions = { ...(this.opts.aiOptions ?? {}), [seat]: aiOptions };
+    this.record({ t: "aiOptions", at: this.clock.now(), seat, aiOptions });
+  }
+
   /**
    * Can the game go on without this seat (D-119)? true when the game doesn't say otherwise, or when its answer throws
    * (recorded): a broken question must not hold a table.
@@ -536,11 +564,12 @@ export function replayLog(manifest: Manifest, def: GameDefinition<any>, log: Log
  */
 export function feedInput(rt: GameRuntime, r: LogRecord) {
   try {
-    if (r.t === "intent" || r.t === "timer" || r.t === "seatJoined" || r.t === "seatLeft") rt.setReplayTime(r.gt);
+    if (r.t === "intent" || r.t === "timer" || r.t === "seatJoined" || r.t === "seatLeft" || r.t === "seatChanged") rt.setReplayTime(r.gt);
     if (r.t === "intent") rt.submit(r.seat, r.intent, r.by); // rejected ones too: a rule may draw randomness before rejecting
     else if (r.t === "timer") rt.fireTimer(r.id);
     else if (r.t === "seatJoined") rt.seatJoined(r.seat);
     else if (r.t === "seatLeft") rt.seatLeft(r.seat);
+    else if (r.t === "seatChanged") rt.seatChanged(r.seat, r.aiOptions);
   } catch {
     // the same exception the game threw when it was played
   }

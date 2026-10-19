@@ -5,7 +5,7 @@ import type { GameDefinition, GameEvent, Intent, StepDescription, StepInfo } fro
 import type { Manifest } from "../../../packages/protocol/src/index.ts";
 import { feedInput, GameRuntime, VirtualClock, type AiMoveMeta, type LogRecord } from "./runtime.ts";
 
-export type RowKind = "start" | "move" | "timer" | "seatJoined" | "seatLeft" | "disconnected" | "reconnected" | "aiTakeover" | "pause" | "resume" | "error" | "snapshot" | "gap" | "end";
+export type RowKind = "start" | "move" | "timer" | "seatJoined" | "seatLeft" | "disconnected" | "reconnected" | "aiTakeover" | "seatChanged" | "aiOptions" | "pause" | "resume" | "error" | "snapshot" | "gap" | "end";
 
 export interface MoveRow {
   /** Player moves (intents, refused ones too) are numbered from 1; every other row has null. */
@@ -49,8 +49,8 @@ export interface MoveList {
 export const GAP_MS = 2 * 60_000;
 
 type Game = { manifest: Manifest; def: GameDefinition<any> };
-type InputRecord = Extract<LogRecord, { t: "intent" | "timer" | "seatJoined" | "seatLeft" }>;
-const isInput = (r: LogRecord): r is InputRecord => r.t === "intent" || r.t === "timer" || r.t === "seatJoined" || r.t === "seatLeft";
+type InputRecord = Extract<LogRecord, { t: "intent" | "timer" | "seatJoined" | "seatLeft" | "seatChanged" }>;
+const isInput = (r: LogRecord): r is InputRecord => r.t === "intent" || r.t === "timer" || r.t === "seatJoined" || r.t === "seatLeft" || r.t === "seatChanged";
 
 const clone = <T>(v: T): T => (v === undefined ? v : structuredClone(v));
 
@@ -93,6 +93,10 @@ function genericText(r: LogRecord, names: Record<number, string>): string {
       return `${names[r.seat] ?? `seat ${r.seat}`}'s phone went away${r.waiting ? ` · the game waits: ${r.waiting}` : ""}`;
     case "reconnected":
       return `${names[r.seat] ?? `seat ${r.seat}`}'s phone is back`;
+    case "seatChanged":
+      return `${r.seat.name} took over ${names[r.seat.seat] ?? `seat ${r.seat.seat}`}'s seat (exchanged on the board)`;
+    case "aiOptions":
+      return `${names[r.seat] ?? `seat ${r.seat}`}'s AI options changed: ${compact(r.aiOptions)}`;
     case "aiTakeover":
       return `${r.name} took over ${names[r.seat] ?? `seat ${r.seat}`}'s seat (the board handed it to an AI player)`;
     case "pause":
@@ -115,7 +119,8 @@ function genericText(r: LogRecord, names: Record<number, string>): string {
 /** The seat a record belongs to, for the player column. */
 function seatOf(r: LogRecord): number | null {
   if (r.t === "intent" || r.t === "seatLeft" || r.t === "disconnected" || r.t === "reconnected" || r.t === "aiTakeover") return r.seat;
-  if (r.t === "seatJoined") return r.seat.seat;
+  if (r.t === "seatJoined" || r.t === "seatChanged") return r.seat.seat;
+  if (r.t === "aiOptions") return r.seat;
   if (r.t === "pause" || r.t === "error") return r.seat ?? null;
   return null;
 }
@@ -129,6 +134,8 @@ const KIND: Record<LogRecord["t"], RowKind> = {
   disconnected: "disconnected",
   reconnected: "reconnected",
   aiTakeover: "aiTakeover",
+  seatChanged: "seatChanged",
+  aiOptions: "aiOptions",
   pause: "pause",
   resume: "resume",
   error: "error",
@@ -207,13 +214,14 @@ export function buildMoves(log: LogRecord[], game?: Game): MoveList {
       row.flags.push("error");
     }
     if ("events" in r && r.events) row.events = r.events.length;
+    if (r.t === "seatChanged") names[r.seat.seat] = r.seat.name; // later rows name the new player (D-159)
     if (isInput(r) && stepper) {
       const before = describe ? clone(stepper.rt.state) : undefined;
       stepper.feed(r);
       if (describe) {
         const info: StepInfo<unknown> = {
           kind: r.t,
-          seat: r.t === "timer" ? null : r.t === "seatJoined" ? r.seat.seat : r.seat,
+          seat: r.t === "timer" ? null : r.t === "seatJoined" || r.t === "seatChanged" ? r.seat.seat : r.seat,
           ...(r.t === "intent" ? { intent: r.intent, by: r.by } : {}),
           ...(r.t === "timer" ? { timer: r.id } : {}),
           accepted: r.t === "intent" ? r.accepted : !r.error,

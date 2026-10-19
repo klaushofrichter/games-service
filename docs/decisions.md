@@ -697,3 +697,36 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   - **Checks.** `tests/away.test.ts` (leaving the table before a game; leaving a game: the removal message, `left`
     at once, the session's message, handing to an AI; a D-119 game pausing); `scripts/e2e/away.py` (the button, the
     confirmation, the phone's message, the board's card).
+- **D-159 · 2026-10-19 · Klaus** — A running game keeps its players; who plays a seat can be exchanged on the board.
+  Replacing someone is a conscious choice of the people at the table, never a timeout. *Why:* Klaus: "it becomes a
+  conscious choice by the players … to replace a player who is unresponsive, and we don't want an unexpected or
+  special handling of this type of timeout"; "We do not remove a seat from a running game, so that the game has always
+  the same number of players … no 'remove' option for players during a game, only 'exchange'"; exchange "regardless
+  their status (away, or still in the game)"; seats are changed in the lobby only; "use the final players name for
+  statistics … an asterisk". *Implementation (Claude):*
+  - **No timeout, no removal.** D-144's setting *A player whose phone is away for a minute leaves the game* is gone
+    (`POST /play`, `state.play`): a seat whose phone is away always waits. The board can't remove a player of the
+    running game (`DELETE /players/{id}` answers 409, code `in-game`); away players' waiting time only runs outside a
+    game. Games' `onSeatLeft` is therefore no longer called during a game (logs that have `seatLeft` still replay).
+  - **Exchange.** *Settings › Players › Exchange…* beside every seated player of the running game (and *Exchange …*
+    on the away card, D-144, D-158), on the table's board, and on a remote board with board control (D-059: remote
+    boards with control now also operate colours, AI options and game settings). The window offers *Someone at the
+    table* (a QR code and link for this seat only, `POST /exchange {seat, kind: "local"}`), *A remote player* (a new
+    invite, `kind: "remote"`, needs the service; the next remote player to arrive takes the seat), *An AI player*
+    (`kind: "ai"`, at once, after a confirmation) — or, for an AI player, *How it plays* (its options, now changeable
+    during the game from its next move, logged as `aiOptions`). The window stays open until the new player has taken
+    the seat, then closes by itself; *Cancel* (`DELETE /exchange`) ends it. One exchange is open at a time
+    (`state.exchange`); it ends with the game. Whoever had the seat goes: an AI stops, a person's phone is told the
+    seat went to the new player. The newcomer gets the seat's colour, and may use the old player's name (Ann back on
+    a new phone stays "Ann").
+  - **Games.** A new input `seatChanged` (logged and replayed) carries the new player's name and kind to the game's
+    optional `onSeatChanged(state, seat, ctx)`; the seat, its cards and score stay. Coin Flip, Hold'em, Pachisi,
+    Quartet and Roulette update their names; Loopy (L-036), Chess, Liar's Dice and Backgammon (E-016) too. A game
+    without it shows the name it started with.
+  - **Statistics.** A seat's last player names it, marked with *: in the awards, the moves table and the game's own
+    table (a row whose name matches), with "* Another player took over this seat during the game." under the window.
+    Times and pace awards leave such a seat out (they would mix two players).
+  - **Checks.** `tests/away.test.ts` (exchange for an AI, connected or away, with the phone's message, the log, replay
+    and statistics; for someone at the table with the seat's own code, once; for a remote player; cancelling; ending
+    with the game), updated tests for the refused removals; `scripts/e2e/exchange.py` (the window, the QR code, the new
+    phone taking the seat, then an AI); `scripts/e2e/rejoin.py` and `away.py` use the exchange.

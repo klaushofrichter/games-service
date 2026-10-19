@@ -138,7 +138,7 @@ describe("player colours on the table (D-106)", () => {
     }
   });
 
-  it("a seat keeps the colour of a player who leaves during the game, for an AI taking it over (D-125)", async () => {
+  it("a seat keeps its colour for the player taking it over during the game (D-125, D-159)", async () => {
     const t = await testHost();
     try {
       await t.ok("POST", "/layout", { seats: 4 });
@@ -153,18 +153,13 @@ describe("player colours on the table (D-106)", () => {
       await ben.request("lobby", "ready", { ready: true });
       await t.ok("POST", "/game/start");
       expect(t.host.table.state().seatColors).toEqual({});
-      await t.ok("DELETE", `/players/${ids.Ben}`);
-      let st = t.host.table.state();
+      // A running game keeps its players (D-159): Ben is exchanged for an AI player, which gets Ben's colour.
+      expect((await t.api("DELETE", `/players/${ids.Ben}`)).status).toBe(409);
+      const r = await t.ok("POST", "/exchange", { seat: benSeat, kind: "ai" });
+      const st = t.host.table.state();
       expect(st.phase).toBe("active");
-      expect(st.seatColors).toEqual({ [benSeat]: SEAT_COLORS[5] });
-      expect(playerColor(st, benSeat)).toBe(SEAT_COLORS[5]); // not the seat's own colour
-      // nobody else gets it, and taking it in the settings swaps with the empty seat
-      const annBefore = colorOf(t, "Ann");
-      expect(st.players.map((p) => p.color)).not.toContain(SEAT_COLORS[5]);
-      await t.ok("POST", `/players/${ids.Ann}/color`, { color: SEAT_COLORS[5] });
-      st = t.host.table.state();
-      expect(colorOf(t, "Ann")).toBe(SEAT_COLORS[5]);
-      expect(st.seatColors).toEqual({ [benSeat]: annBefore });
+      expect(st.players.find((p) => p.id === r.playerId)).toMatchObject({ seat: benSeat, color: SEAT_COLORS[5], kind: "ai" });
+      expect(st.players.some((p) => p.id === ids.Ben)).toBe(false);
       // back in the lobby the seat is an ordinary empty seat again
       await t.ok("POST", "/game/end", {});
       await t.ok("POST", "/game/close", {});
