@@ -730,3 +730,23 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
     and statistics; for someone at the table with the seat's own code, once; for a remote player; cancelling; ending
     with the game), updated tests for the refused removals; `scripts/e2e/exchange.py` (the window, the QR code, the new
     phone taking the seat, then an AI); `scripts/e2e/rejoin.py` and `away.py` use the exchange.
+- **D-160 · 2026-10-19 · Klaus** — The contract between games and the platform is one developer guide, written for
+  people and for language models, and published for LLMs as `llms.txt`. *Why:* Klaus: "the 'contract' between the
+  game and the platform/lobby needs to be clear and well documented. It can be assumed that games will be created by
+  LLMs like Claude"; private game repositories are not named or linked as sources of information or requirements.
+  *Implementation (Claude):*
+  - **The guide:** `docs/developers/game-development.md`: the table, principles (one way for the same action in every
+    game; a running game keeps its players; deterministic rules; private views; the rules decide, the UIs draw), the
+    folder, every manifest field, every rules hook and the context, what the platform does about players and what a
+    game hears (D-144, D-158, D-159), AI players, the end-of-game summary and awards, the board and phone modules with
+    every `ctx` and `info` field, rules for players, logs and replay, versions, testing, a game repository of one's
+    own, and a checklist. The README's *Writing a game* is now a summary that points to it.
+  - **For LLMs:** `llms.txt` (the llmstxt.org format: a title, a summary, the key rules, links to the guide, the SDK
+    and protocol sources, the board kit, the log format, the example games and the test helpers). The cloud service
+    serves it publicly at `https://games.skylar.technology/llms.txt`, the guide at `/docs/game-development.md`, and
+    both in one file at `/llms-full.txt`; the landing page links them, and the deploy's smoke test checks
+    `/llms.txt`. `AGENTS.md` points coding agents to the guide; the SDK's header comment too.
+  - **No private sources:** the guide, `llms.txt`, the README and code comments name only this public repository; the
+    examples are the games here. `tests/developer-docs.test.ts` keeps the guide in step with the code (every hook,
+    manifest field and `info` field documented) and checks that no private repository is named; `tests/cloud.test.ts`
+    checks the three public routes.

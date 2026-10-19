@@ -6,6 +6,8 @@ page is the history. Leave it empty if there is nothing to add beyond the commit
 
 ## [Unreleased]
 
+- **Developer guide for game authors and LLMs** (D-160): `docs/developers/game-development.md`, published at
+  `https://games.skylar.technology/llms.txt` (index), `/docs/game-development.md` and `/llms-full.txt`.
 - **Exchange a player during a game** (D-159): Settings › Players › Exchange… puts someone at the table (QR code), a
   remote player (invite) or an AI player in a seat; the window closes once they have taken it. A running game keeps
   all its players: no removing during a game, and no more leaving after a minute away. Statistics name a seat's last

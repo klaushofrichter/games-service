@@ -111,68 +111,38 @@ Decks speak JSON envelopes over `/ws`: `system.hello {joinToken, name}` or `{ses
 
 ## Writing a game
 
-A game is a folder with `manifest.json` (validated by `packages/protocol`; the folder name is the game's id), `rules.ts`, and optionally its own UI: `board.js`, `deck.js`, `board.css`, `deck.css`, `how-to-play.md` (rules for players, below) and an `assets/` folder. The host serves exactly those files to boards and decks, never `rules.ts` or the manifest. `rules.ts`:
+**The contract between games and the platform is [`docs/developers/game-development.md`](docs/developers/game-development.md)**:
+the folder, the manifest, every rules hook and its exact behaviour, what the platform does about players (joining,
+phones going away, leaving, exchanging a player), AI players, the end-of-game summary and awards, the board and phone
+UI modules with everything they receive, rules for players, logs and replay, versions, testing, and a game repository
+of your own, with a checklist. It is written for people and for language models; [`llms.txt`](llms.txt) is its index
+for LLMs, served at `https://games.skylar.technology/llms.txt` (and the whole guide at `/llms-full.txt`).
 
-```ts
-import { defineGame } from "../../packages/sdk/src/index.ts";
-export default defineGame<State>({
-  setup(ctx, settings) { ... },               // ctx.random(), ctx.setTimer(), ctx.now(), ctx.seats
-  onIntent(state, seat, intent, ctx) { ... }, // return { state, events } or { reject }
-  view(state, seat) { ... },                  // private, per seat
-  boardView(state) { ... },                   // public
-  isOver(state) { ... },                      // summary { text, highlights } or null
-  onTimer, onSeatJoined, onSeatLeft,         // optional; onSeatLeft may return { end: { text } } (D-119)
-  canContinueWithout(state, seat) { ... },    // optional: true, or { wait: text } if the game needs this player (D-119)
-  ai(view, seat, ctx, options) { ... },       // optional: an intent, null, or a promise of one (D-112)
-  aiFallback(view, seat, ctx, options) { ... }, // optional: a quick move for "Play now"
-  describe(step) { ... },                     // optional: one step in words for the Game Viewer and logs (D-120)
-});
-```
-
-The UI modules export `mount(root, ctx)` returning `{ update(view, events, info), destroy() }`. A game's end-of-game summary may carry `awards` (D-140): `{ id, icon, title, blurb?, seats, value? }`, e.g. *The Killer* for the most captures; the SDK's `mostAward` and `leastAward` build them and leave out an award nobody or everybody would get. The board shows them, the summary's `table`, and moves and thinking time per player (read from the log by the host) in a scrollable statistics window: its button sits beside *Show result* and on the result screen, and the Game Viewer opens it for finished games. A board may also return `whenIdle()`, a promise that resolves once it has shown everything it was sent: when a game ends by itself, *Show result* waits for it (D-134), so a board still replaying moves shows the end first. `info` carries the players, seat positions, the front edge and rotation, settings, and host timer deadlines for countdowns; the deck's `ctx.send(name, payload)` submits an intent and resolves with `{ ok, reason }`. `/shared/board-kit.js` has helpers for seat plates, rotation and countdowns, and `packages/sdk/src/cards.ts` has a deck, seeded shuffle and poker hand evaluation. The SDK also has `count(n, singular, plural?)` ("one die", "three dice") and `list(names)` ("Ann, Bob and Cleo") for natural end-of-game texts.
-
-**Rules for players (D-099).** A game provides its rules as `how-to-play.md` in its folder. Every phone then has a **Rules** button while the game is chosen or running, which opens the rules in a modal, with the settings chosen at this table on top (label and value, from the manifest). Images and diagrams go in the game's `assets/` folder and appear with `![alt text](assets/board.svg)`; SVG, PNG, JPEG, WebP and GIF work. The renderer (`/shared/markdown.js`) takes a small, safe subset of Markdown: `#` title, `##`/`###` headings, paragraphs, `-` and `1.` lists (one level), `**bold**`, `*italic*`, `` `code` ``, `> tip`, `---`, simple tables, `https` links and those images; everything else shows as plain text. The lobby state carries `game.howToPlay` (the URL, or `null`) and `game.settingsShown`; `GET /games` lists `howToPlay` per game. Start with the one-sentence goal and an `## In short` section of two to five bullets (the tests require it), then the details. Write for a phone about 360 px wide: short tables, illustrations around 360–720 px wide. Assets and rules are served with a content security policy that keeps an SVG from running script.
-
-**AI players that take their time (D-112).** `ai()` may answer later: return a promise, for a search or a call to a language model, and the table keeps running meanwhile. `ctx.signal` is aborted when the game moves on (the AI is then asked again with the new view, and a late answer for an old view is dropped), pauses or ends; `ctx.deadline` is when the table expects the move. The manifest's `ai.timeoutSeconds` (default 20) sets that budget per move. When an AI runs out of time, the game pauses (timers stop, nobody moves) and the board shows a card at the AI's seat with **Play now**: tapping it plays the game's `aiFallback()` move for it, a quick synchronous choice (without one, the AI is asked again). If nobody taps, the game goes on as soon as the AI answers. Remote boards with board control can tap it too. A failing AI gets its fallback at once. `"ai": { "worker": true }` runs the AI in a worker thread, one per AI player, so even a synchronous search never blocks the table; it gets the view and options as plain data, and a stale search is stopped by ending the thread. While an AI has been thinking for more than a moment, the lobby state's `aiThinking` lists it (`{ playerId, seat, since, deadline }`), and games get it as `info.aiThinking` on the board and the phones. The log records each such move's thinking time (`ai: { ms, fallback?, worker?, error? }`); replay never looks at it. Simulations wait for the answers and play the fallback when one is out of time. Synchronous AIs work as before.
-
-**Players lost during a game (D-119).** When a player's phone goes away, the table asks the game `canContinueWithout(state, seat)`. `true` (or no such hook): the game goes on, and the player leaves after the waiting time (`GRACE_MS`, 60 s), when `onSeatLeft` decides. `{ wait: "…" }`: the game needs this player. It pauses (timers stop, AI players wait), their seat is held with no time limit, and the board shows a card at their seat with the game's text and **End game** (remote boards with board control too); the phones say whom the game waits for. When the phone comes back the game goes on by itself. Removing a player the game needs ends it with that text, and the board's Remove says so first (the lobby state's `needed` lists them). `onSeatLeft` may also end the game with its own reason, `{ end: { text, highlights? } }`, e.g. when a team is broken or too few players are left. The hook is a question about the state, never a change: replay asks it again. The log records disconnects and returns (`disconnected`, `reconnected`); replay skips them. The test game `partners` (tests/fixtures/seat-games) shows both kinds.
-
-**Describing moves for the Game Viewer (D-120).** After a game, the board's Game Viewer, the move list in the log and LLMs reading it show every step as one line. By default that line is generic (`play card 54`, `timer turn`). A game says what a step meant with `describe(step)`: `step` has `kind` (`intent`, `timer`, `seatJoined`, `seatLeft`), `seat`, `intent` and `by` (for moves), `timer`, `accepted`, `reason` (why the rules refused it), `events`, `names` (seat → name), and the state `before` and `after` it, rebuilt by replay; the game is over, so it may reveal everything. Return `{ text, columns?, details?, steps? }` or null for the generic line. `text` is one line without the player's name ("plays a Seven: 4 steps for marble 3"). `columns` fills the viewer's extra columns, declared in the manifest as `"viewer": { "columns": [{ "key": "round", "label": "Round" }] }` (up to four). `details` is shown when a step is opened. `steps` lists what happened within the step for other seats or by the rules alone, such as a forced move, a seat the AI took over or a turn timer's move: `{ seat?, text, auto? }`, where `auto` marks a move nobody chose. Like the rules, `describe` is pure and is never called while the game runs. Coin Flip and Pachisi have one.
-
-**The phone during a game (D-123).** While a game runs, the phone's header is a slim tab bar: the player's own tab (colour, name, seat) and the game's tab, which is open by default and holds the game's deck UI. The own tab shows the name with the seat badge, **Rules**, everyone at the table and the terms; the game's deck stays mounted (hidden) meanwhile. The footer is hidden during a game. So a deck UI starts about 60 px below the top of the screen and has the rest of the height. A seat view with `myTurn: true` brings the game's tab forward when it turns true, so put `myTurn` in the seat view when the game waits for that player.
-
-**Moves on the board (D-102).** A game may let players act by touching the board as well as their phone, to feel more like a real table: list the intent names in the manifest, e.g. Pachisi's `"boardIntents": ["move"]`. The board's `mount(root, ctx)` then gets `ctx.act(seat, name, payload)`, which resolves with `{ ok, reason }` (a rejection also shows as a toast), and `info.controlSeats` lists the seats this board may act for: on the table's board every human sitting at the table, on a remote board only its own player. The table checks again: an intent not in `boardIntents` is refused (403), the table's board never acts for AI or remote players, a remote board only for the player who joined through it, and the game's own rules decide the rest (whose turn, which token). The game log records such intents with `by: "board"`. Everything else, such as Pachisi's roll, stays on the phones. Pachisi: tap a token that can move; the phones follow at once.
-
-**Skipping a wait (D-136).** A game may let the board end one of its waits early: list the timer ids in the manifest, e.g. Hold'em's `"skipTimers": ["next"]` (the pause on a hand's result). The board's `mount(root, ctx)` gets `ctx.skipTimer(id)`, which resolves with `{ ok, reason }`, and `info.boardControl` says whether this board may use it: always on the table's board, on a remote board only while the table gives remote players board control. `POST /game/skip-timer { id }` fires the timer at once; the table refuses ids the manifest does not list (403) and answers 409 when the timer is not pending (a second tap, the wait ran out) or the game is paused. The log records it as a timer firing with `early: true`, so replay is exact. Hold'em shows **Next hand** (**Finish** after the last hand) with the seconds left under each result. Browser check: `scripts/e2e/next_hand.py`.
-
-**A single player at the table (D-128).** `"localSeat": "south"` in the manifest moves the one human playing at the table to the south seat when the game starts, if the others are remote or AI (their boards turn to them by themselves, D-059). With two or more people at the table nobody is moved.
-
-**Facing (D-101).** The lobby turns to any edge with the corner buttons. A game faces north or south only, so it fills the long sides; the turn-around button left of the gear switches between the two, and the seat plates stay put. During a game the gear and the turn-around button stay put too (D-127): at the bottom, where they are when the game faces south, whichever way the game faces, so a game keeps its own displays clear of the bottom-left corner (or bottom-right, when its Lobby button is bottom-left) in both directions. `info.frontEdge`/`info.rotation` tell a game which way to draw. Each phone's seat badge shows the player's colour (`playerColor`), with near-black or white letters chosen by contrast (`inkOn` in the board kit).
-
-**Board settings.** The board's gear button opens a settings modal: Fullscreen for every game, then anything the chosen game adds. A game adds items by exporting `settings({ info, setPrefs })` from its `board.js`, which returns a list of `{ type: "toggle" | "choice" | "swatches" | "button", label, value, options, onChange }`. `setPrefs(patch)` stores display choices for that game on the table (`POST /game/prefs`, at most 20 keys and 4 KB, `null` removes a key). Board and decks get them as `info.prefs`, and they last until the host restarts. They are display choices only: not part of the rules, the log or replay. Pachisi uses this for its pieces (numbers or icons, D-102). **Player colours (D-106)** are the table's, not a game's: the settings modal has a *Player colours* group for every seated player (`POST /players/{id}/color` with a colour from `PLAYER_COLORS` in the protocol; taking someone's colour swaps the two). Every player in the lobby state carries `color` (their choice, else their seat's, always distinct; `null` without a seat), so games read it from `info.players`, most simply through `playerColor(info, seat)` in the board kit. When a player leaves during a game, their seat keeps their colour until the next game (`seatColors` in the lobby state, `info.seatColors`, D-125), so a game that goes on with that seat, like Loopy with an AI taking over, shows it unchanged; `playerColor` handles that. The board shows it as the border of each player's card and a dot before the name, in the lobby and on every game's seat plates; the phones as the seat badge and a dot in *At the table* (D-104). Remote boards have no settings. The modal also lists the chosen game's manifest settings (a choice with more than three options as a pulldown, D-129): changeable with − / + until the game starts (`POST /game/settings`), read-only while it runs; a setting may give a `step`. A game's `isOver()` summary may include `table: { columns, rows }`, which the result screen and the phones show; when a game ends by itself the board keeps its final screen until someone taps *Show result*. Sound effects go through `playSound(info, name, make)` from the board kit, which respects the table's sound setting (`info.sound`).
-
-**Versions (D-127).** A game's `version` in its manifest is a calendar version, `YYYY.MM.DD.N` (America/Chicago), and it changes when, and only when, something in the game's folder changes: rules, UI, styles, assets, `how-to-play.md` or another manifest field. Platform changes (lobby, board kit, SDK, host) never change it. Set it in the same pull request as the change: the change's date, `N` one more than the game's last version that day, else 1. `node scripts/check-game-versions.ts` checks this against `origin/main` (it runs in the PR checks), and `--fix` sets the versions of changed games for you.
-
-Rules must be deterministic: all randomness through `ctx.random()`, and the time only through `ctx.now()`: the game time in ms since the start, pauses left out (D-126), logged with every input so replay gets the same value; it is how a game charges a chess clock. The host logs the seed and every input (intents, timer firings, seat changes), so `replay()` rebuilds any game exactly; the tests check this for live games and simulations.
+In short: a game is a folder with `manifest.json`, `rules.ts` (pure, deterministic functions on a JSON state:
+`setup`, `onIntent`, `view`, `boardView`, `isOver`, optional `onTimer`, `onSeatChanged`, `onSeatJoined`,
+`canContinueWithout`, `ai`, `aiFallback`, `describe`), optional `board.js` and `deck.js` UI modules
+(`mount(root, ctx)` → `{ update(view, events, info), destroy(), whenIdle? }`), `how-to-play.md` and `assets/`. The
+platform owns the lobby, seats, names, colours, away and leaving players, exchanges, pauses, AI scheduling, logs and
+replay; a game never reimplements them. Start from `games/coin-flip`.
 
 ## Extra-game repositories
 
 Games can also come from other GitHub repositories, private ones included (D-097), for private games and early
-releases. The first is [`klaushofrichter/extra-games`](https://github.com/klaushofrichter/extra-games) (private); the second is
-[`klaushofrichter/loopy-game`](https://github.com/klaushofrichter/loopy-game) (private, Loopy only).
+releases. The repositories the service lists are in `deploy/game-repos.json`.
 
 - **The list:** [`deploy/game-repos.json`](deploy/game-repos.json) is baked into the cloud image, so these
   repositories are back after every restart (D-098); change it by PR. In the console they are marked *deploy config*.
 - **Console, *Game repositories*:** you can also add `owner/name` and a branch there, until the next restart. The service
   fetches each repository's `games/` folder as one bundle and lists its games; *Refresh* fetches again (it also does
   every hour). A private repository needs `GAME_REPO_TOKEN`, a fine-grained token with Contents: read on it; with several
-  private repositories (extra-games, loopy-game) the one token must cover each of them (D-110).
+  private repositories the one token must cover each of them (D-110).
 - **Per table:** tick a repository when approving the table's pairing code, or later on its row. The table installs the
   games within 15 seconds, between games, and its board marks them *extra*. Remote players see them too: their board
   comes from the table.
 - **A game repository** has a `games/` folder like this one, and its rules import the SDK by name:
-  `import { defineGame } from "@game-table/sdk"` (the host maps the name to its own SDK). See the extra-games README for
-  how it tests against this repository.
+  `import { defineGame } from "@game-table/sdk"` (the host maps the name to its own SDK). How such a repository is laid
+  out and tested against this one: [`docs/developers/game-development.md`](docs/developers/game-development.md), *A game
+  repository of your own*.
 
 Ticking a repository trusts its code on that table PC (rules run in-process, D-035). The ticks, and repositories added
 in the console, are kept by the service across restarts (D-114). A table approved with an access code gets the
@@ -238,11 +208,11 @@ yourself or handing it to Claude.
   (not the one being played). A game opens as a table of its moves, a page at a time, with filters (a player, moves
   only, problems), *Move #* to jump to a move, and a simulation's games one by one; a move opens in full with its
   intent, events, AI timing, the state before and after, and a reference to copy such as
-  `20261016044059-loopy-491f #54`, so a developer can tell Claude exactly where to look. Remote players with board
+  `20261016044059-pachisi-491f #54`, so a developer can tell Claude exactly where to look. Remote players with board
   control can open it too. Simulations and older logs get their move list built when opened.
 - **For developers and LLMs:** `node scripts/game-log.ts <zip>` reads a log without a table: `info`, `moves 40-45`,
   `move 43` (in full, with the state before and after), `state 43 [--before]`, `line 17`; `--json` for scripts,
-  `--games ../loopy-game/games` for games from other repositories (states and descriptions need the game's rules in
+  `--games ../my-games/games` for games from other repositories (states and descriptions need the game's rules in
   the version the log was written with).
 - **Console:** *Game logs* lists them with their metadata and filters by game, table, date and kind. A download token
   can be limited the same way (game, table, from and to), so one link gives a pipeline or a Claude session exactly

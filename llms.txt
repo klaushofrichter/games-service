@@ -1,0 +1,37 @@
+# Game Table
+
+> Game Table is a platform for multiplayer board and card games at a real table: a touchscreen board lying flat, each player's phone as their private deck, AI players, and remote players who join through an invite. A game is a folder with a manifest, pure deterministic rules in TypeScript, and optional plain-JavaScript UI modules for the board and the phones; the platform does everything else (lobby, seats, players joining, leaving and being exchanged, AI scheduling, pauses, logs, replay, statistics, remote play).
+
+Read the developer guide before writing or changing a game. It is the contract between games and the platform, written for language models as much as for people. The platform's code is the final word: `packages/sdk/src/index.ts` (the rules API) and `packages/protocol/src/index.ts` (the manifest schema and lobby types) in the public repository https://github.com/klaushofrichter/games-service.
+
+Key rules for every game: rules are pure and deterministic (randomness only from `ctx.random()`, time only from `ctx.now()`, never mutate the given state); a seat's view never contains another seat's secrets; a running game always keeps all its players, and the platform owns joining, leaving, away phones and exchanging players (a game only reacts in `onSeatChanged`); AI players read only their seat's view; a game's version changes with every change in its folder.
+
+## Developer guide
+
+- [Writing a game for Game Table](https://games.skylar.technology/docs/game-development.md): the full contract, with a checklist (the same file in the repository: https://raw.githubusercontent.com/klaushofrichter/games-service/main/docs/developers/game-development.md)
+- [Everything in one file](https://games.skylar.technology/llms-full.txt): this index followed by the whole guide
+
+## API reference (source)
+
+- [Rules SDK](https://raw.githubusercontent.com/klaushofrichter/games-service/main/packages/sdk/src/index.ts): `defineGame`, `GameDefinition` with every hook, `GameContext`, `SeatInfo`, `count`, `list`, `mostAward`, `leastAward`
+- [Cards helpers](https://raw.githubusercontent.com/klaushofrichter/games-service/main/packages/sdk/src/cards.ts): deck, seeded shuffle, poker hand evaluation
+- [Manifest schema and lobby types](https://raw.githubusercontent.com/klaushofrichter/games-service/main/packages/protocol/src/index.ts): `manifestSchema`, `GameSummary`, `GameAward`, `PlayerInfo`, `LobbyState`
+- [Board kit for UI modules](https://raw.githubusercontent.com/klaushofrichter/games-service/main/apps/table-host/public/shared/board-kit.js): seat plates, player colours, rotation, countdowns, sounds, styles
+- [Game log format](https://raw.githubusercontent.com/klaushofrichter/games-service/main/apps/table-host/src/log-format.md): records, move lists, replay
+
+## Example games
+
+- [Coin Flip](https://github.com/klaushofrichter/games-service/tree/main/games/coin-flip): the smallest complete game (simultaneous guesses, timers, statistics, players joining mid-game, board and phone UIs, rules for players)
+- [Pachisi](https://github.com/klaushofrichter/games-service/tree/main/games/pachisi): turns, dice, captures, moves made by touching the board, `describe` for the Game Viewer
+- [Hold'em](https://github.com/klaushofrichter/games-service/tree/main/games/holdem): private cards, AI styles, awards, a skippable wait, sounds
+- [Roulette](https://github.com/klaushofrichter/games-service/tree/main/games/roulette): simultaneous betting, AI styles
+
+## Testing
+
+- [Rules test harness](https://raw.githubusercontent.com/klaushofrichter/games-service/main/tests/harness.ts): run a game on the real runtime with virtual time, check exact replay
+- [Host test helpers](https://raw.githubusercontent.com/klaushofrichter/games-service/main/tests/helpers.ts): a real Table Host with fake phones
+
+## Optional
+
+- [Platform README](https://raw.githubusercontent.com/klaushofrichter/games-service/main/README.md): running a table, the board control API, extra-game repositories, remote play, logs
+- [Decision log](https://raw.githubusercontent.com/klaushofrichter/games-service/main/docs/decisions.md): why the platform behaves as it does

@@ -8,6 +8,9 @@ COPY packages ./packages
 COPY apps/cloud ./apps/cloud
 # The extra-game repositories every start lists (D-098).
 COPY deploy/game-repos.json ./deploy/game-repos.json
+# The developer guide it serves at /llms.txt, /llms-full.txt and /docs/game-development.md (D-160).
+COPY llms.txt ./llms.txt
+COPY docs/developers ./docs/developers
 # Calendar version (YYYY.MM.DD.N), stamped by the deploy workflow; any other build reports "dev".
 ARG APP_VERSION=dev
 ENV APP_VERSION=$APP_VERSION

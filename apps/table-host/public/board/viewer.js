@@ -1,6 +1,6 @@
 // The Game Viewer (D-120): finished games' logs on the board, move by move. A list of logs, then one game's moves a page
 // at a time with filters, then one step in full, with a reference to copy for a developer or an LLM
-// ("20261016044059-loopy-491f #54"). Read-only; served by GET /api/v1/history….
+// ("20261016044059-pachisi-491f #54"). Read-only; served by GET /api/v1/history….
 import { esc, copyText } from "/shared/board-kit.js";
 
 const PAGE = 16;

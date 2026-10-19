@@ -9,7 +9,7 @@
 //   node scripts/game-log.ts <log> state N [--before]           only the state after (or before) move N, as JSON
 //
 // Options: --game G (a simulation's game, default 1) · --games DIR (more game folders, repeatable, e.g.
-// ../loopy-game/games) · --seat S, --moves-only, --problems (filter the move list) · --json (machine-readable).
+// ../my-games/games) · --seat S, --moves-only, --problems (filter the move list) · --json (machine-readable).
 import { readdir, readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { loadGames, type InstalledGame } from "../apps/table-host/src/games.ts";

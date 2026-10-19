@@ -21,6 +21,22 @@ afterEach(async () => {
 });
 
 describe("cloud service", () => {
+  it("serves the developer guide for game authors and language models, publicly (D-160)", async () => {
+    const llms = await fetch(`${base}/llms.txt`);
+    expect(llms.status).toBe(200);
+    expect(llms.headers.get("content-type")).toMatch(/^text\/plain/);
+    const text = await llms.text();
+    expect(text).toMatch(/^# Game Table\n\n> /); // llmstxt.org: a title, then a one-paragraph summary
+    expect(text).toContain("https://games.skylar.technology/docs/game-development.md");
+    const guide = await (await fetch(`${base}/docs/game-development.md`)).text();
+    expect(guide).toMatch(/^# Writing a game for Game Table/);
+    const full = await (await fetch(`${base}/llms-full.txt`)).text();
+    expect(full.startsWith(text) && full.includes(guide)).toBe(true);
+    // Only public repositories: no private game repository is named as a source.
+    for (const t of [text, guide]) expect(t).not.toMatch(/loopy-game|starforge-game|extra-games/);
+    expect(await (await fetch(`${base}/`)).text()).toContain('href="/llms.txt"');
+  });
+
   it("rejects admin calls without the admin token", async () => {
     expect((await fetch(`${base}/admin/api/tables`)).status).toBe(401);
   });
