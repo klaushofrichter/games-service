@@ -657,3 +657,5 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
 - **D-153 · 2026-10-19 · Klaus** — `klaushofrichter/starforge-game` (Starforge Circuit, private, ported from
   DigitalTableTop like Loopy) joins the deploy-time repositories on its `production` branch, beside extra-games and
   loopy-game (D-098, D-110). `GAME_REPO_TOKEN` must be able to read it (Contents: read).
+- **D-154 · 2026-10-19 · Klaus** — The lobby's QR panel reads *Scan to join locally* (was *Scan to join*): the code
+  is for players at the table; remote players join through an invite. Checked facing south and east (the narrow panel).
