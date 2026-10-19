@@ -29,6 +29,29 @@ async function inviteClient(page) {
   return all.length === 1 ? all[0] : null;
 }
 
+// A game's assets (images, sounds) are kept for a while (D-152): a game that redraws its deck refetched every picture
+// over the data channel on every update, and the deck flickered blank. Only successful GETs under /games/<id>/assets/,
+// in memory (gone when the worker restarts), at most ASSET_BYTES in all; a game updated in between shows its new
+// assets after ASSET_TTL_MS.
+const ASSET = /^\/games\/[^/]+\/assets\//;
+const ASSET_TTL_MS = 10 * 60 * 1000;
+const ASSET_BYTES = 64 * 1024 * 1024;
+const assets = new Map(); // path -> { at, type, body }
+let assetBytes = 0;
+function keepAsset(path, r) {
+  const size = r.body?.byteLength ?? 0;
+  if (r.status !== 200 || size > ASSET_BYTES / 8) return;
+  const old = assets.get(path);
+  if (old) assetBytes -= old.body.byteLength;
+  assets.set(path, { at: Date.now(), type: r.type, body: r.body });
+  assetBytes += size;
+  for (const [k, v] of assets) {
+    if (assetBytes <= ASSET_BYTES) break;
+    assets.delete(k);
+    assetBytes -= v.body.byteLength;
+  }
+}
+
 async function route(e, url) {
   let page = url.searchParams.get("gtp");
   if (page && e.resultingClientId) {
@@ -40,12 +63,20 @@ async function route(e, url) {
   const top = await inviteClient(page);
   if (!top) return new Response("Open the invite link again to reconnect.", { status: 503, headers: { "content-type": "text/plain" } });
   const method = e.request.method;
+  const path = url.pathname + url.search;
+  const asset = method === "GET" && ASSET.test(url.pathname);
+  const kept = asset && assets.get(path);
+  if (kept && Date.now() - kept.at < ASSET_TTL_MS) return new Response(kept.body.slice(0), { status: 200, headers: { "content-type": kept.type, "cache-control": "private, max-age=600" } });
   const body = method === "GET" || method === "HEAD" ? undefined : await e.request.text();
   const ch = new MessageChannel();
   const r = await new Promise((resolve) => {
     const t = setTimeout(() => resolve({ status: 504, type: "text/plain", body: new TextEncoder().encode("The table did not answer.").buffer }), 20000);
     ch.port1.onmessage = (m) => (clearTimeout(t), resolve(m.data));
-    top.postMessage({ type: "gt-req", method, path: url.pathname + url.search, body }, [ch.port2]);
+    top.postMessage({ type: "gt-req", method, path, body }, [ch.port2]);
   });
+  if (asset) {
+    keepAsset(path, r);
+    if (r.status === 200) return new Response(r.body, { status: 200, headers: { "content-type": r.type, "cache-control": "private, max-age=600" } });
+  }
   return new Response(r.status === 204 || r.status === 304 ? null : r.body, { status: r.status, headers: { "content-type": r.type, "cache-control": "no-store" } });
 }

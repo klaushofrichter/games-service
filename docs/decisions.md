@@ -646,3 +646,14 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   - **Deck `info`** gains `seatEdges` (as the board has them), `viewEdge` (the table edge the player looks from) and `boardEdge` (the edge the game faces on the board that player sees). At the table: `viewEdge` = the seat's edge, `boardEdge` = `gameFacing`. A remote player has their own board, turned to their seat (D-059), or upright when an east or west seat chose the full width (D-101): there both are that board's edge, so the phone reads it upright. A phone turns a map by `ROT[boardEdge]`-relative angles; Starforge's `viewAngle()` is the worked example.
   - A remote player toggling the full width re-renders the game on their phone (`storage` event), so the map follows at once.
   - **Checks.** `tests/lobby.test.ts` (the facing kept through east, west and rotations).
+- **D-152 · 2026-10-19 · Claude** — Two fixes found by Starforge's browser checks (D-151):
+  - **Remote players keep a game's assets.** The relay worker (`remote-sw.js`) answered everything `no-store`, so a
+    deck that redraws its screen refetched every picture over the data channel on each update (Starforge: about 25
+    per tap) and went blank meanwhile. Successful GETs under `/games/<id>/assets/` are now kept in the worker's
+    memory for 10 minutes (64 MB at most, oldest dropped first) and served `private, max-age=600`. Everything else
+    stays `no-store`. A game updated between games shows its new assets within 10 minutes, or at once after a reload.
+  - **A game's result table scrolls sideways inside its card on the phone**, with slightly tighter headers, instead
+    of running past the card (Starforge's eight columns at 390 px).
+- **D-153 · 2026-10-19 · Klaus** — `klaushofrichter/starforge-game` (Starforge Circuit, private, ported from
+  DigitalTableTop like Loopy) joins the deploy-time repositories on its `production` branch, beside extra-games and
+  loopy-game (D-098, D-110). `GAME_REPO_TOKEN` must be able to read it (Contents: read).
