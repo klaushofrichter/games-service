@@ -654,3 +654,6 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
     stays `no-store`. A game updated between games shows its new assets within 10 minutes, or at once after a reload.
   - **A game's result table scrolls sideways inside its card on the phone**, with slightly tighter headers, instead
     of running past the card (Starforge's eight columns at 390 px).
+- **D-153 · 2026-10-19 · Klaus** — `klaushofrichter/starforge-game` (Starforge Circuit, private, ported from
+  DigitalTableTop like Loopy) joins the deploy-time repositories on its `production` branch, beside extra-games and
+  loopy-game (D-098, D-110). `GAME_REPO_TOKEN` must be able to read it (Contents: read).
