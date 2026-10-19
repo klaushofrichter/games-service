@@ -73,7 +73,7 @@ jobs:
       - run: pip install -r scripts/e2e/requirements.txt
       - run: python -m playwright install --with-deps chromium
       - run: scripts/e2e/run-all.sh e2e-out
-      # The local Docker runbook (docs/runbooks/local-docker.md, D-164), as written: its setup script and compose file,
+      # The local Docker runbook (docs/runbooks/local-docker.md, D-165), as written: its setup script and compose file,
       # the image built from this checkout, the board and a phone over plain http on the runner's LAN address, more
       # games from a folder (Part B), and the cloud profile (Part C).
       - name: Local Docker runbook
