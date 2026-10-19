@@ -27,6 +27,10 @@ Key rules for every game: rules are pure and deterministic (randomness only from
 - [Roulette](https://github.com/klaushofrichter/games-service/tree/main/games/roulette): simultaneous betting, AI styles
 - [Example game repository](https://github.com/klaushofrichter/extra-games): Chess, Liar's Dice and Backgammon in a repository of their own (public), tested against games-service with CI; the layout to copy for a new game repository
 
+## Running it
+
+- [Run Game Table locally with Docker](https://raw.githubusercontent.com/klaushofrichter/games-service/main/docs/runbooks/local-docker.md): a runbook for agents and people: the Table Host with the built-in games on one machine, phones on the LAN, no cloud service, DNS or HTTPS; optional extra games and a local cloud service
+
 ## Testing
 
 - [Rules test harness](https://raw.githubusercontent.com/klaushofrichter/games-service/main/tests/harness.ts): run a game on the real runtime with virtual time, check exact replay

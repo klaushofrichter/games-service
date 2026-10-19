@@ -769,3 +769,18 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   (as is: availability, errors, correct rules or results, kept logs and saves, fitness; terms may change; liability
   excluded as far as the law allows) and *Software* (MIT, link to the repository; games from other authors under
   their own terms). Not reviewed by a lawyer.
+- **D-164 · 2026-10-19 · Klaus** — The board's invite dialog closes by itself when its invite brings a player, with a short note "*Rita* joined through the invite". *Implementation (Claude):* the service knows an invite only by its hash; it keeps that hash with the remote session and sends it to the table with the connection offer. The table remembers the invites it asked for (by hash, the last 32) and, when a remote player joins through one, lists it in `state.remote.joined` (`{invite, name}`, the last 8). The dialog closes when its own invite appears there, so another invite being used leaves it open; the board's name keyboard (D-155) closes with it. The board-control switch stays in the invite dialog. Checks: `tests/remote.test.ts` (the joined invite), `scripts/e2e/remote.py` (the dialog closes and says who joined) and `next_hand.py`.
+- **D-165 · 2026-10-19 · Klaus** — A runbook sets up Game Table on one machine with Docker, independent of
+  games.skylar.technology, without DNS or HTTPS, written to be followed by a coding agent. *Why:* Klaus: "this runbook
+  should be independent of the "games.skylar.technology" service, and ideally not require a DNS entry and HTTPS. The
+  runbook would be used by an LLM such as Claude, where a developer would instruct the LLM something like "read the
+  repository … and setup a running version of the core service with the build-in games"." *Implementation
+  (Claude):* `docs/runbooks/local-docker.md` with checks after every step; `deploy/local/setup.sh` writes
+  `deploy/local/.env` (the LAN address for the QR code, a random table key); `deploy/local/docker-compose.yml` builds
+  the Table Host from the checkout, publishes port 8080 with `ALLOW_REMOTE_BOARD=1` (the board's browser reaches the
+  container from outside its loopback) and no `CLOUD_URL` (development mode). Optional: more games from a folder
+  mounted at `/app/games` (`GAMES`, e.g. extra-games), and `--profile cloud` with a local cloud service (ADMIN_TOKEN
+  sign-in, only `klaushofrichter/extra-games` listed). Phones work over plain http; remote play does not except on
+  `localhost`, because browsers allow its service worker only in a secure context (checked in Chromium). Linked from
+  the README, `AGENTS.md` and `llms.txt`; the `e2e` job runs the runbook as written (setup, build, simulation, a
+  browser game over the LAN address, Part B, the cloud profile).

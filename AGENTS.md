@@ -4,6 +4,8 @@
   first: the contract between games and the platform (also served at `https://games.skylar.technology/llms.txt`).
   Start from `games/coin-flip`. A game never reimplements what the platform owns (lobby, seats, joining, leaving,
   away phones, exchanging players, pauses, AI scheduling).
+- **Asked to set it up and run it?** Follow [`docs/runbooks/local-docker.md`](docs/runbooks/local-docker.md): the
+  Table Host with the built-in games in Docker on one machine, no cloud service, DNS or HTTPS.
 - **Changing the platform?** Decisions are recorded in [`docs/decisions.md`](docs/decisions.md) (D-nnn); add one for
   every product decision in the same pull request. Keep the developer guide, `llms.txt` and the SDK comments in step:
   `tests/developer-docs.test.ts` checks that every rules hook, manifest field and UI `info` field is documented.

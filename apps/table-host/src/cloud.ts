@@ -189,7 +189,7 @@ export class CloudLink {
       }
       if (msg.type !== "offer" || !this.gateway) return;
       try {
-        const sdp = await this.gateway.answer(String(msg.session), String(msg.sdp), msg.iceServers ?? []);
+        const sdp = await this.gateway.answer(String(msg.session), String(msg.sdp), msg.iceServers ?? [], typeof msg.invite === "string" ? msg.invite : undefined);
         ws.send(JSON.stringify({ type: "answer", session: msg.session, sdp }));
       } catch (err) {
         ws.send(JSON.stringify({ type: "error", session: msg.session, message: (err as Error).message }));
