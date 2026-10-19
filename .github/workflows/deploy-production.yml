@@ -147,6 +147,9 @@ jobs:
           [ "$admin" = "302 $BASE/" ] || { echo "::error::GET /admin returned '$admin', expected '302 $BASE/'"; exit 1; }
           api=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/admin/api/tables" || true)
           [ "$api" = "401" ] || { echo "::error::GET /admin/api/tables returned $api without a session"; exit 1; }
+          # The developer guide for game authors and language models (D-160) is public.
+          llms=$(curl -s -o /tmp/llms.txt -w '%{http_code}' "$BASE/llms.txt" || true)
+          [ "$llms" = "200" ] && grep -q "^# Game Table" /tmp/llms.txt || { echo "::error::GET /llms.txt returned $llms"; exit 1; }
           {
             echo "served_version=$served"
             echo "page_code=$page"

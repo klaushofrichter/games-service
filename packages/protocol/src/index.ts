@@ -177,8 +177,7 @@ export interface GameSummary {
    * the most captures. The host drops awards that nobody or every player holds.
    */
   awards?: GameAward[];
-  /** Filled in by the host (D-140): the seats' names, for the awards. */
-  /** Each seat's player at the end; `changed`: another player took the seat over during the game (D-159). */
+  /** Filled in by the host (D-140): each seat's player at the end, for the awards; `changed`: another player took the seat over during the game (D-159). */
   players?: { seat: number; name: string; ai: boolean; changed?: boolean }[];
   /** Filled in by the host from the game log (D-140): moves and thinking time per player. */
   play?: { columns: string[]; rows: (string | number)[][] };
@@ -257,7 +256,7 @@ export interface LobbyState {
   needed: Record<string, string>;
   /**
    * Empty seats whose player left during the game, with that player's colour (D-125), seat → colour: a game that goes
-   * on with the seat (Loopy's AI takes it over) keeps showing it in the same colour. Kept until the next game starts
+   * on with the seat keeps showing it in the same colour. Kept until the next game starts
    * or the table returns to the lobby; `playerColor(info, seat)` in the board kit uses it.
    */
   seatColors: Record<number, string>;
