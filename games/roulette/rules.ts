@@ -1,6 +1,6 @@
 // Roulette rules. Everyone bets at the same time during a betting window; the wheel then spins
 // (one seeded random draw), bets are settled, and after a short result display the next round starts.
-import { count, defineGame, list, type GameContext } from "../../packages/sdk/src/index.ts";
+import { count, defineGame, list, mostAward, type GameAward, type GameContext } from "../../packages/sdk/src/index.ts";
 import { betKey, colorOf, returnFor, validBet, type Bet, type BetType, type Color } from "./wheel.ts";
 
 export interface SeatResult {
@@ -26,8 +26,33 @@ export interface State {
   last: { round: number; number: number; color: Color; results: Record<number, SeatResult> } | null;
   history: number[];
   biggestWin: { seat: number; amount: number } | null;
+  /** Per seat, for the statistics window (D-150). */
+  stats: Record<number, SeatStats>;
   over: boolean;
 }
+
+/** What a player did over the game, counted as each spin is settled (D-150). */
+export interface SeatStats {
+  /** Bets placed, by type (a top-up on a spot counts once). */
+  byType: Partial<Record<BetType, number>>;
+  /** Single-number bets that hit. */
+  hits: number;
+  /** Bets on zero. */
+  zero: number;
+  /** Points put on the table over the game. */
+  staked: number;
+  /** Spins the player bet on, and those that came out ahead. */
+  played: number;
+  won: number;
+  /** The current and longest run of spins won in a row. */
+  streak: number;
+  bestStreak: number;
+  /** The biggest gain on one spin. */
+  biggest: number;
+  /** Spins sat out without a bet. */
+  sitOut: number;
+}
+const noStats = (): SeatStats => ({ byType: {}, hits: 0, zero: 0, staked: 0, played: 0, won: 0, streak: 0, bestStreak: 0, biggest: 0, sitOut: 0 });
 
 const total = (bets: Bet[] = []) => bets.reduce((a, b) => a + b.amount, 0);
 
@@ -52,6 +77,7 @@ function spin(s: State, ctx: GameContext) {
   const balances = { ...s.balances };
   const results: Record<number, SeatResult> = {};
   let biggestWin = s.biggestWin;
+  const stats = { ...s.stats };
   for (const seat of s.active) {
     const bets = s.bets[seat] ?? [];
     const staked = total(bets);
@@ -59,10 +85,94 @@ function spin(s: State, ctx: GameContext) {
     balances[seat] += returned;
     results[seat] = { staked, returned, net: returned - staked };
     if (returned - staked > 0 && (!biggestWin || returned - staked > biggestWin.amount)) biggestWin = { seat, amount: returned - staked };
+    stats[seat] = tally(stats[seat] ?? noStats(), bets, number, returned - staked);
   }
   ctx.setTimer("next", s.resultMs);
-  const next: State = { ...s, phase: "result", balances, last: { round: s.round, number, color: colorOf(number), results }, history: [...s.history, number], biggestWin };
+  const next: State = { ...s, phase: "result", balances, last: { round: s.round, number, color: colorOf(number), results }, history: [...s.history, number], biggestWin, stats };
   return { state: next, events: [{ name: "betsClosed" }, { name: "wheelSpun", data: { number, color: colorOf(number) } }, { name: "settled", data: results }] };
+}
+
+/** One spin added to a player's statistics. */
+function tally(st: SeatStats, bets: Bet[], number: number, net: number): SeatStats {
+  if (!bets.length) return { ...st, sitOut: st.sitOut + 1 };
+  const byType = { ...st.byType };
+  for (const b of bets) byType[b.type] = (byType[b.type] ?? 0) + 1;
+  const streak = net > 0 ? st.streak + 1 : 0;
+  return {
+    byType,
+    hits: st.hits + bets.filter((b) => b.type === "straight" && b.target === number).length,
+    zero: st.zero + bets.filter((b) => b.type === "straight" && b.target === 0).length,
+    staked: st.staked + total(bets),
+    played: st.played + 1,
+    won: st.won + (net > 0 ? 1 : 0),
+    streak,
+    bestStreak: Math.max(st.bestStreak, streak),
+    biggest: Math.max(st.biggest, net),
+    sitOut: st.sitOut,
+  };
+}
+
+/** The longest run of one colour in the spins, and where it ended. */
+function longestRun(history: number[], color: Color) {
+  let best = 0, run = 0;
+  for (const n of history) {
+    run = colorOf(n) === color ? run + 1 : 0;
+    best = Math.max(best, run);
+  }
+  return best;
+}
+
+/** Facts about the wheel itself over the game (D-150): runs, zeros, the number that came up most. */
+function spinFacts(history: number[]) {
+  const freq = new Map<number, number>();
+  for (const n of history) freq.set(n, (freq.get(n) ?? 0) + 1);
+  const most = Math.max(0, ...freq.values());
+  const hottest = [...freq].filter(([, c]) => c === most).map(([n]) => n).sort((a, b) => a - b);
+  return {
+    spins: history.length,
+    longestRed: longestRun(history, "red"),
+    longestBlack: longestRun(history, "black"),
+    zeros: freq.get(0) ?? 0,
+    reds: history.filter((n) => colorOf(n) === "red").length,
+    blacks: history.filter((n) => colorOf(n) === "black").length,
+    hottest: most >= 2 ? { numbers: hottest, times: most } : null,
+    neverHit: 37 - freq.size,
+  };
+}
+
+function factsText(f: ReturnType<typeof spinFacts>) {
+  if (!f.spins) return "";
+  const parts = [`${f.reds} red, ${f.blacks} black`];
+  if (f.longestRed >= 2) parts.push(`longest red streak ${f.longestRed}`);
+  if (f.longestBlack >= 2) parts.push(`longest black streak ${f.longestBlack}`);
+  parts.push(f.zeros ? `zero came up ${f.zeros === 1 ? "once" : `${f.zeros} times`}` : "no zero");
+  if (f.hottest) parts.push(`hottest number ${list(f.hottest.numbers.map(String))} (${f.hottest.times}×)`);
+  return ` Over ${count(f.spins, "spin")}: ${parts.join(", ")}.`;
+}
+
+/** The statistics window's awards (D-150); one that nobody or everybody would get is left out by the SDK and host. */
+function awardsOf(s: State): GameAward[] {
+  const st = (seat: number) => s.stats[seat] ?? noStats();
+  const by = (f: (x: SeatStats) => number) => s.active.map((seat) => ({ seat, score: f(st(seat)) }));
+  const t = (type: BetType) => (x: SeatStats) => x.byType[type] ?? 0;
+  const bets = (n: number) => count(n, "bet");
+  return [
+    mostAward({ id: "high-roller", icon: "💎", title: "High Roller", blurb: "Put the most points on the table." }, by((x) => x.staked), (n) => `${n} points staked`),
+    mostAward({ id: "big-win", icon: "💰", title: "Jackpot", blurb: "Won the most on a single spin." }, by((x) => x.biggest), (n) => `+${n} on one spin`),
+    mostAward({ id: "bullseye", icon: "🎯", title: "Bullseye", blurb: "Hit a single number the most." }, by((x) => x.hits), (n) => count(n, "hit")),
+    mostAward({ id: "hot-hand", icon: "🔥", title: "Hot Hand", blurb: "Won the most spins in a row." }, by((x) => x.bestStreak), (n) => `${n} in a row`),
+    mostAward({ id: "lucky", icon: "🍀", title: "Lucky Charm", blurb: "Came out ahead on the most spins." }, by((x) => x.won), (n) => count(n, "spin")),
+    mostAward({ id: "number-cruncher", icon: "🔢", title: "Number Cruncher", blurb: "Bet on single numbers the most." }, by(t("straight")), bets),
+    mostAward({ id: "zero-hero", icon: "🟢", title: "Zero Hero", blurb: "Trusted the zero the most." }, by((x) => x.zero), bets),
+    mostAward({ id: "odd-man", icon: "🦄", title: "Odd Man", blurb: "Bet on odd the most." }, by(t("odd")), bets),
+    mostAward({ id: "even-steven", icon: "⚖️", title: "Even Steven", blurb: "Bet on even the most." }, by(t("even")), bets),
+    mostAward({ id: "seeing-red", icon: "🌹", title: "Seeing Red", blurb: "Bet on red the most." }, by(t("red")), bets),
+    mostAward({ id: "night-owl", icon: "🦉", title: "Night Owl", blurb: "Bet on black the most." }, by(t("black")), bets),
+    mostAward({ id: "low-rider", icon: "🐢", title: "Low Rider", blurb: "Bet on 1 to 18 the most." }, by(t("low")), bets),
+    mostAward({ id: "high-flyer", icon: "🦅", title: "High Flyer", blurb: "Bet on 19 to 36 the most." }, by(t("high")), bets),
+    mostAward({ id: "by-the-dozen", icon: "🥚", title: "By the Dozen", blurb: "Bet on dozens and columns the most." }, by((x) => t("dozen")(x) + t("column")(x)), bets),
+    mostAward({ id: "wallflower", icon: "🪴", title: "Wallflower", blurb: "Sat out the most spins." }, by((x) => x.sitOut), (n) => count(n, "spin")),
+  ].filter((a): a is GameAward => a !== null);
 }
 
 function nextRound(s: State, ctx: GameContext) {
@@ -92,6 +202,7 @@ export default defineGame<State>({
       last: null,
       history: [],
       biggestWin: null,
+      stats: {},
       over: false,
     };
     return openBetting(s, ctx);
@@ -210,9 +321,22 @@ export default defineGame<State>({
     const best = s.balances[ranked[0]];
     const winners = ranked.filter((x) => s.balances[x] === best).map((x) => s.names[x]);
     const net = Object.fromEntries(s.active.map((x) => [s.names[x], s.balances[x] - s.startPoints]));
+    const facts = spinFacts(s.history);
+    const st = (seat: number) => s.stats?.[seat] ?? noStats();
     return {
-      text: winners.length === 1 ? `${winners[0]} wins with ${count(best, "point")}.` : `${list(winners)} tie with ${count(best, "point")}.`,
+      text: (winners.length === 1 ? `${winners[0]} wins with ${count(best, "point")}.` : `${list(winners)} tie with ${count(best, "point")}.`) + factsText(facts),
+      table: {
+        columns: ["Player", "Points", "Net", "Bets", "Spins won", "Biggest win", "Best streak"],
+        rows: ranked.map((x) => {
+          const t = st(x);
+          const placed = Object.values(t.byType).reduce((a, b) => a + (b ?? 0), 0);
+          const net = s.balances[x] - s.startPoints;
+          return [s.names[x], s.balances[x], `${net > 0 ? "+" : ""}${net}`, placed, `${t.won} of ${t.played}`, t.biggest ? `+${t.biggest}` : "–", t.bestStreak];
+        }),
+      },
+      awards: awardsOf(s),
       highlights: {
+        facts,
         winners,
         balances: Object.fromEntries(s.active.map((x) => [s.names[x], s.balances[x]])),
         net,
@@ -222,7 +346,8 @@ export default defineGame<State>({
     };
   },
 
-  ai(view, _seat, ctx, options) {
+  // Every AI has a pet outside bet and a lucky number, from its seat, so players differ (and the awards with them).
+  ai(view, seat, ctx, options) {
     const v = view as { phase: string; canBet: boolean; myBets: Bet[]; balance: number; minBet: number; maxBet: number; round: number; myDone: boolean };
     if (v.phase !== "betting" || v.myDone) return null;
     const style = String(options.style ?? "conservative");
@@ -232,10 +357,20 @@ export default defineGame<State>({
     const amount = Math.max(v.minBet, Math.min(v.maxBet, v.balance, Math.round((v.balance * pct) / v.minBet) * v.minBet));
     if (amount > v.balance) return { name: "done" };
     const outside: BetType[] = ["red", "black", "odd", "even", "low", "high"];
-    if (style === "conservative") return { name: "placeBet", payload: { type: outside[ctx.randomInt(0, 5)], amount } };
+    const pet = outside[seat % outside.length];
+    const lucky = (seat * 7 + 11) % 37;
+    const outsideBet = () => ({ name: "placeBet", payload: { type: ctx.random() < 0.5 ? pet : outside[ctx.randomInt(0, 5)], amount } });
+    const numberBet = (stake: number) => ({ name: "placeBet", payload: { type: "straight", target: ctx.random() < 0.4 ? lucky : ctx.randomInt(0, 36), amount: stake } });
+    const groupBet = () => ({ name: "placeBet", payload: { type: ctx.random() < 0.5 ? "dozen" : "column", target: ctx.randomInt(1, 3), amount } });
     const r = ctx.random();
-    if (r < 0.35) return { name: "placeBet", payload: { type: "straight", target: ctx.randomInt(0, 36), amount } };
-    if (r < 0.7) return { name: "placeBet", payload: { type: ctx.random() < 0.5 ? "dozen" : "column", target: ctx.randomInt(1, 3), amount } };
-    return { name: "placeBet", payload: { type: outside[ctx.randomInt(0, 5)], amount } };
+    if (style === "conservative") {
+      // Mostly even money, now and then a dozen or a small flutter on a number.
+      if (r < 0.12) return numberBet(v.minBet);
+      if (r < 0.3) return groupBet();
+      return outsideBet();
+    }
+    if (r < 0.4) return numberBet(amount);
+    if (r < 0.7) return groupBet();
+    return outsideBet();
   },
 });

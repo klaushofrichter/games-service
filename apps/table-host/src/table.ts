@@ -29,6 +29,18 @@ import { baseMeta, countRecords, rebuild, verifyGame, verifySummary } from "./ga
 import { AiCancelled, AiWorker, aiMove, isPromise, usesWorker } from "./ai.ts";
 import type { LogStore, PlayerMeta, RunningLog } from "./logs.ts";
 
+/** The longest player name (D-148): longer ones are cut. Room for "Alexandra 12" on every seat plate and result table. */
+export const MAX_NAME = 12;
+
+/** Spaces tidied, control characters dropped, cut to MAX_NAME characters (not UTF-16 units, so emoji stay whole). */
+export function trimName(raw: unknown): string {
+  const n = String(raw ?? "").normalize("NFC").replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202e\u2060-\u206f]/g, "").replace(/\s+/g, " ").trim();
+  return Array.from(n).slice(0, MAX_NAME).join("").trim();
+}
+
+/** What makes two names the same (D-148): case, accents as typed (é ≠ e), and spacing don't matter beyond that. */
+const nameKey = (n: string) => n.normalize("NFKC").toLocaleLowerCase("en").replace(/\s+/g, " ").trim();
+
 export class TableError extends Error {
   readonly status: number;
   /** A machine-readable reason where a client acts on it, e.g. "no-seat" (D-129). */
@@ -85,6 +97,8 @@ export class Table extends EventEmitter {
   private players = new Map<string, Player>();
   layout: SeatLayout = 4;
   frontEdge: Edge = "south";
+  /** The edge games face on the table's board (D-101, D-151): the last north or south the table faced. */
+  gameFacing: "north" | "south" = "south";
   phase: Phase = "idle";
   private selected: { game: InstalledGame; settings: Record<string, unknown> } | null = null;
   /** Sound effects on the boards (D-092); on until someone turns them off in the board's settings. */
@@ -143,6 +157,7 @@ export class Table extends EventEmitter {
       layout: this.layout,
       seatEdges: seatEdges(this.layout),
       frontEdge: this.frontEdge,
+      gameFacing: this.gameFacing,
       players: this.playerInfos(),
       phase: this.phase,
       game: this.selected
@@ -395,7 +410,8 @@ export class Table extends EventEmitter {
     // A seat is taken when a player joins (D-129): with none free, nobody joins to stand around without one.
     const noSeat = this.noFreeSeat();
     if (noSeat) throw new TableError(409, noSeat, "no-seat");
-    const name = this.cleanName(rawName);
+    // Names are unique at the table (D-148); a remote player can't retype on the invite page, so theirs gets a number.
+    const name = location === "remote" ? this.freeName(rawName) : this.cleanName(rawName);
     const id = newId("p");
     const sessionToken = randomBytes(24).toString("base64url");
     const p: Player = { id, name, kind: "human", location, seat: null, connected: true, ready: false, sessionToken, remoteSession };
@@ -405,10 +421,52 @@ export class Table extends EventEmitter {
     return { playerId: id, sessionToken };
   }
 
-  private cleanName(raw: unknown): string {
-    const n = String(raw ?? "").replace(/\s+/g, " ").trim().slice(0, 24);
-    if (n) return n;
-    return `Player ${this.players.size + 1}`;
+  /**
+   * A player's name (D-148): spaces tidied, control characters dropped, cut to MAX_NAME characters, and unique at the
+   * table ignoring case (refused with code "name-taken" otherwise). Empty: the next free "Player N". "(AI)" at the end
+   * is for AI players.
+   */
+  private cleanName(raw: unknown, exceptId?: string): string {
+    const n = trimName(raw);
+    if (!n) {
+      let i = this.players.size + 1;
+      while (this.nameTaken(`Player ${i}`)) i++;
+      return `Player ${i}`;
+    }
+    if (/\(\s*ai\s*\)$/i.test(n)) throw new TableError(400, "names ending in (AI) are for AI players; choose another name", "name-invalid");
+    if (this.nameTaken(n, exceptId)) throw new TableError(409, `${n} is already at this table; choose another name`, "name-taken");
+    return n;
+  }
+
+  /** A remote player's name: as cleanName, but a taken one gets a number ("Ann 2") instead of being refused. */
+  private freeName(raw: unknown): string {
+    let base = trimName(raw).replace(/\s*\(\s*ai\s*\)$/i, "").trim();
+    if (!base) return this.cleanName("");
+    if (!this.nameTaken(base)) return base;
+    for (let i = 2; ; i++) {
+      const suffix = ` ${i}`;
+      const n = Array.from(base).slice(0, MAX_NAME - suffix.length).join("").trim() + suffix;
+      if (!this.nameTaken(n)) return n;
+    }
+  }
+
+  private nameTaken(n: string, exceptId?: string): boolean {
+    const k = nameKey(n);
+    return [...this.players.values()].some((p) => p.id !== exceptId && nameKey(p.name) === k);
+  }
+
+  /** A player changes their own name on the phone (D-148), not during a game: games use the names they started with. */
+  rename(playerId: string, raw: unknown) {
+    const p = this.mustPlayer(playerId);
+    if (p.kind !== "human") throw new TableError(409, "AI players keep their names; remove one and add another for a new name");
+    if (this.phase === "active" || this.phase === "paused" || this.phase === "terminating")
+      throw new TableError(409, "names can be changed between games, not during one");
+    if (!trimName(raw)) throw new TableError(400, "a name needs at least one character", "name-invalid");
+    const n = this.cleanName(raw, p.id);
+    if (n === p.name) return p;
+    p.name = n;
+    this.changed();
+    return p;
   }
 
   resume(sessionToken: string): PlayerInfo {
@@ -555,6 +613,7 @@ export class Table extends EventEmitter {
     if (!["north", "east", "south", "west"].includes(edge)) throw new TableError(400, "edge must be north, east, south or west");
     if (this.frontEdge === edge) return;
     this.frontEdge = edge as Edge;
+    if (edge === "north" || edge === "south") this.gameFacing = edge;
     this.changed();
   }
 
@@ -1205,9 +1264,23 @@ export class Table extends EventEmitter {
    */
   private scheduleAi(retryMs?: number) {
     if (this.phase !== "active" || !this.runtime) return;
-    this.stopAllAi();
+    // In a game everyone plays at once (Roulette), an AI still waiting for its pause keeps its place (D-150): it reads
+    // the game as it is when the pause ends anyway. Restarting every waiting AI at each move let the first in line
+    // cancel all the others, so the AIs bet one after another in join order and the last ones ran out of time.
+    // A move already being worked out is still replaced, so no AI answers from an old view.
+    const keepWaiting = retryMs === undefined && this.runtime.manifest.turnModel === "simultaneous";
+    if (keepWaiting) {
+      // Kept: a pause still running (its timer set, the move not started). Anything else (a move being worked out, a
+      // pause that ended without a move because the game could not take one then) goes and is scheduled afresh.
+      for (const [id, mv] of [...this.aiMoves]) if (mv.startedAt || mv.timer === undefined || !this.players.has(id)) this.cancelAiMove(id, mv);
+      if (this.stateDirty) {
+        this.stateDirty = false;
+        queueMicrotask(() => this.changed()); // a thinking marker went away
+      }
+    } else this.stopAllAi();
     for (const p of this.players.values()) {
       if (p.kind !== "ai" || p.seat === null) continue;
+      if (keepWaiting && this.aiMoves.has(p.id)) continue;
       const mv: AiMoveState = { seat: p.seat, startedAt: 0, deadline: 0, shown: false };
       // No pause when this AI just moved and the game asks it again (a card, then the marble to move): it is one move,
       // and the board shows each step anyway (D-143). Only with the board pacing the game; without it the pause is all

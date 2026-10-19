@@ -23,14 +23,17 @@ function landSound(ctx, t, out) {
 }
 
 export function mount(root) {
-  const center = html(`<div class="cf-center" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);text-align:center;transition:transform .5s;width:900px">
+  // During play one column; once all rounds are played the table of results goes beside the coin, not under it, so
+  // with eight players nothing runs into the seat plates at the top and bottom (D-149).
+  const center = html(`<div class="cf-center" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);text-align:center;transition:transform .5s;display:flex;align-items:center;justify-content:center;gap:56px">
+      <div class="cf-main" style="width:900px">
       <div class="eyebrow" style="font-size:20px">Coin Flip</div>
       <div class="cf-round" style="font-family:var(--display);font-size:60px;margin-top:4px"></div>
       <div class="cf-coin" style="width:220px;height:220px;margin:22px auto 14px;border-radius:50%;display:grid;place-items:center;font-family:var(--display);font-size:40px;color:#3a2a08;
         background:radial-gradient(circle at 35% 30%,#f6d98e,#c8962f 60%,#8a6216);box-shadow:0 18px 50px rgba(0,0,0,.5),inset 0 0 0 10px rgba(255,255,255,.15)">?</div>
       <div class="cf-caption muted" style="font-size:24px;min-height:34px"></div>
       <div class="cf-picks" style="display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:14px;min-height:44px"></div>
-      <div class="cf-clock" style="margin:18px auto 0;width:420px;min-height:70px"></div>
+      <div class="cf-clock" style="margin:18px auto 0;width:420px;min-height:70px"></div></div>
       <div class="cf-stats"></div></div>`);
   root.appendChild(center);
   let info = null;
@@ -68,10 +71,17 @@ export function mount(root) {
           return `<span class="chip" style="font-size:20px;border-color:${playerColor(info, s.seat)}">${esc(s.name)} · ${s.lastGuess ?? "no pick"}${mark}</span>`;
         }).join("")
       : "";
-    center.querySelector(".cf-stats").innerHTML = v.done && !spinning
-      ? `<table class="cf-table" style="margin:22px auto 0;font-size:22px;border-collapse:collapse">
+    const end = v.done && !spinning;
+    center.querySelector(".cf-main").style.width = end ? "720px" : "900px";
+    const coin = center.querySelector(".cf-coin").style;
+    coin.width = coin.height = end ? "170px" : "220px";
+    coin.fontSize = end ? "34px" : "40px";
+    center.querySelector(".cf-clock").style.minHeight = end ? "0" : "70px";
+    center.querySelector(".cf-stats").style.display = end ? "" : "none";
+    center.querySelector(".cf-stats").innerHTML = end
+      ? `<table class="cf-table" style="margin:0;font-size:22px;border-collapse:collapse">
           <tr class="faint" style="font-size:16px;letter-spacing:.12em;text-transform:uppercase"><th style="text-align:left;padding:4px 18px">Player</th><th style="padding:4px 18px">Correct</th><th style="padding:4px 18px">Heads</th></tr>
-          ${[...v.seats].sort((a, b) => b.score - a.score).map((s) => `<tr><td style="text-align:left;padding:6px 18px;color:${playerColor(info, s.seat)}">${esc(s.name)}</td>
+          ${[...v.seats].sort((a, b) => b.score - a.score).map((s) => `<tr><td style="text-align:left;padding:6px 18px;white-space:nowrap;color:${playerColor(info, s.seat)}">${esc(s.name)}</td>
             <td style="padding:6px 18px">${s.score} of ${v.rounds}</td><td style="padding:6px 18px">${s.headsPct === null ? "–" : `${s.headsPct}%`}</td></tr>`).join("")}</table>`
       : "";
     clock();

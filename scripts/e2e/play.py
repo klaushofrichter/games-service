@@ -47,6 +47,7 @@ def roulette(browser, board):
     # Mira picks a colour that is not her seat's: her chips must show it (lobby colours, D-106).
     mira = next(p for p in api("GET", "/state")["players"] if p["name"] == "Mira")
     api("POST", f"/players/{mira['id']}/color", {"color": "#9d6bf0"})
+    board.mouse.click(5, 5)  # a touch on the board lets it play sound (browsers keep it off until then)
     api("POST", "/game/start")
     decks[0].wait_for_selector(".rd-balance")
     d0, d1, d2 = decks
@@ -72,6 +73,9 @@ def roulette(browser, board):
     time.sleep(5.5)
     shot(board, "board-result")
     shot(d0, "deck-result")
+    # D-150: chips, the spin and the number have sounds
+    played = board.evaluate("() => window.gameTableSounds ?? []")
+    assert {"roulette-bet", "roulette-spin", "roulette-reveal"} <= set(played), played
     v = api("GET", "/game/board")["view"]
     assert v["phase"] == "result", v["phase"]
     api("POST", "/rotate", {"degrees": 180})
@@ -125,6 +129,11 @@ def pachisi(browser, board):
     rows.nth(1).locator(".swatch").nth(4).click()
     wait_for(decks[1], ".pc-tokens .card > div:first-child", purple)
     board.wait_for_function("() => document.querySelectorAll('.player-colors .swatch.on').length === 3")
+    # The board redraws the rows after the swap reaches it, which can be a moment after Mira's phone: wait for it.
+    for _ in range(50):
+        if rows.nth(0).locator(".swatch.on").get_attribute("style") != klaus_before:
+            break
+        time.sleep(0.1)
     assert rows.nth(0).locator(".swatch.on").get_attribute("style") != klaus_before, "picking a taken colour swaps it"
     # on the board: each player's card has a border and a dot before the name in their colour
     time.sleep(0.3)

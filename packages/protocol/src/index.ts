@@ -204,6 +204,11 @@ export interface LobbyState {
   layout: SeatLayout;
   seatEdges: Edge[];
   frontEdge: Edge;
+  /**
+   * The edge a game faces on the table's board (D-151): north or south only (D-101), the last of the two the table
+   * faced. Turning the lobby east or west leaves it. Phones use it to show the board the way their player sees it.
+   */
+  gameFacing: "north" | "south";
   players: PlayerInfo[];
   phase: Phase;
   game: {

@@ -1,11 +1,96 @@
 // Roulette board UI: a spinning European wheel and the betting layout with everyone's chips.
-import { html, playerColor, remainingMs, seatPlates, svg, useStyles } from "/shared/board-kit.js";
+import { html, ping, playerColor, playSound, remainingMs, seatPlates, svg, useStyles } from "/shared/board-kit.js";
 
 const ORDER = [0, 32, 15, 19, 4, 21, 2, 25, 17, 34, 6, 27, 13, 36, 11, 30, 8, 23, 10, 5, 24, 16, 33, 1, 20, 14, 31, 9, 22, 18, 29, 7, 28, 12, 35, 3, 26];
 const RED = new Set([1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36]);
 const color = (n) => (n === 0 ? "green" : RED.has(n) ? "red" : "black");
 const STEP = 360 / 37;
 const short = (n) => (n >= 1000 ? `${Math.round(n / 100) / 10}k` : String(n));
+
+// ---------- sounds (Web Audio, made here: no files to load; they follow the table's sound setting, D-092) ----------
+let noiseBuf = null;
+function noise(ctx) {
+  if (noiseBuf) return noiseBuf;
+  noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 0.5, ctx.sampleRate);
+  const d = noiseBuf.getChannelData(0);
+  for (let k = 0; k < d.length; k++) d[k] = Math.random() * 2 - 1;
+  return noiseBuf;
+}
+/** Filtered noise with a quick attack: `from`→`to` sweeps the filter, a fixed one knocks. */
+function burst(ctx, out, t, { from, to = from, q = 1, type = "bandpass", dur, gain }) {
+  const src = ctx.createBufferSource();
+  src.buffer = noise(ctx);
+  const f = ctx.createBiquadFilter();
+  f.type = type;
+  f.Q.value = q;
+  f.frequency.setValueAtTime(from, t);
+  if (to !== from) f.frequency.exponentialRampToValueAtTime(to, t + dur);
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(gain, t + 0.004);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  src.connect(f).connect(g).connect(out);
+  src.start(t, Math.random() * 0.4);
+  src.stop(t + dur + 0.02);
+}
+/** One clay chip set down on the felt: a dry click with a short ring. */
+function clack(ctx, out, t, gain = 0.45) {
+  burst(ctx, out, t, { from: 3300 + Math.random() * 600, q: 7, dur: 0.03, gain });
+  ping(ctx, out, t, { freq: 4300 + Math.random() * 500, partials: [1, 1.71], decay: 0.06, gain: gain * 0.25 });
+}
+/** A bet: the chip lands, then a second one taps it. */
+const betSound = (ctx, t, out) => {
+  clack(ctx, out, t, 0.42);
+  clack(ctx, out, t + 0.055, 0.22);
+};
+/** A player takes their chips back: a soft slide and a click as the stack is picked up. */
+const clearSound = (ctx, t, out) => {
+  burst(ctx, out, t, { from: 1800, to: 700, q: 0.8, dur: 0.22, gain: 0.2 });
+  clack(ctx, out, t + 0.2, 0.25);
+};
+/** "Place your bets": two soft bell tones. */
+const openSound = (ctx, t, out) => {
+  ping(ctx, out, t, { freq: 1046, partials: [1, 2.01, 3.0], decay: 0.9, gain: 0.22 });
+  ping(ctx, out, t + 0.18, { freq: 1318, partials: [1, 2.01, 3.0], decay: 1.1, gain: 0.22 });
+};
+/** The last seconds to bet: a quiet tick per second. */
+const tickSound = (ctx, t, out) => burst(ctx, out, t, { from: 2400, q: 9, dur: 0.025, gain: 0.18 });
+const SPIN_S = 5.2; // as .rl-spin's transition in board.css
+/**
+ * The spin, timed to the wheel's 5.2 s ease-out: the wheel's rumble dying away, the ball running fast round the rim
+ * and slowing, dropping onto the frets and bouncing pocket to pocket, then settling as the number is revealed.
+ */
+const spinSound = (ctx, t, out) => {
+  // The wheel turning on its bearing: low, looping noise that fades as it slows.
+  const src = ctx.createBufferSource();
+  src.buffer = noise(ctx);
+  src.loop = true;
+  const f = ctx.createBiquadFilter();
+  f.type = "lowpass";
+  f.frequency.setValueAtTime(900, t);
+  f.frequency.exponentialRampToValueAtTime(160, t + SPIN_S);
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(0.22, t + 0.25);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + SPIN_S);
+  src.connect(f).connect(g).connect(out);
+  src.start(t);
+  src.stop(t + SPIN_S + 0.05);
+  // The ball rolling round the rim: a fine rattle, ever slower.
+  for (let at = 0.05, gap = 0.03; at < 3.6; at += gap, gap *= 1.045) {
+    burst(ctx, out, t + at, { from: 5200 + Math.random() * 800, q: 4, dur: 0.012, gain: 0.05 + 0.06 * (at / 3.6) });
+  }
+  // It drops onto the deflectors and bounces from pocket to pocket.
+  [[3.75, 0.5], [4.05, 0.38], [4.32, 0.3], [4.55, 0.22], [4.74, 0.16], [4.9, 0.11], [5.02, 0.08]].forEach(([at, gain]) =>
+    clack(ctx, out, t + at + Math.random() * 0.03, gain));
+};
+/** The number shown: a bright chime, a little fanfare when someone won. */
+function revealSound(anyWin) {
+  return (ctx, t, out) => {
+    const notes = anyWin ? [784, 988, 1175, 1568] : [880];
+    notes.forEach((freq, k) => ping(ctx, out, t + k * 0.11, { freq, partials: [1, 2.01, 3.0], decay: 0.8, gain: 0.2 }));
+  };
+}
 
 // Betting layout geometry (SVG units).
 const CW = 66, CH = 82, ZW = 70, TOP = 10, LEFT = 10;
@@ -123,11 +208,19 @@ function buildLayout() {
   return { el: s, cells, chips };
 }
 
+// The betting countdown: a ring that empties with the seconds left in its middle. Always in the status row, hidden
+// when nobody can bet, so the row never changes width or height.
+const CLOCK_R = 31, CLOCK_C = 2 * Math.PI * CLOCK_R;
+const CLOCK = `<div class="rl-clock" ><svg viewBox="0 0 76 76" width="76" height="76">
+  <circle class="track" cx="38" cy="38" r="${CLOCK_R}"/>
+  <circle class="left" cx="38" cy="38" r="${CLOCK_R}" stroke-dasharray="${CLOCK_C}" stroke-dashoffset="0" transform="rotate(-90 38 38)"/>
+  </svg><span class="secs"></span></div>`;
+
 export function mount(root) {
   useStyles("/games/roulette/board.css");
   const box = html(`<div class="rl-root"><div class="rl-table">
       <div><div class="rl-wheelbox"></div><div class="rl-history"></div></div>
-      <div class="rl-side"><div class="rl-status"><span class="eyebrow rl-round"></span><span class="big rl-msg"></span><span class="clock rl-clock"></span></div>
+      <div class="rl-side"><div class="rl-status"><span class="eyebrow rl-round"></span><span class="big rl-msg"></span>${CLOCK}</div>
         <div class="rl-layoutbox"></div><div class="rl-legend"></div></div></div></div>`);
   root.appendChild(box);
   const wheel = buildWheel();
@@ -140,12 +233,36 @@ export function mount(root) {
   let info = null;
   let view = null;
   let revealTimer = null;
+  /** The pending reveal of the last spin (ball, number, winners), or null; and who waits for it (whenIdle, D-149). */
+  let pendingReveal = null;
+  const idleWaiters = [];
+  function revealNow() {
+    clearTimeout(revealTimer);
+    const r = pendingReveal;
+    pendingReveal = null;
+    if (r) r();
+    idleWaiters.splice(0).forEach((w) => w());
+  }
 
   const clock = box.querySelector(".rl-clock");
+  const clockLeft = clock.querySelector(".left");
+  const clockSecs = clock.querySelector(".secs");
+  let lastSecs = null;
   const tick = setInterval(() => {
-    const ms = view?.phase === "betting" ? remainingMs(info, "betting") : null;
-    clock.textContent = ms === null ? "" : `${Math.ceil(ms / 1000)} s`;
-    clock.classList.toggle("hurry", ms !== null && ms < 6000);
+    const ms = view?.phase === "betting" && !view.over ? remainingMs(info, "betting") : null;
+    clock.classList.toggle("off", ms === null);
+    if (ms === null) {
+      lastSecs = null;
+      return;
+    }
+    const total = Math.max(1000, (Number(info?.settings?.bettingSeconds) || 25) * 1000);
+    const secs = Math.ceil(ms / 1000);
+    clockSecs.textContent = secs;
+    clockLeft.setAttribute("stroke-dashoffset", String(CLOCK_C * (1 - Math.min(1, ms / total))));
+    clock.classList.toggle("hurry", ms < 6000);
+    // The last five seconds tick, once each.
+    if (lastSecs !== null && secs !== lastSecs && secs >= 1 && secs <= 5) playSound(info, "roulette-tick", tickSound);
+    lastSecs = secs;
   }, 200);
 
   function spinTo(n) {
@@ -197,10 +314,31 @@ export function mount(root) {
     });
   }
 
+  // One sound per rules event. A burst of AI bets in one step is spread out a little, as chips are set down in turn.
+  function sounds(events) {
+    let at = 0;
+    const later = (ms, name, make) => (ms ? setTimeout(() => playSound(info, name, make), ms) : playSound(info, name, make));
+    let bets = 0;
+    for (const e of events) {
+      if (e.name === "betPlaced" && bets++ < 8) {
+        later(at, "roulette-bet", betSound);
+        at += 90;
+      } else if (e.name === "betsCleared") {
+        later(at, "roulette-clear", clearSound);
+        at += 250;
+      } else if (e.name === "bettingOpen") {
+        later(at, "roulette-open", openSound);
+      } else if (e.name === "wheelSpun") {
+        later(at, "roulette-spin", spinSound);
+      }
+    }
+  }
+
   return {
     update(v, events, i) {
       view = v;
       info = i;
+      sounds(events);
       box.querySelector(".rl-table").style.transform = `rotate(${i.rotation}deg)`;
       box.querySelector(".rl-round").textContent = `Spin ${v.round} of ${v.rounds}`;
       drawChips(v);
@@ -211,14 +349,22 @@ export function mount(root) {
         spinTo(v.last.number);
         markWinners(null);
         box.querySelector(".rl-msg").textContent = "No more bets";
-        clearTimeout(revealTimer);
-        revealTimer = setTimeout(() => {
+        revealNow(); // an earlier spin still waiting: show it before this one
+        const last = v.last;
+        const history = v.history;
+        const live = events.some((e) => e.name === "wheelSpun");
+        pendingReveal = () => {
+          if (live) playSound(info, "roulette-reveal", revealSound(Object.values(last.results ?? {}).some((r) => r.net > 0)));
           wheel.ball.setAttribute("opacity", 1);
-          box.querySelector(".rl-msg").innerHTML = `${v.last.number} <span style="color:${v.last.color === "red" ? "#e0544a" : v.last.color === "green" ? "#3fbf7f" : "#cfcfcf"}">${v.last.color}</span>`;
-          markWinners(v.last.number);
-          renderHistory(v.history);
-        }, events.some((e) => e.name === "wheelSpun") ? 5200 : 0);
+          box.querySelector(".rl-msg").innerHTML = `${last.number} <span style="color:${last.color === "red" ? "#e0544a" : last.color === "green" ? "#3fbf7f" : "#cfcfcf"}">${last.color}</span>`;
+          markWinners(last.number);
+          renderHistory(history);
+        };
+        revealTimer = setTimeout(revealNow, events.some((e) => e.name === "wheelSpun") ? 5200 : 0);
       } else if (v.phase === "betting") {
+        // A short result time: the next round's betting can arrive before the wheel stops. Reveal the spin at once,
+        // so the reveal can't later overwrite "Place your bets".
+        revealNow();
         markWinners(null);
         box.querySelector(".rl-msg").textContent = v.over ? "Game over" : "Place your bets";
         renderHistory(v.history);
@@ -232,11 +378,21 @@ export function mount(root) {
         const net = res && res.staked ? ` · <b style="color:${res.net >= 0 ? "#7fd18b" : "#e8735f"}">${res.net >= 0 ? "+" : ""}${res.net}</b>` : "";
         return `${s.balance} pts${s.staked && v.phase === "betting" ? ` · ${s.staked} on the table` : ""}${s.done && v.phase === "betting" ? " · done ✓" : ""}${net}`;
       });
-      box.querySelector(".rl-legend").textContent = v.phase === "betting" ? "Bet from your phone. Tap Done when you're finished." : "";
+      // The hint is for people: an all-AI table (a test or simulation run) has nobody to tell. Its line keeps its
+      // height either way, so the layout does not move when it comes and goes.
+      const people = (i.players ?? []).some((p) => p.kind === "human" && p.seat !== null);
+      box.querySelector(".rl-legend").textContent = people && v.phase === "betting" && !v.over ? "Bet from your phone. Tap Done when you're finished." : "";
+    },
+    /** Resolves once the last spin is revealed: the platform shows Show result only then (D-134), so the final
+     *  board shows the number, not "No more bets". */
+    whenIdle() {
+      return pendingReveal ? new Promise((r) => idleWaiters.push(r)) : Promise.resolve();
     },
     destroy() {
       clearInterval(tick);
       clearTimeout(revealTimer);
+      pendingReveal = null;
+      idleWaiters.splice(0).forEach((w) => w());
     },
   };
 

@@ -68,7 +68,7 @@ There are no split, corner or other combination bets.
 
 The wheel takes about 5 seconds to stop, and that time counts toward **Seconds to show the result**. Below about 6 seconds, the next betting window opens before you can read the result.
 
-AI players can join with a play style: *conservative* (small bets on red, black, odd, even, low or high), *aggressive* (bigger bets, often on numbers, dozens or columns) or *erratic* (anything goes).
+AI players can join with a play style: *conservative* (small bets, mostly on red, black, odd, even, low or high, now and then a dozen or a number), *aggressive* (bigger bets, often on numbers, dozens or columns) or *erratic* (anything goes). Each AI player has a favourite even-money bet and a lucky number of its own.
 
 ## Players joining and leaving
 
@@ -78,7 +78,7 @@ AI players can join with a play style: *conservative* (small bets on red, black,
 
 ## End of the game
 
-The game ends after the last spin, or earlier when nobody has enough points left for the minimum bet. The player with the most points wins. Players with the same top score share the win. The result screen also shows the biggest win in a single spin.
+The game ends after the last spin, or earlier when nobody has enough points left for the minimum bet. The player with the most points wins. Players with the same top score share the win. **Statistics** on the board shows how everyone played: points, bets, spins won, the biggest win and the longest winning streak, what the wheel did (red and black, the longest red and black streaks, zeros, the hottest number), and awards such as *Odd Man* (bet on odd the most), *Seeing Red*, *Night Owl* (black), *Bullseye* (hit a single number the most), *Hot Hand* (most spins won in a row), *Jackpot* (biggest win on one spin) and *Wallflower* (sat out the most spins).
 
 ## Tips
 

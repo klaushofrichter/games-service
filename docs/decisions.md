@@ -578,3 +578,71 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
 ## The classic colour set (18 Oct 2026)
 
 - **D-147 · 2026-10-18 · Klaus** — Player colours become the classic set: yellow, sky, red, green, purple, pearl, orange, pink. Green and teal (colours 4 and 7) were too close; measured, they were the nearest pair, and for red-green colour blindness sky and violet were nearly identical. *Implementation (Claude):* refines D-106 and D-124. `PLAYER_COLORS` (protocol) and `SEAT_COLORS` (board kit): `#f2d24b`, `#5fb7e8`, `#e5484d`, `#7fd18b`, `#9d6bf0`, `#dde3ea`, `#f08a3c`, `#ef8fcf`. Compared in CAM02-UCS with simulated colour-vision deficiencies: the closest pair for normal vision goes from 15.3 (green/teal) to 22.3 (red/orange); for deuteranopia from 1.9 (sky/violet) to 12.3; protanopia 6.3, tritanopia 9.8. Pearl stays the one neutral. Badges pick dark or white letters by contrast (`inkOn`), so the light colours need nothing else. Colours are not stored across restarts; a choice made before the update falls back to the seat's colour.
+
+## Player names (18 Oct 2026)
+
+- **D-148 · 2026-10-18 · Klaus** — Player names are at most 12 characters (longer ones are cut) and unique at a table: a second player who picks a name already there is refused. Players can change their name on the phone. *Why:* long names overlapped seat plates and result tables with eight players, and two players with the same name can't be told apart. *Implementation (Claude):*
+  - **Rule.** `trimName()` in `table.ts`: spaces tidied, control and invisible characters dropped, cut to `MAX_NAME` = 12 characters (code points, so an emoji stays whole). Two names are the same when they match ignoring case and spacing (NFKC). Empty: the next free "Player N". A name ending in "(AI)" is refused: it is how AI players are marked (D-081). AI names and AI takeovers (D-139) keep their own rules.
+  - **Joining.** A taken name is refused with `{status: 409, code: "name-taken"}` (`name-invalid` for "(AI)"); the phone's join form shows the reason under the name and keeps what was typed; its field takes 12 characters. A remote player types the name on the service's invite page and can't retype it there, so a taken name gets a number instead ("Ann 2", cut to fit 12); the invite page's field takes 12 too.
+  - **Change name.** On the phone, beside Rules in the header, outside a game: a sheet with the name, *Save*, and the reason if it is refused (`lobby.rename {name}` on the socket). Not during a game, since games and their logs use the names they started with; not for AI players. The board has no keyboard, so renaming is the player's own business on their phone.
+  - **Checks.** `tests/names.test.ts` (cutting and tidying, taken names ignoring case and after the cut, "(AI)", empty names, remote numbering, rename rules) and `scripts/e2e/names.py` (a taken name on the join form, the 12-character field, Change name refused and accepted, the board following).
+- **D-149 · 2026-10-18 · Klaus** — End screens fit at the most players with the longest names. Klaus found Coin Flip's
+  last screen with eight players overlapping the north plates (title) and the south plates (results), and asked to check
+  every game at its most players, the statistics window too, with long names. *Survey (Claude):* every game played to
+  the end at its most seats with 12-character names, each handed to an AI ("Christophers (AI)", the longest a seat
+  shows): Coin Flip 8, Hold'em 8, Roulette 6, Pachisi 4, with the end, statistics and result screens captured.
+  - **Coin Flip.** At the end the results table stands beside a smaller coin instead of under it, so nothing reaches
+    the north or south plates; names in it stay on one line.
+  - **Show result, Statistics, Lobby.** The corner buttons sit 26 px from the edges (was 38), and *Statistics* sits
+    10 px beside *Show result*, measured, so the buttons take less of the corner a south-east or north-east plate needs.
+  - **Lobby seat cards.** A name longer than 12 characters (only an AI that took a seat over) is a size smaller, so
+    "Maximilianus (AI)" is no longer cut.
+  - **Roulette** could end on "No more bets": the number is revealed 5.2 s after the spin, the game could end sooner,
+    and the board had no `whenIdle()` (D-134). It now has one that resolves at the reveal, and a new round's betting
+    reveals the last spin at once, so a late reveal can't overwrite "Place your bets".
+  - Hold'em, Pachisi and every statistics window already fitted (the statistics window scrolls).
+
+## Roulette at a full AI table (18 Oct 2026)
+
+- **D-150 · 2026-10-18 · Klaus** — Roulette with six AI players (the developer setting, D-118): the betting layout
+  shifted down at "No more bets" and back at "Place your bets"; the countdown ("1  s") looked poor; "Bet from your
+  phone" showed with no phone at the table; Roulette had no sounds; two of six AIs never bet in 50 spins; AIs only bet
+  even-money chances; and the end had no statistics. Klaus asked for awards in the spirit of "Odd Man".
+  - **Layout.** The side column is centred in the table's grid, and the hint line under the layout was emptied outside
+    betting, so the column got shorter and moved. The status row and the hint line now have fixed heights.
+  - **Countdown.** A 76 px ring in the status row that empties with the time to bet (`bettingSeconds`), the seconds in
+    its middle; brass, red and beating under 6 s. Faded out, not removed, when nobody can bet, so it never moves the row.
+  - **Hint.** "Bet from your phone…" only while a human sits at the table (`info.players`, `kind: "human"`).
+  - **Sounds** (Web Audio, as Hold'em, D-139, through `playSound`, D-092): `betPlaced` a chip and a tap (a step's AI
+    bets 90 ms apart, at most 8); `betsCleared` a slide and a click; `bettingOpen` two bell tones; a tick per second in
+    the last five; `wheelSpun` 5.2 s timed to the wheel's ease-out: a low rumble fading, the ball's rattle slowing,
+    then seven bounces into a pocket; the reveal a chime, a four-note fanfare when anyone came out ahead (only after a
+    live spin, not when a board comes up mid-result).
+  - **AIs that never bet: a platform fix.** `scheduleAi` cancelled and restarted every AI's pending move on each
+    change. All pauses were equal, so the first AI's move cancelled the others: AIs moved one at a time in join order,
+    about 1.6 s each at the board's pace (D-141), a bet and Done each. Six needed about 10 s; with a shorter time to
+    bet the last two never got a turn, every spin. Now, in `turnModel: "simultaneous"` games, an AI still waiting out
+    its pause keeps it (it reads the game when the pause ends anyway); a move already being worked out is still
+    replaced, so no AI answers from an old view. Sequential games are unchanged. A pause that ended without a
+    move (the game could not take one then) is not kept but scheduled afresh. One effect: an AI no longer starts its
+    pause over when someone else moves, so in Coin Flip it may guess a moment after a phone and the next round opens at
+    once; `viewer.py` now waits for the round to flip rather than for the phone's buttons to grey out. Measured: six AIs done in about 2 s,
+    every seat betting every spin with 8 s to bet. Test: six AIs with a 1 s pause finish inside 5 s (fails before).
+  - **AI variety.** Each AI has a pet even-money bet (`seat % 6`) for half its outside bets and a lucky number
+    (`(7·seat + 11) % 37`) for 40 % of its number bets. *Conservative* now bets a number at the minimum 12 % of the
+    time and a dozen or column 18 %; *aggressive* and *erratic* as before, with the pet and lucky number.
+  - **Statistics** (D-140): per seat, counted at each spin (`stats` in the state): bets by type, single-number hits,
+    bets on zero, points staked, spins played, won and sat out, longest winning streak, biggest gain on one spin.
+    *Table:* Player, Points, Net, Bets, Spins won, Biggest win, Best streak. *Wheel facts* (in the summary's text and
+    `highlights.facts`): red and black counts, longest red and black streaks, zeros, the hottest number (twice or
+    more). *Awards* (`mostAward`, so a tie of everyone or nobody is left out): High Roller, Jackpot, Bullseye, Hot
+    Hand, Lucky Charm, Number Cruncher, Zero Hero, Odd Man, Even Steven, Seeing Red, Night Owl (black), Low Rider
+    (1–18), High Flyer (19–36), By the Dozen (dozens and columns), Wallflower (sat out most).
+
+## How a phone sees the board (19 Oct 2026)
+
+- **D-151 · 2026-10-19 · Klaus** — A game's phone can show the board the way its player sees it, at the table and remotely, in every rotation. Klaus asked Starforge (a programming race on a factory map) to carry everything learnt about the deck and the board's rotations, remote players included: a robot's "north" on the phone must be the direction the player sees as up the table. *Implementation (Claude):*
+  - **The table keeps the game's facing.** `gameFacing` (`"north" | "south"`) in the lobby state: the last north or south the table faced (D-101). Turning the lobby east or west leaves it; the board's `gameEdge()` reads it instead of tracking it itself, so a phone that joins later knows it too.
+  - **Deck `info`** gains `seatEdges` (as the board has them), `viewEdge` (the table edge the player looks from) and `boardEdge` (the edge the game faces on the board that player sees). At the table: `viewEdge` = the seat's edge, `boardEdge` = `gameFacing`. A remote player has their own board, turned to their seat (D-059), or upright when an east or west seat chose the full width (D-101): there both are that board's edge, so the phone reads it upright. A phone turns a map by `ROT[boardEdge]`-relative angles; Starforge's `viewAngle()` is the worked example.
+  - A remote player toggling the full width re-renders the game on their phone (`storage` event), so the map follows at once.
+  - **Checks.** `tests/lobby.test.ts` (the facing kept through east, west and rotations).

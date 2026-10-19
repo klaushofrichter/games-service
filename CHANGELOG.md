@@ -6,8 +6,23 @@ page is the history. Leave it empty if there is nothing to add beyond the commit
 
 ## [Unreleased]
 
+- Roulette (D-150): the betting layout no longer jumps between "Place your bets" and "No more bets"; the countdown is a
+  ring that empties with the seconds left in its middle, red and beating in the last five; "Bet from your phone" only
+  when someone at the table bets from a phone; sounds for chips, clearing bets, betting opening, the last seconds, the
+  spin (the wheel's rumble, the ball's rattle and its bounces into a pocket) and the number (a fanfare if someone won).
+  The end has statistics: awards (*Odd Man*, *Seeing Red*, *Night Owl*, *Bullseye*, *Hot Hand*, *Jackpot* and more),
+  a table per player and what the wheel did (longest red and black streaks, zeros, the hottest number). AI players
+  each have a favourite bet and a lucky number, and bet on numbers and dozens too.
+- AI players in games everyone plays at once (Roulette) move at the same time (D-150). They used to go one after
+  another in the order they joined, so at a full table the last ones ran out of betting time and never played.
+- End screens with eight players and long names (D-149): Coin Flip shows its results beside the coin, the corner
+  buttons sit closer to the edge and to each other, long AI names fit on the lobby's seat cards, and Roulette's last
+  screen shows the number instead of "No more bets".
 - A game setting typed out of range (D-146) is caught in the settings window: a message names the setting and what it
   can be, waits for OK, and the window stays open on that field.
+- Player names (D-148): at most 12 characters, and each name once at a table (ignoring upper and lower case); a
+  taken name is refused on the phone with the reason, and a remote player's gets a number ("Ann 2"). **Change name**
+  on the phone, between games.
 - Player colours are the classic set (D-147): yellow, sky, red, green, purple, pearl, orange and pink. Green and teal were
   too close, and sky and violet looked the same to red-green colour-blind players.
 - A remote player on a north seat (D-145): *Show result*, *Statistics* and *Lobby* sit in the game's corner as they

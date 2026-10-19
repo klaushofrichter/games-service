@@ -289,6 +289,7 @@ const viewEdge = () => remoteEdge() ?? state.frontEdge;
 let lastFacing = "south";
 function gameEdge() {
   if (REMOTE) return viewEdge();
+  if (state.gameFacing) return state.gameFacing; // the table keeps it (D-151)
   if (state.frontEdge === "north" || state.frontEdge === "south") lastFacing = state.frontEdge;
   return lastFacing;
 }
@@ -350,7 +351,7 @@ function renderSeats() {
           ? `<span class="dot"></span>${pl.ready ? "Ready" : "Not ready"}`
           : pl.kind === "ai" ? `AI player${pl.aiOptions ? ` · ${esc(Object.values(pl.aiOptions).join(", "))}` : ""}` : pl.location === "remote" ? "Remote" : "";
     el.innerHTML = `<div class="num">${esc(seatName(state.seatEdges, seat))}</div>
-      <div class="name">${pl ? `<span class="pdot" aria-hidden="true"></span>${esc(pl.name)}` : "—"}</div><div class="status">${status}</div>`;
+      <div class="name${pl && [...pl.name].length > 12 ? " long" : ""}">${pl ? `<span class="pdot" aria-hidden="true"></span>${esc(pl.name)}` : "—"}</div><div class="status">${status}</div>`;
     if (!playing && !REMOTE) el.addEventListener("click", () => onSeatTap(seat, pl)); // seating stays with the table
     seatsEl.appendChild(el);
   });
@@ -421,6 +422,15 @@ function showStatistics() {
   openStatistics({ summary: state.summary, gameName: state.game?.name, overlayRoot, edge: overlayEdge(), turnable: !REMOTE });
 }
 statsBtn.addEventListener("click", showStatistics);
+/** Statistics sits right beside Show result, 10 px apart, whatever Show result's width (D-149). */
+function placeStats() {
+  const st = statsBtn.style;
+  st.left = st.right = "";
+  if (statsBtn.hidden || resultBtn.hidden) return;
+  const corner = [...statsBtn.classList].find((c) => /^(top|bottom)-(left|right)$/.test(c));
+  if (!corner) return;
+  st[corner.endsWith("right") ? "right" : "left"] = `${26 + resultBtn.offsetWidth + 10}px`;
+}
 resultBtn.addEventListener("click", () => {
   holdFinal = false;
   render();
@@ -837,6 +847,7 @@ function render() {
   // Beside Show result, when the game has statistics (D-140).
   statsBtn.hidden = resultBtn.hidden || !hasStatistics(state.summary);
   statsBtn.className = gameCorner;
+  placeStats();
   if (state.phase !== "finished") overlayRoot.querySelector(".overlay.statistics")?.remove();
 
   renderPause();

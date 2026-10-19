@@ -22,6 +22,8 @@ let removed = false;
 let replaced = false; // this player's deck opened in another window (D-133)
 let seq = 0;
 let retry = 0;
+/** Why the name typed on the join form was refused (D-148): taken at this table, or not allowed. */
+let joinError = "";
 /** No free seat at the table (D-129): the reason, shown instead of the name form until a seat is free. */
 let noSeat = null;
 let seatTimer = null;
@@ -102,6 +104,10 @@ function connect(hello) {
           storage.clear();
           me = null;
           banner = msg;
+        } else if (!me && (m.payload.code === "name-taken" || m.payload.code === "name-invalid")) {
+          joinError = msg; // the form stays, with the reason under the name (D-148)
+          const el = body.querySelector("#join-error");
+          if (el) el.textContent = msg;
         } else if (m.payload.code === "no-seat") {
           // Taken by someone else just now (D-129): say why, and look again. A remote player's invite page shows it.
           if (REMOTE) banner = msg;
@@ -190,7 +196,8 @@ function renderTop() {
 /** The player's name, the Rules button and the seat badge: the header outside a game, the top of the own tab in one. */
 function whoHtml(p, inGame) {
   return `<div class="who"><div><div class="eyebrow">${esc(state.tableName)}${inGame ? ` · ${esc(state.game?.name)}` : ""}</div><h1>${esc(p?.name ?? "")}</h1></div>
-      <div class="who-side">${state.game?.howToPlay ? `<button type="button" class="rules-btn" data-rules aria-haspopup="dialog">Rules</button>` : ""}
+      <div class="who-side">${inGame || p?.kind !== "human" ? "" : `<button type="button" class="rules-btn" data-rename aria-haspopup="dialog">Change name</button>`}
+      ${state.game?.howToPlay ? `<button type="button" class="rules-btn" data-rules aria-haspopup="dialog">Rules</button>` : ""}
       ${p?.seat == null ? "" : seatBadgeHtml(p)}</div></div>`;
 }
 
@@ -209,6 +216,7 @@ let rulesOpen = null; // the open modal element
 for (const el of [top, tablePanel]) {
   el.addEventListener("click", (e) => {
     if (e.target.closest("[data-rules]")) void openRules();
+    if (e.target.closest("[data-rename]")) openRename(e.target.closest("[data-rename]"));
     const t = e.target.closest("[data-tab]");
     if (t) setTab(t.dataset.tab);
     const terms = e.target.closest("a[data-terms]");
@@ -251,6 +259,28 @@ function openSheet(eyebrow, title, label, back) {
   });
   modal.querySelector(".rules-close").focus();
   return modal;
+}
+
+/** Change name (D-148): this player's own, between games; refused with the reason if it is taken at the table. */
+function openRename(back) {
+  const me_ = self();
+  const modal = openSheet(state.tableName, "Change name", "Change name", back);
+  if (!modal || !me_) return;
+  const bodyEl = modal.querySelector(".rules-body");
+  bodyEl.innerHTML = `<form id="rename" style="display:flex;flex-direction:column;gap:12px">
+    <input type="text" name="name" maxlength="12" autocomplete="nickname" value="${esc(me_.name)}">
+    <div class="join-error" role="alert"></div>
+    <button class="primary big" type="submit">Save</button>
+    <div class="faint" style="font-size:.8em">Up to 12 characters; each name once at a table.</div></form>`;
+  const input = bodyEl.querySelector("input");
+  input.focus();
+  input.select();
+  bodyEl.querySelector("#rename").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const r = await send("lobby", "rename", { name: input.value });
+    if (r.ok) modal.querySelector("[data-close]").click();
+    else bodyEl.querySelector(".join-error").textContent = r.reason;
+  });
 }
 
 async function fetchText(url) {
@@ -384,13 +414,16 @@ function renderJoin() {
   if (body.querySelector("#join")) return;
   body.innerHTML = `<div><div class="eyebrow">Game Table</div><h1>What should we call you?</h1></div>
     <form id="join" class="card" style="display:flex;flex-direction:column;gap:14px">
-      <input type="text" name="name" maxlength="24" autocomplete="nickname" placeholder="Your name" autofocus>
+      <input type="text" name="name" maxlength="12" autocomplete="nickname" placeholder="Your name" autofocus>
+      <div id="join-error" class="join-error" role="alert">${esc(joinError)}</div>
       <button class="primary big" type="submit">Take a seat</button>
-      <div class="faint" style="font-size:.8em">No account needed. Any name works.</div>
+      <div class="faint" style="font-size:.8em">No account needed. Up to 12 characters; each name once at a table.</div>
     </form>`;
   body.querySelector("#join").addEventListener("submit", (e) => {
     e.preventDefault();
     banner = "";
+    joinError = "";
+    body.querySelector("#join-error").textContent = "";
     connect({ joinToken, name: new FormData(e.target).get("name") });
   });
 }
@@ -423,10 +456,32 @@ function renderLobby(p) {
 // ---------- the game's own deck UI ----------
 let game = null; // { key, inst }
 
+/**
+ * How this player sees the game's board (D-151): `viewEdge`, the table edge they look from (their seat's at the table;
+ * on a remote player's own board, the edge at the bottom of their screen, D-059/D-101), and `boardEdge`, the edge the
+ * game faces on that board (the table's facing, or the remote board's own). With them a game can turn a map on the
+ * phone the way the player sees the board: a direction on the phone is the same direction on the table.
+ */
+function boardView() {
+  const seat = self()?.seat ?? null;
+  const own = seat === null ? null : (state.seatEdges?.[seat] ?? null);
+  if (REMOTE) {
+    let landscape = false;
+    try {
+      landscape = localStorage.getItem(`gametable.remote.${params.get("inv") ?? ""}.landscape`) === "1";
+    } catch {}
+    const edge = own && (own === "east" || own === "west") && landscape ? "south" : (own ?? state.frontEdge ?? "south");
+    return { viewEdge: edge, boardEdge: edge };
+  }
+  return { viewEdge: own ?? "south", boardEdge: state.gameFacing ?? "south" };
+}
+
 function info() {
   return {
     seat: gameMsg?.seat,
     me: self(),
+    seatEdges: state.seatEdges ?? [],
+    ...boardView(),
     players: state.players,
     seatColors: state.seatColors ?? {}, // seats whose player left keep their colour (D-125)
     settings: state.game?.settings ?? {},
@@ -470,6 +525,11 @@ async function showGame() {
   }
   game.inst?.update(gameMsg.view, gameMsg.events ?? [], info());
 }
+
+// A remote player switching their board between turned and full width (D-101) changes how they see it: tell the game.
+addEventListener("storage", (e) => {
+  if (REMOTE && e.key?.endsWith(".landscape") && gameMsg) game?.inst?.update(gameMsg.view, [], info());
+});
 
 function closeGame() {
   if (!game) return;

@@ -34,10 +34,12 @@ try:
         phone.click("#ready")
         wait(lambda: all(pl["ready"] for pl in t("GET", "/state")["players"]), 10, "everyone ready")
         t("POST", "/game/start", {})
-        for _ in range(3):
+        for rnd in range(1, 4):
             phone.wait_for_selector("[data-guess=heads]:not([disabled])", timeout=15000)
             phone.click("[data-guess=heads]")
-            wait(lambda: phone.locator("[data-guess=heads]:not([disabled])").count() == 0 or t("GET", "/state")["phase"] == "finished", 10, "the guess")
+            # The round is flipped (the AI may guess a moment later and the next round open at once, D-150), or over.
+            flipped = f"() => (document.querySelector('.cf-last')?.textContent ?? '').startsWith('Round {rnd} came up')"
+            wait(lambda: t("GET", "/state")["phase"] == "finished" or phone.evaluate(flipped), 10, "the guess")
         wait(lambda: t("GET", "/state")["phase"] == "finished", 20, "the game to end")
         t("POST", "/game/close", {})
         sim = t("POST", "/simulation", {"gameId": "pachisi", "players": 2, "games": 2, "seed": 4, "settings": {"tokens": 1}})
