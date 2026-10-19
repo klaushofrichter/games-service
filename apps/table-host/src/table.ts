@@ -1093,6 +1093,7 @@ export class Table extends EventEmitter {
     this.runningGame = game;
     this.gameStartedAt = Date.now();
     this.lastActorSeat = null;
+    this.aiTrace = [];
     this.handedToAi.clear();
     this.beginLog(rt, game, settings, aiOptions);
     this.leftColors.clear();
@@ -1281,7 +1282,7 @@ export class Table extends EventEmitter {
     for (const p of this.players.values()) {
       if (p.kind !== "ai" || p.seat === null) continue;
       if (keepWaiting && this.aiMoves.has(p.id)) continue;
-      const mv: AiMoveState = { seat: p.seat, startedAt: 0, deadline: 0, shown: false };
+      const mv: AiMoveState = { seat: p.seat, startedAt: 0, deadline: 0, shown: false, askedAt: Date.now() };
       // No pause when this AI just moved and the game asks it again (a card, then the marble to move): it is one move,
       // and the board shows each step anyway (D-143). Only with the board pacing the game; without it the pause is all
       // that lets people follow.
@@ -1340,9 +1341,11 @@ export class Table extends EventEmitter {
   private thinkAi(p: Player, mv: AiMoveState, retried: boolean) {
     mv.timer = undefined;
     if (this.aiMoves.get(p.id) === mv && this.waitingForBoard()) {
+      if (!mv.waitingSince) mv.waitingSince = Date.now();
       mv.timer = setTimeout(() => this.thinkAi(p, mv, retried), 50); // the board is still showing the last moves
       return;
     }
+    if (mv.waitingSince) this.traceAi(p, `waited ${Date.now() - mv.waitingSince} ms for the board`);
     const rt = this.runtime;
     const game = this.runningGame;
     if (this.aiMoves.get(p.id) !== mv || this.phase !== "active" || !rt || !game || !this.players.has(p.id) || rt.over || p.seat === null) return;
@@ -1361,6 +1364,9 @@ export class Table extends EventEmitter {
     }
     if (!isPromise<Intent | null>(answer)) {
       this.aiMoves.delete(p.id);
+      // "No move" answers (not its turn) only when they took a while: every AI is asked after every change.
+      const ms = Date.now() - mv.startedAt;
+      if (answer || ms >= 50) this.traceAi(p, answer ? `moves: ${answer.name} (${ms} ms)` : `no move to make (${ms} ms)`);
       if (answer) this.submitAi(p, answer, undefined, retried);
       return;
     }
@@ -1375,6 +1381,7 @@ export class Table extends EventEmitter {
       (intent) => {
         if (this.aiMoves.get(p.id) !== mv) return; // the game moved on: a newer move replaced this one
         const meta: AiMoveMeta = { ms: Date.now() - mv.startedAt, ...(worker ? { worker: true } : {}) };
+        if (intent || meta.ms >= 50) this.traceAi(p, intent ? `moves: ${intent.name} (${meta.ms} ms)` : `no move to make (${meta.ms} ms)`);
         const waitedFor = this.pause?.reason === "ai" && this.pause.ai?.playerId === p.id;
         this.endAiMove(p.id, mv);
         if (intent) this.submitAi(p, intent, meta, retried);
@@ -1386,6 +1393,35 @@ export class Table extends EventEmitter {
         this.aiFailed(p, mv, e);
       },
     );
+  }
+
+  // ---------- live status for finding problems (D-157) ----------
+  private aiTrace: { at: number; seat: number; name: string; what: string }[] = [];
+  private traceAi(p: Player, what: string) {
+    this.aiTrace.push({ at: Date.now(), seat: p.seat ?? -1, name: p.name, what });
+    if (this.aiTrace.length > 100) this.aiTrace.shift();
+  }
+
+  /**
+   * What holds the game up right now (D-157): every AI player's move in the making (the pause before acting, waiting
+   * for the board, thinking), the board's progress through the game messages, and what the AI players did lately.
+   */
+  debugStatus() {
+    const now = Date.now();
+    const ai = [...this.aiMoves].map(([id, mv]) => {
+      const p = this.players.get(id);
+      const state = mv.startedAt ? "thinking" : mv.waitingSince ? "waiting for the board" : "pause before acting";
+      const since = mv.startedAt || mv.waitingSince || mv.askedAt || now;
+      return { name: p?.name ?? id, seat: mv.seat, state, ms: now - since };
+    });
+    return {
+      now,
+      phase: this.phase,
+      pause: this.pause?.reason ?? null,
+      pacing: { on: !!this.config.boardPacing, localBoard: this.localBoard, sent: this.boardSent, shown: this.boardShown, sentMsAgo: this.boardSent ? now - this.boardSentAt : null, timeoutMs: this.boardPaceTimeoutMs },
+      ai,
+      trace: this.aiTrace.slice(-40).map((x) => ({ ...x, msAgo: now - x.at })),
+    };
   }
 
   /** An AI move ended (answered, failed or replaced): its timers go, and a pause waiting for it ends. */
@@ -1614,6 +1650,9 @@ interface AiMoveState {
   overdueTimer?: NodeJS.Timeout;
   /** Shown as thinking on the board (`aiThinking`). */
   shown: boolean;
+  /** When it was asked (the pause before acting starts then), and since when it waits for the board (D-157). */
+  askedAt?: number;
+  waitingSince?: number;
 }
 
 /** AI player names (D-081): short, so "Name (AI)" fits a seat plate; half female, half male. */

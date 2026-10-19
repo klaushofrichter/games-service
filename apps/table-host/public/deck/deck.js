@@ -496,6 +496,8 @@ function info() {
     now: gameMsg?.now ?? Date.now(),
     receivedAt: gameMsg?.receivedAt ?? Date.now(),
     over: gameMsg?.over ?? false,
+    // The board has shown these moves already (D-143, D-157): a game that stages moves on the phone can skip that.
+    shownOnBoard: !!gameMsg?.afterBoard,
     // AI players thinking for more than a moment (D-112): { playerId, seat, since, deadline } in host time.
     aiThinking: state.aiThinking ?? [],
   };

@@ -6,6 +6,8 @@ page is the history. Leave it empty if there is nothing to add beyond the commit
 
 ## [Unreleased]
 
+- *Advanced › Developer › Live status…* (D-157) shows what holds a game up: the board's progress, each AI player
+  (pause, waiting for the board, thinking), phones held back, and recent AI answers.
 - Roulette (D-150): the betting layout no longer jumps between "Place your bets" and "No more bets"; the countdown is a
   ring that empties with the seconds left in its middle, red and beating in the last five; "Bet from your phone" only
   when someone at the table bets from a phone; sounds for chips, clearing bets, betting opening, the last seconds, the
