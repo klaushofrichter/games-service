@@ -659,3 +659,12 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   loopy-game (D-098, D-110). `GAME_REPO_TOKEN` must be able to read it (Contents: read).
 - **D-154 · 2026-10-19 · Klaus** — The lobby's QR panel reads *Scan to join locally* (was *Scan to join*): the code
   is for players at the table; remote players join through an invite. Checked facing south and east (the narrow panel).
+
+## Inviting a remote player by name (19 Oct 2026)
+
+- **D-155 · 2026-10-19 · Klaus** — The lobby's button reads *Invite remote player…* (was *Invite…*). The invite dialog takes an optional name for the player; the link carries it (`/i/CODE?name=…`) and the invite page fills it into the name field, where the player can still change it. Names stay at most 12 characters (D-148) everywhere, non-ASCII included. *Implementation (Claude):*
+  - **Board.** *Player's name (optional, they can change it)* with *Add a name…* opens the board's own keyboard (`openNamePad`, the board has no keyboard): letters with the first of each word capitalised and ⇧ for the other case, a row of accented letters (ä ö ü é è à ç ñ å ø, ß), digits and `- ' . & ! ?` behind *123*, space, delete, a 12-character count. A real keyboard, any input method and pasting work in the field too (keys don't take its focus). The link and the QR code update with the name; ✕ removes it.
+  - **Counting.** Names are cut like the table's `trimName`: NFC, control and invisible characters dropped, spaces tidied, at most 12 code points, so an emoji or an accented letter counts once (not UTF-16 units). The same rule on the board, in the link and on the invite page (its field was `maxlength=12` in UTF-16 units; now cut by code points as typed). The table still cleans every name it receives, and a taken name still gets a number (D-148).
+  - **QR endpoint.** `/api/v1/qr` accepts a URL with a query now (characters `\w.~%+=&-`), up to 400 characters.
+  - **Also fixed:** the dialog's *Remote players can use the board controls* checkbox sat above its text (a general `.overlay label` rule); it is beside it again.
+  - **Checks.** `scripts/e2e/invite_name.py` (the button text; the keyboard's capitals and accents; a real keyboard with Japanese stopping at 12; the link and QR with the name; the invite page filled in, editable, 14 emoji cut to 12, a long name in the link cut to 12; removing the name) and `tests/remote.test.ts` (QR with a named link, a bad query refused).
