@@ -141,7 +141,7 @@ all game folders into one folder and point the table at it:
 git clone https://github.com/klaushofrichter/extra-games ../extra-games
 mkdir -p ../table-games
 cp -r games/* ../extra-games/games/* ../table-games/
-echo "GAMES=$(cd ../table-games && pwd)" >> deploy/local/.env
+echo "GAMES=\"$(cd ../table-games && pwd)\"" >> deploy/local/.env
 docker compose -f deploy/local/docker-compose.yml up -d
 ```
 

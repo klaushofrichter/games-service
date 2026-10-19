@@ -94,7 +94,7 @@ jobs:
           BASE="$PUBLIC_URL" python3 scripts/e2e/play.py coinflip e2e-out/local-docker
           git clone -q --depth 1 -b production https://github.com/klaushofrichter/extra-games ../extra-games
           mkdir -p ../table-games && cp -r games/* ../extra-games/games/* ../table-games/
-          echo "GAMES=$(cd ../table-games && pwd)" >> deploy/local/.env
+          echo "GAMES=\"$(cd ../table-games && pwd)\"" >> deploy/local/.env
           $C up -d && sleep 3 && ok "$PUBLIC_URL/health"
           games=$(curl -fs -H "X-Table-Key: $TABLE_KEY" "$PUBLIC_URL/api/v1/games" | grep -o '"id":"[a-z-]*"' | tr '\n' ' ')
           for g in coin-flip holdem pachisi roulette backgammon chess liars-dice; do

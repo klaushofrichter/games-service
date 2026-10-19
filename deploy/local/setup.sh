@@ -23,7 +23,7 @@ case "$ip" in 127.*|172.1[6-9].*|172.2[0-9].*|172.3[01].*) echo "warning: $ip lo
 rand() { od -An -N16 -tx1 /dev/urandom | tr -d ' \n'; }
 {
   echo "# Written by setup.sh. Phones reach the table at PUBLIC_URL; keep TABLE_KEY on this machine."
-  echo "TABLE_NAME=Game Table"
+  echo 'TABLE_NAME="Game Table"' # quoted: the runbook also loads this file into a shell
   echo "PORT=8080"
   echo "PUBLIC_URL=http://$ip:8080"
   echo "TABLE_KEY=$(rand)"
