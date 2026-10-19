@@ -106,7 +106,7 @@ try:
         remote.wait_for_selector("#play:not([hidden])", timeout=30000)
         rdeck, rboard = remote.frame_locator("#deck"), remote.frame_locator("#board")
         rdeck.locator("text=Rita").first.wait_for(timeout=20000)
-        board.click(".invite button[data-x=close]")
+        board.wait_for_selector(".overlay .invite", state="detached", timeout=10000)  # closes once Rita joins (D-164)
 
         a("POST", "/game/select", {"gameId": "holdem", "settings": {"hands": 3, "turnSeconds": 0, "showdownSeconds": 30}})
         # The board's audio running before the game starts: a headless browser without a sound device can take a while to

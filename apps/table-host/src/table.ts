@@ -1,7 +1,7 @@
 // The table: players, seats, orientation, game selection and the running game.
 // The lobby owns the table; the running game owns everything inside it.
 import { EventEmitter } from "node:events";
-import { randomBytes, randomInt } from "node:crypto";
+import { createHash, randomBytes, randomInt } from "node:crypto";
 import {
   PLAYER_COLORS,
   allowedPlayerCounts,
@@ -192,7 +192,12 @@ export class Table extends EventEmitter {
       exchange: this.exchangeInfo(),
       developer: { allowNoLocalPlayer: this.allowNoLocalPlayer, protectedPlayer: this.protectedPlayer()?.id ?? null },
       noSeat: this.noFreeSeat(),
-      remote: { boardControl: this.remoteBoardControl, maxPlayers: this.config.maxRemotePlayers, players: this.humans().filter((p) => p.location === "remote").length },
+      remote: {
+        boardControl: this.remoteBoardControl,
+        maxPlayers: this.config.maxRemotePlayers,
+        players: this.humans().filter((p) => p.location === "remote").length,
+        joined: this.invitesJoined,
+      },
     };
   }
 
@@ -395,13 +400,30 @@ export class Table extends EventEmitter {
    * A remote player arriving through an invite (already checked by the cloud): no join code needed.
    * One invite seats one player: a second hello from the same session gets that same player back.
    */
-  joinRemote(rawName: unknown, remoteSession: string) {
+  joinRemote(rawName: unknown, remoteSession: string, invite?: string) {
     const existing = [...this.players.values()].find((p) => p.remoteSession === remoteSession);
     if (existing?.sessionToken) {
       this.resume(existing.sessionToken);
       return { playerId: existing.id, sessionToken: existing.sessionToken };
     }
-    return this.join("", rawName, "remote", remoteSession);
+    const r = this.join("", rawName, "remote", remoteSession);
+    // The board's open invite dialog closes when its invite brings a player (D-164).
+    const token = invite ? this.invitesMade.get(invite) : undefined;
+    if (token) {
+      this.invitesMade.delete(invite!);
+      this.invitesJoined = [...this.invitesJoined, { invite: token, name: this.players.get(r.playerId)?.name ?? "" }].slice(-8);
+      this.changed();
+    }
+    return r;
+  }
+
+  /** Invites this table asked for, by sha256 of the code (the service names an invite only by its hash), D-164. */
+  private invitesMade = new Map<string, string>();
+  /** Invites that brought a player, newest last: the board closes that invite's dialog. */
+  private invitesJoined: { invite: string; name: string }[] = [];
+  inviteCreated(token: string) {
+    this.invitesMade.set(createHash("sha256").update(token).digest("hex"), token);
+    while (this.invitesMade.size > 32) this.invitesMade.delete(this.invitesMade.keys().next().value!);
   }
 
   join(joinToken: string, rawName: unknown, location: "local" | "remote" = "local", remoteSession?: string) {

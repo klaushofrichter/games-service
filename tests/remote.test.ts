@@ -182,6 +182,8 @@ describe("remote play", { timeout: 60_000 }, () => {
     await until(() => deck.lastState()?.players.some((p: any) => p.name === "Rita"));
     expect(deck.lastState().joinUrl).toBe("");
     expect(t.host.table.state().remote).toMatchObject({ players: 1, maxPlayers: 4, boardControl: true });
+    // the table knows which invite brought Rita, so the board's invite dialog can close (D-164)
+    expect(t.host.table.state().remote.joined).toEqual([{ invite: inv.token, name: "Rita" }]);
     expect(JSON.stringify(t.host.table.state())).not.toContain(peer.session); // the cloud session stays private
 
     // one invite seats one player: another hello on the same connection gets Rita back, not a new seat

@@ -98,11 +98,14 @@ class Session {
   private lastSeen = Date.now();
   readonly id: string;
   readonly pc: RTCPeerConnection;
+  /** sha256 of the invite this session came through (D-164), when the service says. */
+  readonly invite: string | undefined;
   private readonly gw: RemoteGateway;
-  constructor(id: string, pc: RTCPeerConnection, gw: RemoteGateway) {
+  constructor(id: string, pc: RTCPeerConnection, gw: RemoteGateway, invite?: string) {
     this.id = id;
     this.pc = pc;
     this.gw = gw;
+    this.invite = invite;
   }
 
   send(frame: object) {
@@ -128,7 +131,7 @@ class Session {
       return;
     }
     if (f?.k === "pong") return;
-    const ctx: RemoteContext = { session: this.id };
+    const ctx: RemoteContext = { session: this.id, invite: this.invite };
     if (f.k === "req" && typeof f.path === "string" && Number.isInteger(f.id)) {
       const method = String(f.method ?? "GET").toUpperCase();
       // Only the paths a remote board or deck needs; everything else stays on the table.
@@ -187,13 +190,13 @@ export class RemoteGateway {
   }
 
   /** Answer a remote browser's offer (relayed by the cloud). Non-trickle ICE: the answer carries all candidates. */
-  async answer(session: string, offerSdp: string, iceServers: IceServer[] = []): Promise<string> {
+  async answer(session: string, offerSdp: string, iceServers: IceServer[] = [], invite?: string): Promise<string> {
     const old = this.sessions.get(session);
     if (old) this.drop(session, old); // a reconnect replaces its own earlier connection
     if (this.sessions.size >= MAX_SESSIONS) throw new Error("too many remote connections");
     if (!/^m=application .*webrtc-datachannel/m.test(offerSdp)) throw new Error("the offer has no data channel");
     const pc = new RTCPeerConnection({ iceServers: iceServers as any });
-    const s = new Session(session, pc, this);
+    const s = new Session(session, pc, this, invite);
     this.sessions.set(session, s);
     try {
       pc.onDataChannel.subscribe((ch) => {

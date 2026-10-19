@@ -266,7 +266,8 @@ export interface LobbyState {
    */
   aiThinking: { playerId: string; seat: number; since: number; deadline: number }[];
   /** Remote play: whether remote boards may act, and how many remote players fit. */
-  remote: { boardControl: boolean; maxPlayers: number; players: number };
+  /** `joined`: invites (codes) that brought a player, newest last, with that player's name (D-164). */
+  remote: { boardControl: boolean; maxPlayers: number; players: number; joined: { invite: string; name: string }[] };
   /** The table's display choices from the board's settings (D-092), followed by every board, remote ones too. */
   display: { sound: boolean };
   /**

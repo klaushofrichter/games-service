@@ -60,7 +60,9 @@ try:
         assert rboard.locator("button[data-sim], button[data-adv=sim]").count() == 0, "remote board must not offer simulations"
         players = wait(lambda: [x for x in state()["players"] if x["name"] == "Rita"])
         assert players[0]["location"] == "remote" and players[0]["seat"] is not None, players
-        board.wait_for_selector(".invite-body >> text=1 of 4 remote seats in use")
+        # D-164: the invite brought Rita, so its dialog closes by itself and says who joined.
+        board.wait_for_selector(".overlay .invite", state="detached", timeout=10000)
+        board.locator(".toast >> text=Rita joined through the invite").wait_for(timeout=5000)
         remote.wait_for_timeout(600)
         remote.screenshot(path=os.path.join(OUT, "remote-player.png"))
 
@@ -102,6 +104,9 @@ try:
         # remote board control: change the layout from the remote board, then the table switches control off
         rboard.locator("button[data-layout='6']").click()
         wait(lambda: state()["layout"] == 6)
+        # the board-control switch is in the invite dialog: a new invite shows it (and counts Rita)
+        board.click("button[data-invite]")
+        board.wait_for_selector(".invite-body >> text=1 of 4 remote seats in use")
         board.uncheck(".invite input[name=control]")
         wait(lambda: not state()["remote"]["boardControl"])
         rboard.locator("text=view only").wait_for(timeout=10000)

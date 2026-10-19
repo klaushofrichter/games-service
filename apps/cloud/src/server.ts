@@ -167,7 +167,7 @@ export function startCloud(o: CloudOptions) {
   };
   const saveCode = (c: AccessCode) => store.put("code", c.id, c);
   const saveSettings = () => store.put("setting", "service", settings);
-  const saveRemote = (key: string, s: { tableId: string; expiresAt: number }) => store.put("session", key, { tableId: s.tableId, expiresAt: s.expiresAt });
+  const saveRemote = (key: string, s: { tableId: string; expiresAt: number; invite?: string }) => store.put("session", key, { tableId: s.tableId, expiresAt: s.expiresAt, invite: s.invite });
 
   // ----- load what the store has (D-114) -----
   const now0 = Date.now();
@@ -356,8 +356,9 @@ export function startCloud(o: CloudOptions) {
   const iceServers = o.iceServers ?? [{ urls: "stun:stun.l.google.com:19302" }];
   // Remote play signaling (D-020): tables hold a socket here; remote browsers get a session per invite.
   const tableSockets = new Map<string, WebSocket>();
-  const remoteSessions = new Map<string, { tableId: string; expiresAt: number; ws: WebSocket | null }>(); // by sha256(session id)
-  for (const { key, value } of store.all<{ tableId: string; expiresAt: number }>("session")) value.expiresAt < now0 ? store.delete("session", key) : remoteSessions.set(key, { ...value, ws: null });
+  // by sha256(session id); `invite`: sha256 of the invite it came through, so the table can tell which invite was used (D-164)
+  const remoteSessions = new Map<string, { tableId: string; expiresAt: number; invite?: string; ws: WebSocket | null }>();
+  for (const { key, value } of store.all<{ tableId: string; expiresAt: number; invite?: string }>("session")) value.expiresAt < now0 ? store.delete("session", key) : remoteSessions.set(key, { ...value, ws: null });
   /** The client's address; behind the ingress, the last X-Forwarded-For entry (the one the ingress added). */
   const proxies = new BlockList();
   if (o.trustProxy) {
@@ -1006,7 +1007,7 @@ export function startCloud(o: CloudOptions) {
         inv.used = true;
         store.put("invite", key, inv);
         id = randomToken();
-        session = { tableId: inv.tableId, expiresAt: inv.expiresAt + 12 * 3600_000, ws: null };
+        session = { tableId: inv.tableId, expiresAt: inv.expiresAt + 12 * 3600_000, invite: key, ws: null };
         remoteSessions.set(tokenKey(id), session);
         saveRemote(tokenKey(id), session);
       }
@@ -1035,7 +1036,7 @@ export function startCloud(o: CloudOptions) {
     ws.on("close", () => tableSockets.get(t.tableId) === ws && tableSockets.delete(t.tableId));
   }
 
-  function onRemoteSocket(ws: WebSocket, id: string, s: { tableId: string; expiresAt: number; ws: WebSocket | null }) {
+  function onRemoteSocket(ws: WebSocket, id: string, s: { tableId: string; expiresAt: number; invite?: string; ws: WebSocket | null }) {
     s.ws?.close(4000, "replaced");
     s.ws = ws;
     const t = tables.get(s.tableId);
@@ -1050,7 +1051,7 @@ export function startCloud(o: CloudOptions) {
       if (msg.type !== "offer" || typeof msg.sdp !== "string" || msg.sdp.length > 100_000) return;
       const tws = tableSockets.get(s.tableId);
       if (!tws || t?.status !== "approved") return sendJson(ws, { type: "error", message: "The table is not connected right now. Try again in a moment." });
-      sendJson(tws, { type: "offer", session: id, sdp: msg.sdp, iceServers });
+      sendJson(tws, { type: "offer", session: id, sdp: msg.sdp, iceServers, invite: s.invite });
     });
     ws.on("close", () => s.ws === ws && (s.ws = null));
   }

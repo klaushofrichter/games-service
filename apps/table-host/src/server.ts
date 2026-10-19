@@ -28,6 +28,8 @@ export interface ServerOptions {
 /** A request or socket that arrived over a remote player's WebRTC channel (see remote.ts). */
 export interface RemoteContext {
   session: string;
+  /** sha256 of the invite the session came through (D-164). */
+  invite?: string;
 }
 export const remoteOf = (req: IncomingMessage): RemoteContext | undefined => (req as IncomingMessage & { gtRemote?: RemoteContext }).gtRemote;
 
@@ -252,7 +254,9 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
       const noSeat = table.noFreeSeat(); // an invite with no seat to offer only disappoints (D-129)
       if (noSeat) throw new TableError(409, noSeat, "no-seat");
       if (table.cloud.status !== "online") throw new TableError(409, "the table is not connected to the service right now");
-      return json(res, 201, await opts.createInvite());
+      const inv = await opts.createInvite();
+      table.inviteCreated(inv.token); // so the board's invite dialog can close when it is used (D-164)
+      return json(res, 201, inv);
     }
     if (m === "POST" && path === "/cloud/code") {
       // The table's pre-approved access code (D-113), typed in the board's settings; "" removes it.
@@ -537,7 +541,7 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
             reply("welcome", { role: "deck", playerId: info.id }, msg.seq);
           } else {
             if ([...clients].filter((o) => o.role === "deck").length >= MAX_DECKS) throw new TableError(409, "the table serves eight phones at most");
-            const { playerId, sessionToken } = remoteCtx ? table.joinRemote(p.name, remoteCtx.session) : table.join(String(p.joinToken ?? ""), p.name);
+            const { playerId, sessionToken } = remoteCtx ? table.joinRemote(p.name, remoteCtx.session, remoteCtx.invite) : table.join(String(p.joinToken ?? ""), p.name);
             c.role = "deck";
             c.playerId = playerId;
             reply("welcome", { role: "deck", playerId, sessionToken }, msg.seq);
