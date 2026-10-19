@@ -934,7 +934,7 @@ function toolbar() {
   // Left: the table's seat layout. Right: managing players (D-086).
   return `<div class="toolbar">
     ${seatButtons()}
-    ${REMOTE ? "" : `<div class="right"><button data-add-ai ${fullAttr()}>+ AI player</button><button data-invite ${fullAttr()}>Invite…</button></div>`}
+    ${REMOTE ? "" : `<div class="right"><button data-add-ai ${fullAttr()}>+ AI player</button><button data-invite ${fullAttr()}>Invite remote player…</button></div>`}
   </div>
   ${REMOTE || !sel ? "" : `<div class="toolbar selected"><div class="right"><span class="faint">${esc(sel.name)}</span>
     ${sel.kind === "ai" ? `<button data-config="${sel.id}">Configure</button>` : ""}
@@ -1505,6 +1505,84 @@ function openSimulation() {
   overlayRoot.appendChild(o);
 }
 
+// ---------- typing a name on the board (D-155) ----------
+/** At most this many characters (code points: an emoji or an accented letter counts once), the table's MAX_NAME. */
+const MAX_NAME = 12;
+/** A name as the table keeps it (D-148 trimName): control and invisible characters dropped, spaces tidied, cut. */
+function cleanName(raw, trim = true) {
+  let n = String(raw ?? "").normalize("NFC").replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202e\u2060-\u206f]/g, "").replace(/\s+/g, " ");
+  if (trim) n = n.trimStart();
+  n = Array.from(n).slice(0, MAX_NAME).join("");
+  return trim ? n.trim() : n;
+}
+const NAME_ROWS = [[..."QWERTYUIOP"], [..."ASDFGHJKL"], [..."ZXCVBNM"], [..."ÄÖÜÉÈÀÇÑÅØ"]];
+/**
+ * A keyboard for a name: the board is a touchscreen without one (D-148). Letters (the first of each word capitalised,
+ * ⇧ for the other case), common accented letters, digits by a switch, space and delete. A real keyboard, an input
+ * method for any script, and pasting work in the field too. Calls done(name) with the cleaned name ("" for none).
+ */
+let namePad = null;
+function openNamePad(initial, done) {
+  if (namePad) return;
+  const o = (namePad = document.createElement("div"));
+  o.className = "overlay name-pad";
+  let shift = false;
+  let digits = false;
+  o.innerHTML = `<div class="panel"><h2>Player's name</h2>
+    <div class="name-field"><input maxlength="48" autocomplete="off" spellcheck="false" aria-label="Name"><span class="count"></span></div>
+    <div class="keys"></div>
+    <div class="actions"><button data-clear>Clear</button><span style="flex:1"></span><button data-cancel>Cancel</button><button class="primary" data-save>Use this name</button></div></div>`;
+  const input = o.querySelector("input");
+  input.value = cleanName(initial);
+  const length = () => Array.from(input.value).length;
+  const capital = () => shift !== (input.value === "" || input.value.endsWith(" "));
+  const drawKeys = () => {
+    const up = capital();
+    const full = length() >= MAX_NAME;
+    const rows = digits ? [[..."1234567890"], [..."-'.&!?"]] : NAME_ROWS.map((r) => (up ? r : r.map((c) => c.toLowerCase())));
+    const key = (k, cls = "") => `<button class="${cls}" data-key="${esc(k)}" ${full ? "disabled" : ""}>${k === " " ? "space" : esc(k)}</button>`;
+    o.querySelector(".keys").innerHTML =
+      rows.map((r) => `<div class="row">${r.map((k) => key(k)).join("")}</div>`).join("") +
+      `<div class="row"><button class="wide" data-shift aria-pressed="${shift}" ${digits ? "disabled" : ""}>⇧</button>` +
+      `<button class="wide" data-digits>${digits ? "ABC" : "123"}</button>${digits ? "" : key("ß")}${key(" ", "space")}` +
+      `<button class="wide" data-back aria-label="Delete the last character" ${input.value ? "" : "disabled"}>⌫</button></div>`;
+    o.querySelector(".count").textContent = `${length()}/${MAX_NAME}`;
+  };
+  const set = (v) => {
+    input.value = cleanName(v, false);
+    input.setSelectionRange(input.value.length, input.value.length); // keys type at the end
+    shift = false;
+    drawKeys();
+  };
+  // Keys don't take the focus from the field, so a real keyboard can carry on where the keys left off.
+  o.addEventListener("mousedown", (e) => e.target.closest(".keys button") && e.preventDefault());
+  const close = () => (o.remove(), (namePad = null));
+  const save = () => (done(cleanName(input.value)), close());
+  input.addEventListener("input", () => {
+    const v = cleanName(input.value, false);
+    if (v !== input.value) input.value = v;
+    drawKeys();
+  });
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.isComposing) save();
+    if (e.key === "Escape") (e.stopPropagation(), close());
+  });
+  o.addEventListener("click", (e) => {
+    const b = e.target.closest("button");
+    if (e.target === o || b?.dataset.cancel !== undefined) return close();
+    if (!b) return;
+    if (b.dataset.key !== undefined) set(input.value + b.dataset.key);
+    else if (b.dataset.back !== undefined) set(Array.from(input.value).slice(0, -1).join(""));
+    else if (b.dataset.clear !== undefined) set("");
+    else if (b.dataset.shift !== undefined) ((shift = !shift), drawKeys());
+    else if (b.dataset.digits !== undefined) ((digits = !digits), drawKeys());
+    else if (b.dataset.save !== undefined) save();
+  });
+  drawKeys();
+  overlayRoot.appendChild(o);
+  faceFront(o.querySelector(".panel"));
+}
+
 // ---------- remote invites (phase 1c) ----------
 async function openInvite() {
   const o = document.createElement("div");
@@ -1534,12 +1612,34 @@ async function openInvite() {
     if (r.ok) qr = await r.text();
   } catch {}
   const until = new Date(inv.expiresAt).toLocaleString([], { weekday: "short", hour: "2-digit", minute: "2-digit" });
+  // An optional name for the player (D-155): it travels in the link (?name=) and fills in their name field, which they
+  // can still change. Cut to MAX_NAME characters like every name (D-148).
+  let guest = "";
+  const link = () => {
+    const u = new URL(inv.url);
+    if (guest) u.searchParams.set("name", guest);
+    return u.toString();
+  };
+  const loadQr = async () => {
+    try {
+      const r = await fetch(`/api/v1/qr?text=${encodeURIComponent(link())}`, { headers: { "x-table-key": KEY } });
+      if (r.ok) qr = await r.text();
+    } catch {}
+  };
+  o.addEventListener("click", (e) => {
+    const b = e.target.closest("button");
+    if (b?.dataset.x === "name") openNamePad(guest, async (n) => ((guest = n), await loadQr(), draw()));
+    if (b?.dataset.x === "noname") (async () => ((guest = ""), await loadQr(), draw()))();
+  });
   const draw = () => {
     const r = state.remote ?? { boardControl: true, maxPlayers: 4, players: 0 };
     o.innerHTML = `<div class="panel invite"><h2>Invite a remote player</h2>
       <div class="muted">Send this link by email or chat. It works once, for one player, until ${esc(until)}.</div>
+      <div class="invite-name"><span>Player's name <span class="faint">(optional, they can change it)</span></span>
+        <button data-x="name" class="name-value ${guest ? "" : "empty"}">${guest ? esc(guest) : "Add a name…"}</button>
+        ${guest ? `<button data-x="noname" aria-label="Remove the name">✕</button>` : ""}</div>
       <div class="invite-body"><div class="qr">${qr}</div>
-        <div>${linkLine(inv.url)}<div class="code">${esc(inv.token)}</div>
+        <div>${linkLine(link())}<div class="code">${esc(inv.token)}</div>
         <div class="faint" style="margin-top:10px">${r.players} of ${r.maxPlayers} remote seats in use</div></div></div>
       <label class="invite-control"><input type="checkbox" name="control" ${r.boardControl ? "checked" : ""}>
         Remote players can use the board controls (pick games, start, end)</label>

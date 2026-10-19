@@ -199,7 +199,7 @@ repositories, or chosen ones). The console shows the code, like `ABCD-EFGH`, onc
 
 ## Remote play
 
-A remote player gets an invite link (`https://games.skylar.technology/i/CODE`) from the board (*Invite…*). Opening it asks for a name, then connects the browser **directly to the table** over WebRTC; the service only relays the connection offer and answer. The browser shows the same board as the table, with the player's private deck beside it.
+A remote player gets an invite link (`https://games.skylar.technology/i/CODE`) from the board (*Invite remote player…*), optionally with their name (`?name=`, D-155). Opening it asks for a name (filled in from the link), then connects the browser **directly to the table** over WebRTC; the service only relays the connection offer and answer. The browser shows the same board as the table, with the player's private deck beside it.
 
 ```
  remote browser ──(1) /api/remote/ws: offer──▶ service ──(2) /api/tables/ws──▶ table host

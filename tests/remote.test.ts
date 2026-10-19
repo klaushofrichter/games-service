@@ -145,6 +145,11 @@ describe("remote play", { timeout: 60_000 }, () => {
     // the local board can render a QR code for the invite
     const qr = await t.api("GET", `/qr?text=${encodeURIComponent(inv.url)}`);
     expect(qr.body.toString()).toContain("<svg");
+    // ... also with a name for the player (D-155), and the invite page answers with the name in the link
+    const named = `${inv.url}?${new URLSearchParams({ name: "Zoë 日本 😀" })}`;
+    expect((await t.api("GET", `/qr?text=${encodeURIComponent(named)}`)).body.toString()).toContain("<svg");
+    expect((await t.api("GET", `/qr?text=${encodeURIComponent(inv.url + "?name=<script>")}`)).status).toBe(400);
+    expect((await fetch(`${base}/i/${inv.token}?name=Zo%C3%AB`)).status).toBe(200);
 
     const peer = await RemotePeer.connect(inv.token);
 

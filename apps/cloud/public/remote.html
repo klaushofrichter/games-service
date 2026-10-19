@@ -55,7 +55,7 @@
     <div class="eyebrow">Invitation</div>
     <h1 id="title">Join the game table</h1>
     <p>You're invited to play at a game table. You'll see the board and your own cards. No account needed — any name works.</p>
-    <input name="name" maxlength="12" autocomplete="nickname" placeholder="Your name" required>
+    <input name="name" maxlength="48" autocomplete="nickname" placeholder="Your name" required>
     <button class="primary" type="submit">Join the table</button>
     <p class="err" id="join-err" hidden></p>
     <p style="font-size:.8em;color:var(--faint)">The game runs on the table; this page connects to it directly. <a href="#" id="terms" style="color:var(--brass)">Terms</a> are shown once you're connected.</p>
@@ -80,6 +80,18 @@
   };
   const show = (id) => ["intro", "wait", "play"].forEach((x) => ($(x).hidden = x !== id));
   const wait = (title, text) => { $("wait-title").textContent = title; $("wait-text").textContent = text; show("wait"); };
+
+  // Names (D-148, D-155): at most 12 characters, counted as the table counts them (code points, so an emoji or an
+  // accented letter is one); control and invisible characters dropped, spaces tidied, as the table keeps them.
+  const MAX_NAME = 12;
+  const cleanName = (raw, trim = true) => {
+    let n = String(raw ?? "").normalize("NFC").replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202e\u2060-\u206f]/g, "").replace(/\s+/g, " ");
+    if (trim) n = n.trimStart();
+    n = Array.from(n).slice(0, MAX_NAME).join("");
+    return trim ? n.trim() : n;
+  };
+  // The table may suggest a name in the link (?name=, D-155); the player can change it.
+  const suggested = cleanName(new URLSearchParams(location.search).get("name"));
 
   let saved = store.get() || {};
   let name = saved.name || "";
@@ -340,7 +352,7 @@
 
   $("join").addEventListener("submit", async (e) => {
     e.preventDefault();
-    name = String(new FormData(e.target).get("name") || "").trim();
+    name = cleanName(new FormData(e.target).get("name"));
     if (!name) return;
     $("join-err").hidden = true;
     try {
@@ -355,7 +367,12 @@
     name = saved.name;
     serviceWorker().then(connect, (err) => fail(err.message));
   } else {
-    if (saved.name) document.querySelector("#join input").value = saved.name;
+    const field = document.querySelector("#join input");
+    field.value = saved.name || suggested;
+    field.addEventListener("input", () => {
+      const v = cleanName(field.value, false);
+      if (v !== field.value) field.value = v;
+    });
     show("intro");
   }
 })();
