@@ -27,7 +27,9 @@ function table(t, cls) {
 export function openStatistics({ summary, gameName, overlayRoot, edge = "south", turnable = false, onClose }) {
   const o = document.createElement("div");
   o.className = "overlay statistics";
-  const names = new Map((summary.players ?? []).map((p) => [p.seat, p.name]));
+  // A seat another player took over shows the last player's name with * (D-159), explained under the window.
+  const names = new Map((summary.players ?? []).map((p) => [p.seat, p.changed ? `${p.name} *` : p.name]));
+  const changed = (summary.players ?? []).some((p) => p.changed);
   const holders = (seats) => {
     const n = seats.map((s) => esc(names.get(s) ?? `Seat ${s + 1}`));
     return n.length < 2 ? (n[0] ?? "") : `${n.slice(0, -1).join(", ")} and ${n.at(-1)}`;
@@ -50,6 +52,7 @@ export function openStatistics({ summary, gameName, overlayRoot, edge = "south",
     <h4>Awards</h4>${awardsHtml}
     ${summary.table ? `<h4>Statistics</h4>${table(summary.table, "game")}` : ""}
     ${summary.play ? `<h4>Moves and time</h4>${table(summary.play, "play")}` : ""}
+    ${changed ? `<p class="stats-note">* Another player took over this seat during the game.</p>` : ""}
   </div>`;
   const panel = o.querySelector(".panel");
   const face = (e) => {

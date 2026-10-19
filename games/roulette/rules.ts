@@ -272,6 +272,11 @@ export default defineGame<State>({
     };
   },
 
+  // Another player took over the seat (D-159): the balance and bets stay, the name changes.
+  onSeatChanged(s, seat) {
+    return { state: { ...s, names: { ...s.names, [seat.seat]: seat.name } } };
+  },
+
   onSeatLeft(s, seat, ctx) {
     const active = s.active.filter((x) => x !== seat);
     if (!active.length) return "end";

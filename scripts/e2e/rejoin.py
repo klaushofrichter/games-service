@@ -1,11 +1,11 @@
-"""Browser check: a phone at the table drops during a game and rejoins with the join code from the settings (D-130).
+"""Browser check: a phone at the table drops during a game and gets its seat back (D-130, D-159).
   python3 scripts/e2e/rejoin.py out/
 
 A Table Host of its own (port 8097, a 1.5 s waiting time). Ann and Ben join by phone and play Coin Flip. Ben's phone
-goes away for good (its browser closed, so its session is gone too); after the waiting time Ben leaves the table and
-the game goes on. On a new phone page Ben is told to scan the code, which the board doesn't show during a game. On the
-board, Settings › Show join code shows the QR code and the address; Ben's phone opens that address (as scanning the
-code does), joins with his name, gets a seat in the running game (Coin Flip seats newcomers) and can guess again.
+goes away for good (its browser closed, so its session is gone too); his seat waits and the game goes on. On a new
+phone page Ben is told to scan the code. On the board, Settings › Show join code shows the QR code and the address
+during the game; then Settings › Players › Exchange… Ben, "Someone at the table", shows the seat's own code: Ben's
+phone opens it, joins with his name, takes his seat back and can guess again.
 """
 import os, sys
 from playwright.sync_api import sync_playwright
@@ -45,13 +45,13 @@ try:
         ann.click("#ready")
         ben.click("#ready")
         wait(lambda: all(pl["ready"] for pl in players().values()), 10, "everyone ready")
-        a("POST", "/play", {"awayTimeout": True})  # the waiting time is a setting, off by default (D-144)
         a("POST", "/game/start", {})
         ben.wait_for_selector("[data-guess=heads]")
 
-        # Ben's phone goes away for good: after the waiting time he leaves the table; the game goes on with Ann.
+        # Ben's phone goes away for good (its session too): his seat waits (D-144, D-159); the game goes on.
+        ben_seat = players()["Ben"]["seat"]
         ben_ctx.close()
-        wait(lambda: "Ben" not in players(), 10, "Ben to leave the table")
+        wait(lambda: not players()["Ben"]["connected"], 10, "Ben away")
         assert a("GET", "/state")["phase"] == "active"
         assert not any(board.locator("aside.join").nth(i).is_visible() for i in range(board.locator("aside.join").count())), "the lobby's QR panel is not on the screen during a game"
 
@@ -61,7 +61,7 @@ try:
         ben.goto(BASE + "/deck/")
         ben.wait_for_selector("text=Settings › Show join code")
 
-        # The board: Settings › Show join code, during the game.
+        # The board: Settings › Show join code, during the game (for someone joining a game that seats newcomers).
         board.click("#settings-button")
         board.click(".overlay.settings button[data-join-code]")
         board.wait_for_selector(".overlay.join-code .join-big img")
@@ -69,19 +69,23 @@ try:
         assert shown == a("GET", "/join")["url"], f"the address shown: {shown}"
         assert a("GET", "/join")["token"] in board.inner_text(".overlay.join-code .code")
         board.screenshot(path=os.path.join(OUT, "rejoin-join-code.png"))
+        board.click(".overlay.join-code [data-close-overlay]")
+        board.wait_for_selector(".overlay.join-code", state="detached")
 
-        # Ben "scans" it: his phone opens the address, joins, and is seated in the running game.
-        ben.goto(shown)
+        # Back into his own seat: Settings › Players › Exchange… Ben, someone at the table (D-159). Ben "scans" its
+        # code, joins with his name and plays his seat again.
+        board.click(f".overlay.settings [data-exchange='{players()['Ben']['id']}']")
+        board.click(".overlay.exchange [data-ex=local]")
+        board.wait_for_selector(".overlay.exchange .join-big img")
+        ben.goto(a("GET", "/state")["exchange"]["url"])
         ben.fill("input[name=name]", "Ben")
         ben.click("button[type=submit]")
-        wait(lambda: players().get("Ben", {}).get("seat") is not None, 10, "Ben seated again")
+        wait(lambda: players().get("Ben", {}).get("seat") == ben_seat and players()["Ben"]["connected"], 10, "Ben in his seat again")
+        board.wait_for_selector(".overlay.exchange", state="detached", timeout=5000)
         assert a("GET", "/state")["phase"] == "active"
         ben.wait_for_selector("[data-guess=heads]", timeout=10000)
         ben.screenshot(path=os.path.join(OUT, "rejoin-phone.png"))
 
-        # The window closes with Done; the settings stay open beneath it until closed too.
-        board.click(".overlay.join-code [data-close-overlay]")
-        board.wait_for_selector(".overlay.join-code", state="detached")
         board.click(".overlay.settings [data-close-overlay]")
         br.close()
     if errors:

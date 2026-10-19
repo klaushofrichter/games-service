@@ -21,19 +21,25 @@ export function withStatistics(summary: GameSummary | null, log: readonly LogRec
   const own = (summary.awards ?? []).map((a) => checkAward(a, seats)).filter((a): a is GameAward => a !== null);
   const pace = paceOf(log, players);
   const awards = [...own, ...pace.awards.filter((a) => !own.some((o) => o.id === a.id))];
+  // The game's own table names the seats' last players (with onSeatChanged); a changed seat gets its * there too (D-159).
+  const changed = new Set(players.filter((p) => p.changed).map((p) => p.name));
+  const table = summary.table && changed.size ? { ...summary.table, rows: summary.table.rows.map((r) => (typeof r[0] === "string" && changed.has(r[0]) ? [`${r[0]} *`, ...r.slice(1)] : r)) } : summary.table;
   return {
     ...summary,
+    ...(table ? { table } : {}),
     players,
     ...(pace.table ? { play: pace.table } : {}),
     awards,
   };
 }
 
+/** Each seat's player at the end (D-159): a seat another player took over has the last one's name, marked `changed`. */
 function playersOf(log: readonly LogRecord[]) {
-  const out = new Map<number, { seat: number; name: string; ai: boolean }>();
+  const out = new Map<number, { seat: number; name: string; ai: boolean; changed?: true }>();
   for (const r of log) {
     if (r.t === "start") for (const s of r.seats) out.set(s.seat, { seat: s.seat, name: s.name, ai: s.kind === "ai" });
     else if (r.t === "seatJoined") out.set(r.seat.seat, { seat: r.seat.seat, name: r.seat.name, ai: r.seat.kind === "ai" });
+    else if (r.t === "seatChanged") out.set(r.seat.seat, { seat: r.seat.seat, name: r.seat.name, ai: r.seat.kind === "ai", changed: true });
   }
   return [...out.values()].sort((a, b) => a.seat - b.seat);
 }
@@ -58,7 +64,7 @@ function checkAward(a: GameAward, seats: Set<number>): GameAward | null {
  * Moves and thinking time per player. A move's thinking time is the time since the game's previous step (a move, a
  * timer, a seat change, the start), without the time the game stood paused; times are shown for people, not AI players.
  */
-function paceOf(log: readonly LogRecord[], players: { seat: number; name: string; ai: boolean }[]) {
+function paceOf(log: readonly LogRecord[], players: { seat: number; name: string; ai: boolean; changed?: true }[]) {
   const moves = new Map<number, number[]>();
   let last: number | null = null;
   let pausedSince: number | null = null;
@@ -73,7 +79,7 @@ function paceOf(log: readonly LogRecord[], players: { seat: number; name: string
       pausedSince = null;
       continue;
     }
-    if (r.t === "start" || r.t === "timer" || r.t === "seatJoined" || r.t === "seatLeft") {
+    if (r.t === "start" || r.t === "timer" || r.t === "seatJoined" || r.t === "seatLeft" || r.t === "seatChanged") {
       last = r.at;
       paused = 0;
       continue;
@@ -94,8 +100,10 @@ function paceOf(log: readonly LogRecord[], players: { seat: number; name: string
     if (!m.length) continue;
     const avg = m.reduce((a, b) => a + b, 0) / m.length;
     const longest = Math.max(...m);
-    rows.push([p.name, m.length, p.ai ? "–" : seconds(avg), p.ai ? "–" : seconds(longest)]);
-    if (!p.ai && m.length >= MIN_MOVES_FOR_TIMES) timed.push({ seat: p.seat, avg, longest });
+    // A seat that changed hands (D-159): one row under the last player's name with *, no times (they mix two players).
+    const noTimes = p.ai || p.changed;
+    rows.push([p.changed ? `${p.name} *` : p.name, m.length, noTimes ? "–" : seconds(avg), noTimes ? "–" : seconds(longest)]);
+    if (!noTimes && m.length >= MIN_MOVES_FOR_TIMES) timed.push({ seat: p.seat, avg, longest });
   }
   const awards: GameAward[] = [];
   if (timed.length >= 2) {

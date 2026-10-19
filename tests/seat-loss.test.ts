@@ -94,18 +94,17 @@ describe("a game that can't go on without a player (D-119)", () => {
     expect(records.find((r) => r.t === "disconnected")).toMatchObject({ waiting: "Partners can't go on without a full team." });
   });
 
-  it("ends with the game's reason when a player it needs is removed, and the board can tell beforehand", async () => {
+  it("a player it needs can't be removed (D-159), the board can tell why, and an exchange keeps the game going", async () => {
     const { ben } = await partners("teams");
     expect((await state()).needed[ben.playerId]).toBe("Partners can't go on without a full team.");
-    await t.ok("DELETE", `/players/${ben.playerId}`);
-    const s = await until(async () => {
-      const x = await state();
-      return x.phase === "finished" ? x : null;
-    });
-    expect(s.summary.text).toBe("Partners can't go on without a full team.");
+    expect((await t.api("DELETE", `/players/${ben.playerId}`)).status).toBe(409);
+    const seat = (await state()).players.find((p: any) => p.id === ben.playerId).seat;
+    await t.ok("POST", "/exchange", { seat, kind: "ai" });
+    expect((await state()).phase).toBe("active");
+    await t.ok("POST", "/game/end");
     const { run, records } = await lastLog();
-    expect(run).toMatchObject({ endReason: "seatLeft", result: "Partners can't go on without a full team.", verify: { ok: 1 } });
-    expect(records.at(-2)).toMatchObject({ t: "seatLeft", ended: true });
+    expect(run).toMatchObject({ endReason: "terminated", verify: { ok: 1 } });
+    expect(records.some((r) => r.t === "seatChanged" && r.seat.seat === seat && r.seat.kind === "ai")).toBe(true);
   });
 
   it("logs a disconnect and a return, and the game still replays exactly", async () => {
@@ -125,37 +124,20 @@ describe("a game that can't go on without a player (D-119)", () => {
 });
 
 describe("a game that goes on without a player (D-119)", () => {
-  it("goes on while a phone is away, and the player leaves after the waiting time", async () => {
+  it("goes on while a phone is away, and the seat waits past the waiting time (D-144, D-159)", async () => {
     const { ann } = await partners("free");
     expect((await state()).needed).toEqual({});
-    await t.ok("POST", "/play", { awayTimeout: true }); // the waiting time is a setting (D-144)
     ann.close();
-    await sleep(100);
-    expect((await state()).phase).toBe("active");
-    await until(async () => !(await state()).players.some((p: any) => p.name === "Ann"));
-    expect((await state()).phase).toBe("active");
-  });
-
-  it("ends with its own reason from onSeatLeft", async () => {
-    const { ann, ben } = await partners("free");
-    const ais = (await state()).players.filter((p: any) => p.kind === "ai");
-    await t.ok("DELETE", `/players/${ais[0].id}`);
-    await t.ok("DELETE", `/players/${ais[1].id}`);
-    await t.ok("DELETE", `/players/${ben.playerId}`);
-    const s = await until(async () => {
-      const x = await state();
-      return x.phase === "finished" ? x : null;
-    });
-    expect(s.summary).toMatchObject({ text: "Partners needs at least two players.", highlights: { left: expect.any(Number) } });
-    expect(ann.playerId).toBeTruthy();
-    expect((await lastLog()).run).toMatchObject({ endReason: "seatLeft", verify: { ok: 1 } });
+    await sleep(600); // twice the tests' waiting time
+    const s = await state();
+    expect(s.phase).toBe("active");
+    expect(s.players.find((p: any) => p.name === "Ann")).toMatchObject({ connected: false });
   });
 });
 
 describe("games without the hook", () => {
-  it("go on as before when a phone is away", async () => {
+  it("go on when a phone is away, and keep the seat (D-159)", async () => {
     t = await testHost();
-    await t.ok("POST", "/play", { awayTimeout: true }); // the waiting time is a setting (D-144)
     const a = await t.joinDeck("Ann");
     const b = await t.joinDeck("Ben");
     await t.ok("POST", "/game/select", { gameId: "coin-flip", settings: { rounds: 20, roundSeconds: 0 } });
@@ -164,9 +146,8 @@ describe("games without the hook", () => {
     await t.ok("POST", "/game/start");
     expect((await state()).needed).toEqual({});
     b.close();
-    await sleep(100);
+    await sleep(600);
     expect((await state()).phase).toBe("active");
-    await until(async () => !(await state()).players.some((p: any) => p.name === "Ben"));
-    expect((await state()).phase).toBe("active");
+    expect((await state()).players.find((p: any) => p.name === "Ben")).toMatchObject({ connected: false });
   });
 });

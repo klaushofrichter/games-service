@@ -142,6 +142,11 @@ export default defineGame<State>({
     };
   },
 
+  // Another player took over the seat (games-service D-159): the board names them.
+  onSeatChanged(state, seat) {
+    return { state: { ...state, names: { ...state.names, [seat.seat]: seat.name } } };
+  },
+
   onSeatLeft(state, seat, ctx) {
     const active = state.active.filter((s) => s !== seat);
     const guesses = { ...state.guesses };

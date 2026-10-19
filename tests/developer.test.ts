@@ -102,9 +102,8 @@ describe("games without a player at the table (D-118)", () => {
     expect((await t.ok("GET", "/state")).players.map((p: any) => p.name)).toContain("Ann");
   });
 
-  it("off: a phone that goes away still leaves, and the game carries on with the AIs", async () => {
+  it("off: a phone that goes away keeps its seat, and the game carries on with the AIs (D-159)", async () => {
     t = await testHost();
-    await t.ok("POST", "/play", { awayTimeout: true }); // the waiting time is a setting (D-144)
     const a = await t.joinDeck("Ann");
     await t.ok("POST", "/ai", {});
     await t.ok("POST", "/ai", {});
@@ -112,11 +111,13 @@ describe("games without a player at the table (D-118)", () => {
     await a.request("lobby", "ready", { ready: true });
     await t.ok("POST", "/game/start");
     a.close(); // grace period in the tests: 300 ms
-    await until(async () => !(await t.ok("GET", "/state")).players.some((p: any) => p.name === "Ann"));
-    expect((await t.ok("GET", "/state")).phase).toBe("active");
+    await new Promise((r) => setTimeout(r, 600));
+    const s = await t.ok("GET", "/state");
+    expect(s.players.find((p: any) => p.name === "Ann")).toMatchObject({ connected: false });
+    expect(s.phase).toBe("active");
   });
 
-  it("on: the last player at the table can be removed, and the game carries on", async () => {
+  it("on: the last player at the table can be exchanged for an AI, and the game carries on (D-159)", async () => {
     t = await testHost();
     const a = await t.joinDeck("Ann");
     await t.ok("POST", "/ai", {});
@@ -126,7 +127,8 @@ describe("games without a player at the table (D-118)", () => {
     await t.ok("POST", "/developer", { allowNoLocalPlayer: true });
     expect((await t.ok("GET", "/state")).developer.protectedPlayer).toBeNull();
     await t.ok("POST", "/game/start");
-    await t.ok("DELETE", `/players/${a.playerId}`);
+    const seat = (await t.ok("GET", "/state")).players.find((p: any) => p.id === a.playerId).seat;
+    await t.ok("POST", "/exchange", { seat, kind: "ai" });
     const s = await t.ok("GET", "/state");
     expect(s.phase).toBe("active");
     expect(s.players.every((p: any) => p.kind === "ai")).toBe(true);

@@ -234,6 +234,12 @@ export default defineGame<State>({
     return doMove(s, s.turn, chooseMove(s, s.turn, legal, "average", ctx.random), ctx);
   },
 
+  // Another player took over the seat (D-159): the tokens stay, the name changes.
+  onSeatChanged(s, seat) {
+    const p = s.players[seat.seat];
+    return p ? { state: { ...s, players: { ...s.players, [seat.seat]: { ...p, name: seat.name } } } } : { state: s };
+  },
+
   onSeatLeft(s, seat, ctx) {
     if (!s.players[seat]) return { state: s };
     const order = s.order.filter((x) => x !== seat);

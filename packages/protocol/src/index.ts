@@ -178,7 +178,8 @@ export interface GameSummary {
    */
   awards?: GameAward[];
   /** Filled in by the host (D-140): the seats' names, for the awards. */
-  players?: { seat: number; name: string; ai: boolean }[];
+  /** Each seat's player at the end; `changed`: another player took the seat over during the game (D-159). */
+  players?: { seat: number; name: string; ai: boolean; changed?: boolean }[];
   /** Filled in by the host from the game log (D-140): moves and thinking time per player. */
   play?: { columns: string[]; rows: (string | number)[][] };
 }
@@ -270,13 +271,15 @@ export interface LobbyState {
   /** The table's display choices from the board's settings (D-092), followed by every board, remote ones too. */
   display: { sound: boolean };
   /**
-   * D-144: `awayTimeout` — a player whose phone stays away during a game leaves it after the waiting time (on), or
-   * their seat waits (off, the default). `away`: players away that long during the game whose seat waits; the board
-   * offers to hand their seat to an AI player.
+   * Players away during the game, whose seat waits (D-144); the board offers to exchange them (D-159). `left`: they
+   * left the game from their phone (D-158) and won't come back to it.
    */
-  play: { awayTimeout: boolean };
-  /** `left`: they left the game from their phone (D-158) and won't come back to it. */
   away: { playerId: string; name: string; seat: number; since: number; left?: boolean }[];
+  /**
+   * The seat exchange the board has open (D-159): seat `seat` (now `name`'s) waits for a person to join with `url`, at
+   * the table (`local`, a QR code) or remotely (an invite). Null when none is open.
+   */
+  exchange: { seat: number; kind: "local" | "remote"; url: string; since: number; playerId: string | null; name: string | null } | null;
   /**
    * The developer setting (D-118): games without a player at the table. `protectedPlayer`: the one player the board
    * may not remove while it is off (the last one at the table, while a game is chosen or running).

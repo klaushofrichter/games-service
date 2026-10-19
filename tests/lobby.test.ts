@@ -431,7 +431,7 @@ describe("ready flow and play", () => {
     expect((await t.ok("POST", "/game/close")).phase).toBe("idle");
   });
 
-  it("ends a non-dynamic game when a player leaves", async () => {
+  it("keeps every player in a running game: the board can't remove one (D-159)", async () => {
     const decks = [];
     for (const n of ["A", "B", "C", "D"]) decks.push(await t.joinDeck(n));
     await t.ok("POST", "/game/select", { gameId: "quartet" });
@@ -440,9 +440,10 @@ describe("ready flow and play", () => {
     const first = await decks[0].waitView((v) => v.view.myTurn === true);
     expect(first.seat).toBe(0);
     expect((await decks[1].request("game", "intent", { name: "pass" })).payload.reason).toMatch(/not your turn/);
-    await t.ok("DELETE", `/players/${decks[2].playerId}`);
-    const s = await decks[0].waitState((s) => s.phase === "finished");
-    expect(s.summary?.text).toMatch(/a player left/);
+    const r = await t.api("DELETE", `/players/${decks[2].playerId}`);
+    expect(r.status).toBe(409);
+    expect(r.body).toMatchObject({ code: "in-game", error: /exchange them/ });
+    expect((await t.ok("GET", "/state")).phase).toBe("active");
   });
 });
 
@@ -480,8 +481,7 @@ describe("disconnects and eviction", () => {
     await expect(Deck.connect(t.base, { sessionToken: a.sessionToken })).rejects.toThrow(/session expired/);
   });
 
-  it("removes a disconnected player from a running dynamic game after the grace period", async () => {
-    await t.ok("POST", "/play", { awayTimeout: true }); // the waiting time is a setting (D-144)
+  it("keeps a disconnected player's seat in a running game past the grace period (D-144, D-159)", async () => {
     const a = await t.joinDeck("A");
     const b = await t.joinDeck("B");
     await t.ok("POST", "/game/select", { gameId: "coin-flip", settings: { rounds: 2, roundSeconds: 0 } });
@@ -490,10 +490,11 @@ describe("disconnects and eviction", () => {
     await t.ok("POST", "/game/start");
     await a.request("game", "intent", { name: "guess", payload: "heads" });
     b.close();
-    // once B's grace period is over, B is removed and A's guess completes the round
-    const v = await a.waitView((v) => v.view.round === 2);
-    expect(v.view.lastFlip).toMatch(/heads|tails/);
-    expect((await t.ok("GET", "/state")).phase).toBe("active");
+    // past B's grace period B is still seated (away): the round waits for B's guess
+    await new Promise((r) => setTimeout(r, 600));
+    const s = await t.ok("GET", "/state");
+    expect(s.players.find((p: any) => p.id === b.playerId)).toMatchObject({ connected: false });
+    expect(s.phase).toBe("active");
   });
 });
 
@@ -555,7 +556,10 @@ describe("AI configuration", () => {
     const seatOf = (id: string) => s.players.find((p: any) => p.id === id).seat;
     expect(start.aiOptions[seatOf(ai1)]).toEqual({ style: "aggressive" });
     expect(start.aiOptions[seatOf(ai2)]).toEqual({ style: "conservative" }); // manifest default
-    expect((await t.api("POST", `/players/${ai2}/ai-options`, { options: { style: "erratic" } })).status).toBe(409); // not while playing
+    // During the game the board may change how an AI in it plays (D-159): from its next move, noted in the log.
+    expect((await t.ok("POST", `/players/${ai2}/ai-options`, { options: { style: "erratic" } })).players.find((p: any) => p.id === ai2).aiOptions).toEqual({ style: "erratic" });
+    expect(t.host.table.runtime!.aiOptions(seatOf(ai2))).toEqual({ style: "erratic" });
+    expect(t.host.table.runtime!.log.at(-1)).toMatchObject({ t: "aiOptions", seat: seatOf(ai2) });
   });
 });
 

@@ -365,6 +365,11 @@ export default defineGame<State>({
     return { state: s };
   },
 
+  // Another player took over the seat (D-159): the seat's chips and cards stay, the name changes.
+  onSeatChanged(prev, seat) {
+    return { state: { ...prev, names: { ...prev.names, [seat.seat]: seat.name } } };
+  },
+
   onSeatLeft(prev, seat, ctx) {
     if (!prev.seats.includes(seat)) return { state: prev };
     const s = clone(prev);
