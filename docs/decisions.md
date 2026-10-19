@@ -669,3 +669,17 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   - **Also fixed:** the dialog's *Remote players can use the board controls* checkbox sat above its text (a general `.overlay label` rule); it is beside it again.
   - **Checks.** `scripts/e2e/invite_name.py` (the button text; the keyboard's capitals and accents; a real keyboard with Japanese stopping at 12; the link and QR with the name; the invite page filled in, editable, 14 emoji cut to 12, a long name in the link cut to 12; removing the name) and `tests/remote.test.ts` (QR with a named link, a bad query refused).
 - **D-156 · 2026-10-19 · Klaus** — The deck's header outside a game gives the name its room: *Change name* and *Rules* sit in a row of their own under the name, only the seat badge beside it. Klaus saw a remote player's name cut to "Ja…" in the lobby (a narrow deck window with three items beside the name). In a game the header is unchanged (*Rules* and the badge beside the name; no *Change name* there). *Also:* in *At the table*, a name keeps its colour dot and stays on one line; on a narrow deck the seat and status move under it, to the right. Checked at 320, 340 and 390 px with 12-character names.
+- **D-157 · 2026-10-19 · Klaus** — A live status for finding what holds a game up, and phones told when the board has
+  shown their moves already. *Why:* Klaus saw the board light up his turn while his phone still said "Waiting for …
+  (AI)" several times over, and asked whether AI players think when it isn't their move and how to see what blocks.
+  Measured: they don't block; every AI is asked after each change and answers "no move" in milliseconds when it isn't
+  its turn. The lag was Loopy's phone staging every move again on its own (slower) timeline after the board had
+  shown it (loopy-game L-035). *Implementation (Claude):*
+  - **Live status.** *Advanced › Developer › Live status…* on the table's board (`GET /api/v1/debug`, not for remote
+    boards), refreshed twice a second: the board's progress (game messages sent and shown, D-141), each AI player's
+    move in the making (*pause before acting*, *waiting for the board*, *thinking*, and for how long), the phones held
+    back until the board shows the AI moves (D-143), and the AI players' recent answers (moves with their time, the
+    time they waited for the board; "no move" answers only when they took 50 ms or more).
+  - **afterBoard.** A game message a phone gets only after the board has shown it (D-143) carries `afterBoard: true`;
+    the deck passes it to the game as `info.shownOnBoard`, so a game that stages moves on the phone can skip that.
+  - **Checks.** `tests/board-pacing.test.ts`: the flag on a held message and not on the player's own, and the status.

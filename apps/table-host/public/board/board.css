@@ -413,7 +413,7 @@ button.copy:hover, button.copy.done { color: var(--brass); border-color: var(--b
 #stats-button.bottom-left { left: 214px; bottom: 26px; }
 #stats-button.top-right { right: 214px; top: 26px; }
 #stats-button.top-left { left: 214px; top: 26px; }
-/* A remote board turned to a north seat: the game's corner as its player sees it, text upright (D-145). */
+/* A remote board turned to a north seat: the game's corner as its player sees it, text upright (D-157). */
 #lobby-button.turned, #result-button.turned, #stats-button.turned { transform: rotate(180deg); }
 #lobby-button.turned:active, #result-button.turned:active, #stats-button.turned:active { transform: rotate(180deg) scale(0.97); }
 .overlay.statistics { z-index: 42; }
@@ -457,3 +457,6 @@ button.copy:hover, button.copy.done { color: var(--brass); border-color: var(--b
 .name-pad .keys button.space { flex: 1 1 auto; font-size: 16px; }
 .name-pad .keys button[aria-pressed="true"] { background: var(--brass-deep); color: #1b1407; }
 .name-pad .actions { display: flex; gap: 12px; margin-top: 18px; }
+
+/* Live status (D-157): the AI players' recent answers, newest first. */
+.overlay.live-status .live-trace { max-height: 260px; overflow: auto; font-family: var(--mono); font-size: 15px; line-height: 1.5; color: var(--ink-soft); }
