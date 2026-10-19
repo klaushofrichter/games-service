@@ -3,7 +3,8 @@
 
 A Table Host of its own (port 8131, a 1.5 s waiting time, which is off by default). Ann and Ben play Coin Flip; Ben's
 phone goes away. His seat waits past the waiting time; after a moment the board shows a card at his seat, "Ben is away",
-with "Hand Ben to an AI". Tapping it asks first; confirmed, "Ben (AI)" takes the seat and the card is gone.
+with "Hand Ben to an AI". Tapping it asks first; confirmed, "Ben (AI)" takes the seat and the card is gone. Then Ann
+leaves from her phone (D-158), and the board shows "Ann left the game" at once.
 """
 import os, sys
 from playwright.sync_api import sync_playwright
@@ -52,6 +53,16 @@ try:
         wait(lambda: any(pl["name"] == "Ben (AI)" and pl["kind"] == "ai" for pl in a("GET", "/state")["players"]), 10, "Ben (AI) in the seat")
         board.wait_for_selector("#away-layer .away-card", state="detached", timeout=5000)
         assert a("GET", "/state")["phase"] == "active"
+        # Ann leaves from her phone (D-158): the own tab, Leave the game, confirmed; her phone says so and the board
+        # shows "Ann left the game" with Hand Ann to an AI at once.
+        ann.click("#tab-table")
+        ann.click("[data-leave=game]")
+        ann.wait_for_selector(".leave-confirm")
+        ann.screenshot(path=os.path.join(OUT, "leave-confirm.png"))
+        ann.click(".leave-confirm")
+        ann.wait_for_selector("text=You left the game")
+        board.wait_for_selector("#away-layer .away-card:has-text('left the game')", timeout=5000)
+        board.screenshot(path=os.path.join(OUT, "left-card.png"))
         br.close()
 finally:
     proc.terminate()

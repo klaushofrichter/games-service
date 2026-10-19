@@ -247,7 +247,7 @@ export interface LobbyState {
     canSave: boolean;
     ai?: { playerId: string; name: string; seat: number; since: number };
     /** "player" (D-119): the players the game can't go on without, whose phones are away, and the game's reason. */
-    players?: { playerId: string; name: string; seat: number; since: number; text: string }[];
+    players?: { playerId: string; name: string; seat: number; since: number; text: string; left?: boolean }[];
   } | null;
   /**
    * During a game (D-119): players the game can't go on without, with the game's reason. Removing one ends the game;
@@ -275,7 +275,8 @@ export interface LobbyState {
    * offers to hand their seat to an AI player.
    */
   play: { awayTimeout: boolean };
-  away: { playerId: string; name: string; seat: number; since: number }[];
+  /** `left`: they left the game from their phone (D-158) and won't come back to it. */
+  away: { playerId: string; name: string; seat: number; since: number; left?: boolean }[];
   /**
    * The developer setting (D-118): games without a player at the table. `protectedPlayer`: the one player the board
    * may not remove while it is off (the last one at the table, while a game is chosen or running).

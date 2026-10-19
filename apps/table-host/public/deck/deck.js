@@ -19,6 +19,8 @@ let state = null;
 let gameMsg = null; // last game.view message { seat, view, events, timers, now, receivedAt }
 let banner = "";
 let removed = false;
+let removedReason = ""; // "left" (from this phone, D-158), "evicted", "replaced"
+let leftGame = false; // removed during a game
 let replaced = false; // this player's deck opened in another window (D-133)
 let seq = 0;
 let retry = 0;
@@ -97,6 +99,8 @@ function connect(hello) {
         replaced = true;
       } else if (m.type === "removed") {
         removed = true;
+        removedReason = m.payload?.reason ?? "";
+        leftGame = !!(state && (state.phase === "active" || state.phase === "paused"));
         storage.clear();
       } else if (m.type === "error" || m.type === "reject") {
         const msg = m.payload.message ?? m.payload.reason;
@@ -182,6 +186,7 @@ function renderTop() {
       <button type="button" role="tab" id="tab-game" data-tab="game" aria-selected="${tab === "game"}" aria-controls="body">${esc(state.game?.name ?? "Game")}</button></div>`;
     body.setAttribute("aria-labelledby", "tab-game");
     tablePanel.innerHTML = tab === "table" ? `${whoHtml(p, true)}<div class="card list"><div class="eyebrow" style="margin-bottom:6px">At the table</div>${playersHtml()}</div>
+      ${p?.seat != null ? leaveHtml(true) : ""}
       <div class="center"><a href="/deck/terms.html" data-terms class="faint">Terms of service</a></div>` : "";
   } else {
     tab = "game";
@@ -223,6 +228,8 @@ for (const el of [top, tablePanel]) {
   el.addEventListener("click", (e) => {
     if (e.target.closest("[data-rules]")) void openRules();
     if (e.target.closest("[data-rename]")) openRename(e.target.closest("[data-rename]"));
+    const lv = e.target.closest("[data-leave]");
+    if (lv) void leave(lv.dataset.leave === "game");
     const t = e.target.closest("[data-tab]");
     if (t) setTab(t.dataset.tab);
     const terms = e.target.closest("a[data-terms]");
@@ -373,7 +380,12 @@ function render() {
   if (removed) {
     closeGame();
     top.innerHTML = "";
-    body.innerHTML = `<div class="card center"><h1>You left the table</h1><p class="muted">${REMOTE ? "Ask the table for a new invite to join again." : "Scan the QR code on the board to join again. During a game, the board shows it under Settings › Show join code."}</p></div>`;
+    // Left from the own tab during a game (D-158): out of the game's layout, so the message shows.
+    tablePanel.hidden = true;
+    tablePanel.innerHTML = "";
+    body.style.display = "";
+    document.body.classList.remove("in-game");
+    body.innerHTML = removedReason === "left" && leftGame ? `<div class="card center"><h1>You left the game</h1><p class="muted">${REMOTE ? "Ask the table for a new invite to play again." : "Scan the QR code on the board to join the next game."}</p></div>` : `<div class="card center"><h1>You left the table</h1><p class="muted">${REMOTE ? "Ask the table for a new invite to join again." : "Scan the QR code on the board to join again. During a game, the board shows it under Settings › Show join code."}</p></div>`;
     return;
   }
   if (!me) return renderJoin();
@@ -388,6 +400,7 @@ function render() {
   }
   body.innerHTML = renderLobby(self());
   body.querySelector("#ready")?.addEventListener("click", () => send("lobby", "ready", { ready: !self()?.ready }));
+  body.querySelector("[data-leave]")?.addEventListener("click", () => void leave(false));
 }
 
 function renderJoin() {
@@ -434,6 +447,42 @@ function renderJoin() {
   });
 }
 
+/** "Leave the game" (D-158): on the Ready screen (leaves the table) and on the own tab during a game. */
+function leaveHtml(inGame) {
+  return `<div class="leave-row"><button type="button" class="big leave-btn" data-leave="${inGame ? "game" : "table"}">Leave the game</button></div>`;
+}
+
+/** A yes/no question in a sheet (D-158); resolves true for the confirming button. */
+function confirmSheet(title, text, yes) {
+  return new Promise((resolve) => {
+    const modal = openSheet(state.tableName, title, title);
+    if (!modal) return resolve(false);
+    modal.querySelector(".rules-body").innerHTML = `<p>${esc(text)}</p>`;
+    const closeBtn = modal.querySelector(".rules-sheet > button[data-close]");
+    closeBtn.textContent = "Stay";
+    const ok = document.createElement("button");
+    ok.type = "button";
+    ok.className = "big leave-confirm";
+    ok.textContent = yes;
+    closeBtn.before(ok);
+    let answer = false;
+    ok.addEventListener("click", () => {
+      answer = true;
+      closeBtn.click();
+    });
+    new MutationObserver((_, obs) => {
+      if (!modal.isConnected) (obs.disconnect(), resolve(answer));
+    }).observe(document.body, { childList: true });
+  });
+}
+
+async function leave(inGame) {
+  const text = inGame
+    ? "You leave this game and can't come back into it. Your seat waits on the board, where it can be handed to an AI player."
+    : "You leave the table. To play again, scan the QR code on the board.";
+  if (await confirmSheet("Leave the game?", REMOTE && !inGame ? "You leave the table. To play again, ask the table for a new invite." : text, "Leave the game")) send("lobby", "leave", {});
+}
+
 /** Everyone at the table with their colour and seat (D-104). */
 function playersHtml() {
   return state.players
@@ -456,7 +505,8 @@ function renderLobby(p) {
     action = `<div class="card"><div class="eyebrow">Result</div><div class="display" style="font-size:1.3em;margin-top:6px">${esc(state.summary.text)}</div>
       ${t ? `<div class="summary-scroll"><table class="summary-table"><tr>${t.columns.map((c) => `<th>${esc(c)}</th>`).join("")}</tr>${t.rows.map((r) => `<tr>${r.map((c) => `<td>${esc(c)}</td>`).join("")}</tr>`).join("")}</table></div>` : ""}</div>`;
   }
-  return `${action}<div class="card list"><div class="eyebrow" style="margin-bottom:6px">At the table</div>${playersHtml()}</div>`;
+  const leaveRow = state.phase === "ready" && state.game && p?.seat != null ? leaveHtml(false) : "";
+  return `${action}<div class="card list"><div class="eyebrow" style="margin-bottom:6px">At the table</div>${playersHtml()}</div>${leaveRow}`;
 }
 
 // ---------- the game's own deck UI ----------
