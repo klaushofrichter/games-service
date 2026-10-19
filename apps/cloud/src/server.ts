@@ -17,6 +17,9 @@ import { check, CODE_ALPHABET, codeState, expiryFor, formatCode, hashCode, isExp
 
 const ADMIN_PAGE = fileURLToPath(new URL("../public/admin.html", import.meta.url));
 const REMOTE_PAGE = fileURLToPath(new URL("../public/remote.html", import.meta.url));
+// The developer guide for game authors and language models (D-160): llms.txt, the guide, and both in one file.
+const LLMS_TXT = fileURLToPath(new URL("../../../llms.txt", import.meta.url));
+const GAME_GUIDE = fileURLToPath(new URL("../../../docs/developers/game-development.md", import.meta.url));
 const REMOTE_SW = fileURLToPath(new URL("../public/remote-sw.js", import.meta.url));
 const FAVICON = fileURLToPath(new URL("../public/favicon.svg", import.meta.url));
 export const REPO_URL = "https://github.com/klaushofrichter/games-service";
@@ -500,6 +503,15 @@ export function startCloud(o: CloudOptions) {
         res.writeHead(200, { "content-type": "image/svg+xml", "cache-control": "public, max-age=86400" });
         return res.end(await readFile(FAVICON));
       }
+      if (m === "GET" && (p === "/llms.txt" || p === "/llms-full.txt" || p === "/docs/game-development.md")) {
+        // Public: what anyone (a person or a language model) needs to write a game for Game Table (D-160).
+        const text =
+          p === "/llms.txt" ? await readFile(LLMS_TXT, "utf8")
+          : p === "/docs/game-development.md" ? await readFile(GAME_GUIDE, "utf8")
+          : `${await readFile(LLMS_TXT, "utf8")}\n\n---\n\n${await readFile(GAME_GUIDE, "utf8")}`;
+        res.writeHead(200, { "content-type": `${p.endsWith(".md") ? "text/markdown" : "text/plain"}; charset=utf-8`, "cache-control": "public, max-age=300", "access-control-allow-origin": "*" });
+        return res.end(text);
+      }
       if (await auth.handle(req, res, p)) return;
       if (m === "GET" && p === "/") {
         // Public landing page; also where logout lands (200, with a Sign in link, never a bounce to Google).
@@ -511,7 +523,7 @@ export function startCloud(o: CloudOptions) {
             ? `<p><a class="btn" href="/auth/google/login">Administrators: sign in with Google</a></p>`
             : `<p><a class="btn" href="/admin">Admin portal</a></p>`;
         // The version label is part of the public page (and checked by the deploy's smoke test).
-        return sendPage(res, 200, "Game Table", `<p class="muted">The service behind Game Table: it pairs tables, relays invites for remote players and keeps game logs.</p>${note}${action}<p class="faint">${versionLabel()}</p>`);
+        return sendPage(res, 200, "Game Table", `<p class="muted">The service behind Game Table: it pairs tables, relays invites for remote players and keeps game logs.</p>${note}${action}<p class="faint">Writing a game? <a href="/docs/game-development.md">Developer guide</a> · <a href="/llms.txt">llms.txt</a></p><p class="faint">${versionLabel()}</p>`);
       }
       if (m === "GET" && (p === "/admin" || p === "/admin/")) {
         // With Google sign-in configured the portal is for signed-in admins only; anonymous visitors go to the public

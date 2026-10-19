@@ -194,7 +194,7 @@ try:
         remote.wait_for_timeout(600)
         remote.screenshot(path=os.path.join(OUT, "remote-pachisi.png"))
         # D-131: during a game the deck window is a phone screen. It takes the window's height on both of the deck's
-        # tabs, and coming back to the game's tab gives the game the same room as before (Loopy's card shrank).
+        # tabs, and coming back to the game's tab gives the game the same room as before (a game's card shrank there once).
         GAME = """() => { const w = document.getElementById('deck-wrap').getBoundingClientRect(); const f = document.getElementById('deck');
           const d = f.contentDocument.scrollingElement;
           return { bottom: Math.round(w.bottom), inner: innerHeight, frame: f.contentWindow.innerHeight, scrolls: d.scrollHeight > d.clientHeight + 1 }; }"""

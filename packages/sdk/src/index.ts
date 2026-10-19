@@ -1,4 +1,5 @@
-// Game SDK: what a game author writes against.
+// Game SDK: what a game author writes against. The full contract between games and the platform, for people and
+// language models: docs/developers/game-development.md (also https://games.skylar.technology/llms.txt).
 // Rules are pure: given the same state, inputs and RNG stream they produce the same result,
 // so a game can be replayed from its log.
 import type { GameAward, GameSummary, Manifest } from "../../protocol/src/index.ts";
@@ -115,16 +116,16 @@ export interface GameDefinition<S = unknown> {
    */
   onSeatChanged?(state: S, seat: SeatInfo, ctx: GameContext): StepResult<S>;
   /**
-   * A seat left for good. Return "end" to end the game, or `{ end: { text } }` to end it with the game's own reason
-   * (D-119), e.g. "Team North–South was broken." Otherwise the new state.
+   * A seat left for good. Kept for logs written before D-159: a running game never loses a player now (the board
+   * exchanges players instead, onSeatChanged), so the platform does not call this during games. Return "end" to end
+   * the game, or `{ end: { text } }` to end it with the game's own reason (D-119). Otherwise the new state.
    */
   onSeatLeft?(state: S, seat: number, ctx: GameContext): StepResult<S> | "end" | SeatLeftEnd;
   /**
-   * Can the game go on without this seat (D-119)? Asked when its player's phone goes away and before the player is
-   * removed. `true`: go on (a disconnected player then leaves after the waiting time, and onSeatLeft follows).
-   * `{ wait: text }`: the game needs this player: while they are away the game pauses, their seat is held, and the
-   * board says the text and offers to end the game; removing them ends it with the text. Must not change the state
-   * (it is a question, asked again during replay). Without it, games go on.
+   * Can the game go on without this seat (D-119)? Asked when its player's phone goes away. `true`: go on; the seat
+   * waits for them, and the board offers to exchange them (D-144, D-159). `{ wait: text }`: the game needs this player:
+   * while they are away the game pauses, and the board says the text and offers to exchange them or end the game.
+   * Must not change the state (it is a question, asked again during replay). Without it, games go on.
    */
   canContinueWithout?(state: S, seat: number): true | { wait: string };
   /**
