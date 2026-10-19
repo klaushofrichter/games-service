@@ -784,3 +784,16 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   `localhost`, because browsers allow its service worker only in a secure context (checked in Chromium). Linked from
   the README, `AGENTS.md` and `llms.txt`; the `e2e` job runs the runbook as written (setup, build, simulation, a
   browser game over the LAN address, Part B, the cloud profile).
+- **D-165 · 2026-10-19 · Klaus** — In the board's settings, a player's name is the way to exchange them during a game;
+  the *Exchange…* buttons are gone, and the colours sit right-aligned. An exchange for a remote player shows the
+  invite's QR code next to its link. *Why:* Klaus: "remove the "Exchange" button, and make the player name clickable
+  instead. Show the color choices right aligned. Add a subtitle note to that section …"; "When showing the link for a
+  remote player to exchange against someone in the current game in the settings window: also show the QR code."
+  *Implementation (Claude):* `board.js` renders each name as a button (dot, name, ›) where the player may be
+  exchanged (a running game; a remote board only with board control), else as plain text, with the note "Tap a
+  player's name to exchange them for someone at the table, a remote player or an AI player, or to change how an AI
+  player plays." In the lobby nothing changes but the alignment. `/qr.svg?exchange` also answers for an open remote
+  exchange, with its invite, on the table's board and on a remote board with board control (which sees the link
+  anyway); a seat's join code stays on the table. The remote channel passes `/qr.svg` through for that. The in-game
+  lobby's player list and the away card keep their *Exchange…* buttons. Checks: `tests/remote.test.ts`,
+  `scripts/e2e/exchange_remote.py`.

@@ -574,13 +574,22 @@ function openSettings() {
           : `<span class="seg">${f.values.map((x) => `<button class="${String(v) === x ? "on" : ""}" data-setting="${esc(f.key)}" data-value="${esc(x)}">${esc(x)}</button>`).join("")}</span>`;
       return `<span class="value">${esc(v)}</span>`;
     };
-    // Player colours (D-106): a table setting for every seated player, used in the lobby and by every game.
+    // Player colours (D-106): a table setting for every seated player, used in the lobby and by every game. During a
+    // game the name opens the player's exchange window (D-159, D-165); the colours stay right-aligned.
     const playerColors = () => {
       const seated = state.players.filter((p) => p.seat !== null).sort((a, b) => a.seat - b.seat);
       if (!seated.length) return "";
+      const manage = seated.some(canExchange);
+      const name = (p) => {
+        const label = `<span class="pdot" style="background:${esc(p.color ?? "")}"></span>${esc(p.name)}`;
+        return canExchange(p)
+          ? `<button class="pname" data-exchange="${esc(p.id)}" aria-label="Exchange ${esc(p.name)}">${label}<span class="chev" aria-hidden="true">›</span></button>`
+          : `<span class="pname">${label}</span>`;
+      };
       return `<div class="group player-colors"><div class="eyebrow">${inRunningGame() ? "Players" : "Player colours"}</div>
-        ${seated.map((p) => `<div class="row"><span><span class="pdot" style="background:${esc(p.color ?? "")}"></span>${esc(p.name)}</span><span class="swatches">${SEAT_COLORS.map((c, i) =>
-          `<button class="swatch ${c === p.color ? "on" : ""}" style="--c:${c}" data-color-player="${esc(p.id)}" data-color="${c}" aria-label="${esc(p.name)}: colour ${i + 1}"></button>`).join("")}</span>${canExchange(p) ? `<button class="exchange-btn" data-exchange="${esc(p.id)}">Exchange…</button>` : ""}</div>`).join("")}
+        ${manage ? `<div class="faint group-note">Tap a player's name to exchange them for someone at the table, a remote player or an AI player, or to change how an AI player plays.</div>` : ""}
+        ${seated.map((p) => `<div class="row">${name(p)}<span class="swatches">${SEAT_COLORS.map((c, i) =>
+          `<button class="swatch ${c === p.color ? "on" : ""}" style="--c:${c}" data-color-player="${esc(p.id)}" data-color="${c}" aria-label="${esc(p.name)}: colour ${i + 1}"></button>`).join("")}</span></div>`).join("")}
         <div class="faint" style="font-size:.7em;margin-top:6px">Picking a colour someone else has swaps the two.</div></div>`;
     };
     const gameSettings = fields.length
@@ -1165,7 +1174,8 @@ function openExchange(playerId) {
       setPanel(o, `<div class="panel exchange-panel">${head}
         ${local ? `<div class="join-big"><img src="/qr.svg?exchange=1&s=${x.since}" alt="QR code to take over this seat">${linkLine(x.url)}</div>
           <p class="muted">Scan this with the new player's phone. They type their name and take over ${esc(cur.name)}'s seat.</p>`
-          : `${x.url ? linkLine(x.url) : ""}<p class="muted">Send this invite to the remote player. When they open it, they take over ${esc(cur.name)}'s seat.</p>`}
+          : `${x.url ? `<div class="join-big"><img src="/qr.svg?exchange=1&s=${x.since}" alt="QR code of the invite">${linkLine(x.url)}</div>` : ""}
+          <p class="muted">Send this invite to the remote player, or let them scan the code. When they open it, they take over ${esc(cur.name)}'s seat.</p>`}
         <p class="exchange-wait"><span class="thinking-dots" aria-hidden="true"><i></i><i></i><i></i></span> Waiting for the new player to join…</p>
         <div class="actions settings-actions"><button data-ex-cancel>Cancel</button></div></div>`);
     }

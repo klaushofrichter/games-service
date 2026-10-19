@@ -463,7 +463,13 @@ button.copy:hover, button.copy.done { color: var(--brass); border-color: var(--b
 .stats-note { color: var(--ink-soft); font-size: 17px; margin: 14px 0 0; }
 
 /* Exchanging a seat's player (D-159). */
-.player-colors .exchange-btn { margin-left: 12px; font-size: .8em; padding: 6px 14px; }
+/* The player's name: a plain label, or during a game the way into the exchange window (D-165). */
+.player-colors .pname { display: inline-flex; align-items: center; min-width: 0; font: inherit; color: inherit; text-align: left; }
+.player-colors button.pname { background: none; border: 0; padding: 6px 10px 6px 0; border-radius: 8px; cursor: pointer; text-decoration: underline; text-decoration-color: var(--felt-line); text-underline-offset: 4px; }
+.player-colors button.pname:hover, .player-colors button.pname:focus-visible { color: var(--brass); text-decoration-color: currentColor; }
+.player-colors button.pname .chev { margin-left: .4em; color: var(--brass); }
+.player-colors .swatches { margin-left: auto; }
+.player-colors .group-note { font-size: .7em; margin: 2px 0 6px; }
 .overlay.exchange .exchange-panel { width: 640px; }
 .overlay.exchange h2 .pdot { width: 18px; height: 18px; margin-right: 12px; vertical-align: middle; }
 .overlay.exchange .choices { display: flex; flex-direction: column; gap: 12px; margin: 16px 0; }
