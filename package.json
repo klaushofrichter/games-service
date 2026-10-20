@@ -27,6 +27,6 @@
     "@types/qrcode": "^1.5.5",
     "@types/ws": "^8.5.13",
     "typescript": "^7.0.2",
-    "vitest": "^5.0.4"
+    "vitest": "^5.0.5"
   }
 }
