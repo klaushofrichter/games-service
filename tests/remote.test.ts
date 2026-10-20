@@ -685,5 +685,25 @@ describe("remote play", { timeout: 60_000 }, () => {
       // letting the watcher play keeps the count: one place changes from watching to playing
       await t.ok("POST", `/watchers/${watcherNamed(t, "Wanda")!.id}/play`);
     }, 120_000);
+
+    it("a remote exchange's invite reaches remote boards that may exchange, not watchers (D-166)", async () => {
+      const t = await pairedHost();
+      const ann = await t.joinDeck("Ann");
+      await t.ok("POST", "/ai", {});
+      const rita = await remoteBoard(t, "Rita", false);
+      const wanda = await remoteBoard(t, "Wanda", true);
+      await coinFlip(t, [() => ann.request("lobby", "ready", { ready: true }), async () => rita.deck!.send("lobby", "ready", { ready: true }, 6)]);
+      const aiSeat = t.host.table.state().players.find((p) => p.kind === "ai")!.seat!;
+      t.host.table.exchange(aiSeat, "remote", "https://games.skylar.technology/i/ABCDEFGH");
+      await until(() => rita.board.lastState()?.exchange?.seat === aiSeat && wanda.board.lastState()?.exchange?.seat === aiSeat);
+      expect(rita.board.lastState().exchange.url).toBe("https://games.skylar.technology/i/ABCDEFGH");
+      expect(wanda.board.lastState().exchange.url).toBe("");
+      expect((await rita.peer.request("GET", "/qr.svg?exchange=1")).status).toBe(200);
+      expect((await wanda.peer.request("GET", "/qr.svg?exchange=1")).status).toBe(403);
+      // board control switched off: Rita's board loses the link too
+      await t.ok("POST", "/remote", { boardControl: false });
+      await until(() => rita.board.lastState()?.exchange?.url === "");
+      expect((await rita.peer.request("GET", "/qr.svg?exchange=1")).status).toBe(403);
+    }, 120_000);
   });
 });

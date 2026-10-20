@@ -89,7 +89,7 @@ describe("players away during a game (D-144)", () => {
     const { ann } = await partners("teams");
     ann.close();
     await until(async () => ((await state()).phase === "paused" ? true : null));
-    const r = await t.ok("POST", `/players/${ann.playerId}/replace-with-ai`);
+    const r = await t.ok("POST", "/exchange", { seat: (await state()).players.find((p: any) => p.id === ann.playerId).seat, kind: "ai" });
     expect(r.state.phase).toBe("active");
     expect(r.state.pause).toBeNull();
   });
@@ -145,7 +145,7 @@ describe("players away during a game (D-144)", () => {
     expect(s.away).toMatchObject([{ playerId: ann.playerId, left: true }]); // no wait for a phone lock
     expect(s.phase).toBe("active");
     await expect(Deck.connect(t.base, { sessionToken: ann.sessionToken })).rejects.toThrow(/you left this game/);
-    const r = await t.ok("POST", `/players/${ann.playerId}/replace-with-ai`);
+    const r = await t.ok("POST", "/exchange", { seat: (await state()).players.find((p: any) => p.id === ann.playerId).seat, kind: "ai" });
     expect(r.state.players.find((p: any) => p.id === r.playerId)).toMatchObject({ name: "Ann (AI)", kind: "ai" });
   });
 
@@ -154,7 +154,7 @@ describe("players away during a game (D-144)", () => {
     await ann.request("lobby", "leave", {});
     const s = await until(async () => ((await state()).phase === "paused" ? await state() : null));
     expect(s.pause.players).toMatchObject([{ playerId: ann.playerId, left: true }]);
-    await t.ok("POST", `/players/${ann.playerId}/replace-with-ai`);
+    await t.ok("POST", "/exchange", { seat: (await state()).players.find((p: any) => p.id === ann.playerId).seat, kind: "ai" });
     expect((await state()).phase).toBe("active");
   });
 });

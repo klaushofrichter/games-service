@@ -39,7 +39,7 @@ happened in a game, why a rule misbehaved, or why an AI made a move.
 ## Records (`game-NNN.jsonl`)
 
 Every record has `t` (its type) and `at` (milliseconds: epoch time in a played game, virtual time from 0 in a
-simulation). Inputs (`intent`, `timer`, `seatJoined`, `seatLeft`) also have `gt`: the game time the rules saw, ms
+simulation). Inputs (`intent`, `timer`, `seatJoined`, `seatChanged`, `seatLeft`) also have `gt`: the game time the rules saw, ms
 since the start with paused time left out (games use it for clocks; replay uses it). Seats are numbers from 0; the `start` record maps them to players, and `run.json` lists the players.
 
 - `start`: `gameId`, `version`, `seed` (all randomness in the rules comes from it), `settings`, `seats` (`seat`,
@@ -51,13 +51,18 @@ since the start with paused time left out (games use it for clocks; replay uses 
   (`message`, `stack`) and `accepted: false`; the game went on without it.
 - `timer`: a timer the game set fired (`id`), with `events`, or `error`.
 - `seatJoined`: a player took a seat during the game (`seat` as in `start`). `seatLeft`: a player left (`seat`);
-  `ended` says whether the game ended because of it.
+  `ended` says whether the game ended because of it. Only in older logs: since D-159 a running game keeps its players.
+- `seatChanged`: another player took over a seat (D-159, the board's exchange): `seat` as in `start` with the new
+  player's `playerId`, `name` and `kind`, `aiOptions` when the new player is an AI, and the game's `events` (its
+  `onSeatChanged`) or `error`. The seat's cards and score stay.
+- `aiOptions`: an AI player's options changed during the game (`seat`, `aiOptions`), from its next move. Not an input.
 - `error`: an exception in the game's code outside a move, e.g. while drawing a player's view (`where`: `view`,
   `boardView`, `isOver`, `canContinueWithout`; `seat` if it was one player's view). Only the first 20 are recorded; `counts.errors` has all.
 - `disconnected`: a player's phone went away (`seat`); `waiting` is the game's text when it could not go on without
   them (the game was paused until they were back). `reconnected`: the phone came back. Not inputs; replay skips them.
 - `aiTakeover`: the board handed an away player's seat to an AI player (`seat`, the AI's `name` and `aiOptions`,
-  D-144); its moves follow as ordinary intents `by: "ai"`. Not an input; replay skips it.
+  D-144); its moves follow as ordinary intents `by: "ai"`. Not an input; replay skips it. Only in older logs: since
+  D-159 an exchange is a `seatChanged` input.
 - `pause`: the game stood still, `reason` `cloud` (the connection to the service was lost), `ai` (an AI player, `seat`,
   ran over its time) or `player` (waiting for a player who went away). `resume`: it went on, `reason` `cloud`, `ai` (the
   AI answered), `playNow` (the AI's quick move was played) or `player` (everyone is back). Not inputs; replay skips them.
@@ -68,7 +73,7 @@ since the start with paused time left out (games use it for clocks; replay uses 
 ## Reading a log
 
 The state after any record can be rebuilt exactly: start the game's rules with the `start` record's seed, settings
-and seats, and feed the `intent`, `timer`, `seatJoined` and `seatLeft` records in order (the refused ones too). The
+and seats, and feed the `intent`, `timer`, `seatJoined`, `seatChanged` and `seatLeft` records in order (the refused ones too). The
 table does this to verify every log. To understand a game without the rules, follow the records: who moved what, what
 was refused and why, which events followed, and compare with `game-NNN.state.json` at the end.
 
@@ -80,7 +85,7 @@ The same game as rows a person or an LLM can follow, one JSON object per line, a
 Each row has:
 
 - `line`: the record's line in `game-NNN.jsonl` (the `start` record is line 1), to find the raw record.
-- `kind`: `move`, `timer`, `seatJoined`, `seatLeft`, `disconnected`, `reconnected`, `aiTakeover`, `pause`, `resume`, `error`,
+- `kind`: `move`, `timer`, `seatJoined`, `seatChanged`, `seatLeft`, `disconnected`, `reconnected`, `aiTakeover`, `aiOptions`, `pause`, `resume`, `error`,
   `snapshot`, `start`, `end`, or `gap`: no record for at least two minutes without a pause to explain it (its `line` is
   the record after the silence).
 - `at` (as in the record) and `t` (milliseconds since the start); `seat` and `player` (name); for moves `by`, `intent`,

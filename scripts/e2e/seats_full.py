@@ -5,7 +5,8 @@ A Table Host of its own (port 8096), two seats. Ann joins by phone and an AI pla
 and Invite are greyed out (Invite because this host has no service, D-169), and the board's QR panel says there is no
 free seat. A second phone that scans the code
 sees why instead of the name form; when the AI player is removed on the board, that phone shows the form by itself
-and Ben takes the seat.
+and Ben takes the seat. Then Ann and Ben play Coin Flip: a third phone is told to join after the game, still has no
+seat once it ended, and gets the form when the board chooses four seats.
 """
 import os, sys
 from playwright.sync_api import sync_playwright
@@ -64,6 +65,27 @@ try:
         ben.click("button[type=submit]")
         ben.wait_for_selector(".who h1")
         wait(lambda: any(pl["name"] == "Ben" and pl["seat"] is not None for pl in a("GET", "/state")["players"]), 5, "Ben seated")
+
+        # During a full game: a third phone is told to join after it; the game ends and the seats stay taken; more
+        # seats on the board, and the phone shows the form by itself.
+        a("POST", "/game/select", {"gameId": "coin-flip", "settings": {"rounds": 20, "roundSeconds": 0}})
+        ann.click("#ready")
+        ben.click("#ready")
+        wait(lambda: all(pl["ready"] for pl in a("GET", "/state")["players"]), 10, "everyone ready")
+        a("POST", "/game/start", {})
+        cleo = br.new_context(viewport={"width": 390, "height": 844}).new_page()
+        watch(cleo, "Cleo", ignore=("409",))
+        cleo.goto(url)
+        cleo.wait_for_selector("#no-seat :text('Join after it')")
+        assert cleo.locator("input[name=name]").count() == 0
+        board.wait_for_selector("aside.join.full", state="attached")
+        cleo.screenshot(path=os.path.join(OUT, "seats-full-in-game-phone.png"))
+        a("POST", "/game/end", {})
+        wait(lambda: a("GET", "/state")["phase"] == "finished", 10, "the game to end")
+        cleo.wait_for_selector("#no-seat :text('Choose more seats')", timeout=10000)
+        a("POST", "/game/close", {})
+        a("POST", "/layout", {"seats": 4})
+        cleo.wait_for_selector("input[name=name]", timeout=10000)
         br.close()
     if errors:
         raise AssertionError("browser errors:\n" + "\n".join(errors))
