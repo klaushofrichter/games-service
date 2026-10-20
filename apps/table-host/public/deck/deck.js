@@ -490,7 +490,7 @@ async function leave(inGame) {
       ? "You leave this game and keep watching the board. Your seat waits there; the table can hand it to someone else, or back to you."
       : "You leave the table and keep watching the board. The table can let you play again; close the window to leave altogether."
     : inGame
-      ? "You leave this game and can't come back into it on your own. Your seat waits on the board, where it can be handed to someone else, or back to you."
+      ? "You leave this game. Your seat waits on the board: scan the QR code again with your name to come back to it, or the table hands it to someone else."
       : "You leave the table. To play again, scan the QR code on the board.";
   if (await confirmSheet("Leave the game?", text, "Leave the game")) send("lobby", "leave", {});
 }

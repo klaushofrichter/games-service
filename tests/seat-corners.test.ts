@@ -355,7 +355,7 @@ describe("exchanging the AI the game waits for (D-112)", { timeout: 30_000 }, ()
 });
 
 describe("leaving and coming back", () => {
-  it("in the lobby the name is free again; during a full game only an exchange brings the player back", async () => {
+  it("in the lobby the name is free again; during a full game the join code with the name, or an exchange, brings the player back (D-172)", async () => {
     t = await testHost();
     await t.ok("POST", "/layout", { seats: 2 });
     const ann = await t.joinDeck("Ann");
@@ -369,8 +369,15 @@ describe("leaving and coming back", () => {
     await again.request("lobby", "leave", {});
     await until(() => named("Ann")?.connected === false);
     const { token } = await t.ok("GET", "/join");
-    expect((await hello(token, "Ann")).payload.code).toBe("no-seat");
+    expect((await hello(token, "Bea")).payload.code).toBe("no-seat"); // someone else: no free seat
     await expect(Deck.connect(t.base, { sessionToken: again.sessionToken })).rejects.toThrow(/you left this game/);
+    // Ann with the join code and her name: her waiting seat, the same player (D-172)
+    const rejoined = await Deck.connect(t.base, { joinToken: token, name: "Ann" });
+    expect(rejoined.playerId).toBe(again.playerId);
+    expect(named("Ann")).toMatchObject({ seat, connected: true });
+    await rejoined.request("lobby", "leave", {});
+    await until(() => named("Ann")?.connected === false);
+    // or an exchange for someone at the table
     const r = await t.ok("POST", "/exchange", { seat, kind: "local" });
     const back = await Deck.connect(t.base, { joinToken: r.url.split("/").pop(), name: "Ann" });
     expect(named("Ann")).toMatchObject({ seat, connected: true });

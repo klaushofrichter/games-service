@@ -1206,7 +1206,7 @@ function renderPlayerWait(p) {
     <div class="who">${names || "A player"}</div>
     <div class="what">${list.every((w) => w.left) ? "left the game" : `<span class="thinking-dots" aria-hidden="true"><i></i><i></i><i></i></span> ${list.length > 1 ? "are" : "is"} away`}</div>
     ${reasons.map((r) => `<p>${esc(r)}</p>`).join("")}
-    <p>${list.every((w) => w.left) ? "The game is paused. Exchange them for another player, or end the game." : `The game is paused and goes on as soon as ${list.length > 1 ? "they are" : `${esc(first?.name ?? "they")} is`} back, or when they are exchanged.`}</p>
+    <p>${list.every((w) => w.left) ? "The game is paused. They come back by scanning the join code with their name; or exchange them for another player, or end the game." : `The game is paused and goes on as soon as ${list.length > 1 ? "they are" : `${esc(first?.name ?? "they")} is`} back, or when they are exchanged.`}</p>
     ${control ? `<div class="row">${exchangeButtons(list)}<button class="danger" data-pause="end">End game</button></div>` : ""}
   </div>`;
 }
@@ -1331,7 +1331,7 @@ function renderAway() {
       return `<div class="ai-wait-card away-card" data-away="${esc(w.playerId)}" style="left:${x}px;top:${y}px;transform:translate(-50%,-50%) rotate(${ROT[gameEdge()]}deg)">
     <div class="who"><span class="dot" style="background:${who?.color ?? "var(--brass)"}"></span>${esc(w.name)}</div>
     <div class="what">${w.left ? "left the game" : "is away"}</div>
-    <p>${w.left ? "Exchange them for another player, and the game goes on." : "The seat waits for them. Or exchange them for another player, and the game goes on."}</p>
+    <p>${w.left ? "The seat waits: they come back by scanning the join code with their name. Or exchange them for another player." : "The seat waits for them. Or exchange them for another player, and the game goes on."}</p>
     ${exchangeButtons([w]) ? `<div class="row">${exchangeButtons([w])}</div>` : ""}
   </div>`;
     })
