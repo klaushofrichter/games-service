@@ -7,7 +7,7 @@ import { WebSocketServer, type WebSocket } from "ws";
 import QRCode from "qrcode";
 import { envelope, type AccessCodeStatus, type Envelope } from "../../../packages/protocol/src/index.ts";
 import type { GameEvent } from "../../../packages/sdk/src/index.ts";
-import { Table, TableError } from "./table.ts";
+import { REMOTE_FULL, Table, TableError } from "./table.ts";
 import { runSimulation } from "./simulation.ts";
 import { platformMeta, verifyStoredLog } from "./game-log.ts";
 import { History } from "./history.ts";
@@ -88,11 +88,13 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
   const send = (ws: WebSocket, e: Envelope) => sendText(ws, JSON.stringify(e));
 
   // Remote clients never see the local join code (it would let them join as if they sat at the table).
-  // Remote boards get no local join codes: neither the table's nor a local seat exchange's (D-159).
+  // Remote boards get no local join codes: neither the table's nor a local seat exchange's (D-159); a remote exchange's
+  // invite only a remote board that may exchange (D-166), not a watcher's or a phone's.
   // A remote board whose browser has no player at the table (exchanged, left, removed) sees board control as off (D-167).
   const forClient = (remote: boolean | undefined, state: ReturnType<Table["state"]>, session?: string) => {
     if (!remote) return state;
-    const s = { ...state, joinUrl: "", exchange: state.exchange && state.exchange.kind === "local" ? { ...state.exchange, url: "" } : state.exchange };
+    const hideLink = state.exchange && (state.exchange.kind === "local" || session === undefined || !table.remoteControlAllowed(session));
+    const s = { ...state, joinUrl: "", exchange: hideLink ? { ...state.exchange!, url: "" } : state.exchange };
     if (session === undefined) return s;
     const mayJoin = table.mayJoin(session);
     return table.hasRemotePlayer(session) ? { ...s, remote: { ...s.remote, mayJoin } } : { ...s, remote: { ...s.remote, boardControl: false, watching: true, mayJoin } };
@@ -230,6 +232,12 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
     }
   };
 
+  /** A new invite from the service (remote play), for a player, a watcher or an exchange. */
+  const newInvite = async () => {
+    if (!opts.createInvite) throw new TableError(409, "remote play needs the Game Table service (CLOUD_URL)");
+    if (table.cloud.status !== "online") throw new TableError(409, "the table is not connected to the service right now");
+    return await opts.createInvite();
+  };
   const noControl = (session: string) =>
     table.hasRemotePlayer(session) ? "board control is switched off for remote players" : "you are no longer a player at this table";
   const api = async (req: IncomingMessage, res: ServerResponse, path: string, qs: URLSearchParams) => {
@@ -265,9 +273,8 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
       const watch = body.watch === true; // an invite to watch (D-168): the board only, no seat
       const noSeat = table.noFreeSeat(); // an invite with no seat to offer only disappoints (D-129)
       if (noSeat && !watch) throw new TableError(409, noSeat, "no-seat");
-      if (table.remoteFull()) throw new TableError(409, "the table has no room for more remote players or watchers", "remote-full");
-      if (table.cloud.status !== "online") throw new TableError(409, "the table is not connected to the service right now");
-      const inv = await opts.createInvite();
+      table.assertRemoteRoom(); // players and watchers together (D-168)
+      const inv = await newInvite();
       table.inviteCreated(inv.token, watch); // so the board's invite dialog can close when it is used (D-164)
       if (!watch) return json(res, 201, inv);
       const u = new URL(inv.url);
@@ -313,17 +320,11 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
       const kind = String(body.kind);
       if (kind !== "ai" && kind !== "local" && kind !== "remote" && kind !== "watcher") throw new TableError(400, "kind must be ai, local, remote or watcher");
       if (remote && kind === "local") throw new TableError(403, "a remote board can exchange for a remote player or an AI");
-      let url: string | undefined;
-      if (kind === "remote") {
-        if (!opts.createInvite) throw new TableError(409, "remote play needs the Game Table service (CLOUD_URL)");
-        if (table.cloud.status !== "online") throw new TableError(409, "the table is not connected to the service right now");
-        url = (await opts.createInvite()).url;
-      }
+      table.assertExchange(seat, kind); // before asking the service for an invite that could not be used
+      const url = kind === "remote" ? (await newInvite()).url : undefined;
       return json(res, 200, { ...table.exchange(seat, kind, url, body.watcher), state: table.state() });
     }
     if (m === "DELETE" && path === "/exchange") return (table.cancelExchange(), json(res, 200, table.state()));
-    // Hand an away player's seat to an AI player (D-144), from the table's board.
-    if (m === "POST" && (match = path.match(/^\/players\/([\w-]+)\/replace-with-ai$/))) return json(res, 200, { playerId: table.replaceWithAi(match[1]), state: table.state() });
     if (m === "DELETE" && (match = path.match(/^\/players\/([\w-]+)$/))) return (table.removePlayer(match[1], "evicted"), json(res, 200, table.state()));
     if (m === "POST" && path === "/game/select") {
       table.selectGame(String(body.gameId), (body.settings as Record<string, unknown>) ?? {});
@@ -437,7 +438,8 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
         // on a remote board with board control, which sees the link anyway (D-166); a seat's join code only here.
         const ex = table.state().exchange;
         if (url.searchParams.get("exchange") !== null && ex?.kind === "remote" && ex.url) {
-          if (remoteOf(req) ? !table.remoteControlAllowed() : !boardAllowed(req)) return json(res, 403, { error: "board only" });
+          const r = remoteOf(req);
+          if (r ? !table.remoteControlAllowed(r.session) : !boardAllowed(req)) return json(res, 403, { error: "board only" });
           return await qrSvg(res, ex.url);
         }
         if (!boardAllowed(req) || remoteOf(req)) return json(res, 403, { error: "board only" });
@@ -532,7 +534,7 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
               c.session = remoteCtx!.session;
               const remoteBoards = [...clients].filter((o) => o !== client && o.role === "board" && o.remote);
               remoteBoards.filter((o) => o.session === c.session).forEach(replaceClient);
-              if (remoteBoards.filter((o) => o.session !== c.session).length >= (table.config.maxRemotePlayers)) throw new TableError(409, "the table has no room for more remote players or watchers");
+              if (remoteBoards.filter((o) => o.session !== c.session).length >= table.config.maxRemotePlayers) throw new TableError(409, REMOTE_FULL, "remote-full");
               table.remoteBoardOpened(c.session, remoteCtx!.invite, p.name); // watchers are counted by their boards (D-168)
               c.counted = true;
               return acceptBoard();

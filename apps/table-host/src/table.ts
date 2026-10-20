@@ -38,6 +38,9 @@ export function trimName(raw: unknown): string {
   return Array.from(n).slice(0, MAX_NAME).join("").trim();
 }
 
+/** Why another remote player or watcher can't come in (D-168): one message wherever the remote places are counted. */
+export const REMOTE_FULL = "the table has no room for more remote players or watchers";
+
 /** What makes two names the same (D-148): case, accents as typed (é ≠ e), and spacing don't matter beyond that. */
 const nameKey = (n: string) => n.normalize("NFKC").toLocaleLowerCase("en").replace(/\s+/g, " ").trim();
 
@@ -107,8 +110,6 @@ export class Table extends EventEmitter {
   private sound = true;
   /** Display choices per game id (D-088), set from the board's settings; in memory, so they last until a restart. */
   private prefs = new Map<string, Record<string, unknown>>();
-  /** Colours of seats whose player left during the game (D-125), kept until the next game or the lobby. */
-  private leftColors = new Map<number, string>();
   runtime: GameRuntime | null = null;
   private summary: GameSummary | null = null;
   private stateRev = 0;
@@ -147,6 +148,11 @@ export class Table extends EventEmitter {
 
   // ---------- state ----------
 
+  /** A game is running (or ending): the lobby's seats, layout, names and games wait until it is over. */
+  get playing() {
+    return this.phase === "active" || this.phase === "paused" || this.phase === "terminating";
+  }
+
   private changed() {
     this.stateRev++;
     this.emit("state", this.state());
@@ -183,7 +189,7 @@ export class Table extends EventEmitter {
       cloud: this.cloud,
       pause: this.pause,
       needed: this.neededPlayers(),
-      seatColors: this.seatColors(),
+      seatColors: {}, // a running game never loses a player (D-159), so no empty seat keeps a colour (D-125)
       aiThinking: [...this.aiMoves.entries()]
         .filter(([, m]) => m.shown)
         .map(([playerId, m]) => ({ playerId, seat: m.seat, since: m.startedAt, deadline: m.deadline })),
@@ -225,7 +231,7 @@ export class Table extends EventEmitter {
 
   /**
    * Players the running game can't go on without whose phones are away (D-119): their seats are held with no time
-   * limit, and the game is paused until they are back, or someone ends the game, or removes them (which ends it).
+   * limit, and the game is paused until they are back, the board exchanges them (D-159), or someone ends the game.
    */
   private waitingFor = new Map<string, { seat: number; text: string; since: number }>();
 
@@ -426,7 +432,8 @@ export class Table extends EventEmitter {
     if (v?.banned) throw new TableError(403, "you were removed from this table");
     if (v && (v.watch || v.wasPlayer) && !v.promoted && this.exchangeOpen?.session !== remoteSession) throw new TableError(403, "you are watching this table; the table can let you play");
     if (!v && invite && this.invitesMade.get(invite)?.watch) throw new TableError(403, "this invite is for watching");
-    const r = this.join("", rawName, "remote", remoteSession);
+    // The name this browser is listed with (from the invite page, made unique among watchers too) goes on (D-168).
+    const r = this.join("", v?.name || rawName, "remote", remoteSession);
     const visitor = this.visitor(remoteSession);
     visitor.wasPlayer = true;
     visitor.promoted = false;
@@ -488,8 +495,14 @@ export class Table extends EventEmitter {
     return players + [...this.visitors.keys()].filter((s) => s !== except && this.isWatcher(s)).length;
   }
 
-  remoteFull() {
-    return this.remoteCount() >= this.config.maxRemotePlayers;
+  /**
+   * Refuse one more remote player or watcher when the remote places are taken (D-168). `session`: the browser that
+   * comes in (not counted, so a watcher taking a seat keeps the count). `leaving`: the seat's player in an exchange,
+   * whose place frees up if they are a remote player whose browser goes too (with a board open they stay as a watcher).
+   */
+  assertRemoteRoom(session?: string, leaving?: Player) {
+    const frees = leaving?.location === "remote" && !leaving.leftGame && leaving.remoteSession !== session && !this.visitors.get(leaving.remoteSession!)?.boards;
+    if (this.remoteCount(session) - (frees ? 1 : 0) >= this.config.maxRemotePlayers) throw new TableError(409, REMOTE_FULL, "remote-full");
   }
 
   remoteBanned(session: string) {
@@ -509,9 +522,8 @@ export class Table extends EventEmitter {
     if (v.banned) throw new TableError(403, "you were removed from this table");
     const made = invite ? this.invitesMade.get(invite) : undefined;
     if (made?.watch) v.watch = true;
-    if (!v.name && typeof name === "string") v.name = this.freeName(name);
-    if (v.watch && !v.boards && !this.hasRemotePlayer(session) && this.remoteCount(session) >= this.config.maxRemotePlayers)
-      throw new TableError(409, "the table has no room for more remote players or watchers");
+    if (!v.name && typeof name === "string") v.name = this.freeName(name, undefined, session); // listed apart from other watchers
+    if (v.watch && !v.boards && !this.hasRemotePlayer(session)) this.assertRemoteRoom(session);
     v.boards++;
     if (made?.watch) {
       this.invitesMade.delete(invite!);
@@ -546,7 +558,7 @@ export class Table extends EventEmitter {
   /** In the lobby, let a watcher take a free seat: their page opens the deck and they join as a player (D-168). */
   letWatcherPlay(id: unknown) {
     const s = this.watcherSession(id);
-    if (this.phase === "active" || this.phase === "paused" || this.phase === "terminating")
+    if (this.playing)
       throw new TableError(409, "during a game, exchange a player for the watcher instead");
     const noSeat = this.noFreeSeat();
     if (noSeat) throw new TableError(409, noSeat, "no-seat");
@@ -561,34 +573,25 @@ export class Table extends EventEmitter {
       (location === "remote" && this.exchangeOpen?.kind === "remote" && (!this.exchangeOpen.session || this.exchangeOpen.session === remoteSession))
         ? this.exchangeOpen
         : null;
-    if (exchange) {
-      const old = this.seated().find((q) => q.seat === exchange.seat);
-      if (location === "remote" && old?.location !== "remote" && !(remoteSession && this.isWatcher(remoteSession)) && this.remoteCount(remoteSession) >= this.config.maxRemotePlayers)
-        throw new TableError(409, "the table has no room for more remote players");
-      // The seat's old player goes, so their name is free (Ann back on a new phone keeps "Ann").
-      const name = location === "remote" ? this.freeName(rawName, old?.id) : this.cleanName(rawName, old?.id);
-      const id = newId("p");
-      const sessionToken = randomBytes(24).toString("base64url");
-      const p: Player = { id, name, kind: "human", location, seat: null, connected: true, ready: true, sessionToken, remoteSession };
-      this.players.set(id, p);
-      this.takeSeat(p, exchange.seat);
-      return { playerId: id, sessionToken };
-    }
-    if (location === "local" && (!joinToken || joinToken.toUpperCase() !== this.currentJoin().token))
+    // The seat's old player goes, so their name is free (Ann back on a new phone keeps "Ann").
+    const old = exchange ? this.seated().find((q) => q.seat === exchange.seat) : undefined;
+    if (!exchange && location === "local" && (!joinToken || joinToken.toUpperCase() !== this.currentJoin().token))
       throw new TableError(403, "join code is invalid or expired; scan the QR code again");
-    if (location === "remote" && this.remoteCount(remoteSession) >= this.config.maxRemotePlayers)
-      throw new TableError(409, "the table has no room for more remote players");
+    if (location === "remote") this.assertRemoteRoom(remoteSession, old);
     // A seat is taken when a player joins (D-129): with none free, nobody joins to stand around without one.
-    const noSeat = this.noFreeSeat();
+    const noSeat = exchange ? null : this.noFreeSeat();
     if (noSeat) throw new TableError(409, noSeat, "no-seat");
     // Names are unique at the table (D-148); a remote player can't retype on the invite page, so theirs gets a number.
-    const name = location === "remote" ? this.freeName(rawName) : this.cleanName(rawName);
+    const name = location === "remote" ? this.freeName(rawName, old?.id) : this.cleanName(rawName, old?.id);
     const id = newId("p");
     const sessionToken = randomBytes(24).toString("base64url");
-    const p: Player = { id, name, kind: "human", location, seat: null, connected: true, ready: false, sessionToken, remoteSession };
+    const p: Player = { id, name, kind: "human", location, seat: null, connected: true, ready: !!exchange, sessionToken, remoteSession };
     this.players.set(id, p);
-    this.seatNewcomer(p);
-    this.changed();
+    if (exchange) this.takeSeat(p, exchange.seat);
+    else {
+      this.seatNewcomer(p);
+      this.changed();
+    }
     return { playerId: id, sessionToken };
   }
 
@@ -609,16 +612,20 @@ export class Table extends EventEmitter {
     return n;
   }
 
-  /** A remote player's name: as cleanName, but a taken one gets a number ("Ann 2") instead of being refused. */
-  /** `exceptId`: a player whose name is free to take (the seat's old player in an exchange, who goes). */
-  private freeName(raw: unknown, exceptId?: string): string {
-    let base = trimName(raw).replace(/\s*\(\s*ai\s*\)$/i, "").trim();
+  /**
+   * A remote player's name: as cleanName, but a taken one gets a number ("Ann 2") instead of being refused.
+   * `exceptId`: a player whose name is free to take (the seat's old player in an exchange, who goes). `watcher`: a
+   * watcher's browser, whose name also differs from the other watchers' (D-168), so the board's list tells them apart.
+   */
+  private freeName(raw: unknown, exceptId?: string, watcher?: string): string {
+    const base = trimName(raw).replace(/\s*\(\s*ai\s*\)$/i, "").trim();
     if (!base) return this.cleanName("");
-    if (!this.nameTaken(base, exceptId)) return base;
+    const taken = (n: string) => this.nameTaken(n, exceptId) || (watcher !== undefined && this.watchers().some((w) => w.name !== "Guest" && nameKey(w.name) === nameKey(n)));
+    if (!taken(base)) return base;
     for (let i = 2; ; i++) {
       const suffix = ` ${i}`;
       const n = Array.from(base).slice(0, MAX_NAME - suffix.length).join("").trim() + suffix;
-      if (!this.nameTaken(n, exceptId)) return n;
+      if (!taken(n)) return n;
     }
   }
 
@@ -631,7 +638,7 @@ export class Table extends EventEmitter {
   rename(playerId: string, raw: unknown) {
     const p = this.mustPlayer(playerId);
     if (p.kind !== "human") throw new TableError(409, "AI players keep their names; remove one and add another for a new name");
-    if (this.phase === "active" || this.phase === "paused" || this.phase === "terminating")
+    if (this.playing)
       throw new TableError(409, "names can be changed between games, not during one");
     if (!trimName(raw)) throw new TableError(400, "a name needs at least one character", "name-invalid");
     const n = this.cleanName(raw, p.id);
@@ -697,7 +704,7 @@ export class Table extends EventEmitter {
    * layout on the edges the chosen game uses is taken, or the chosen game has as many players as it takes.
    */
   noFreeSeat(): string | null {
-    const playing = this.phase === "active" || this.phase === "paused" || this.phase === "terminating";
+    const playing = this.playing;
     const m = this.phase === "ready" || playing ? this.selected?.game.manifest : undefined;
     const max = m ? Math.max(...allowedPlayerCounts(m)) : 8;
     const atMax = !!m && this.seated().length >= max;
@@ -730,10 +737,8 @@ export class Table extends EventEmitter {
       this.scheduleAi();
       return;
     }
-    // A chosen game that is full takes no more players: newcomers wait without a seat instead of cancelling it.
-    const m = this.phase === "ready" ? this.selected?.game.manifest : undefined;
-    const full = m !== undefined && this.seated().length >= Math.max(...allowedPlayerCounts(m));
-    p.seat = full ? null : (this.freeSeats()[0] ?? null);
+    // join() let them in only with a seat free for the chosen game (noFreeSeat, D-129).
+    p.seat = this.freeSeats()[0] ?? null;
     if (this.phase === "ready" && this.selected) this.revalidateSelection();
   }
 
@@ -859,7 +864,7 @@ export class Table extends EventEmitter {
   colors(): Map<string, string> {
     const seated = this.seated();
     const out = new Map<string, string>();
-    const used = new Set<string>(Object.values(this.seatColors()));
+    const used = new Set<string>();
     for (const p of seated) {
       if (p.chosenColor && !used.has(p.chosenColor)) {
         out.set(p.id, p.chosenColor);
@@ -882,12 +887,6 @@ export class Table extends EventEmitter {
     return out;
   }
 
-  /** Empty seats that keep the colour of the player who left them during the game (D-125), seat → colour. */
-  private seatColors(): Record<number, string> {
-    const taken = new Set(this.seated().map((p) => p.seat));
-    return Object.fromEntries([...this.leftColors].filter(([seat]) => !taken.has(seat)));
-  }
-
   private playerInfos(): PlayerInfo[] {
     const colors = this.colors();
     return [...this.players.values()].map(({ sessionToken, graceTimer, aiSeed, remoteSession, chosenColor, keptColor, leftGame, ...info }) => ({ ...info, color: colors.get(info.id) ?? null }));
@@ -906,9 +905,6 @@ export class Table extends EventEmitter {
     const mine = colors.get(p.id)!;
     const other = this.seated().find((q) => q.id !== p.id && colors.get(q.id) === c);
     if (other) other.chosenColor = mine;
-    // An empty seat keeping a departed player's colour (D-125) swaps too.
-    const left = Object.entries(this.seatColors()).find(([, x]) => x === c);
-    if (left) this.leftColors.set(Number(left[0]), mine);
     p.chosenColor = c;
     this.changed();
   }
@@ -929,19 +925,11 @@ export class Table extends EventEmitter {
     if (reason === "evicted" && this.protectedPlayer()?.id === p.id)
       throw new TableError(409, `${p.name} is the last player at the table; a game needs one (the developer setting under Advanced on the board allows games without)`);
     if (p.graceTimer) clearTimeout(p.graceTimer);
-    // During a game the seat keeps the player's colour (D-125): the game may show it.
-    if ((this.phase === "active" || this.phase === "paused") && p.seat !== null) {
-      const c = this.colors().get(p.id);
-      if (c) this.leftColors.set(p.seat, c);
-    }
+    // Never one of the running game's seats (refused above), so the game is not told: games hear onSeatLeft only in
+    // old logs (D-159).
     this.players.delete(playerId);
-    this.waitingFor.delete(playerId);
     this.awaySince.delete(playerId);
     this.emit("removed", playerId, reason);
-    if ((this.phase === "active" || this.phase === "paused") && this.runtime && p.seat !== null) {
-      // may end the game -> onGameOver; a game that needed them ends with its reason (D-119)
-      if (!this.runtime.seatLeft(p.seat)) this.syncPlayerPause();
-    }
     if (this.phase === "ready") this.revalidateSelection();
     this.changed();
   }
@@ -960,7 +948,7 @@ export class Table extends EventEmitter {
   }
 
   private assertNotPlaying(what: string) {
-    if (this.phase === "active" || this.phase === "paused" || this.phase === "terminating")
+    if (this.playing)
       throw new TableError(409, `cannot ${what} while a game is running; open the lobby and end the game first`);
   }
 
@@ -984,7 +972,7 @@ export class Table extends EventEmitter {
    * that is updated stays chosen with the new code, if its settings still fit. Returns true if applied now.
    */
   setExtraGames(extra: Map<string, InstalledGame>): boolean {
-    if (this.phase === "active" || this.phase === "paused" || this.phase === "terminating") {
+    if (this.playing) {
       this.pendingExtra = extra;
       return false;
     }
@@ -1064,7 +1052,7 @@ export class Table extends EventEmitter {
    */
   private blockersFor(m: Manifest): string[] {
     const reasons: string[] = [];
-    if (this.phase === "active" || this.phase === "paused" || this.phase === "terminating") reasons.push("a game is running");
+    if (this.playing) reasons.push("a game is running");
     if (this.config.requireCloud && !this.cloudOnline) reasons.push("the table is offline");
     const seated = this.seated();
     const max = Math.max(...allowedPlayerCounts(m));
@@ -1157,8 +1145,8 @@ export class Table extends EventEmitter {
   /**
    * A player leaves from their phone (D-158). Outside a game they leave the table. In a running game their phone is
    * done (the session ends) and the seat is handled like an away player's at once: it waits and the board offers to
-   * hand it to an AI player (or, with the waiting-time setting on, the game's leaving rule runs after it; a game that
-   * can't go on without them pauses, D-119).
+   * exchange them (D-159); a game that can't go on without them pauses (D-119). A remote player's browser watches on
+   * (D-170).
    */
   leave(playerId: string) {
     const p = this.mustPlayer(playerId);
@@ -1171,13 +1159,6 @@ export class Table extends EventEmitter {
     this.disconnected(p.id);
     if (this.awaySince.has(p.id)) this.awaySince.set(p.id, Date.now() - Table.AWAY_SHOW_MS); // shown at once, no grace for a phone lock
     this.changed();
-  }
-
-  /** Hand a player's seat to a new AI player (D-144), from the away card: an exchange with an AI (D-159). */
-  replaceWithAi(playerId: string) {
-    const p = this.mustPlayer(playerId);
-    if (p.seat === null || !this.inRunningGame(p)) throw new TableError(409, `${p.name} is not playing in a running game`);
-    return this.exchange(p.seat, "ai").playerId!;
   }
 
   // ---------- exchanging a seat's player during a game (D-159) ----------
@@ -1194,17 +1175,12 @@ export class Table extends EventEmitter {
    * player is the invite's). The game keeps all its seats; whoever had the seat goes, a person's phone is told why.
    */
   exchange(seat: number, kind: "ai" | "local" | "remote" | "watcher", url?: string, watcher?: unknown): { playerId?: string; url?: string } {
-    const rt = this.runtime;
-    const game = this.runningGame;
-    if (!rt || !game || rt.over || (this.phase !== "active" && this.phase !== "paused")) throw new TableError(409, "no game is running");
-    if (!rt.seats.some((s) => s.seat === seat)) throw new TableError(404, `seat ${seat} is not in the game`);
-    const current = this.seated().find((p) => p.seat === seat);
+    const current = this.assertExchange(seat, kind);
+    const game = this.runningGame!;
     if (kind === "ai") {
-      if (!game.manifest.ai.supported) throw new TableError(409, `${game.manifest.name} has no AI players`);
-      if (current?.kind === "ai") throw new TableError(409, `${current.name} is an AI player already; change its options instead`);
-      const taken = new Set([...this.players.values()].map((x) => x.name));
-      const base = current ? `${current.name} (AI)` : "";
-      const name = base && !taken.has(base) ? base : this.aiName();
+      // "Ann (AI)", the old name cut to fit twelve characters with the mark (D-148), unless taken.
+      const base = current ? `${Array.from(current.name).slice(0, MAX_NAME - 5).join("").trim()} (AI)` : "";
+      const name = base && !this.nameTaken(base) ? base : this.aiName();
       const ai: Player = { id: newId("ai"), name, kind: "ai", location: "local", seat: null, connected: true, ready: true, sessionToken: null, aiSeed: randomInt(2 ** 31), aiOptions: aiDefaults(game.manifest, {}) };
       this.players.set(ai.id, ai);
       this.takeSeat(ai, seat);
@@ -1223,6 +1199,23 @@ export class Table extends EventEmitter {
     this.exchangeOpen = { seat, kind, token, url: link, since: Date.now() };
     this.changed();
     return { url: link };
+  }
+
+  /**
+   * Whether `seat`'s player may be exchanged for `kind` now (else a TableError), before an invite is asked for: a seat
+   * of the running game; an AI only for a person in a game with AI players; a new remote player only with a remote
+   * place free (D-168), counting the place the seat's remote player frees if their browser goes. Returns the seat's player.
+   */
+  assertExchange(seat: number, kind: string): Player | undefined {
+    const rt = this.runtime;
+    const game = this.runningGame;
+    if (!rt || !game || rt.over || (this.phase !== "active" && this.phase !== "paused")) throw new TableError(409, "no game is running");
+    if (!rt.seats.some((s) => s.seat === seat)) throw new TableError(404, `seat ${seat} is not in the game`);
+    const current = this.seated().find((p) => p.seat === seat);
+    if (kind === "ai" && !game.manifest.ai.supported) throw new TableError(409, `${game.manifest.name} has no AI players`);
+    if (kind === "ai" && current?.kind === "ai") throw new TableError(409, `${current.name} is an AI player already; change its options instead`);
+    if (kind === "remote") this.assertRemoteRoom(undefined, current);
+    return current;
   }
 
   cancelExchange() {
@@ -1258,7 +1251,7 @@ export class Table extends EventEmitter {
   private takeSeat(newcomer: Player, seat: number) {
     const rt = this.runtime!;
     const old = this.seated().find((p) => p.seat === seat && p.id !== newcomer.id);
-    const color = old ? this.colors().get(old.id) : this.leftColors.get(seat);
+    const color = old ? this.colors().get(old.id) : undefined;
     if (old) {
       if (old.graceTimer) clearTimeout(old.graceTimer);
       if (old.kind === "ai") {
@@ -1266,6 +1259,8 @@ export class Table extends EventEmitter {
         if (mv) this.cancelAiMove(old.id, mv);
         this.aiWorkers.get(old.id)?.terminate();
         this.aiWorkers.delete(old.id);
+        // The game waited for this AI (D-112): nobody waits for an AI that has gone.
+        if (this.pause?.reason === "ai" && this.pause.ai?.playerId === old.id) this.resumeAfterAi("ai");
       } else if (old.sessionToken && !this.endedSessions.has(old.sessionToken)) {
         this.endedSessions.set(old.sessionToken, `your seat was handed to ${newcomer.name}; scan the QR code to join the next game`);
       }
@@ -1363,7 +1358,6 @@ export class Table extends EventEmitter {
     this.aiTrace = [];
     this.endedSessions.clear();
     this.beginLog(rt, game, settings, aiOptions);
-    this.leftColors.clear();
     this.phase = "active";
     rt.onChange((kind, events) => {
       if (kind === "over") void this.onGameOver(events);
@@ -1410,7 +1404,6 @@ export class Table extends EventEmitter {
     this.assertNotPlaying("return to the lobby");
     this.selected = null;
     this.summary = null;
-    this.leftColors.clear();
     this.phase = "idle";
     for (const p of this.players.values()) p.ready = p.kind === "ai";
     this.changed();
@@ -1422,17 +1415,12 @@ export class Table extends EventEmitter {
     this.stopAllAi(true);
     this.phase = "finished";
     this.pause = null;
-    // Seats held for players who are still away (D-119) are released the usual way now.
-    for (const id of this.waitingFor.keys()) {
+    // Seats held for players who are still away (D-119, D-144) are released the usual way now: after the waiting time.
+    for (const id of new Set([...this.waitingFor.keys(), ...this.awaySince.keys()])) {
       const p = this.players.get(id);
       if (p && !p.connected && !p.graceTimer) p.graceTimer = setTimeout(() => this.removeAfterGrace(id), this.config.graceMs);
     }
     this.waitingFor.clear();
-    // Seats that waited for away players (D-144) are released the usual way too.
-    for (const id of this.awaySince.keys()) {
-      const p = this.players.get(id);
-      if (p && !p.connected && !p.graceTimer) p.graceTimer = setTimeout(() => this.removeAfterGrace(id), this.config.graceMs);
-    }
     this.awaySince.clear();
     this.exchangeOpen = null; // an exchange still open ends with the game (D-159)
     // Extra games that changed while this one ran take effect now (D-097); the log below still names the code it ran.
