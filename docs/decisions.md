@@ -845,3 +845,20 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   the invite brings now and how many remote places are taken. Invite buttons are now greyed out, with the reason,
   while the table has no connection to the Game Table service (before, they failed only when tapped). Also: a
   `node_modules` symlink committed by mistake with D-168 is removed, and `.gitignore` catches such a link.
+- **D-170 · 2026-10-19 · Klaus** — More tests around players and watchers, and what they found. *Why:* Klaus: "you can
+  create more tests around the player and watcher management, and deploy when all tests are green." *Implementation
+  (Claude):*
+  - **Found and fixed:** a remote player who left a running game (D-158) kept their player record for the waiting
+    seat, so their browser kept board control and did not become a watcher, against D-168. `hasRemotePlayer` and the
+    remote counts now leave out players who left; their board watches, and the seat can go back to them through an
+    exchange for them as a watcher. A remote player who takes back a seat keeps their name (the leaving record no
+    longer turns "Ruth" into "Ruth 2"). The board limit's message now says "no room for more remote players or
+    watchers". A remote board without control (a watcher, or control switched off) no longer shows *Start game*,
+    *Change game* or game tiles as buttons; the server refused them anyway. The phone's leave dialog tells a remote
+    player that they keep watching.
+  - **Tests:** `tests/remote.test.ts` (leaving in the lobby and in a game, counted once, seat back by exchange;
+    closing the window and coming back in the same browser, two windows as one watcher; an exchange for a watcher is
+    theirs alone, cancelled or with the watcher removed it lets nobody in; Let play only in the lobby with a free
+    seat; a watcher through the end of a game; who may manage watchers; no session in the state; players and watchers
+    filling the places, an earlier invite refused). `scripts/e2e/watch_lobby.py` (leave → watching → Let play →
+    reload; a watcher closing the window; leaving a game and coming back by exchange).

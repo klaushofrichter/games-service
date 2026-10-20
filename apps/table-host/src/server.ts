@@ -532,7 +532,7 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
               c.session = remoteCtx!.session;
               const remoteBoards = [...clients].filter((o) => o !== client && o.role === "board" && o.remote);
               remoteBoards.filter((o) => o.session === c.session).forEach(replaceClient);
-              if (remoteBoards.filter((o) => o.session !== c.session).length >= (table.config.maxRemotePlayers)) throw new TableError(409, "this table already shows its board to every remote seat");
+              if (remoteBoards.filter((o) => o.session !== c.session).length >= (table.config.maxRemotePlayers)) throw new TableError(409, "the table has no room for more remote players or watchers");
               table.remoteBoardOpened(c.session, remoteCtx!.invite, p.name); // watchers are counted by their boards (D-168)
               c.counted = true;
               return acceptBoard();

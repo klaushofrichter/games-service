@@ -496,3 +496,4 @@ button.copy:hover, button.copy.done { color: var(--brass); border-color: var(--b
 .player-colors .row-actions button { font-size: .8em; padding: 6px 14px; }
 .overlay.watchers .watchers-panel { width: 560px; }
 .invite-watch { margin: 10px 0 4px; }
+.tile.view-only { pointer-events: none; }

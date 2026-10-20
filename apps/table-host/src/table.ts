@@ -195,7 +195,7 @@ export class Table extends EventEmitter {
       remote: {
         boardControl: this.remoteBoardControl,
         maxPlayers: this.config.maxRemotePlayers,
-        players: this.humans().filter((p) => p.location === "remote").length,
+        players: this.humans().filter((p) => p.location === "remote" && !p.leftGame).length, // one who left watches (D-170)
         joined: this.invitesJoined,
       },
       watchers: this.watchers(),
@@ -402,9 +402,12 @@ export class Table extends EventEmitter {
     return !(m && (this.phase === "active" || this.phase === "paused") && !m.remoteBoardControl);
   }
 
-  /** Whether a remote browser (its cloud session) has a player at the table, seated or not (D-167). */
+  /**
+   * Whether a remote browser (its cloud session) has a player at the table, seated or not (D-167). One who left a
+   * running game (D-158) does not: their seat waits for an exchange, and their browser watches (D-168, D-170).
+   */
   hasRemotePlayer(session: string): boolean {
-    for (const p of this.players.values()) if (p.remoteSession === session) return true;
+    for (const p of this.players.values()) if (p.remoteSession === session && !p.leftGame) return true;
     return false;
   }
 
@@ -481,7 +484,7 @@ export class Table extends EventEmitter {
 
   /** Remote players and watchers, without `except`'s session: together at most `maxRemotePlayers` (D-168). */
   remoteCount(except?: string) {
-    const players = this.humans().filter((p) => p.location === "remote" && p.remoteSession !== except).length;
+    const players = this.humans().filter((p) => p.location === "remote" && !p.leftGame && p.remoteSession !== except).length;
     return players + [...this.visitors.keys()].filter((s) => s !== except && this.isWatcher(s)).length;
   }
 
@@ -563,7 +566,7 @@ export class Table extends EventEmitter {
       if (location === "remote" && old?.location !== "remote" && !(remoteSession && this.isWatcher(remoteSession)) && this.remoteCount(remoteSession) >= this.config.maxRemotePlayers)
         throw new TableError(409, "the table has no room for more remote players");
       // The seat's old player goes, so their name is free (Ann back on a new phone keeps "Ann").
-      const name = location === "remote" ? this.freeName(rawName) : this.cleanName(rawName, old?.id);
+      const name = location === "remote" ? this.freeName(rawName, old?.id) : this.cleanName(rawName, old?.id);
       const id = newId("p");
       const sessionToken = randomBytes(24).toString("base64url");
       const p: Player = { id, name, kind: "human", location, seat: null, connected: true, ready: true, sessionToken, remoteSession };
@@ -607,14 +610,15 @@ export class Table extends EventEmitter {
   }
 
   /** A remote player's name: as cleanName, but a taken one gets a number ("Ann 2") instead of being refused. */
-  private freeName(raw: unknown): string {
+  /** `exceptId`: a player whose name is free to take (the seat's old player in an exchange, who goes). */
+  private freeName(raw: unknown, exceptId?: string): string {
     let base = trimName(raw).replace(/\s*\(\s*ai\s*\)$/i, "").trim();
     if (!base) return this.cleanName("");
-    if (!this.nameTaken(base)) return base;
+    if (!this.nameTaken(base, exceptId)) return base;
     for (let i = 2; ; i++) {
       const suffix = ` ${i}`;
       const n = Array.from(base).slice(0, MAX_NAME - suffix.length).join("").trim() + suffix;
-      if (!this.nameTaken(n)) return n;
+      if (!this.nameTaken(n, exceptId)) return n;
     }
   }
 
