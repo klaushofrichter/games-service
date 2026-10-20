@@ -99,6 +99,14 @@ try:
         wanda.wait_for_selector("#wait:not([hidden]) >> text=You were removed", timeout=15000)
         board.wait_for_selector("#watchers-button", state="hidden")
         wanda.screenshot(path=os.path.join(OUT, "watch-removed.png"))
+
+        # Settings › Joining also invites someone remote (D-169): during a game, as a watcher.
+        board.wait_for_selector(".overlay.settings button[data-invite=watch]:has-text('Invite a watcher')")
+        assert "Someone remote, as a watcher" in board.inner_text(".overlay.settings")
+        board.screenshot(path=os.path.join(OUT, "watch-settings-joining.png"))
+        board.click(".overlay.settings button[data-invite=watch]")
+        board.wait_for_selector(".panel.invite input[name=watch]:checked")
+        board.click(".panel.invite [data-x=close]")
 finally:
     host.terminate()
     cloud.terminate()
