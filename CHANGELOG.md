@@ -6,6 +6,8 @@ page is the history. Leave it empty if there is nothing to add beyond the commit
 
 ## [Unreleased]
 
+- Settings › Joining: *Invite remote player…* (during a game, or with every seat taken, *Invite a watcher…*), with
+  how many of the four remote places are taken (D-169).
 - **Run Game Table locally with Docker** (D-165): `docs/runbooks/local-docker.md` and `deploy/local/`: the Table Host
   with the built-in games on one machine, phones on the LAN, no cloud service, DNS or HTTPS; written for coding agents.
 - Settings › Players during a game: tap a player's name to exchange them (no more *Exchange…* buttons); an exchange
