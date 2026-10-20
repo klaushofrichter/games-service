@@ -477,10 +477,15 @@ function confirmSheet(title, text, yes) {
 }
 
 async function leave(inGame) {
-  const text = inGame
-    ? "You leave this game and can't come back into it. Your seat waits on the board, where it can be handed to an AI player."
-    : "You leave the table. To play again, scan the QR code on the board.";
-  if (await confirmSheet("Leave the game?", REMOTE && !inGame ? "You leave the table. To play again, ask the table for a new invite." : text, "Leave the game")) send("lobby", "leave", {});
+  // A remote player keeps watching the board after leaving (D-168, D-170); the table can let them play again.
+  const text = REMOTE
+    ? inGame
+      ? "You leave this game and keep watching the board. Your seat waits there; the table can hand it to someone else, or back to you."
+      : "You leave the table and keep watching the board. The table can let you play again; close the window to leave altogether."
+    : inGame
+      ? "You leave this game and can't come back into it. Your seat waits on the board, where it can be handed to an AI player."
+      : "You leave the table. To play again, scan the QR code on the board.";
+  if (await confirmSheet("Leave the game?", text, "Leave the game")) send("lobby", "leave", {});
 }
 
 /** Everyone at the table with their colour and seat (D-104). */
