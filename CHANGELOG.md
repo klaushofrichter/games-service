@@ -6,6 +6,7 @@ page is the history. Leave it empty if there is nothing to add beyond the commit
 
 ## [Unreleased]
 
+- A player who left a game comes back to their waiting seat by scanning the join code with their name (D-172).
 - Fixes from a review of players, seats and watchers (D-171): exchanging the AI a paused game waits for ends the
   pause; an exchange for a remote player is refused at once when the remote places are full; AI names stay within
   twelve characters; watchers with the same name are told apart; only remote boards that may exchange see the

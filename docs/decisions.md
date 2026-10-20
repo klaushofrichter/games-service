@@ -905,3 +905,14 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
     `tests/remote.test.ts` (the exchange link only for boards that may exchange), `scripts/e2e/seats_full.py` (a full
     game: the third phone is told to join after it, the form appears with more seats), `scripts/e2e/exchange.py`
     (the replaced phone's message).
+- **D-172 · 2026-10-20 · Klaus** — A player who left a running game (D-158) and scans the join code again with their
+  name gets back the seat that waits for them; and an exchange for a remote player stays open to the next remote
+  player who arrives, not tied to one invite. *Why:* asked after the D-171 review, Klaus: "Should a player who leaves a
+  game and rejoins with the join code get their waiting seat back? Yes"; "Should a remote exchange be tied to one
+  specific invite? No". *Implementation (Claude):* `Table.join` looks for a player at the table who left the running
+  game, whose seat still waits, with the same name ignoring case (`leftPlayerNamed`), before the free-seat check: the
+  same player comes back with a new session (the game sees no seat change; a pause for them ends), even when every
+  seat is taken. Only phones at the table; a remote player who left watches (D-170) and comes back through an exchange
+  for them as a watcher. Once the seat went to someone else, the name is free and joining is the ordinary way. The
+  phone's leave dialog, the ended session's message and the board's cards for a player who left say how to come back.
+  The remote exchange is unchanged (D-159). Checks: `tests/away.test.ts`.

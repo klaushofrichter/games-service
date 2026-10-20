@@ -578,6 +578,15 @@ export class Table extends EventEmitter {
     if (!exchange && location === "local" && (!joinToken || joinToken.toUpperCase() !== this.currentJoin().token))
       throw new TableError(403, "join code is invalid or expired; scan the QR code again");
     if (location === "remote") this.assertRemoteRoom(remoteSession, old);
+    // A player who left the running game (D-158) and scans the join code again with their name gets back the seat that
+    // waits for them (D-172): the same player, so the game goes on with them as before; it takes no free seat.
+    const back = !exchange && location === "local" ? this.leftPlayerNamed(rawName) : undefined;
+    if (back) {
+      back.leftGame = false;
+      back.sessionToken = randomBytes(24).toString("base64url");
+      this.resume(back.sessionToken);
+      return { playerId: back.id, sessionToken: back.sessionToken };
+    }
     // A seat is taken when a player joins (D-129): with none free, nobody joins to stand around without one.
     const noSeat = exchange ? null : this.noFreeSeat();
     if (noSeat) throw new TableError(409, noSeat, "no-seat");
@@ -663,6 +672,14 @@ export class Table extends EventEmitter {
     if (this.waitingFor.delete(p.id)) this.syncPlayerPause(); // the game goes on when everyone it needs is back
     this.changed();
     return p;
+  }
+
+  /** A player at the table who left the running game and whose seat still waits, by name (ignoring case), D-172. */
+  private leftPlayerNamed(raw: unknown) {
+    const k = nameKey(trimName(raw));
+    if (!k) return undefined;
+    for (const p of this.players.values()) if (p.leftGame && p.kind === "human" && p.location === "local" && this.inRunningGame(p) && nameKey(p.name) === k) return p;
+    return undefined;
   }
 
   /** The player has a seat in the game that is running. */
@@ -1153,7 +1170,7 @@ export class Table extends EventEmitter {
     if (p.kind !== "human") throw new TableError(400, "only people leave by themselves");
     if (!this.inRunningGame(p)) return this.removePlayer(playerId, "left");
     p.leftGame = true;
-    if (p.sessionToken) this.endedSessions.set(p.sessionToken, "you left this game; scan the QR code on the board to join the next one");
+    if (p.sessionToken) this.endedSessions.set(p.sessionToken, "you left this game; scan the QR code on the board with your name to come back to your seat, or to join the next game");
     p.sessionToken = null;
     this.emit("removed", p.id, "left"); // the phone shows that it left
     this.disconnected(p.id);

@@ -149,6 +149,41 @@ describe("players away during a game (D-144)", () => {
     expect(r.state.players.find((p: any) => p.id === r.playerId)).toMatchObject({ name: "Ann (AI)", kind: "ai" });
   });
 
+  it("a player who left and scans the join code again with their name gets their waiting seat back (D-172)", async () => {
+    const { ann } = await partners("free");
+    const seat = (await state()).players.find((p: any) => p.id === ann.playerId).seat;
+    await ann.request("lobby", "leave", {});
+    await until(async () => ((await state()).away.length ? true : null));
+    // someone else with another name finds no free seat; Ann, with her name in any case, is back in her seat
+    await expect(t.joinDeck("Dora")).rejects.toThrow(/seat/);
+    const back = await t.joinDeck("  ANN ");
+    expect(back.playerId).toBe(ann.playerId);
+    const s = await until(async () => ((await state()).away.length === 0 ? await state() : null));
+    expect(s.players.find((p: any) => p.id === ann.playerId)).toMatchObject({ name: "Ann", seat, connected: true });
+    expect(s.players.filter((p: any) => p.name === "Ann")).toHaveLength(1);
+    expect(s.phase).toBe("active");
+    expect(t.host.table.runtime!.seats.find((x) => x.seat === seat)).toMatchObject({ name: "Ann", kind: "human" });
+    // the old phone's session stays ended; a new one works, and leaving again works as before
+    await expect(Deck.connect(t.base, { sessionToken: ann.sessionToken })).rejects.toThrow(/you left this game/);
+    back.close();
+    const phone = await Deck.connect(t.base, { sessionToken: back.sessionToken }); // the same phone, reconnecting
+    await phone.request("lobby", "leave", {});
+    await until(async () => ((await state()).away.length ? true : null));
+    // once the seat went to someone else, the name is free and joining is the ordinary way (no seat: refused)
+    await t.ok("POST", "/exchange", { seat, kind: "ai" });
+    await expect(t.joinDeck("Ann")).rejects.toThrow(/seat/);
+  });
+
+  it("coming back to a waiting seat also ends the pause of a game that can't go on without the player (D-172)", async () => {
+    const { ann } = await partners("teams");
+    await ann.request("lobby", "leave", {});
+    await until(async () => ((await state()).phase === "paused" ? true : null));
+    const back = await t.joinDeck("Ann");
+    expect(back.playerId).toBe(ann.playerId);
+    await until(async () => ((await state()).phase === "active" ? true : null));
+    expect((await state()).pause).toBeNull();
+  });
+
   it("leaving a game that can't go on without the player (D-119) pauses it with the player marked as left", async () => {
     const { ann } = await partners("teams");
     await ann.request("lobby", "leave", {});
