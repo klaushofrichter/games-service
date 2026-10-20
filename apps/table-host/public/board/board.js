@@ -222,12 +222,6 @@ function cannotRemove(p) {
   return true;
 }
 
-/** Removing this player ends the running game (D-119): the game's reason, said before the board asks. */
-function endsGame(p) {
-  const why = p && state.needed?.[p.id];
-  return why ? `This ends the game: ${why}` : null;
-}
-
 /** The AI player's window: how it plays in the chosen game, and Remove (D-103), which works with or without a game. */
 async function configureAi(playerId) {
   const p = state.players.find((x) => x.id === playerId);
@@ -978,12 +972,19 @@ document.addEventListener("click", async (e) => {
 function fullAttr() {
   return state.noSeat ? `disabled title="${esc(state.noSeat)}"` : "";
 }
+/** The remote places (D-168): remote players and watchers together, at most `max`. */
+function remotePlaces() {
+  const watching = state.watchers?.length ?? 0;
+  const used = (state.remote?.players ?? 0) + watching;
+  const max = state.remote?.maxPlayers ?? 4;
+  return { used, watching, max, full: used >= max };
+}
+
 /** Invite: a player while a seat is free, else a watcher (D-168); off when the remote places are taken. */
 function inviteButton(label) {
   if (state.cloud?.status !== "online")
     return `<button data-invite disabled title="Remote play needs the connection to the Game Table service">${label}</button>`;
-  const full = (state.remote?.players ?? 0) + (state.watchers?.length ?? 0) >= (state.remote?.maxPlayers ?? 4);
-  if (full) return `<button data-invite disabled title="All remote places are taken (players and watchers)">${label}</button>`;
+  if (remotePlaces().full) return `<button data-invite disabled title="All remote places are taken (players and watchers)">${label}</button>`;
   // During a game a person comes in only through an exchange (D-159), so the lobby's invite is for watching.
   const why = inRunningGame() ? "During a game, a remote player comes in through an exchange" : state.noSeat;
   return why ? `<button data-invite="watch" title="${esc(why)}: invite someone to watch">Invite a watcher…</button>` : `<button data-invite>${label}</button>`;
@@ -991,11 +992,10 @@ function inviteButton(label) {
 
 /** Settings › Joining, the remote row (D-169): what an invite brings now, and how many remote places are taken. */
 function remoteJoinText() {
-  const r = state.remote ?? { players: 0, maxPlayers: 4 };
-  const w = state.watchers?.length ?? 0;
-  const used = `<span class="faint">${r.players + w} of ${r.maxPlayers} remote places taken${w ? ` (${w} watching)` : ""}</span>`;
+  const r = remotePlaces();
+  const used = `<span class="faint">${r.used} of ${r.max} remote places taken${r.watching ? ` (${r.watching} watching)` : ""}</span>`;
   if (state.cloud?.status !== "online") return `Someone remote, with an invite link <span class="faint">· needs the Game Table service</span>`;
-  const what = r.players + w >= r.maxPlayers
+  const what = r.full
     ? "Someone remote, with an invite link"
     : inRunningGame()
       ? "Someone remote, as a watcher; tap a player's name below to give them a seat"
@@ -1207,15 +1207,12 @@ function renderPlayerWait(p) {
     <div class="what">${list.every((w) => w.left) ? "left the game" : `<span class="thinking-dots" aria-hidden="true"><i></i><i></i><i></i></span> ${list.length > 1 ? "are" : "is"} away`}</div>
     ${reasons.map((r) => `<p>${esc(r)}</p>`).join("")}
     <p>${list.every((w) => w.left) ? "The game is paused. Exchange them for another player, or end the game." : `The game is paused and goes on as soon as ${list.length > 1 ? "they are" : `${esc(first?.name ?? "they")} is`} back, or when they are exchanged.`}</p>
-    ${control ? `<div class="row">${handToAiButtons(list)}<button class="danger" data-pause="end">End game</button></div>` : ""}
+    ${control ? `<div class="row">${exchangeButtons(list)}<button class="danger" data-pause="end">End game</button></div>` : ""}
   </div>`;
 }
 
-/** Whether the running game has AI players, so an away player's seat can be handed to one (D-144). */
-const gameHasAi = () => !!games.find((x) => x.id === state.game?.id)?.ai;
-
 /** "Exchange …" for away players (D-144, D-159): opens the exchange dialog (an AI, someone at the table, a remote player). */
-function handToAiButtons(list) {
+function exchangeButtons(list) {
   if (REMOTE && !state.remote?.boardControl) return "";
   return list.map((w) => `<button data-exchange-away="${esc(w.playerId)}">Exchange ${esc(w.name)}…</button>`).join("");
 }
@@ -1257,9 +1254,11 @@ function openExchange(playerId) {
     const head = `<h2>${dot}Exchange ${esc(cur.name)}</h2>`;
     if (!waiting) {
       const online = state.cloud?.status === "online";
+      // A new remote player needs a remote place (D-171); a remote player's own may free up (the table decides).
+      const room = !remotePlaces().full || cur.location === "remote";
       const choices = [
         REMOTE ? "" : `<button class="choice" data-ex="local"><b>Someone at the table</b><span>A QR code to scan with their phone</span></button>`,
-        `<button class="choice" data-ex="remote" ${online ? "" : "disabled"}><b>A remote player</b><span>${online ? "An invite link to send" : "Needs the connection to the Game Table service"}</span></button>`,
+        `<button class="choice" data-ex="remote" ${online && room ? "" : "disabled"}><b>A remote player</b><span>${!online ? "Needs the connection to the Game Table service" : room ? "An invite link to send" : "All remote places are taken (players and watchers)"}</span></button>`,
         ...(state.watchers ?? []).map((w) => `<button class="choice" data-ex="watcher" data-watcher="${esc(w.id)}"><b>${esc(w.name)}, watching</b><span>Takes the seat from their own window</span></button>`),
         g?.ai && cur.kind !== "ai" ? `<button class="choice" data-ex="ai"><b>An AI player</b><span>Takes over at once</span></button>` : "",
         cur.kind === "ai" && (g?.aiOptions?.length ?? 0) ? `<button class="choice" data-ex="ai-options"><b>How ${esc(cur.name)} plays</b><span>Change this AI player's settings</span></button>` : "",
@@ -1333,7 +1332,7 @@ function renderAway() {
     <div class="who"><span class="dot" style="background:${who?.color ?? "var(--brass)"}"></span>${esc(w.name)}</div>
     <div class="what">${w.left ? "left the game" : "is away"}</div>
     <p>${w.left ? "Exchange them for another player, and the game goes on." : "The seat waits for them. Or exchange them for another player, and the game goes on."}</p>
-    ${handToAiButtons([w]) ? `<div class="row">${handToAiButtons([w])}</div>` : ""}
+    ${exchangeButtons([w]) ? `<div class="row">${exchangeButtons([w])}</div>` : ""}
   </div>`;
     })
     .join("");
@@ -1483,7 +1482,7 @@ center.addEventListener("click", async (e) => {
     const p = state.players.find((x) => x.id === d.chip);
     if (!p) return;
     if (cannotRemove(p)) return;
-    const why = endsGame(p) ?? (p.kind === "ai" ? "The AI player leaves its seat." : p.connected ? "Their phone is disconnected and must scan the QR code again to rejoin." : "Their phone is offline; the seat is freed now instead of after the waiting time.");
+    const why = p.kind === "ai" ? "The AI player leaves its seat." : p.connected ? "Their phone is disconnected and must scan the QR code again to rejoin." : "Their phone is offline; the seat is freed now instead of after the waiting time.";
     if (await confirmDialog(`Remove ${p.name}?`, why, "Remove")) {
       if (selectedPlayer === p.id) selectedPlayer = null;
       act("DELETE", `/players/${p.id}`);
@@ -1491,7 +1490,7 @@ center.addEventListener("click", async (e) => {
   } else if (d.remove) {
     const p = state.players.find((x) => x.id === d.remove);
     if (cannotRemove(p)) return;
-    if (await confirmDialog(`Remove ${p?.name}?`, endsGame(p) ?? (p?.kind === "ai" ? "The AI player leaves its seat." : "Their phone is disconnected and must scan the QR code again to rejoin."), "Remove")) {
+    if (await confirmDialog(`Remove ${p?.name}?`, p?.kind === "ai" ? "The AI player leaves its seat." : "Their phone is disconnected and must scan the QR code again to rejoin.", "Remove")) {
       selectedPlayer = null;
       act("DELETE", `/players/${d.remove}`);
     }
@@ -1566,7 +1565,7 @@ function openLobbyOverlay() {
     if (b.dataset.remove) {
       const p = state.players.find((x) => x.id === b.dataset.remove);
       if (cannotRemove(p)) return;
-      if (await confirmDialog(`Remove ${p?.name}?`, endsGame(p) ?? "The game goes on without them.", "Remove")) act("DELETE", `/players/${b.dataset.remove}`);
+      if (await confirmDialog(`Remove ${p?.name}?`, "They are not playing in this game, which goes on as it is.", "Remove")) act("DELETE", `/players/${b.dataset.remove}`);
     }
     if (b.dataset.end !== undefined && (await confirmDialog("End this game?", "The game stops for everyone and the result is recorded as ended.", "End game"))) {
       await act("POST", "/game/end");
@@ -1878,7 +1877,7 @@ async function openInvite(watch = false) {
     if (b?.dataset.x === "noname") (async () => ((guest = ""), await loadQr(), draw()))();
   });
   const draw = () => {
-    const r = state.remote ?? { boardControl: true, maxPlayers: 4, players: 0 };
+    const r = state.remote ?? { boardControl: true };
     // The invited player has joined (D-164): the link is used up, so the dialog closes by itself.
     const joined = r.joined?.find((j) => j.invite === inv.token);
     if (joined) {
@@ -1894,7 +1893,7 @@ async function openInvite(watch = false) {
         ${guest ? `<button data-x="noname" aria-label="Remove the name">✕</button>` : ""}</div>
       <div class="invite-body"><div class="qr">${qr}</div>
         <div>${linkLine(link())}<div class="code">${esc(inv.token)}</div>
-        <div class="faint" style="margin-top:10px">${r.players + (state.watchers?.length ?? 0)} of ${r.maxPlayers} remote places in use (players and watchers)</div></div></div>
+        <div class="faint" style="margin-top:10px">${remotePlaces().used} of ${remotePlaces().max} remote places in use (players and watchers)</div></div></div>
       ${watch ? "" : `<label class="invite-control"><input type="checkbox" name="control" ${r.boardControl ? "checked" : ""}>
         Remote players can use the board controls (pick games, start, end)</label>`}
       <div class="actions" style="display:flex;justify-content:flex-end;gap:12px;margin-top:16px">

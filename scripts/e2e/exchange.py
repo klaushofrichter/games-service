@@ -74,7 +74,7 @@ try:
         cl = players()["Cleo"]
         assert cl["seat"] == ben_seat and cl["color"] == ben_color, cl
         assert "Ben" not in players()
-        ben.wait_for_selector("text=You left the table", timeout=5000)  # Ben's phone: removed from the seat
+        ben.wait_for_selector("text=Your seat went to someone else", timeout=5000)  # Ben's phone: told why it lost the seat
         cleo.wait_for_selector("[data-guess=heads]", timeout=5000)
         # Cleo for an AI player.
         if not board.locator(".overlay.settings").count():

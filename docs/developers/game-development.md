@@ -235,7 +235,9 @@ The platform owns everything about players. A game must not reimplement any of t
 | Someone joins during a game | Seated only if the manifest says `"dynamicPlayers": true` and a seat is free; else they wait for the next game. | `onSeatJoined`. |
 | A player's phone goes away (locked, out of range, closed) | Their seat **waits, with no time limit**; the game goes on and simply waits when it is their move. After 15 s the board shows "… is away" at their seat with **Exchange …**. The phone rejoins by itself when it is back. | Nothing (the state does not change). If the game answers `{ wait }` in `canContinueWithout`, the game pauses meanwhile. |
 | A player taps **Leave the game** on their phone | Their phone is done with this game. The seat is handled like an away player's at once: "… left the game" with **Exchange …**. | Nothing until the seat is exchanged. |
-| The board exchanges a player (Settings › Players › **Exchange…**, the away card, the in-game Lobby) | For anyone, away or connected: a person at the table (a QR code for this seat), a remote player (an invite) or an AI player takes the seat, with its colour. Whoever had it goes; their phone is told. | `onSeatChanged(state, { seat, playerId, name, kind })`. |
+| The board exchanges a player (Settings › Players › tap the name, **Exchange …** on the away card, the in-game Lobby) | For anyone, away or connected: a person at the table (a QR code for this seat), a remote player (an invite; only with a remote place free), a watcher or an AI player takes the seat, with its colour. Whoever had it goes; their phone is told, and a remote player's browser keeps watching. One exchange is open at a time; a new one replaces it, and it ends with the game. | `onSeatChanged(state, { seat, playerId, name, kind })`. |
+| Every seat is taken | Nobody else joins: phones with the join code, + AI player and player invites are refused with the reason. During a game the way in is an exchange; someone remote can still come as a watcher. | — |
+| Someone remote watches | They see the board only, take no seat and have no phone page; remote players and watchers together use at most the table's remote places (4 by default). | Nothing. |
 | An AI player's options change during the game | From its next move. | Nothing (options reach `ai()` as its `options`). |
 | Removing a player during a game | **Not possible.** The game always has the same players' seats. | — |
 | A timeout that hands a seat to an AI | **Does not exist.** Replacing a player is always a choice made at the table. | — |
@@ -356,7 +358,7 @@ export function settings({ info, setPrefs }) { return []; } // optional: items f
 | Field | Meaning |
 | --- | --- |
 | `players` | Everyone at the table: `{ id, name, kind: "human" \| "ai", location: "local" \| "remote", seat, connected, ready, color, aiOptions? }`. |
-| `seatColors` | Colours kept for seats whose player left. Use `playerColor(info, seat)`, which handles both. |
+| `seatColors` | Always empty since a running game keeps all its players; kept so older UI code still works. Use `playerColor(info, seat)` for a seat's colour. |
 | `seatEdges`, `seatPositions` | Each seat's edge; each seat's position on the surface. |
 | `frontEdge`, `rotation` | Which way the game faces on this board. |
 | `controlSeats`, `boardControl` | Seats this board may act for; whether it may use table controls. |

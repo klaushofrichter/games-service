@@ -862,3 +862,46 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
     seat; a watcher through the end of a game; who may manage watchers; no session in the state; players and watchers
     filling the places, an earlier invite refused). `scripts/e2e/watch_lobby.py` (leave → watching → Let play →
     reload; a watcher closing the window; leaving a game and coming back by exchange).
+- **D-171 · 2026-10-20 · Claude** — An overnight review of players, seats, watchers and exchanges (D-159 … D-170),
+  with tests for "all seats are taken, can another one come in?" in every way someone can arrive. *Why:* Klaus: "Do
+  another /simplify run … Apply any fixes, invent new testcases then needed, specifically for cornercases like "all
+  seats are taken, can we add another", and deploy when all test are green." *Implementation (Claude):*
+  - **Found and fixed:**
+    - Exchanging the AI player a game was paused for (D-112, out of time) left the game paused, waiting for an AI that
+      had gone; the newcomer could not move until someone tapped *Play now*. The pause now ends with the exchange.
+    - An exchange for a new remote player did not count the remote places (D-168): it opened, asked the service for
+      an invite, and the invited player was then turned away at the board ("no room"). Now `POST /exchange
+      {kind: "remote"}` is refused at once when the places are taken (code `remote-full`), before an invite is made.
+      The seat's own remote player frees a place only if their browser goes too; with their board open they would
+      stay as a watcher, so that place stays taken. An exchange for a watcher, an AI or someone at the table never
+      needs a remote place.
+    - An AI taking over a long name went over the twelve characters of D-148 ("Alexandra 12 (AI)"); the old name is
+      now cut to fit with the mark ("Alexand (AI)").
+    - Two watchers with the same name were listed alike, so *Remove* could not tell them apart; a watcher's name is
+      now unique among watchers and players ("Wanda 2"), and a watcher let in to play keeps the name they were
+      listed with.
+    - A remote exchange's invite link (and its QR code, `/qr.svg?exchange`) reached every remote browser, watchers
+      included; now only remote boards that may exchange (board control, a player at the table, D-167) get it.
+    - A phone whose seat was exchanged said "You left the table"; it now says "Your seat went to someone else" (and a
+      phone removed on the board "You were removed from the table"). The leave dialog no longer says the seat can be
+      handed only to an AI player.
+  - **Simplified:** one check for the remote places (`assertRemoteRoom`, one message `REMOTE_FULL`) for invites,
+    watch boards, remote joins and exchanges; one exchange check before an invite is asked for (`assertExchange`);
+    `join()` has one path for newcomers and exchanges; one `newInvite()` in the server; `Table.playing` for "a game
+    is running". **Removed** as dead since D-159: the table's `onSeatLeft` call and the colours kept for empty seats
+    (`seatColors` stays in the state, always empty, for older UI code), the unused `POST
+    /players/{id}/replace-with-ai` (the away card opens the exchange), `endsGame`/`gameHasAi` on the board, a "full
+    game" branch nobody could reach when seating newcomers. Comments, the developer guide (Settings › tap the name,
+    every seat taken, watchers, the remote places) and `log-format.md` (`seatChanged`, `aiOptions`) match the code.
+  - **Not changed:** a player who left a running game with free seats and joins again by the join code is refused
+    their own name while the seat waits for an exchange; whether they should take back their seat that way is a
+    product question for Klaus. "The next remote player to arrive takes the seat" of a remote exchange stays as D-159
+    has it.
+  - **Checks:** `tests/seat-corners.test.ts` (every way in with every seat taken, in the lobby, with a chosen game at
+    its maximum and during a game; newcomers during games that take them or not; two and eight seats; the remote
+    places with players and watchers, the remote exchange refused or allowed; a second exchange replacing the first,
+    cancelled, the game ending with one open, a seat whose player left, taken names, a long name, a pause for the
+    service, the AI the game waits for; leaving and coming back; names colliding; removals refused), a new check in
+    `tests/remote.test.ts` (the exchange link only for boards that may exchange), `scripts/e2e/seats_full.py` (a full
+    game: the third phone is told to join after it, the form appears with more seats), `scripts/e2e/exchange.py`
+    (the replaced phone's message).

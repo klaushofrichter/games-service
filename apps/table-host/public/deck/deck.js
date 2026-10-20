@@ -385,7 +385,14 @@ function render() {
     tablePanel.innerHTML = "";
     body.style.display = "";
     document.body.classList.remove("in-game");
-    body.innerHTML = removedReason === "left" && leftGame ? `<div class="card center"><h1>You left the game</h1><p class="muted">${REMOTE ? "Ask the table for a new invite to play again." : "Scan the QR code on the board to join the next game."}</p></div>` : `<div class="card center"><h1>You left the table</h1><p class="muted">${REMOTE ? "Ask the table for a new invite to join again." : "Scan the QR code on the board to join again. During a game, the board shows it under Settings › Show join code."}</p></div>`;
+    // Why: left from this phone (D-158), the seat exchanged for someone else (D-159), or removed on the board.
+    const [title, text] =
+      removedReason === "replaced"
+        ? ["Your seat went to someone else", REMOTE ? "Another player took over your seat. You keep watching the board; the table can give you a seat again." : "Another player took over your seat in this game. Scan the QR code on the board to join the next game."]
+        : removedReason === "left" && leftGame
+          ? ["You left the game", REMOTE ? "Ask the table for a new invite to play again." : "Scan the QR code on the board to join the next game."]
+          : [removedReason === "evicted" ? "You were removed from the table" : "You left the table", REMOTE ? "Ask the table for a new invite to join again." : "Scan the QR code on the board to join again. During a game, the board shows it under Settings › Show join code."];
+    body.innerHTML = `<div class="card center"><h1>${title}</h1><p class="muted">${text}</p></div>`;
     return;
   }
   if (!me) return renderJoin();
@@ -483,7 +490,7 @@ async function leave(inGame) {
       ? "You leave this game and keep watching the board. Your seat waits there; the table can hand it to someone else, or back to you."
       : "You leave the table and keep watching the board. The table can let you play again; close the window to leave altogether."
     : inGame
-      ? "You leave this game and can't come back into it. Your seat waits on the board, where it can be handed to an AI player."
+      ? "You leave this game and can't come back into it on your own. Your seat waits on the board, where it can be handed to someone else, or back to you."
       : "You leave the table. To play again, scan the QR code on the board.";
   if (await confirmSheet("Leave the game?", text, "Leave the game")) send("lobby", "leave", {});
 }

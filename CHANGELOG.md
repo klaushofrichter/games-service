@@ -6,6 +6,10 @@ page is the history. Leave it empty if there is nothing to add beyond the commit
 
 ## [Unreleased]
 
+- Fixes from a review of players, seats and watchers (D-171): exchanging the AI a paused game waits for ends the
+  pause; an exchange for a remote player is refused at once when the remote places are full; AI names stay within
+  twelve characters; watchers with the same name are told apart; only remote boards that may exchange see the
+  exchange's invite; a replaced phone says its seat went to someone else. More corner-case tests ("all seats taken").
 - Fix: a remote player who leaves a running game now watches (their seat waits), without board control; they can
   get the seat back through an exchange. Remote boards without control no longer show the lobby's buttons (D-170).
 - Settings › Joining: *Invite remote player…* (during a game, or with every seat taken, *Invite a watcher…*), with
