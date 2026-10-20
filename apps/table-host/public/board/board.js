@@ -667,7 +667,8 @@ function openSettings() {
         <div class="row"><span>Sound effects</span><button data-sound class="${state.display?.sound !== false ? "on" : ""}" role="switch" aria-checked="${state.display?.sound !== false}">${state.display?.sound !== false ? "On" : "Off"}</button></div>
         <div class="row"><span>Fullscreen</span>${fs ? `<button data-fs class="${document.fullscreenElement ? "on" : ""}">${document.fullscreenElement ? "Leave fullscreen" : "Fullscreen"}</button>` : `<span class="faint">not available in this browser</span>`}</div></div>
       <div class="group"><div class="eyebrow">Joining</div>
-        <div class="row"><span>The QR code and address for phones, to join or rejoin, also during a game</span><button data-join-code>Show join code…</button></div></div>
+        <div class="row"><span>The QR code and address for phones, to join or rejoin, also during a game</span><button data-join-code>Show join code…</button></div>
+        <div class="row"><span>${remoteJoinText()}</span>${inviteButton("Invite remote player…")}</div></div>
       ${playerColors()}
       ${(state.watchers ?? []).length ? `<div class="group player-colors watchers-group"><div class="eyebrow">Watching</div>${watcherRows()}<div class="faint group-note">${WATCHER_NOTE}</div></div>` : ""}
       ${gameSettings}
@@ -711,6 +712,7 @@ function openSettings() {
     if (b.dataset.joinCode !== undefined) return openJoinCode();
     if (b.dataset.colorPlayer) return void act("POST", `/players/${encodeURIComponent(b.dataset.colorPlayer)}/color`, { color: b.dataset.color });
     if (b.dataset.watcherRemove || b.dataset.watcherPlay) return void watcherAction(b);
+    if (b.dataset.invite !== undefined) return void openInvite(b.dataset.invite === "watch"); // D-169
     if (b.dataset.exchange) return void openExchange(b.dataset.exchange);
     if (b.dataset.setting) {
       const f = gameFields().find((x) => x.key === b.dataset.setting);
@@ -978,11 +980,29 @@ function fullAttr() {
 }
 /** Invite: a player while a seat is free, else a watcher (D-168); off when the remote places are taken. */
 function inviteButton(label) {
+  if (state.cloud?.status !== "online")
+    return `<button data-invite disabled title="Remote play needs the connection to the Game Table service">${label}</button>`;
   const full = (state.remote?.players ?? 0) + (state.watchers?.length ?? 0) >= (state.remote?.maxPlayers ?? 4);
   if (full) return `<button data-invite disabled title="All remote places are taken (players and watchers)">${label}</button>`;
   // During a game a person comes in only through an exchange (D-159), so the lobby's invite is for watching.
   const why = inRunningGame() ? "During a game, a remote player comes in through an exchange" : state.noSeat;
   return why ? `<button data-invite="watch" title="${esc(why)}: invite someone to watch">Invite a watcher…</button>` : `<button data-invite>${label}</button>`;
+}
+
+/** Settings › Joining, the remote row (D-169): what an invite brings now, and how many remote places are taken. */
+function remoteJoinText() {
+  const r = state.remote ?? { players: 0, maxPlayers: 4 };
+  const w = state.watchers?.length ?? 0;
+  const used = `<span class="faint">${r.players + w} of ${r.maxPlayers} remote places taken${w ? ` (${w} watching)` : ""}</span>`;
+  if (state.cloud?.status !== "online") return `Someone remote, with an invite link <span class="faint">· needs the Game Table service</span>`;
+  const what = r.players + w >= r.maxPlayers
+    ? "Someone remote, with an invite link"
+    : inRunningGame()
+      ? "Someone remote, as a watcher; tap a player's name below to give them a seat"
+      : state.noSeat
+        ? "Someone remote, as a watcher: every seat is taken"
+        : "Someone remote, with an invite link (or to watch only)";
+  return `${what} · ${used}`;
 }
 
 function joinPanel() {

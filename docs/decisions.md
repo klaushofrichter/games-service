@@ -835,3 +835,13 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
     watcher's lobby line, "Wanda is watching" when a watch invite is used.
   - **Checks:** `tests/remote.test.ts` (watch invite, refused deck, removal and refused reconnect, limits, converted
     players and Let play, exchange for a watcher and back), `scripts/e2e/watch.py` (the whole flow in browsers).
+- **D-169 · 2026-10-19 · Klaus** — Settings › Joining invites someone remote too, not only phones at the table: during a
+  game and with every seat taken as a watcher (who can then be given a seat through the exchange), in the lobby with a
+  free seat as a player. Remote players and watchers together stay within the four remote places. *Why:* Klaus:
+  "During game, we can use the "joining" section in the settings to "add a player". This currently can only add local
+  players. But we may want to add "remote players" … a remote player may join as "watcher" and therefore can join a
+  "full board". As before, we want to limit the total number of remote connections to 4." *Implementation (Claude):*
+  a second row under Joining with the same invite button as the lobby (`inviteButton`, D-168) and a line saying what
+  the invite brings now and how many remote places are taken. Invite buttons are now greyed out, with the reason,
+  while the table has no connection to the Game Table service (before, they failed only when tapped). Also: a
+  `node_modules` symlink committed by mistake with D-168 is removed, and `.gitignore` catches such a link.
