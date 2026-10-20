@@ -6,6 +6,8 @@ page is the history. Leave it empty if there is nothing to add beyond the commit
 
 ## [Unreleased]
 
+- Fix: a remote player who leaves a running game now watches (their seat waits), without board control; they can
+  get the seat back through an exchange. Remote boards without control no longer show the lobby's buttons (D-170).
 - Settings › Joining: *Invite remote player…* (during a game, or with every seat taken, *Invite a watcher…*), with
   how many of the four remote places are taken (D-169).
 - **Run Game Table locally with Docker** (D-165): `docs/runbooks/local-docker.md` and `deploy/local/`: the Table Host

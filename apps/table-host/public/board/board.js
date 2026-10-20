@@ -1056,12 +1056,15 @@ function renderLobby() {
 // The lobby shows the games a page at a time (three tiles fit beside the join panel), with arrows and dots.
 const PAGE_SIZE = 3;
 let gamePage = 0;
+/** A remote board that may not operate the table: a watcher, or board control switched off (D-167, D-170). */
+const viewOnly = () => REMOTE && !state.remote?.boardControl;
 function gameTiles() {
   const pages = Math.max(1, Math.ceil(games.length / PAGE_SIZE));
   gamePage = Math.min(gamePage, pages - 1);
   const tiles = games
     .slice(gamePage * PAGE_SIZE, (gamePage + 1) * PAGE_SIZE)
-    .map((g) => `<button class="tile ${g.selectable ? "selectable" : ""}" data-game="${g.id}" ${g.selectable ? "" : "disabled"}>
+    // A remote board without board control (a watcher, or control switched off) shows the games, not as buttons (D-170).
+    .map((g) => `<button class="tile ${g.selectable ? "selectable" : ""} ${viewOnly() ? "view-only" : ""}" data-game="${g.id}" ${g.selectable && !viewOnly() ? "" : viewOnly() ? 'tabindex="-1" aria-disabled="true"' : "disabled"}>
           <span class="title">${esc(g.name)}</span><span class="desc">${esc(g.description ?? "")}</span>
           <span class="faint" style="font-size:.66em">${playersLabel(g.players)}${g.ai ? " · AI" : ""}${g.extra ? ` · <span style="color:var(--brass)">extra</span>` : ""}</span>
           ${g.selectable ? `<span class="hint">${esc(tileHint(g))}</span>` : `<span class="why">${esc(g.reasons[0])}</span>`}</button>`)
@@ -1121,7 +1124,7 @@ function renderReady() {
       <div class="sub">${needs.length ? `${esc(needs.map((n, i) => (i ? n : n[0].toUpperCase() + n.slice(1))).join(" · "))}. Scan the code to join${g?.ai ? " or add an AI player" : ""}.` : !humans.length ? "AI players only (developer setting): <b>Start game</b> plays it on the board." : !state.players.some((p) => p.seat !== null && p.kind === "human" && p.location === "local") && state.developer?.allowNoLocalPlayer ? "No player at the table (developer setting). Everyone taps <b>Ready</b> on their phone." : "Everyone taps <b>Ready</b> on their phone."}</div></div>
       <div class="ready-list">${state.players.filter((p) => p.seat !== null).map(playerChip).join("")}</div>
       ${REMOTE ? "" : `<div class="toolbar">${seatButtons()}${roomForAi ? `<div class="right"><button data-add-ai ${fullAttr()}>+ AI player</button></div>` : ""}</div>`}
-      <div class="toolbar"><button class="primary" data-start ${all ? "" : "disabled"}>Start game</button><button data-close>Change game</button>
+      <div class="toolbar">${viewOnly() ? "" : `<button class="primary" data-start ${all ? "" : "disabled"}>Start game</button><button data-close>Change game</button>`}
       ${REMOTE ? "" : (() => { const sel = state.players.find((p) => p.id === selectedPlayer); return sel?.kind === "ai" ? `<button data-config="${sel.id}">Configure ${esc(sel.name)}</button>` : state.players.some((p) => p.kind === "ai") ? `<span class="faint" style="font-size:.7em">Tap an AI seat to configure it</span>` : ""; })()}
       </div>
     </section>${joinPanel()}`;
