@@ -23,6 +23,8 @@ const cornersEl = document.getElementById("corners");
 const settingsBtn = document.getElementById("settings-button");
 const flipBtn = document.getElementById("flip-button");
 const toolsBtn = document.getElementById("tools-button");
+/** The board inside "Play from the board" (D-175, board/play.html), beside one player's deck. */
+const IN_PLAY = new URLSearchParams(location.search).get("in") === "play" && window.parent !== window;
 const watchBtn = document.getElementById("watchers-button");
 const viewBtn = document.getElementById("view-button");
 const resultBtn = document.getElementById("result-button");
@@ -463,7 +465,7 @@ function placeTools(playing, front, gearCorner) {
   toolsBtn.hidden = REMOTE && !state.remote?.boardControl;
   if (toolsBtn.hidden) return placeAlong(watchBtn, REMOTE ? 102 : 172, front, gearCorner, placeWatchers());
   // The developer setting (D-118) marks it while it is on, so nobody forgets it.
-  toolsBtn.classList.toggle("dev", !!state.developer?.allowNoLocalPlayer && !REMOTE);
+  toolsBtn.classList.toggle("dev", !!(state.developer?.allowNoLocalPlayer || state.developer?.boardDeck) && !REMOTE);
   const flipInside = playing && !REMOTE && gearCorner !== FRONT_CORNERS[front][0]; // the turn button at 172 px
   const along = REMOTE ? 102 : flipInside ? 242 : 172;
   const alongX = front === "south" || front === "north";
@@ -661,7 +663,7 @@ function openSettings() {
         <div class="row"><span>Sound effects</span><button data-sound class="${state.display?.sound !== false ? "on" : ""}" role="switch" aria-checked="${state.display?.sound !== false}">${state.display?.sound !== false ? "On" : "Off"}</button></div>
         <div class="row"><span>Fullscreen</span>${fs ? `<button data-fs class="${document.fullscreenElement ? "on" : ""}">${document.fullscreenElement ? "Leave fullscreen" : "Fullscreen"}</button>` : `<span class="faint">not available in this browser</span>`}</div></div>
       <div class="group"><div class="eyebrow">Joining</div>
-        <div class="row"><span>The QR code and address for phones, to join or rejoin, also during a game</span><button data-join-code>Show join code…</button></div>
+        ${state.developer?.boardDeck ? `<div class="row"><span class="faint">Played from the board (Advanced › Developer): no phone joins at the table</span></div>` : `<div class="row"><span>The QR code and address for phones, to join or rejoin, also during a game</span><button data-join-code>Show join code…</button></div>`}
         <div class="row"><span>${remoteJoinText()}</span>${inviteButton("Invite remote player…")}</div></div>
       ${playerColors()}
       ${(state.watchers ?? []).length ? `<div class="group player-colors watchers-group"><div class="eyebrow">Watching</div>${watcherRows()}<div class="faint group-note">${WATCHER_NOTE}</div></div>` : ""}
@@ -1007,6 +1009,10 @@ function remoteJoinText() {
 
 function joinPanel() {
   if (REMOTE) return "";
+  // Played from the board (D-175): no phone joins at the table, so no code to scan.
+  if (state.developer?.boardDeck) return `<aside class="join board-deck"><div class="eyebrow">Played from the board</div>
+    <p class="faint">The deck beside the board is the one player at the table (Advanced › Developer). Remote players come with an invite.</p>
+    <div class="right">${inviteButton("Invite remote player…")}</div></aside>`;
   const code = state.joinUrl.split("/").pop();
   // No free seat (D-129): the code still works for nobody, so the panel says so; a phone that scans it is told too.
   if (state.noSeat) return `<aside class="join full">
@@ -1257,7 +1263,7 @@ function openExchange(playerId) {
       // A new remote player needs a remote place (D-171); a remote player's own may free up (the table decides).
       const room = !remotePlaces().full || cur.location === "remote";
       const choices = [
-        REMOTE ? "" : `<button class="choice" data-ex="local"><b>Someone at the table</b><span>A QR code to scan with their phone</span></button>`,
+        REMOTE || state.developer?.boardDeck ? "" : `<button class="choice" data-ex="local"><b>Someone at the table</b><span>A QR code to scan with their phone</span></button>`,
         `<button class="choice" data-ex="remote" ${online && room ? "" : "disabled"}><b>A remote player</b><span>${!online ? "Needs the connection to the Game Table service" : room ? "An invite link to send" : "All remote places are taken (players and watchers)"}</span></button>`,
         ...(state.watchers ?? []).map((w) => `<button class="choice" data-ex="watcher" data-watcher="${esc(w.id)}"><b>${esc(w.name)}, watching</b><span>Takes the seat from their own window</span></button>`),
         g?.ai && cur.kind !== "ai" ? `<button class="choice" data-ex="ai"><b>An AI player</b><span>Takes over at once</span></button>` : "",
@@ -1626,6 +1632,8 @@ function openAdvanced() {
       ${REMOTE ? "" : `<div class="group developer"><div class="eyebrow">Developer</div>
         <div class="row"><span>Games without a player at the table</span><button data-adv="no-local" data-dev-no-local class="${dev ? "on" : ""}" role="switch" aria-checked="${dev}">${dev ? "On" : "Off"}</button></div>
         <div class="faint" style="font-size:.7em;margin-top:6px">For testing: games with remote and AI players only, or AI players only. Off again when the table restarts.</div>
+        <div class="row" style="margin-top:10px"><span>Play from the board: one player's deck beside the board, no phone</span><button data-adv="board-deck" class="${state.developer?.boardDeck ? "on" : ""}" role="switch" aria-checked="${!!state.developer?.boardDeck}">${state.developer?.boardDeck ? "On" : "Off"}</button></div>
+        <div class="faint" style="font-size:.7em;margin-top:6px">For developing games without a phone: the board shows one player's deck, like a remote player's page, and nobody else joins at the table (the QR code goes); remote and AI players as usual. Off again when the table restarts; that player stays.</div>
         <div class="row" style="margin-top:10px"><span>What holds the game up right now: AI players, the board, the phones</span><button data-adv="live">Live status…</button></div></div>`}
       <div class="actions settings-actions"><button class="primary" data-close-overlay>Done</button></div></div>`);
   };
@@ -1652,6 +1660,7 @@ function openAdvanced() {
     if (a === "logs") return (close(), openGameLogs());
     if (a === "live") return (close(), openLiveStatus());
     if (a === "no-local") act("POST", "/developer", { allowNoLocalPlayer: !state.developer?.allowNoLocalPlayer });
+    if (a === "board-deck") act("POST", "/developer", { boardDeck: !state.developer?.boardDeck });
   });
   overlayRoot.appendChild(o);
 }
@@ -2045,6 +2054,10 @@ function connect() {
       stateListeners.forEach((f) => f());
       // The invite page shows the deck only to a player or to one let in to play; else it is a watcher's (D-168).
       if (REMOTE) tellPage({ type: "gt-seat", mayJoin: state.remote?.mayJoin !== false, watching: !!state.remote?.watching });
+      // Play from the board (D-175): the board moves into the page that shows the deck beside it, and back when it is
+      // switched off (that page listens).
+      else if (IN_PLAY) tellPage({ type: "gt-board-deck", on: !!state.developer?.boardDeck });
+      else if (state.developer?.boardDeck && window.parent === window) location.replace("/board/play.html");
     } else if (m.ch === "game" && m.type === "board") {
       gameMsg = { ...m.payload, receivedAt: Date.now() };
       if (game?.inst && state) game.inst.update(gameMsg.view, gameMsg.events ?? [], gameInfo());

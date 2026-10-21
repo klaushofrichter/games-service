@@ -446,6 +446,11 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
         if (url.searchParams.get("exchange") !== null) return ex?.kind === "local" ? await qrSvg(res, ex.url) : json(res, 404, { error: "no exchange is open" });
         return await qrSvg(res, table.currentJoin().url);
       }
+      // Play from the board (D-175): the board and one player's deck side by side, only on the table PC itself.
+      if (path === "/board/play.html") {
+        if (remoteOf(req) || !boardAllowed(req)) return json(res, 403, { error: "the board is only served on the table PC" });
+        return await serveFile(res, "board/play.html", (s) => s.replace("__TABLE_KEY__", opts.tableKey));
+      }
       if (path === "/board" || path === "/board/" || path === "/board/index.html") {
         // Remote players get the same board, without the key: their channel is their authorisation.
         if (remoteOf(req)) return await serveFile(res, "board/index.html", (s) => s.replace(`window.TABLE_KEY = "__TABLE_KEY__";`, `window.TABLE_KEY = ""; window.REMOTE_BOARD = true;`));
@@ -577,7 +582,14 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
             reply("welcome", { role: "deck", playerId: info.id }, msg.seq);
           } else {
             if ([...clients].filter((o) => o.role === "deck").length >= MAX_DECKS) throw new TableError(409, "the table serves eight phones at most");
-            const { playerId, sessionToken } = remoteCtx ? table.joinRemote(p.name, remoteCtx.session, remoteCtx.invite) : table.join(String(p.joinToken ?? ""), p.name);
+            // The deck played from the board (D-175) proves itself with the table key instead of a join code.
+            const fromBoard = !remoteCtx && p.boardKey !== undefined;
+            if (fromBoard && !keyOk(p.boardKey)) throw new TableError(401, "the deck played from the board needs the table key");
+            const { playerId, sessionToken } = remoteCtx
+              ? table.joinRemote(p.name, remoteCtx.session, remoteCtx.invite)
+              : fromBoard
+                ? table.joinFromBoard(p.name)
+                : table.join(String(p.joinToken ?? ""), p.name);
             c.role = "deck";
             c.playerId = playerId;
             reply("welcome", { role: "deck", playerId, sessionToken }, msg.seq);

@@ -54,6 +54,7 @@ export async function startHost(o: HostOptions = {}) {
     showTestGames: o.showTestGames ?? true,
     logSnapshotEvery: o.logSnapshotEvery ?? 0,
     allowNoLocalPlayer: o.allowNoLocalPlayer ?? false,
+    boardDeck: o.boardDeck ?? false,
   };
   const table = new Table(config, games, logs);
   const server = await startServer(table, logs, {
