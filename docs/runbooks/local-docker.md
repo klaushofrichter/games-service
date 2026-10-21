@@ -123,7 +123,11 @@ from its log to the same result. Every built-in game id works the same way.
 3. On the board, choose a game, add AI players with *+ AI player* if you like, and start. Each phone shows its
    player's private part of the game (cards, bets, controls).
 
-**Check:** a phone joined, and a game started and ended. *How to play* on the board and on the phones explains each
+No phone at hand (a developer trying a game alone): on the board, open *Advanced* (hammer and wrench) › *Developer* ›
+*Play from the board*. The board then shows one player's deck beside it, like a remote player's page; enter a name
+there instead of scanning the QR code. It lasts until the Table Host restarts, or set `BOARD_DECK=1` in `.env`.
+
+**Check:** a phone (or the deck beside the board) joined, and a game started and ended. *How to play* on the board and on the phones explains each
 game.
 
 ### Everyday

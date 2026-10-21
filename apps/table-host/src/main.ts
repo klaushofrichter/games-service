@@ -32,6 +32,7 @@ const host = await startHost({
   showTestGames: env.SHOW_TEST_GAMES === "1",
   logSnapshotEvery: num(env.LOG_SNAPSHOT_EVERY),
   allowNoLocalPlayer: env.ALLOW_NO_LOCAL_PLAYER === "1",
+  boardDeck: env.BOARD_DECK === "1",
   accessCode,
 });
 

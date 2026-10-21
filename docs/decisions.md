@@ -941,3 +941,23 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   service serves the runbook at `/docs/local-docker.md` and in `/llms-full.txt` (only this runbook: the cluster ones
   stay unpublished); the runbook names that prompt and links absolutely. Checks: `tests/cloud.test.ts`, the image
   check in `production-checks.yml`, the deploy's smoke test.
+
+## Play from the board (21 Oct 2026)
+
+- **D-175 · 2026-10-21 · Klaus** — A developer setting *Play from the board* (Advanced › Developer, or `BOARD_DECK=1`)
+  lets one player at the table play from a deck beside the board, without a phone. *Why:* Klaus: "a toggle in the
+  "advanced setting" modal, in the developer section, that would limit the local board member to one, take away the
+  QR code, and show a deck on the board just like the remote player, only for the single local player … for game
+  developers who do not want to use their phone, and it is limited to one local player (because the deck needs to be
+  private)." Asked about the rest: "Remote players are OK, and so are watchers"; switched off, the player stays as an
+  ordinary player at the table ("I follow the recommendation"); "The layout and behavior should be like a remote
+  player". *Implementation (Claude):* while on, the board's top-level page moves to `/board/play.html`, the remote
+  page's layout (board left, deck window right with Hide/Show, full height during a game) with the board and the deck
+  (`/deck/?board=1`) in frames; it is served only where the board is, with the table key, and the deck joins with that
+  key instead of a join code (`joinFromBoard`). One person at the table: switching on is refused (409) while two are
+  there; a phone with the join code is refused (403, "played from its board"); a second name from the board is
+  refused; the same name takes over that person (their phone is told "You play from the board now"); an exchange for
+  "someone at the table" is refused and hidden; the QR code and *Show join code* give way to a note. Remote players,
+  watchers and AI players are unchanged. Switched off, the page returns to `/board/` and the player keeps their seat
+  as an ordinary player (the platform's away and exchange rules apply). In memory until restart, like D-118. Checks:
+  `tests/board-deck.test.ts`, `scripts/e2e/board_deck.py`.

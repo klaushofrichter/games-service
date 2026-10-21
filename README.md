@@ -86,6 +86,7 @@ Or skip the pairing code: create an access code in the console (*Access codes*) 
 | `MAX_REMOTE_PLAYERS` | 4 | Remote seat limit (phase 1c) |
 | `ALLOW_REMOTE_BOARD` | 0 | Serve the board to non-loopback clients (development only) |
 | `ALLOW_NO_LOCAL_PLAYER` | 0 | `1` starts with the developer setting *Games without a player at the table* on (D-118); *Advanced* on the board (hammer and wrench, D-128) turns it on or off until the next restart |
+| `BOARD_DECK` | 0 | `1` starts with the developer setting *Play from the board* on (D-175): one player at the table plays from a deck beside the board, without a phone; *Advanced* turns it on or off until the next restart |
 | `LOG_SNAPSHOT_EVERY` | 0 | A snapshot of the whole game state in the log every N moves (D-116); 0: only the final state |
 | `SHOW_TEST_GAMES` | 0 | `1` lists the test game (`quartet`) in the game menu; the tests and `run-all.sh` turn it on |
 | `DATA_DIR`, `GAMES_DIR` | `<repo>/data`, `<repo>/games` | Logs, saves, the table's identity and a typed access code (`table.json`) and extra-game bundles (`extra-games/`); the built-in games |

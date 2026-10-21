@@ -72,6 +72,8 @@ export interface TableConfig {
   logSnapshotEvery?: number;
   /** The developer setting's value at start (ALLOW_NO_LOCAL_PLAYER, D-118); the board can change it until a restart. */
   allowNoLocalPlayer?: boolean;
+  /** Play from the board (D-175): the developer setting at start (BOARD_DECK=1). */
+  boardDeck?: boolean;
 }
 
 interface Player extends PlayerInfo {
@@ -131,6 +133,7 @@ export class Table extends EventEmitter {
     super();
     this.config = config;
     this.allowNoLocalPlayer = !!config.allowNoLocalPlayer;
+    this.boardDeck = !!config.boardDeck;
     this.games = games;
     this.logs = logs;
     this.rotateJoinToken();
@@ -196,7 +199,7 @@ export class Table extends EventEmitter {
       display: { sound: this.sound },
       away: this.awayPlayers(),
       exchange: this.exchangeInfo(),
-      developer: { allowNoLocalPlayer: this.allowNoLocalPlayer, protectedPlayer: this.protectedPlayer()?.id ?? null },
+      developer: { allowNoLocalPlayer: this.allowNoLocalPlayer, boardDeck: this.boardDeck, protectedPlayer: this.protectedPlayer()?.id ?? null },
       noSeat: this.noFreeSeat(),
       remote: {
         boardControl: this.remoteBoardControl,
@@ -370,13 +373,62 @@ export class Table extends EventEmitter {
    */
   allowNoLocalPlayer = false;
 
+  /** The developer settings (D-118, D-175), one or both: `allowNoLocalPlayer`, `boardDeck`. */
   setDeveloper(d: unknown) {
-    const v = (d as { allowNoLocalPlayer?: unknown } | null)?.allowNoLocalPlayer;
-    if (typeof v !== "boolean") throw new TableError(400, "allowNoLocalPlayer must be true or false");
-    if (v === this.allowNoLocalPlayer) return;
-    this.allowNoLocalPlayer = v;
-    if (this.phase === "ready") this.revalidateSelection();
-    this.changed();
+    const o = (d ?? {}) as { allowNoLocalPlayer?: unknown; boardDeck?: unknown };
+    if (o.allowNoLocalPlayer === undefined && o.boardDeck === undefined) throw new TableError(400, "set allowNoLocalPlayer or boardDeck");
+    for (const k of ["allowNoLocalPlayer", "boardDeck"] as const)
+      if (o[k] !== undefined && typeof o[k] !== "boolean") throw new TableError(400, `${k} must be true or false`);
+    if (o.boardDeck === true && !this.boardDeck) {
+      // One person at the table plays from the board: refused while more are there.
+      const local = this.localPeople();
+      if (local.length > 1) throw new TableError(409, `only one person at the table can play from the board; ${local.map((p) => p.name).join(", ")} are there`, "board-deck");
+    }
+    let changed = false;
+    if (typeof o.allowNoLocalPlayer === "boolean" && o.allowNoLocalPlayer !== this.allowNoLocalPlayer) {
+      this.allowNoLocalPlayer = o.allowNoLocalPlayer;
+      if (this.phase === "ready") this.revalidateSelection();
+      changed = true;
+    }
+    if (typeof o.boardDeck === "boolean" && o.boardDeck !== this.boardDeck) {
+      this.boardDeck = o.boardDeck;
+      if (this.boardDeck && this.exchangeOpen?.kind === "local") this.exchangeOpen = null;
+      changed = true;
+    }
+    if (changed) this.changed();
+  }
+
+  /**
+   * Play from the board (D-175), a developer setting for one person who plays without a phone: the board shows their
+   * deck beside it, and nobody else joins at the table (remote players, watchers and AI players are as usual). Kept
+   * until the host restarts, like the other developer setting. Off again, that player stays, as an ordinary one.
+   */
+  boardDeck = false;
+
+  /** The people at the table (not remote, not AI) who are still in it (a player who left a game is not). */
+  private localPeople() {
+    return this.humans().filter((p) => p.location === "local" && !p.leftGame);
+  }
+
+  /**
+   * The deck played from the board joins (D-175): the one person at the table. With their name it takes over that
+   * person's place (the board's player after a reload, or someone who played by phone before; that phone's session
+   * ends); a different name is refused while someone else is at the table.
+   */
+  joinFromBoard(rawName: unknown) {
+    if (!this.boardDeck) throw new TableError(409, "playing from the board is switched off (Advanced › Developer)", "board-deck");
+    const others = this.localPeople();
+    const k = nameKey(trimName(rawName));
+    const same = others.find((p) => nameKey(p.name) === k);
+    if (same) {
+      if (same.sessionToken) this.endedSessions.set(same.sessionToken, "you play from the board now; this phone left the table");
+      same.sessionToken = randomBytes(24).toString("base64url");
+      this.emit("removed", same.id, "board"); // the old phone, if open, says why
+      this.resume(same.sessionToken);
+      return { playerId: same.id, sessionToken: same.sessionToken };
+    }
+    if (others.length) throw new TableError(409, `${others[0].name} is at the table already: take their name to play as them, or remove them first`, "board-deck");
+    return this.join("", rawName, "local", undefined, true);
   }
 
   /**
@@ -566,7 +618,7 @@ export class Table extends EventEmitter {
     this.changed();
   }
 
-  join(joinToken: string, rawName: unknown, location: "local" | "remote" = "local", remoteSession?: string) {
+  join(joinToken: string, rawName: unknown, location: "local" | "remote" = "local", remoteSession?: string, fromBoard = false) {
     // Someone taking over a seat during a game (D-159): with the open exchange's code, or as the remote player it invited.
     const exchange =
       (location === "local" && joinToken && this.isExchangeToken(joinToken)) ||
@@ -575,7 +627,10 @@ export class Table extends EventEmitter {
         : null;
     // The seat's old player goes, so their name is free (Ann back on a new phone keeps "Ann").
     const old = exchange ? this.seated().find((q) => q.seat === exchange.seat) : undefined;
-    if (!exchange && location === "local" && (!joinToken || joinToken.toUpperCase() !== this.currentJoin().token))
+    // Played from the board (D-175): no phone joins at the table.
+    if (location === "local" && this.boardDeck && !fromBoard)
+      throw new TableError(403, "this table is played from its board right now (a developer setting); phones can't join at the table", "board-deck");
+    if (!fromBoard && !exchange && location === "local" && (!joinToken || joinToken.toUpperCase() !== this.currentJoin().token))
       throw new TableError(403, "join code is invalid or expired; scan the QR code again");
     if (location === "remote") this.assertRemoteRoom(remoteSession, old);
     // A player who left the running game (D-158) and scans the join code again with their name gets back the seat that
@@ -1211,6 +1266,7 @@ export class Table extends EventEmitter {
       return {};
     }
     if (kind === "remote" && !url) throw new TableError(400, "a remote exchange needs an invite");
+    if (kind === "local" && this.boardDeck) throw new TableError(409, "the table is played from its board: nobody else can come in at the table", "board-deck");
     const token = kind === "local" ? this.freshToken() : "";
     const link = kind === "local" ? `${this.config.publicUrl}/j/${token}` : url!;
     this.exchangeOpen = { seat, kind, token, url: link, since: Date.now() };

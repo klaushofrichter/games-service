@@ -22,6 +22,8 @@ services:
       ALLOW_REMOTE_BOARD: "1"
       SHOW_TEST_GAMES: "0"
       AI_DELAY_MS: ${AI_DELAY_MS:-800}
+      # 1: one player plays from a deck beside the board, no phone (D-175); also switched under Advanced on the board.
+      BOARD_DECK: ${BOARD_DECK:-0}
       # Empty: no cloud service. With --profile cloud, setup.sh --cloud sets http://cloud:8081.
       CLOUD_URL: ${CLOUD_URL:-}
       TABLE_CODE: ${TABLE_CODE:-}

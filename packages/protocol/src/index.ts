@@ -291,7 +291,8 @@ export interface LobbyState {
    * The developer setting (D-118): games without a player at the table. `protectedPlayer`: the one player the board
    * may not remove while it is off (the last one at the table, while a game is chosen or running).
    */
-  developer: { allowNoLocalPlayer: boolean; protectedPlayer: string | null };
+  /** The developer settings (D-118, D-175): games without a player at the table; play from the board. */
+  developer: { allowNoLocalPlayer: boolean; boardDeck: boolean; protectedPlayer: string | null };
   /** Why nobody can take a seat now (every seat taken, or the chosen game is full), or null (D-129). */
   noSeat: string | null;
 }
