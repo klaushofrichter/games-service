@@ -4,9 +4,11 @@ Runs the Game Table platform locally: the **Table Host** (lobby, games, AI playe
 with the built-in games, in Docker, on a computer in the same WiFi as the players' phones. It needs **no cloud
 service, no DNS entry and no HTTPS**, and nothing from `games.skylar.technology`.
 
-Written to be followed by a coding agent (for example Claude) as much as by a person. A typical instruction: *"Read
+Written to be followed by a coding agent (for example Claude) as much as by a person. Typical instructions: *"Check
+out https://games.skylar.technology and read the llms.txt. I want to do a local installation."*, or *"Read
 https://github.com/klaushofrichter/games-service and set up a running version of the core service with the built-in
-games."* That is Part A below. Parts B and C are optional.
+games."* Both lead here (also served at https://games.skylar.technology/docs/local-docker.md). That is Part A below;
+Part B adds games from other repositories, public or private; Part C, rarely needed, a local cloud service.
 
 ## For an agent following this
 
@@ -169,7 +171,8 @@ docker compose -f deploy/local/docker-compose.yml up -d
 - A game repository is tested against a version of this one (often named in its `games-service.ref`); if a game
   does not load, the table's log says why (`docker compose -f deploy/local/docker-compose.yml logs table-host`), and
   updating this checkout (`git pull`, then `up -d --build`) usually helps.
-- Writing a game of your own: [`docs/developers/game-development.md`](../developers/game-development.md).
+- Writing a game of your own: the developer guide, https://games.skylar.technology/docs/game-development.md (in the
+  repository: `docs/developers/game-development.md`).
 
 ### B2. Games from a private repository
 

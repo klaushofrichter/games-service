@@ -150,6 +150,8 @@ jobs:
           # The developer guide for game authors and language models (D-160) is public.
           llms=$(curl -s -o /tmp/llms.txt -w '%{http_code}' "$BASE/llms.txt" || true)
           [ "$llms" = "200" ] && grep -q "^# Game Table" /tmp/llms.txt || { echo "::error::GET /llms.txt returned $llms"; exit 1; }
+          runbook=$(curl -s -o /tmp/runbook.md -w '%{http_code}' "$BASE/docs/local-docker.md" || true)
+          [ "$runbook" = "200" ] && grep -q "^# Runbook: Game Table on one machine" /tmp/runbook.md || { echo "::error::GET /docs/local-docker.md returned $runbook"; exit 1; }
           {
             echo "served_version=$served"
             echo "page_code=$page"

@@ -934,4 +934,10 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   before) and B2 (a private one: access check, clone by SSH, HTTPS or `gh`, the release branch, adding the game
   folders, check, update; no token on the table side); an agent hint that other repositories are Part B, not Part C;
   Part C says what the console route needs for a private repository (`GAME_REPOS`, `GAME_REPO_TOKEN`), which
-  `deploy/local/docker-compose.yml` now passes to the local cloud service. README points to it.
+  `deploy/local/docker-compose.yml` now passes to the local cloud service. README points to it. Klaus added: "the
+  audience for the runbook is a LLM. Our prompt to claude was "Checkout https://games.skylar.technology and read the
+  llms.txt. I want to do a local installation."" So `llms.txt` says near its top, before the developer guide, that a
+  local installation follows the runbook and needs no cloud service (private game repositories are cloned); the cloud
+  service serves the runbook at `/docs/local-docker.md` and in `/llms-full.txt` (only this runbook: the cluster ones
+  stay unpublished); the runbook names that prompt and links absolutely. Checks: `tests/cloud.test.ts`, the image
+  check in `production-checks.yml`, the deploy's smoke test.
