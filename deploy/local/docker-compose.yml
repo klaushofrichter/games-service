@@ -46,6 +46,8 @@ services:
       # Only the public example repository, not the hosted service's list.
       GAME_REPOS_FILE: none
       GAME_REPOS: ${GAME_REPOS:-klaushofrichter/extra-games@production}
+      # Reads private repositories in GAME_REPOS (runbook Part C); games at the table need no token (Part B).
+      GAME_REPO_TOKEN: ${GAME_REPO_TOKEN:-}
       ICE_SERVERS: ${ICE_SERVERS:-[]}
     volumes: ["cloud-data:/data"]
 

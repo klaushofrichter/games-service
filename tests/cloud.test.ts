@@ -30,10 +30,18 @@ describe("cloud service", () => {
     expect(text).toContain("https://games.skylar.technology/docs/game-development.md");
     const guide = await (await fetch(`${base}/docs/game-development.md`)).text();
     expect(guide).toMatch(/^# Writing a game for Game Table/);
+    // The local installation runbook, which llms.txt points to (D-174): no cloud service needed.
+    expect(text).toContain("https://games.skylar.technology/docs/local-docker.md");
+    const runbook = await fetch(`${base}/docs/local-docker.md`);
+    expect(runbook.headers.get("content-type")).toMatch(/^text\/markdown/);
+    const local = await runbook.text();
+    expect(local).toMatch(/^# Runbook: Game Table on one machine with Docker/);
+    expect(local).toMatch(/Games from a private repository/);
+    expect((await fetch(`${base}/docs/cloud-state-reset.md`)).status).toBe(404); // the cluster runbooks stay unpublished
     const full = await (await fetch(`${base}/llms-full.txt`)).text();
-    expect(full.startsWith(text) && full.includes(guide)).toBe(true);
+    expect(full.startsWith(text) && full.includes(guide) && full.includes(local)).toBe(true);
     // Only public repositories: no private game repository is named as a source.
-    for (const t of [text, guide]) expect(t).not.toMatch(/loopy-game|starforge-game/);
+    for (const t of [text, guide, local]) expect(t).not.toMatch(/loopy-game|starforge-game/);
     expect(await (await fetch(`${base}/`)).text()).toContain('href="/llms.txt"');
   });
 
