@@ -20,6 +20,8 @@ const REMOTE_PAGE = fileURLToPath(new URL("../public/remote.html", import.meta.u
 // The developer guide for game authors and language models (D-160): llms.txt, the guide, and both in one file.
 const LLMS_TXT = fileURLToPath(new URL("../../../llms.txt", import.meta.url));
 const GAME_GUIDE = fileURLToPath(new URL("../../../docs/developers/game-development.md", import.meta.url));
+// The runbook for a local installation, which llms.txt points to (D-174).
+const LOCAL_RUNBOOK = fileURLToPath(new URL("../../../docs/runbooks/local-docker.md", import.meta.url));
 const REMOTE_SW = fileURLToPath(new URL("../public/remote-sw.js", import.meta.url));
 const FAVICON = fileURLToPath(new URL("../public/favicon.svg", import.meta.url));
 export const REPO_URL = "https://github.com/klaushofrichter/games-service";
@@ -504,12 +506,14 @@ export function startCloud(o: CloudOptions) {
         res.writeHead(200, { "content-type": "image/svg+xml", "cache-control": "public, max-age=86400" });
         return res.end(await readFile(FAVICON));
       }
-      if (m === "GET" && (p === "/llms.txt" || p === "/llms-full.txt" || p === "/docs/game-development.md")) {
-        // Public: what anyone (a person or a language model) needs to write a game for Game Table (D-160).
+      if (m === "GET" && (p === "/llms.txt" || p === "/llms-full.txt" || p === "/docs/game-development.md" || p === "/docs/local-docker.md")) {
+        // Public: what anyone (a person or a language model) needs to write a game for Game Table (D-160) or to install
+        // it locally (D-174).
         const text =
           p === "/llms.txt" ? await readFile(LLMS_TXT, "utf8")
           : p === "/docs/game-development.md" ? await readFile(GAME_GUIDE, "utf8")
-          : `${await readFile(LLMS_TXT, "utf8")}\n\n---\n\n${await readFile(GAME_GUIDE, "utf8")}`;
+          : p === "/docs/local-docker.md" ? await readFile(LOCAL_RUNBOOK, "utf8")
+          : [await readFile(LLMS_TXT, "utf8"), await readFile(GAME_GUIDE, "utf8"), await readFile(LOCAL_RUNBOOK, "utf8")].join("\n\n---\n\n");
         res.writeHead(200, { "content-type": `${p.endsWith(".md") ? "text/markdown" : "text/plain"}; charset=utf-8`, "cache-control": "public, max-age=300", "access-control-allow-origin": "*" });
         return res.end(text);
       }

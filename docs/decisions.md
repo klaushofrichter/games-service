@@ -924,3 +924,20 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   keeps the section's lines that `git diff <previous tag> HEAD -- CHANGELOG.md` adds (all of it before the first
   release), so a note is published once even when the section is not emptied; `PREV=<tag>` renders an older release's
   notes again. Replayed for the last releases: each gets only its own line. The file's header says so.
+- **D-174 · 2026-10-20 · Klaus** — The local Docker runbook says plainly that the cloud service (its console) is not
+  needed to play locally, and has a section on installing games from a private repository by cloning it. *Why:*
+  Klaus, after a successful local installation: "The main uncertainty was how to register a private repository with
+  games. We did a clone of the repo (as we had access), and it worked out. Is the console service actually needed for
+  running local only games? We should clarify this in the runbook."; "Add a section about "private repos" with games,
+  and how to install these (possibly by cloning)." *Implementation (Claude):* `docs/runbooks/local-docker.md`: a
+  "Do I need the cloud service? No" paragraph after *What you get*; Part B split into B1 (a public repository, as
+  before) and B2 (a private one: access check, clone by SSH, HTTPS or `gh`, the release branch, adding the game
+  folders, check, update; no token on the table side); an agent hint that other repositories are Part B, not Part C;
+  Part C says what the console route needs for a private repository (`GAME_REPOS`, `GAME_REPO_TOKEN`), which
+  `deploy/local/docker-compose.yml` now passes to the local cloud service. README points to it. Klaus added: "the
+  audience for the runbook is a LLM. Our prompt to claude was "Checkout https://games.skylar.technology and read the
+  llms.txt. I want to do a local installation."" So `llms.txt` says near its top, before the developer guide, that a
+  local installation follows the runbook and needs no cloud service (private game repositories are cloned); the cloud
+  service serves the runbook at `/docs/local-docker.md` and in `/llms-full.txt` (only this runbook: the cluster ones
+  stay unpublished); the runbook names that prompt and links absolutely. Checks: `tests/cloud.test.ts`, the image
+  check in `production-checks.yml`, the deploy's smoke test.

@@ -56,6 +56,10 @@ jobs:
             [ "$(docker exec "$c" id -u)" = "1000" ] || { echo "::error::$c is not running as uid 1000"; exit 1; }
           done
           curl -fs -H 'x-table-key: ci' http://127.0.0.1:8080/api/v1/games > /dev/null || { docker logs host; exit 1; }
+          # The cloud image carries the documents llms.txt points to (D-160, D-174).
+          for doc in llms.txt docs/game-development.md docs/local-docker.md; do
+            curl -fs "http://127.0.0.1:8081/$doc" > /dev/null || { echo "::error::the cloud image does not serve /$doc"; exit 1; }
+          done
 
   e2e:
     # On GitHub's runners, never the self-hosted one (Playwright OOM-kills at its 512Mi).

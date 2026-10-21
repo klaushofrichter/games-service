@@ -27,7 +27,8 @@ TABLE_KEY=dev npm run host
 Open `http://localhost:8080/board/` on the table PC (full screen, 1920 × 1080 or 4K). Phones on the same WiFi scan the QR code, or type the URL shown under it. When no seat is free, the QR panel and the phone say so, and *+ AI player* and *Invite* are greyed out (D-129): choose more seats on the board, or remove a player. During a game the lobby's QR panel is not shown: *Settings › Show join code* shows the QR code and the address, so a phone that lost its seat can rejoin (D-130).
 
 **On one machine with Docker, without the cloud service, DNS or HTTPS:** [`docs/runbooks/local-docker.md`](docs/runbooks/local-docker.md),
-written for people and for coding agents (`deploy/local/`).
+written for people and for coding agents (`deploy/local/`). It needs no cloud service, also not for games from other
+repositories, private ones included (cloned, runbook Part B).
 
 For development with a local cloud service: `docker compose -f deploy/docker-compose.yml up --build` starts a cloud service and a table host. The table shows a 6-character pairing code; approve it in the admin portal at `http://localhost:8081/admin` (in local development it asks for `ADMIN_TOKEN`: `change-me-dev-admin-token` unless you set your own), or with
 
