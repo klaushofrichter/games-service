@@ -10,10 +10,21 @@ BASE="${BASE:-https://games.skylar.technology}"
 SERVER="${GITHUB_SERVER_URL:-https://github.com}"
 cd "$(dirname "$0")/.."
 
-curated=$(awk '/^## \[Unreleased\]/{on=1; next} /^## /{on=0} on' CHANGELOG.md 2>/dev/null | sed '/./,$!d' || true)
+# PREV: the previous release, by default the newest tag but this one (set it to render an older release's notes again).
+prev=${PREV:-$(git tag --list 'v*' --sort=-creatordate | grep -vx "$TAG" | head -1 || true)}
+
+# The curated notes: the [Unreleased] lines of CHANGELOG.md that were added since the previous release, so each note is
+# published once, even when the section is not emptied after a release (D-173). Without a previous release: all of it.
+section=$(awk '/^## \[Unreleased\]/{on=1; next} /^## /{on=0} on' CHANGELOG.md 2>/dev/null || true)
+if [ -n "$prev" ]; then
+  added=$(git diff --unified=0 "$prev" HEAD -- CHANGELOG.md | grep '^+' | grep -v '^+++' | cut -c2- || true)
+  curated=$(awk 'NR == FNR { if ($0 != "") a[$0] = 1; next } ($0 in a)' <(printf '%s\n' "$added") <(printf '%s\n' "$section"))
+else
+  curated=$section
+fi
+curated=$(printf '%s\n' "$curated" | sed '/./,$!d')
 if [ -n "$(printf '%s' "$curated" | tr -d '[:space:]')" ]; then printf '%s\n\n' "$curated"; fi
 
-prev=$(git tag --list 'v*' --sort=-creatordate | grep -vx "$TAG" | head -1 || true)
 printf '### Changes\n\n'
 if [ -n "$prev" ]; then
   git log --no-merges --pretty='- %s' "$prev..HEAD"

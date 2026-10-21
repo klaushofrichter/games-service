@@ -916,3 +916,11 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   for them as a watcher. Once the seat went to someone else, the name is free and joining is the ordinary way. The
   phone's leave dialog, the ended session's message and the board's cards for a player who left say how to come back.
   The remote exchange is unchanged (D-159). Checks: `tests/away.test.ts`.
+- **D-173 · 2026-10-20 · Klaus** — The CHANGELOG's [Unreleased] section is cleaned up, and a release's notes take only
+  the lines added there since the previous release. *Why:* Klaus, on a review remark that the section held 67
+  already-published entries: "We should cleanup". The remark thought the release step didn't read the CHANGELOG; it
+  does (`scripts/release-notes.sh`), and since nobody emptied the section after releases, every release since 19 Oct
+  repeated all of it (about 70 notes in each). *Implementation (Claude):* the section is emptied; `release-notes.sh`
+  keeps the section's lines that `git diff <previous tag> HEAD -- CHANGELOG.md` adds (all of it before the first
+  release), so a note is published once even when the section is not emptied; `PREV=<tag>` renders an older release's
+  notes again. Replayed for the last releases: each gets only its own line. The file's header says so.
