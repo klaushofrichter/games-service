@@ -15,6 +15,9 @@ games."* That is Part A below. Parts B and C are optional.
 - You can verify everything except the phones yourself: health, games, simulated AI games (A5) and the board page.
   Ask the person to scan the QR code with a phone for the last check (A6).
 - Do not change files in the repository to make the setup work; everything is configured in `deploy/local/.env`.
+- Asked to add games from another repository, public or private: that is Part B (B2 for a private one: a clone and a
+  folder), not Part C.
+  The cloud service is never needed for games at the table.
 - Report at the end: the board URL, the phone URL (`PUBLIC_URL`), and that `deploy/local/.env` holds the table key
   (do not paste the key into shared logs or chats).
 
@@ -27,6 +30,11 @@ games."* That is Part A below. Parts B and C are optional.
 | Game logs, saves, the Game Viewer, simulations, the board control API | Uploading logs, table metrics, the admin console |
 
 Without a cloud service the table runs in *development mode*: nothing to pair, no pairing code, games start at once.
+
+**Do I need the cloud service (its console)? No**, not to play at the table: the built-in games and games from any
+other repository, public or private, run without it (Part B: clone the repository, point the table at its game
+folders). The cloud service only adds remote players outside the room, installing game repositories through its
+console, uploading logs and table metrics (Part C).
 
 ## Prerequisites
 
@@ -131,11 +139,17 @@ game.
 More Table Host settings (time limits, the AI's pause, remote seats) are environment variables, listed in the
 README under *Table Host configuration*.
 
-## Part B (optional): more games
+## Part B (optional): more games, from any repository
 
-Game folders from other repositories run the same way, for example the public example
-[`klaushofrichter/extra-games`](https://github.com/klaushofrichter/extra-games) (Chess, Liar's Dice, Backgammon). Put
-all game folders into one folder and point the table at it:
+Games from other repositories run without the cloud service: a game is a folder (`games/<id>/` in its repository,
+with a `manifest.json`), and the table runs every game folder it is given. You clone the repository, copy its game
+folders next to the built-in ones, and point the table at that folder. A **private repository** works the same way
+(B2): only the clone needs access; the table needs no token and no console.
+
+### B1. Games from a public repository
+
+The example is the public [`klaushofrichter/extra-games`](https://github.com/klaushofrichter/extra-games) (Chess,
+Liar's Dice, Backgammon). Put all game folders, the built-in ones included, into one folder and point the table at it:
 
 ```sh
 git clone https://github.com/klaushofrichter/extra-games ../extra-games
@@ -146,10 +160,55 @@ docker compose -f deploy/local/docker-compose.yml up -d
 ```
 
 **Check:** `curl -s -H "X-Table-Key: $TABLE_KEY" "$PUBLIC_URL/api/v1/games" | grep -o '"id":"[a-z-]*"'` also lists
-`backgammon`, `chess` and `liars-dice`. `GAMES` must be an absolute path; the folder is mounted read-only at
-`/app/games`. To update the games, copy them again and run
-`docker compose -f deploy/local/docker-compose.yml restart table-host`. Writing a game of your own:
-[`docs/developers/game-development.md`](../developers/game-development.md).
+`backgammon`, `chess` and `liars-dice` (and the games of every repository you copied).
+
+- `GAMES` must be an absolute path; the folder is mounted read-only at `/app/games` (there, the games find the SDK).
+- Game folder names must differ between repositories: a folder copied later replaces one with the same name.
+- To update: `git pull` in each clone, copy the game folders again, then
+  `docker compose -f deploy/local/docker-compose.yml restart table-host`.
+- A game repository is tested against a version of this one (often named in its `games-service.ref`); if a game
+  does not load, the table's log says why (`docker compose -f deploy/local/docker-compose.yml logs table-host`), and
+  updating this checkout (`git pull`, then `up -d --build`) usually helps.
+- Writing a game of your own: [`docs/developers/game-development.md`](../developers/game-development.md).
+
+### B2. Games from a private repository
+
+A private game repository is installed like the public one above: cloned with your own access, its game folders
+copied next to the others. Nothing on the table side is private-specific: no token in `deploy/local/.env`, no cloud
+service, no console. Only the clone needs access.
+
+1. **Access:** your GitHub account must be able to read the repository (the owner adds you, or you are in the
+   organization). Check: `git ls-remote https://github.com/<owner>/<repo>` (or the SSH form below) lists its branches
+   instead of saying *Repository not found*. For a coding agent: use the person's existing git access on this
+   machine; ask them if the check fails, and never put a token into the repository or into `deploy/local/.env`.
+2. **Clone** it next to this checkout, with whichever access the machine has:
+
+   ```sh
+   git clone git@github.com:<owner>/<repo>.git ../<repo>            # SSH key registered with GitHub
+   git clone https://github.com/<owner>/<repo>.git ../<repo>        # HTTPS: git asks, or uses the credential helper
+   gh repo clone <owner>/<repo> ../<repo>                           # GitHub CLI, after `gh auth login`
+   ```
+
+   Use the branch the repository releases from, if it has one (for example `git -C ../<repo> checkout production`);
+   tables run what that branch holds.
+3. **Add its games** to the folder the table uses, then let the table load them. The first three lines are what B1
+   sets up; they change nothing when it is done already:
+
+   ```sh
+   mkdir -p ../table-games
+   [ -d ../table-games/coin-flip ] || cp -r games/* ../table-games/      # the built-in games, once
+   grep -q '^GAMES=' deploy/local/.env || echo "GAMES=\"$(cd ../table-games && pwd)\"" >> deploy/local/.env
+   cp -r ../<repo>/games/* ../table-games/
+   docker compose -f deploy/local/docker-compose.yml up -d                # picks up GAMES the first time
+   docker compose -f deploy/local/docker-compose.yml restart table-host   # loads the games in the folder again
+   ```
+
+4. **Check:** the games list (as in B1) now has the repository's game ids (its `games/` folder names); the
+   table's log names them at start (`docker compose -f deploy/local/docker-compose.yml logs table-host | grep games:`).
+5. **Update** later: `git -C ../<repo> pull`, copy again (step 3), restart.
+
+The games stay on this machine: the table serves them to the phones on the LAN and to nobody else. Several private
+repositories: repeat steps 2-5 for each; their game folder names must differ.
 
 ## Part C (optional): a local cloud service
 
@@ -165,7 +224,10 @@ docker compose -f deploy/local/docker-compose.yml up -d --build
 1. The board now shows a 6-character **pairing code**. Open **`http://localhost:8081/admin`**, sign in with the
    `ADMIN_TOKEN` from `deploy/local/.env`, and approve the code. The notice on the board disappears.
 2. The console's game repositories list `klaushofrichter/extra-games`; tick it for the table, and the table installs
-   those games within a minute (the cloud service needs to reach `api.github.com`).
+   those games within a minute (the cloud service needs to reach `api.github.com`). More repositories: list them in
+   `GAME_REPOS` in `deploy/local/.env` (`owner/name@branch`, comma-separated). A private one also needs
+   `GAME_REPO_TOKEN` there: a GitHub token that can read it (fine-grained, *Contents: read*). This is only the console
+   route; Part B2 needs neither.
 3. *Invite* on the board creates a link for a remote player.
 
 **Limit of plain http:** browsers allow remote play (it uses a service worker) only on `https://` or on `localhost`.
