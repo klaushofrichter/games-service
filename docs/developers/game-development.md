@@ -442,6 +442,9 @@ Tests use Vitest and run against the real host code.
   `rt.state` and `rt.over`, and check `expect(expectReplay(game, rt)).toBe(true)` once the game has ended.
 - **Host:** `tests/helpers.ts` starts a real Table Host (`testHost()`) with fake phones (`joinDeck(name)`,
   `deck.request("game", "intent", …)`, `deck.waitView(…)`) and the board API (`t.ok("POST", "/game/start")`).
+- **By hand, without a phone:** *Advanced › Developer › Play from the board* on the board (or `BOARD_DECK=1`) puts one
+  player's deck beside the board, as on a remote player's page, so you can play your game at one screen with AI players
+  (D-175). Only one person plays at the table meanwhile, since the deck is private; remote players can still join.
 - **Browser:** `scripts/e2e/` drives a board and phones in Chromium with Playwright; `common.py` has the helpers.
 - What every game should test: a whole game to the end with AI players or scripted moves, that it replays exactly,
   that a seat's view never contains another seat's secrets, that illegal intents are rejected with a reason, an

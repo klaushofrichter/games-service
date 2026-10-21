@@ -13,7 +13,7 @@ const pick = (rounds = 1) => t.ok("POST", "/game/select", { gameId: "coin-flip",
 describe("games without a player at the table (D-118)", () => {
   it("is off at start, and the state says so", async () => {
     t = await testHost();
-    expect((await t.ok("GET", "/state")).developer).toEqual({ allowNoLocalPlayer: false, protectedPlayer: null });
+    expect((await t.ok("GET", "/state")).developer).toEqual({ allowNoLocalPlayer: false, boardDeck: false, protectedPlayer: null });
     expect((await t.api("POST", "/developer", { allowNoLocalPlayer: "yes" })).status).toBe(400);
   });
 

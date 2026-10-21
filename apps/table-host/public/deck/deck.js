@@ -11,7 +11,11 @@ const joinToken = params.get("t");
 const REMOTE = params.get("remote") === "1";
 const remoteName = params.get("name") ?? "";
 if (REMOTE) claimServiceWorkerPage();
-const SESSION_KEY = REMOTE ? `gametable.remote.${params.get("inv") ?? ""}` : `gametable.session.${location.host}`;
+// Played from the board (D-175, a developer setting): this page sits beside the board on the table PC and joins with
+// the table key the board's page holds, instead of a join code; its session is kept apart from a phone's.
+const BOARD = params.get("board") === "1" && !REMOTE;
+const boardKey = () => { try { return window.parent !== window ? window.parent.TABLE_KEY : undefined; } catch { return undefined; } };
+const SESSION_KEY = REMOTE ? `gametable.remote.${params.get("inv") ?? ""}` : BOARD ? `gametable.board-deck.${location.host}` : `gametable.session.${location.host}`;
 
 let ws = null;
 let me = null; // playerId
@@ -387,12 +391,16 @@ function render() {
     document.body.classList.remove("in-game");
     // Why: left from this phone (D-158), the seat exchanged for someone else (D-159), or removed on the board.
     const [title, text] =
-      removedReason === "replaced"
+      removedReason === "board"
+        ? ["You play from the board now", "Your place at the table continues on the board (a developer setting). Scan the QR code again once it is switched off."]
+        : removedReason === "replaced"
         ? ["Your seat went to someone else", REMOTE ? "Another player took over your seat. You keep watching the board; the table can give you a seat again." : "Another player took over your seat in this game. Scan the QR code on the board to join the next game."]
         : removedReason === "left" && leftGame
           ? ["You left the game", REMOTE ? "Ask the table for a new invite to play again." : "Scan the QR code on the board to join the next game."]
           : [removedReason === "evicted" ? "You were removed from the table" : "You left the table", REMOTE ? "Ask the table for a new invite to join again." : "Scan the QR code on the board to join again. During a game, the board shows it under Settings › Show join code."];
-    body.innerHTML = `<div class="card center"><h1>${title}</h1><p class="muted">${text}</p></div>`;
+    // Beside the board (D-175) there is no QR code to scan: a button takes a seat again.
+    body.innerHTML = `<div class="card center"><h1>${title}</h1><p class="muted">${BOARD ? "You can take a seat again from here." : text}</p>${BOARD ? `<button class="primary big" type="button" data-board-again>Take a seat again</button>` : ""}</div>`;
+    body.querySelector("[data-board-again]")?.addEventListener("click", () => location.reload());
     return;
   }
   if (!me) return renderJoin();
@@ -425,7 +433,7 @@ function renderJoin() {
     }
     return;
   }
-  if (!joinToken) {
+  if (!joinToken && !BOARD) {
     body.innerHTML = `<div class="card center"><h1>Join the table</h1><p class="muted">Scan the QR code on the board, or type the address shown below it. During a game, the board shows it under Settings › Show join code.</p></div>`;
     return;
   }
@@ -450,7 +458,8 @@ function renderJoin() {
     banner = "";
     joinError = "";
     body.querySelector("#join-error").textContent = "";
-    connect({ joinToken, name: new FormData(e.target).get("name") });
+    const name = new FormData(e.target).get("name");
+    connect(BOARD ? { boardKey: boardKey(), name } : { joinToken, name });
   });
 }
 
