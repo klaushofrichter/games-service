@@ -216,7 +216,9 @@ body:has(.preview-sash) .top .wrap { padding-right: clamp(0px, calc(150px - (100
 .games-foot { margin-top: 26px; color: var(--faint); font-size: 15px; }
 
 /* lightbox */
-.lightbox { position: fixed; inset: 0; z-index: 100; background: rgba(5,12,10,.86); backdrop-filter: blur(10px); display: none; place-items: center; padding: 40px; }
+/* The close-up scrolls by itself when it is taller than the screen (phones), and the page behind it stays put (D-179). */
+.lightbox { position: fixed; inset: 0; z-index: 100; background: rgba(5,12,10,.86); backdrop-filter: blur(10px); display: none; justify-items: center; align-content: start; align-content: safe center; padding: 40px; overflow-y: auto; overscroll-behavior: contain; }
+html.lb-open, html.lb-open body { overflow: hidden; }
 .lightbox.open { display: grid; animation: fade .3s; }
 @keyframes fade { from { opacity: 0; } }
 .lb-card { width: min(1240px, 100%); display: grid; grid-template-columns: 1fr auto; gap: 26px; align-items: center; }
@@ -225,7 +227,7 @@ body:has(.preview-sash) .top .wrap { padding-right: clamp(0px, calc(150px - (100
 .lb-card .side img { border-radius: 20px; border: 5px solid #0b0b0b; }
 .lb-card h3 { font-size: 32px; }
 .lb-card .side p { color: var(--soft); font-size: 15px; }
-.lb-close { position: absolute; top: 22px; right: 26px; font: inherit; font-size: 15px; background: none; border: 1px solid var(--line-2); color: var(--soft); border-radius: 999px; padding: 8px 16px; cursor: pointer; }
+.lb-close { position: sticky; z-index: 2; top: 0; justify-self: end; margin: -18px -14px 14px 0; font: inherit; font-size: 15px; background: var(--felt-deep); border: 1px solid var(--line-2); color: var(--soft); border-radius: 999px; padding: 8px 16px; cursor: pointer; }
 
 /* ---------- statistics and awards (D-178) ---------- */
 .awards-sec { background: radial-gradient(60% 70% at 85% 45%, rgba(214,169,74,.07), transparent 70%); }
@@ -445,6 +447,7 @@ footer .version { display: inline; margin: 0; }
   .preview-sash { transform: scale(.55); }
   body:has(.preview-sash) .top .wrap { padding-right: 100px; gap: 10px; }
   .lb-card { grid-template-columns: 1fr; } .lb-card .side { width: auto; }
+  .lightbox { padding: max(16px, env(safe-area-inset-top, 0px)) 16px 32px; } .lb-close { margin: 0 0 14px; }
   .room .shots .small { right: 0; }
   .filters { flex-wrap: wrap; }
   .aw-list { grid-template-columns: 1fr; }
@@ -1079,9 +1082,11 @@ docker compose -f deploy/local/docker-compose.yml up -d --build">Copy</button></
     $("#lb-name").textContent = g.name; $("#lb-desc").textContent = `${g.players}. ${g.text}`;
     const ph = $("#lb-phone"); ph.hidden = !g.phone; if (g.phone) { ph.src = `/site/${g.phone}.webp`; ph.alt = `${g.name} on a phone`; }
     $("#lb-link").href = (g.src === "extra" ? EX : GS) + g.id;
+    lb.scrollTop = 0;
     lb.classList.add("open");
+    document.documentElement.classList.add("lb-open");
   });
-  const close = () => lb.classList.remove("open");
+  const close = () => { lb.classList.remove("open"); document.documentElement.classList.remove("lb-open"); };
   $("#lb-close").addEventListener("click", close);
   lb.addEventListener("click", (e) => { if (e.target === lb) close(); });
   addEventListener("keydown", (e) => { if (e.key === "Escape") close(); });
