@@ -1,5 +1,5 @@
 {
-  "$comment": "Extra-game repositories every deploy starts with (D-098). Baked into the cloud image, so a change takes a PR and a deploy. Repositories added in the console last only until the next restart; the per-table ticks too, until the persistent store lands.",
+  "$comment": "Extra-game repositories every deploy starts with (D-098). Baked into the cloud image, so a change takes a PR and a deploy. Repositories added in the console and the per-table ticks are kept by the service's store (D-114).",
   "repos": [
     { "repo": "klaushofrichter/extra-games", "ref": "production" },
     { "repo": "klaushofrichter/loopy-game", "ref": "production" },

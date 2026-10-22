@@ -10,7 +10,7 @@
 <!-- The repo is public since 13 Oct 2026 (D-096), so these badges render. Versions live on the release badge and the
      releases page, never in this text. -->
 
-Game Table platform: a touchscreen **board** lying flat on a table, players' phones as private **decks**, a Linux **Table Host** that runs the games, and a **cloud service** at `games.skylar.technology` that enrolls tables, collects metrics and logs, and (from phase 1c) brokers remote players.
+Game Table platform: a touchscreen **board** lying flat on a table, players' phones as private **decks**, a Linux **Table Host** that runs the games, and a **cloud service** at `games.skylar.technology` that enrolls tables, collects metrics and logs, and brokers remote players.
 
 This repository implements phases 1a, 1b and 1c of the *Game Table — Concept & Architecture* document: lobby, seats, game selection, the game runtime with replayable logs, AI-only simulation, the board control API, pause on a lost service connection, the admin portal, a table PC kit, **remote play** over WebRTC, automated tests, and four playable games with their own board and phone UIs and rules for players: **Roulette**, **Pachisi**, **Hold'em** and **Coin Flip**. More games can come from other repositories, private ones included (*Extra-game repositories* below); [`klaushofrichter/extra-games`](https://github.com/klaushofrichter/extra-games) is the public example, with Chess, Liar's Dice and Backgammon. Decisions are recorded in [`docs/decisions.md`](docs/decisions.md).
 
@@ -49,23 +49,25 @@ Or skip the pairing code: create an access code in the console (*Access codes*) 
 | --- | --- |
 | `packages/protocol` | Message envelope, manifest schema (zod), seat layouts and edges, lobby types |
 | `packages/sdk` | `defineGame`, seeded RNG, the `GameContext` games receive, `count()` and `list()` for end-of-game texts, cards (`cards.ts`) |
-| `apps/table-host/src` | HTTP + WebSocket server, lobby (`table.ts`), game runtime and replay (`runtime.ts`), game logs (`logs.ts`, `game-log.ts`, and `log-format.md`, the README in every log), move lists and the Game Viewer's endpoints (`moves.ts`, `history.ts`), simulation, cloud link, remote-play gateway (`remote.ts`, WebRTC) |
-| `apps/table-host/public` | Board and deck pages (plain HTML/CSS/JS), the board's Game Viewer (`board/viewer.js`); `shared/` has the board kit and the rules renderer (`markdown.js`) |
-| `apps/cloud/src` | Cloud service: pairing, access codes (`access-codes.ts`), heartbeat, metrics, log upload/download, download tokens, invites and WebRTC signaling; its persistent state (`store.ts`, SQLite) |
-| `apps/cloud/public` | Admin portal (`/admin`) and the remote player's invite page (`/i/CODE`) with its service worker |
+| `apps/table-host/src` | HTTP + WebSocket server, lobby (`table.ts`), game runtime and replay (`runtime.ts`), game logs (`logs.ts`, `game-log.ts`, and `log-format.md`, the README in every log), move lists and the Game Viewer's endpoints (`moves.ts`, `history.ts`), simulation, cloud link, remote-play gateway (`remote.ts`, WebRTC), the game loader (`games.ts`), AI players with their time limits and worker thread (`ai.ts`, `ai-worker.ts`, D-112), the statistics window's data (`stats.ts`, D-140) |
+| `apps/table-host/public` | Board and deck pages (plain HTML/CSS/JS), the board's Game Viewer (`board/viewer.js`) and statistics window (`board/stats.js`), the board with one player's deck beside it (`board/play.html`, D-175); `shared/` has the board kit and the rules renderer (`markdown.js`) |
+| `apps/cloud/src` | Cloud service: pairing, access codes (`access-codes.ts`), heartbeat, metrics, log upload/download, download tokens, invites and WebRTC signaling; its persistent state (`store.ts`, SQLite), Google sign-in for admins (`auth.ts`), log metadata (`log-meta.ts`) |
+| `apps/cloud/public` | The public website (`/`, `site/`), the admin portal (`/admin`) and the remote player's invite page (`/i/CODE`) with its service worker; the service also serves `llms.txt`, `llms-full.txt` and the developer guide and Docker runbook under `/docs/` |
 | `games/roulette` | European roulette, 1–6 players, simultaneous betting, three AI styles |
 | `games/pachisi` | Ludo-style race with dice and captures, 2–4 players, two AI levels |
 | `games/holdem` | Fixed-limit Texas Hold'em, 2–8 players, private hole cards, side pots, two AI styles |
 | `games/coin-flip` | Guess heads or tails, 1–8 players, simultaneous, AI, players can join mid-game, optional time limit, per-player statistics |
 | `games/quartet` | Test game (hidden unless `SHOW_TEST_GAMES=1`): exactly 4 humans, no AI, sequential turns, ends if a player leaves |
 | `apps/cloud/src/game-repos.ts`, `apps/table-host/src/extra-games.ts`, `packages/protocol/src/bundle.ts` | Extra-game repositories: fetching and packing on the service, installing on tables, the bundle format |
-| `scripts/e2e/` | Browser end-to-end checks (Playwright): `run-all.sh` runs them all, `play.py` per game, `layout.py`, `admin.py` for the portal and sign-in, `codes.py` for access codes and a service restart, `remote.py` for remote play, `watch.py` for watchers, `extra.py` for extra-game repositories, `logs.py` for game logs, `viewer.py` for the Game Viewer; shared helpers in `common.py` |
+| `scripts/e2e/` | Browser end-to-end checks (Playwright): `run-all.sh` runs them all, `play.py` per game, `layout.py`, `admin.py` for the portal and sign-in, `codes.py` for access codes and a service restart, `remote.py` for remote play, `watch.py` for watchers, `extra.py` for extra-game repositories, `logs.py` for game logs, `viewer.py` for the Game Viewer, and one check per lobby feature (seats, names, away phones, rejoining, exchanges, watchers, playing from the board, …; see `run-all.sh`); shared helpers in `common.py` |
 | `scripts/game-log.ts` | Reads a game log zip from the command line: an overview, a range of moves, one move in full with the state before and after (D-120) |
+| `scripts/check-game-versions.ts` | A game's calendar version must change when its folder does (D-127); `--fix` sets it |
 | `scripts/sync-secrets.sh` | Puts the values from your local `.env` into GitHub and the cluster, without printing them |
 | `scripts/release-notes.sh`, `release.sh` | The release step of the deploy |
+| `scripts/site-screenshots.py` | Takes the game screenshots for the public website (`apps/cloud/public/site/`) from a host running every public game |
 | `scripts/soak.ts` | AI-only soak run over every game and player count |
 | `scripts/mac-table.sh` | A Table Host on a Mac against the live service (see above) |
-| `docs/` | Decision log; the request to the kube-setup session for the cluster side; `runbooks/` for running a table locally with Docker and for resetting and restoring the service's state |
+| `docs/` | Decision log; `developers/` (the game developer guide); the request to the kube-setup session for the cluster side; `runbooks/` for running a table locally with Docker and for resetting and restoring the service's state |
 | `tests/` | Vitest suites that drive a real host through the board control API and fake decks |
 | `deploy/` | Dockerfiles, docker-compose, the local Docker setup (`local/`), the table PC kit |
 | `.github/` | The three workflows, Dependabot, the CodeQL gate and its accepted-findings list |
@@ -83,10 +85,11 @@ Or skip the pairing code: create an access code in the console (*Access codes*) 
 | `REQUIRE_CLOUD` | 0 | `1` blocks new games while the cloud is unreachable (production) |
 | `GRACE_MS` | 60000 | How long a disconnected deck keeps its seat |
 | `AI_DELAY_MS` | 800 | Pause before an AI player acts |
-| `MAX_REMOTE_PLAYERS` | 4 | Remote seat limit (phase 1c) |
+| `MAX_REMOTE_PLAYERS` | 4 | Remote players and watchers together (D-168) |
 | `ALLOW_REMOTE_BOARD` | 0 | Serve the board to non-loopback clients (development only) |
 | `ALLOW_NO_LOCAL_PLAYER` | 0 | `1` starts with the developer setting *Games without a player at the table* on (D-118); *Advanced* on the board (hammer and wrench, D-128) turns it on or off until the next restart |
 | `BOARD_DECK` | 0 | `1` starts with the developer setting *Play from the board* on (D-175): one player at the table plays from a deck beside the board, without a phone; *Advanced* turns it on or off until the next restart |
+| `BOARD_PACING` | 1 | `0`: AI players don't wait for the board's animations (D-141) |
 | `LOG_SNAPSHOT_EVERY` | 0 | A snapshot of the whole game state in the log every N moves (D-116); 0: only the final state |
 | `SHOW_TEST_GAMES` | 0 | `1` lists the test game (`quartet`) in the game menu; the tests and `run-all.sh` turn it on |
 | `DATA_DIR`, `GAMES_DIR` | `<repo>/data`, `<repo>/games` | Logs, saves, the table's identity and a typed access code (`table.json`) and extra-game bundles (`extra-games/`); the built-in games |
@@ -108,11 +111,11 @@ curl -s -H "$K" $H/logs/<id>.zip -o run.zip                # JSONL game logs
 curl -s -H "$K" "$H/history/<id>/1/moves?offset=0&limit=25" # a finished game's moves (D-120)
 ```
 
-Full list: `GET /state, /join, /games, /metrics, /game/board, /logs, /logs/{id}.zip, /history, /history/{id}, /history/{id}/{game}/moves, /history/{id}/{game}/moves/{n}, /history/{id}/{game}/lines/{line}` and `POST /logs/{id}/verify, /join/new, /layout, /face, /rotate, /seats/move, /ai, /game/select, /game/settings, /game/prefs, /display, /game/start, /game/end, /game/close, /game/resume, /game/play-now, /game/skip-timer, /game/save, /simulation, /players/{id}/ai-options, /invites, /remote, /cloud/code`, `GET /saves, /qr?text=URL`, `DELETE /players/{id}`.
+Full list: `GET /state, /join, /games, /metrics, /game/board, /logs, /logs/{id}.zip, /history, /history/{id}, /history/{id}/{game}/moves, /history/{id}/{game}/moves/{n}, /history/{id}/{game}/lines/{line}, /history/{id}/{game}/statistics, /connections, /debug` and `POST /logs/{id}/verify, /join/new, /layout, /face, /rotate, /seats/move, /ai, /game/select, /game/settings, /game/prefs, /display, /game/start, /game/end, /game/close, /game/resume, /game/play-now, /game/skip-timer, /game/save, /simulation, /players/{id}/ai-options, /players/{id}/color, /invites, /remote, /cloud/code, /developer, /exchange, /watchers/{id}/play`, `GET /saves, /qr?text=URL`, `DELETE /players/{id}, /watchers/{id}, /exchange`.
 
-Remote players reach a subset over WebRTC (D-057): reads, except the join code, logs, saves, simulations, invites, the remote settings, QR codes and the access code; changes only `/layout` and `/game/select|start|end|close|play-now|skip-timer`. With board control they may also read `/history` (the Game Viewer, D-120), never the zips themselves.
+Remote players reach a subset over WebRTC (D-057): reads, except the join code, logs, saves, simulations, invites, the remote settings, QR codes, the access code and the developer settings; changes only `/layout`, `/exchange`, `/game/select|start|end|close|play-now|skip-timer|settings`, `/players/{id}/color|ai-options` and `/watchers/{id}[/play]`. With board control they may also read `/history` (the Game Viewer, D-120), never the zips themselves.
 
-Decks speak JSON envelopes over `/ws`: `system.hello {joinToken, name}` or `{sessionToken}` (remote decks: `{name}`), then `lobby.ready {ready}` and `game.intent {name, payload}`. The host answers with `system.welcome {playerId, sessionToken}`, `lobby.state`, `game.view {seat, view, events, over, timers, now}` (this seat only), `system.ack | reject {reason} | error {message}`, and `system.removed {reason}` when the player is removed. The board says `system.hello {role: "board", key}` and gets `game.board` instead of `game.view`.
+Decks speak JSON envelopes over `/ws`: `system.hello {joinToken, name}` or `{sessionToken}` (remote decks: `{name}`; the deck played from the board, on the table PC: `{boardKey, name}`, D-175), then `lobby.ready {ready}` and `game.intent {name, payload}`. The host answers with `system.welcome {playerId, sessionToken}`, `lobby.state`, `game.view {seat, view, events, over, timers, now}` (this seat only), `system.ack | reject {reason} | error {message}`, and `system.removed {reason}` when the player is removed. The board says `system.hello {role: "board", key}` and gets `game.board` instead of `game.view`.
 
 ## Writing a game
 
@@ -139,7 +142,7 @@ own.
 
 - **The list:** [`deploy/game-repos.json`](deploy/game-repos.json) is baked into the cloud image, so these
   repositories are back after every restart (D-098); change it by PR. In the console they are marked *deploy config*.
-- **Console, *Game repositories*:** you can also add `owner/name` and a branch there, until the next restart. The service
+- **Console, *Game repositories*:** you can also add `owner/name` and a branch there (kept across restarts, D-114). The service
   fetches each repository's `games/` folder as one bundle and lists its games; *Refresh* fetches again (it also does
   every hour). A private repository needs `GAME_REPO_TOKEN`, a fine-grained token with Contents: read on it; with several
   private repositories the one token must cover each of them (D-110).
@@ -276,8 +279,8 @@ feature branch → PR → main → (PR) → production → deploy
 
 | Workflow | Trigger | Does |
 | --- | --- | --- |
-| `production-checks.yml` | PR to `main` or `production` | `test` (tests, typecheck, `npm audit --audit-level=high`, both images built and run non-root), `e2e` (all browser checks), `codeql` (fails on any finding not in `.github/codeql-accepted.tsv`) |
-| `build-push.yml` | push to `main` | tests, then both images as `:main`, and nothing else |
+| `production-checks.yml` | PR to `main` or `production` | `test` (game versions, tests, typecheck, `npm audit --audit-level=high`, both images built and run non-root), `e2e` (all browser checks and the local Docker runbook), `codeql` (fails on any finding not in `.github/codeql-accepted.tsv`) |
+| `build-push.yml` | push to `main` | tests and typecheck, then both images as `:main`, and nothing else |
 | `deploy-production.yml` | push to `production` | on the in-cluster runner: calendar version, images as `:<sha>`, `:v<version>`, `:latest`, kube-setup manifest updated (push, then apply), rollout, smoke test until `/health` serves the new version, then a GitHub release with what the deploy verified |
 
 `main` is built but never deployed. Releases are versioned `YYYY.MM.DD.N` (America/Chicago) at deploy time; nothing in the sources carries a version. Curated release notes go under `## [Unreleased]` in `CHANGELOG.md`.
@@ -290,8 +293,9 @@ npm run typecheck                          # tsconfig.check.json: apps, packages
 node scripts/soak.ts 100                   # 100 AI-only games per game and player count
 scripts/e2e/run-all.sh out/                # every browser check, as CI runs them (pip install -r scripts/e2e/requirements.txt && python -m playwright install chromium)
 # single checks; play.py and layout.py need a running host on port 8090 with TABLE_KEY=devkey
-python3 scripts/e2e/play.py roulette out/  # also: pachisi, holdem, coinflip, endings, dialogs, rules (every game's rules on a 320 px phone)
+python3 scripts/e2e/play.py roulette out/  # also: pachisi, holdem, coinflip, endings, dialogs, rules (every game's rules on a 320 px phone), tabs
 python3 scripts/e2e/admin.py out/          # admin portal, sign-in and logout (starts its own cloud and host)
+python3 scripts/e2e/website.py out/        # the public website at / on a desktop and a phone (starts its own cloud)
 python3 scripts/e2e/codes.py out/          # access codes: console, board keypad, a service restart, a second table refused (starts its own cloud and two hosts)
 python3 scripts/e2e/remote.py out/         # remote play in a second browser (starts its own cloud and host)
 python3 scripts/e2e/seat_loss.py out/     # a player lost during a game: the waiting card, the phone's banner, the return, Remove that ends the game (starts its own host)
@@ -300,6 +304,8 @@ python3 scripts/e2e/logs.py out/          # game logs: a simulation from the boa
 python3 scripts/e2e/viewer.py out/        # the Game Viewer: logs from the lobby and the settings, moves, filters, Move #, a move in full, facing east (starts its own host)
 python3 scripts/e2e/extra.py out/          # extra-game repositories: console, table, remote player (starts its own fake GitHub, cloud and host)
 python3 scripts/e2e/layout.py out/         # decks at 4 phone sizes x 3 games, the board at 5 screen sizes
+# and one check per lobby feature, each with its own host: watch_lobby, invite_name, ai_wait, board_deck, seats_full,
+# rejoin, names, away, exchange, exchange_remote, one_board, settings_choice, next_hand (see each script's docstring)
 ```
 
 ## Known limits
