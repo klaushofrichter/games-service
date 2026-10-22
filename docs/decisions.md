@@ -1023,3 +1023,14 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   (moves and time, *Quick Draw* and *Deep Thinker*, the Game Viewer) and the `mostAward` line a game writes, for the
   developers the page is for. Not in the top bar's menu, which is full. Checks: `tests/website.test.ts` (the
   section), `scripts/e2e/website.py` (the tabs).
+
+## The game close-up on phones (22 Oct 2026)
+
+- **D-179 · 2026-10-22 · Klaus** — On the public website, a game's close-up scrolls by itself, and the page behind it
+  stays put. *Why:* Klaus, with a screenshot of Liar's Dice on an iPhone: "On the games detail, when scrolling, it moves
+  the background." The close-up is taller than a phone's screen but could not scroll, so a swipe scrolled the page
+  under it. *Implementation (Claude):* the close-up scrolls (`overflow-y: auto`, `overscroll-behavior: contain`, so
+  a swipe past its end doesn't pass on to the page), the page is locked while it is open (`html.lb-open`), it opens
+  at its top, and *Close* sticks to the top as one scrolls. The close-up is still centred when it fits, as on desktop.
+  Checks: `scripts/e2e/website.py` (at phone width: the close-up scrolls, the page doesn't, Close stays in view, the
+  page scrolls again after closing).

@@ -90,6 +90,28 @@ try:
                 page.evaluate("window.scrollTo(0, 0)")
                 page.wait_for_timeout(300)
                 page.screenshot(path=os.path.join(OUT, "website-phone.png"))
+                # A game's close-up on a phone (D-179): taller than the screen, it scrolls by itself, the page behind
+                # it stays put, Close stays in view, and closing gives the page its scrolling back.
+                page.locator(".game[data-i='3']").scroll_into_view_if_needed()  # Liar's Dice, with its phone
+                page.wait_for_timeout(600)
+                page.click(".game[data-i='3']")
+                page.wait_for_selector("#lightbox.open")
+                page.wait_for_function("document.querySelector('#lb-phone').complete && document.querySelector('#lb-img').complete")
+                y = page.evaluate("scrollY")
+                assert page.evaluate("lightbox.scrollHeight > lightbox.clientHeight"), "the close-up fits the phone; nothing to check"
+                page.mouse.move(195, 500)
+                for _ in range(8):
+                    page.mouse.wheel(0, 400)
+                    page.wait_for_timeout(120)
+                assert page.evaluate("scrollY") == y, "the page behind the close-up scrolled"
+                assert page.evaluate("lightbox.scrollTop") > 0, "the close-up did not scroll"
+                top = page.locator("#lb-close").bounding_box()["y"]
+                assert 0 <= top < 60, f"Close scrolled out of view: {top}"
+                assert page.locator("#lb-link").is_visible(), "the GitHub link at the end of the close-up"
+                page.screenshot(path=os.path.join(OUT, "website-phone-game.png"))
+                page.click("#lb-close")
+                page.wait_for_selector("#lightbox.open", state="detached")
+                assert not page.evaluate("document.documentElement.classList.contains('lb-open')"), "the page stays locked"
             page.close()
         page = b.new_page()
         page.goto(BASE + "/?signed-out=1")
