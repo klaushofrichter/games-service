@@ -986,6 +986,11 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   away phones, exchanges, remote invites, watchers and *Play from the board*, the developer section (Backgammon as the
   case, a prompt for the agent, five steps, code tabs, what you write and what the platform does, links to the guide
   and `llms.txt`), game repositories (games-service and extra-games only, with "Add yours" as an issue), installing
-  with Docker, and the table hardware as a placeholder. Motion stops with `prefers-reduced-motion`. Checks:
+  with Docker, the table hardware as a placeholder, and "Fork everything" (Klaus: "everything in github for your use under MIT
+  license, with Architecture Decision Records"). After the first draft ("Perhaps a bit too conservative") the hero became
+  a pinned scene whose camera moves overhead as one scrolls, with dice and chips, a marquee of the games and counters;
+  the Backgammon case re-enacts the session from Klaus's real prompt ("Create a backgammon game for the game
+  platform"; "a working version came out by way of Claude without supervision"). Klaus reviews a live preview before
+  it is deployed. Motion stops with `prefers-reduced-motion`. Checks:
   `tests/website.test.ts`, `scripts/e2e/website.py`; the deploy's smoke test still finds the version on `/`.
 

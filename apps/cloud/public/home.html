@@ -62,8 +62,15 @@ nav.main a:hover, nav.main a.on { color: var(--ink); text-decoration: none; }
 @keyframes toast { 0%, 85% { opacity: 1; } 100% { opacity: 0; visibility: hidden; } }
 
 /* ---------- hero ---------- */
-.hero { min-height: 100vh; padding: 120px 0 80px; display: flex; align-items: center; overflow: hidden; }
-.hero::before { content: ""; position: absolute; inset: -20%; background:
+.hero { height: 230vh; padding: 0; --p: 0; }
+.hero-pin { position: sticky; top: 0; height: 100vh; display: flex; align-items: center; overflow: hidden; padding-top: 40px; }
+.hero-text { opacity: calc(1 - var(--p) * 2.4); transform: translateY(calc(var(--p) * -120px)); will-change: opacity, transform; }
+.scene { transform: translateX(calc(var(--p) * -21vw)) translateY(calc(var(--p) * -7vh)) scale(calc(1 + var(--p) * .36)); will-change: transform; }
+.hero-caption { position: absolute; left: 0; right: 0; bottom: 0; height: 22vh; background: linear-gradient(transparent, rgba(10,29,25,.92) 55%); z-index: 4; opacity: calc(var(--p) * 3 - 1); text-align: center; font: 600 clamp(26px, 3vw, 40px)/1.2 var(--display); pointer-events: none; }
+.hero-caption span { position: absolute; left: 0; right: 0; bottom: 6vh; text-shadow: 0 2px 20px rgba(0,0,0,.8); opacity: 0; transform: translateY(20px); transition: opacity .6s, transform .6s; }
+.hero-caption span.on { opacity: 1; transform: none; }
+.hero-caption span:nth-child(3) { color: var(--brass); font-style: italic; }
+.hero-pin::before { content: ""; position: absolute; inset: -20%; background:
   radial-gradient(60% 50% at 70% 45%, rgba(47,100,87,.55), transparent 70%),
   radial-gradient(40% 40% at 15% 20%, rgba(214,169,74,.10), transparent 70%),
   radial-gradient(50% 60% at 50% 110%, rgba(19,58,49,.9), transparent 70%); z-index: -1; }
@@ -79,7 +86,7 @@ nav.main a:hover, nav.main a.on { color: var(--ink); text-decoration: none; }
 /* The table seen from above, tilted: the board in the middle, phones around it. */
 .scene { position: relative; height: 640px; perspective: 1700px; perspective-origin: 50% 30%; }
 .tabletop { position: absolute; left: 50%; top: 50%; width: 820px; height: 560px; margin: -280px 0 0 -410px; transform-style: preserve-3d;
-  transform: translateX(60px) scale(.84) rotateX(var(--rx, 50deg)) rotateZ(var(--rz, -14deg)); transition: transform .8s cubic-bezier(.2,.7,.2,1); }
+  transform: translateX(60px) scale(.84) rotateX(var(--rx, 50deg)) rotateZ(var(--rz, -14deg)); transition: transform .25s ease-out; }
 .wood { position: absolute; inset: 0; border-radius: 40px; background:
   repeating-linear-gradient(92deg, rgba(0,0,0,.08) 0 3px, transparent 3px 19px),
   linear-gradient(135deg, #5a3a22, #3b2615 60%, #2c1c10); box-shadow: 0 60px 120px rgba(0,0,0,.6), inset 0 0 0 2px rgba(255,255,255,.04); }
@@ -108,17 +115,53 @@ nav.main a:hover, nav.main a.on { color: var(--ink); text-decoration: none; }
 @keyframes deal1 { 0% { opacity: 0; transform: translate3d(0,0,4px); } 8% { opacity: 1; } 40% { transform: translate3d(-60px,120px,90px) rotate(-90deg); } 65% { opacity: 1; transform: translate3d(-110px,250px,8px) rotate(-186deg); } 75%, 100% { opacity: 0; transform: translate3d(-110px,250px,8px) rotate(-186deg); } }
 @keyframes deal2 { 0% { opacity: 0; transform: translate3d(0,0,4px); } 8% { opacity: 1; } 40% { transform: translate3d(70px,120px,90px) rotate(80deg); } 65% { opacity: 1; transform: translate3d(120px,246px,8px) rotate(185deg); } 75%, 100% { opacity: 0; transform: translate3d(120px,246px,8px) rotate(185deg); } }
 @keyframes deal3 { 0% { opacity: 0; transform: translate3d(0,0,4px); } 8% { opacity: 1; } 40% { transform: translate3d(180px,-20px,90px) rotate(-40deg); } 65% { opacity: 1; transform: translate3d(360px,-50px,8px) rotate(-84deg); } 75%, 100% { opacity: 0; transform: translate3d(360px,-50px,8px) rotate(-84deg); } }
+/* dice rolling across the felt, and a few chips */
+.die-path { position: absolute; left: 600px; top: 130px; transform-style: preserve-3d; animation: dieRun 7s infinite cubic-bezier(.25,.8,.3,1); }
+.die-path.two { animation-delay: .25s; top: 190px; left: 640px; }
+.die { position: relative; width: 30px; height: 30px; transform-style: preserve-3d; animation: dieSpin 7s infinite cubic-bezier(.25,.8,.3,1); }
+.die-path.two .die { animation-delay: .25s; animation-name: dieSpin2; }
+.die i { position: absolute; inset: 0; border-radius: 6px; background: #f3eee2; box-shadow: inset 0 0 0 1px rgba(0,0,0,.15); }
+.die i::before { content: ""; position: absolute; inset: 0; border-radius: 6px; }
+.die .f1 { transform: translateZ(15px); } .die .f1::before { background: radial-gradient(circle at 50% 50%, #d2574a 3.4px, transparent 3.8px); }
+.die .f6 { transform: rotateY(180deg) translateZ(15px); } .die .f6::before { background: radial-gradient(circle, #0a1d19 2.6px, transparent 3px) 0 0 / 50% 33.3%; background-position: 0 0; }
+.die .f2 { transform: rotateY(90deg) translateZ(15px); } .die .f2::before { background: radial-gradient(circle at 28% 28%, #0a1d19 2.6px, transparent 3px), radial-gradient(circle at 72% 72%, #0a1d19 2.6px, transparent 3px); }
+.die .f5 { transform: rotateY(-90deg) translateZ(15px); } .die .f5::before { background: radial-gradient(circle at 26% 26%, #0a1d19 2.6px, transparent 3px), radial-gradient(circle at 74% 26%, #0a1d19 2.6px, transparent 3px), radial-gradient(circle at 50% 50%, #0a1d19 2.6px, transparent 3px), radial-gradient(circle at 26% 74%, #0a1d19 2.6px, transparent 3px), radial-gradient(circle at 74% 74%, #0a1d19 2.6px, transparent 3px); }
+.die .f3 { transform: rotateX(90deg) translateZ(15px); } .die .f3::before { background: radial-gradient(circle at 25% 25%, #0a1d19 2.6px, transparent 3px), radial-gradient(circle at 50% 50%, #0a1d19 2.6px, transparent 3px), radial-gradient(circle at 75% 75%, #0a1d19 2.6px, transparent 3px); }
+.die .f4 { transform: rotateX(-90deg) translateZ(15px); } .die .f4::before { background: radial-gradient(circle at 28% 28%, #0a1d19 2.6px, transparent 3px), radial-gradient(circle at 72% 28%, #0a1d19 2.6px, transparent 3px), radial-gradient(circle at 28% 72%, #0a1d19 2.6px, transparent 3px), radial-gradient(circle at 72% 72%, #0a1d19 2.6px, transparent 3px); }
+@keyframes dieRun { 0% { transform: translate3d(140px, -60px, 160px); opacity: 0; } 6% { opacity: 1; } 22% { transform: translate3d(40px, 10px, 18px); } 30% { transform: translate3d(0, 30px, 50px); } 42% { transform: translate3d(-40px, 50px, 16px); } 50%, 88% { transform: translate3d(-60px, 60px, 16px); opacity: 1; } 96%, 100% { transform: translate3d(-60px, 60px, 16px); opacity: 0; } }
+@keyframes dieSpin { 0% { transform: rotateX(0) rotateY(0); } 50%, 100% { transform: rotateX(720deg) rotateY(540deg); } }
+@keyframes dieSpin2 { 0% { transform: rotateX(0) rotateY(0); } 50%, 100% { transform: rotateX(450deg) rotateY(810deg); } }
+.chip { position: absolute; width: 34px; height: 34px; border-radius: 50%; background: radial-gradient(circle, transparent 9px, rgba(255,255,255,.9) 9.5px 11px, transparent 11.5px), repeating-conic-gradient(var(--cc) 0 30deg, #f3eee2 30deg 45deg); box-shadow: 0 3px 0 rgba(0,0,0,.35); transform: translateZ(4px); }
+.chip.c1 { --cc: #d2574a; left: 70px; top: 470px; } .chip.c2 { --cc: #2f6fb0; left: 92px; top: 492px; } .chip.c3 { --cc: #2c8a5a; left: 720px; top: 60px; }
 .tag { position: absolute; z-index: 3; font-size: 13px; color: var(--soft); background: rgba(10,29,25,.85); border: 1px solid var(--line-2); padding: 7px 12px; border-radius: 999px; backdrop-filter: blur(6px); white-space: nowrap; animation: bob 5s ease-in-out infinite; }
 .tag b { color: var(--ink); font-weight: 600; }
 .tag i { font-style: normal; color: var(--brass); margin-right: 6px; }
 .tag.t1 { left: 4%; top: 6%; } .tag.t2 { right: 0; bottom: 8%; animation-delay: 1.5s; } .tag.t3 { right: 2%; top: 12%; animation-delay: .8s; }
+.tag { opacity: calc(1 - var(--p) * 3); }
 @keyframes bob { 50% { transform: translateY(-8px); } }
-.scroll-cue { position: absolute; left: 50%; bottom: 26px; width: 26px; height: 42px; border: 2px solid var(--line-2); border-radius: 14px; transform: translateX(-50%); }
+.scroll-cue { opacity: calc(1 - var(--p) * 8); z-index: 5; position: absolute; left: 50%; bottom: 26px; width: 26px; height: 42px; border: 2px solid var(--line-2); border-radius: 14px; transform: translateX(-50%); }
 .scroll-cue::after { content: ""; position: absolute; left: 50%; top: 8px; width: 4px; height: 8px; margin-left: -2px; border-radius: 2px; background: var(--brass); animation: cue 1.8s infinite; }
 @keyframes cue { 0% { opacity: 0; transform: translateY(0); } 40% { opacity: 1; } 100% { opacity: 0; transform: translateY(14px); } }
 
+/* ---------- marquee and numbers ---------- */
+.marquee { overflow: hidden; border-block: 1px solid var(--line); padding: 26px 0; background: linear-gradient(90deg, var(--felt-deep), rgba(19,58,49,.5), var(--felt-deep)); }
+.marquee .track { display: flex; gap: 38px; align-items: center; width: max-content; animation: marquee 38s linear infinite; }
+.marquee span { font: 600 clamp(34px, 4.4vw, 64px)/1 var(--display); color: transparent; -webkit-text-stroke: 1px rgba(243,238,226,.45); white-space: nowrap; transition: color .3s; }
+.marquee span:hover { color: var(--ink); }
+.marquee span.you { -webkit-text-stroke: 0; color: var(--brass); font-style: italic; }
+.marquee i { color: var(--brass-deep); font-style: normal; font-size: 22px; }
+@keyframes marquee { to { transform: translateX(-50%); } }
+.numbers { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; padding: 90px 0 40px; }
+.num { display: grid; gap: 6px; padding-left: 20px; border-left: 2px solid var(--brass-deep); }
+.num b { font: 600 clamp(48px, 5vw, 72px)/1 var(--display); background: linear-gradient(180deg, var(--brass-hi), var(--brass-deep)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.num span { color: var(--soft); font-size: 15px; }
+/* a soft light that follows the pointer over cards */
+.spot { position: relative; isolation: isolate; }
+.spot::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: radial-gradient(360px circle at var(--mx, -999px) var(--my, -999px), rgba(214,169,74,.13), transparent 60%); pointer-events: none; z-index: -1; opacity: 0; transition: opacity .3s; }
+.spot:hover::after { opacity: 1; }
+
 /* ---------- audience strip ---------- */
-.paths { padding: 30px 0 100px; }
+.paths { padding: 60px 0 100px; }
 .paths .grid { display: grid; grid-template-columns: 1.25fr 1fr 1fr; gap: 20px; }
 .path { position: relative; padding: 30px; border-radius: 22px; background: linear-gradient(160deg, var(--felt-mid), var(--felt)); border: 1px solid var(--line); overflow: hidden; transition: transform .3s, border-color .3s; display: grid; gap: 12px; align-content: start; color: var(--ink); }
 .path:hover { transform: translateY(-6px); border-color: var(--brass-deep); text-decoration: none; }
@@ -230,10 +273,20 @@ nav.main a:hover, nav.main a.on { color: var(--ink); text-decoration: none; }
 .build { background: linear-gradient(180deg, var(--felt-deep), #0d241f 30%, var(--felt-deep)); }
 .build::before { content: ""; position: absolute; inset: 0; background: radial-gradient(50% 40% at 80% 10%, rgba(214,169,74,.10), transparent 70%); pointer-events: none; }
 .case { display: grid; grid-template-columns: 1.2fr 1fr; gap: 0; border-radius: 26px; overflow: hidden; border: 1px solid var(--brass-deep); background: var(--felt); margin-bottom: 90px; box-shadow: 0 40px 100px rgba(0,0,0,.45); }
-.case .pic { position: relative; min-height: 380px; }
-.case .pic img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.agent { position: relative; min-height: 460px; background: #050d0a; border-right: 1px solid var(--line); overflow: hidden; display: flex; flex-direction: column; }
+.agent .bar { display: flex; gap: 6px; padding: 12px 14px; background: #0b1c17; border-bottom: 1px solid var(--line); align-items: center; }
+.agent .bar i { width: 11px; height: 11px; border-radius: 50%; background: #2a3b35; }
+.agent .bar span { margin-left: 10px; font: 12.5px var(--mono); color: var(--faint); }
+.agent .lines { padding: 20px 22px; font: 13.5px/1.75 var(--mono); color: #d8d2c3; flex: 1; }
+.agent .lines div { white-space: pre-wrap; animation: lineIn .3s both; }
+.agent .lines .me { color: var(--ink); } .agent .lines .me::before { content: "› "; color: var(--brass); }
+.agent .lines .dim { color: var(--faint); } .agent .lines .ok { color: var(--jade); } .agent .lines .file { color: #7fc4e8; }
+.agent .lines .done { color: var(--brass-hi); font-weight: 600; }
+@keyframes lineIn { from { opacity: 0; transform: translateY(6px); } }
+.agent .result { position: absolute; right: -6%; bottom: -8%; width: 78%; border-radius: 12px; border: 1px solid var(--brass-deep); box-shadow: 0 30px 80px rgba(0,0,0,.7); transform: translateY(60px) rotate(-4deg) scale(.9); opacity: 0; transition: transform 1.1s cubic-bezier(.2,.7,.2,1), opacity .8s; }
+.agent.done .result { transform: rotate(-3deg); opacity: 1; }
 .case .txt { padding: 44px; display: grid; gap: 18px; align-content: center; }
-.case h3 { font-size: 34px; }
+.case h3 { font-size: 32px; font-style: italic; color: var(--ink); }
 .case .clock { display: inline-flex; align-items: center; gap: 10px; font: 600 14px var(--text); color: var(--brass-hi); letter-spacing: .08em; text-transform: uppercase; }
 .case ul { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: 1fr 1fr; gap: 8px 18px; color: var(--soft); font-size: 15px; }
 .case li::before { content: "✓"; color: var(--jade); margin-right: 8px; font-weight: 700; }
@@ -321,6 +374,16 @@ nav.main a:hover, nav.main a.on { color: var(--ink); text-decoration: none; }
 .spec { padding: 16px 18px; border-radius: 14px; border: 1px solid var(--line); background: rgba(15,42,36,.55); }
 .spec b { display: block; font-size: 15px; } .spec span { color: var(--soft); font-size: 14px; }
 
+/* ---------- open source ---------- */
+.open { background: radial-gradient(60% 50% at 50% 0%, rgba(214,169,74,.08), transparent 70%); }
+.opengrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; }
+.og { display: grid; gap: 10px; align-content: start; padding: 28px 24px; border-radius: 20px; border: 1px solid var(--line); background: rgba(15,42,36,.55); color: var(--ink); transition: transform .3s, border-color .3s; }
+.og:hover { transform: translateY(-5px); border-color: var(--brass-deep); text-decoration: none; }
+.og b { font: 600 46px/1 var(--display); background: linear-gradient(180deg, var(--brass-hi), var(--brass-deep)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.og h3 { font: 600 18px/1.3 var(--text); }
+.og p { color: var(--soft); font-size: 15px; }
+.og code { color: var(--brass-hi); font-size: 13.5px; }
+
 /* ---------- footer ---------- */
 footer { border-top: 1px solid var(--line); padding: 60px 0 50px; color: var(--faint); font-size: 14.5px; }
 footer .wrap { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 30px; }
@@ -330,14 +393,16 @@ footer a:hover { color: var(--ink); }
 footer .version { display: inline; margin: 0; }
 
 /* ---------- reveal on scroll ---------- */
-.rv { opacity: 0; transform: translateY(30px); transition: opacity .9s cubic-bezier(.2,.7,.2,1), transform .9s cubic-bezier(.2,.7,.2,1); transition-delay: var(--d, 0s); }
-.rv.in { opacity: 1; transform: none; }
+.js .rv { opacity: 0; transform: translateY(30px); transition: opacity .9s cubic-bezier(.2,.7,.2,1), transform .9s cubic-bezier(.2,.7,.2,1); transition-delay: var(--d, 0s); }
+.js .rv.in { opacity: 1; transform: none; }
 
 @media (max-width: 1080px) {
   nav.main { display: none; }
   .hero .wrap, .room .grid, .demo, .devgrid, .install .grid, .hw .grid, .case { grid-template-columns: 1fr; }
+  .hero { height: auto; } .hero-pin { position: relative; height: auto; min-height: 100vh; padding: 120px 0 60px; } .hero-caption { display: none; }
+  .hero-text { opacity: 1; transform: none; }
   .scene { height: 520px; transform: scale(.8); }
-  .paths .grid, .games, .features, .links { grid-template-columns: 1fr 1fr; }
+  .paths .grid, .games, .features, .links, .opengrid, .numbers { grid-template-columns: 1fr 1fr; }
   .game.wide { grid-column: span 2; }
   .code { position: static; }
   .repo { grid-template-columns: 1fr; }
@@ -347,7 +412,7 @@ footer .version { display: inline; margin: 0; }
   .wrap { width: calc(100% - 32px); }
   section { padding: 80px 0; }
   .scene { height: 380px; transform: scale(.52); margin: -60px -120px; }
-  .paths .grid, .games, .features, .links, .split, .specs, .case ul { grid-template-columns: 1fr; }
+  .paths .grid, .games, .features, .links, .split, .specs, .case ul, .opengrid { grid-template-columns: 1fr; }
   .game.wide { grid-column: auto; }
   .top .gh span { display: none; }
   .lb-card { grid-template-columns: 1fr; } .lb-card .side { width: auto; }
@@ -355,8 +420,9 @@ footer .version { display: inline; margin: 0; }
   .filters { flex-wrap: wrap; }
 }
 @media (prefers-reduced-motion: reduce) {
+  .hero { height: auto; } .hero-pin { position: relative; height: auto; min-height: 100vh; } .hero-caption { display: none; }
   *, *::before, *::after { animation: none !important; transition: none !important; }
-  .rv { opacity: 1; transform: none; }
+  .js .rv { opacity: 1; transform: none; }
 }
 </style>
 </head>
@@ -382,9 +448,10 @@ footer .version { display: inline; margin: 0; }
 
 <main>
 <!-- ============ HERO ============ -->
-<section class="hero">
+<section class="hero" id="hero">
+  <div class="hero-pin">
   <div class="wrap">
-    <div>
+    <div class="hero-text">
       <p class="eyebrow rv">Open source · MIT · Free games</p>
       <h1 class="rv" style="--d:.08s">Gather round<br><em>one screen.</em></h1>
       <p class="lede rv" style="--d:.16s">Game Table turns a touchscreen lying flat on the table into a board that everyone in the room shares. Phones are the private hands. And the games? <b style="color:var(--ink)">You build them, with your AI, in hours.</b></p>
@@ -411,32 +478,49 @@ footer .version { display: inline; margin: 0; }
         <div class="phone n"><img src="/site/coin-flip-phone.webp" alt=""></div>
         <div class="phone w"><img src="/site/lobby-phone.webp" alt=""></div>
         <i class="fly f1"></i><i class="fly f2"></i><i class="fly f3"></i>
+        <div class="die-path"><div class="die"><i class="f1"></i><i class="f2"></i><i class="f3"></i><i class="f4"></i><i class="f5"></i><i class="f6"></i></div></div>
+        <div class="die-path two"><div class="die"><i class="f1"></i><i class="f2"></i><i class="f3"></i><i class="f4"></i><i class="f5"></i><i class="f6"></i></div></div>
+        <i class="chip c1"></i><i class="chip c2"></i><i class="chip c3"></i>
       </div>
       <div class="tag t1"><i>●</i><b>The board</b> · shared by everyone</div>
       <div class="tag t3"><i>◆</i><b>Your deck</b> · private, on your phone</div>
       <div class="tag t2"><i>✦</i><b>AI players</b> fill the empty seats</div>
     </div>
   </div>
+  <div class="hero-caption" id="hero-caption" aria-hidden="true"><span>Everyone shares the board.</span><span>Everyone keeps their own hand.</span><span>Nobody looks at a TV.</span></div>
   <a class="scroll-cue" href="#paths" aria-label="Scroll down"></a>
+  </div>
 </section>
+
+<div class="marquee" aria-hidden="true"><div class="track">
+  <span>Hold'em</span><i>✦</i><span>Backgammon</span><i>✦</i><span>Roulette</span><i>✦</i><span>Liar's Dice</span><i>✦</i><span>Chess</span><i>✦</i><span>Pachisi</span><i>✦</i><span>Coin Flip</span><i>✦</i><span class="you">your game here</span><i>✦</i>
+  <span>Hold'em</span><i>✦</i><span>Backgammon</span><i>✦</i><span>Roulette</span><i>✦</i><span>Liar's Dice</span><i>✦</i><span>Chess</span><i>✦</i><span>Pachisi</span><i>✦</i><span>Coin Flip</span><i>✦</i><span class="you">your game here</span><i>✦</i>
+</div></div>
+
+<div class="numbers wrap">
+  <div class="num rv"><b data-count="1">0</b><span>prompt to a working Backgammon</span></div>
+  <div class="num rv" style="--d:.06s"><b data-count="7">0</b><span>free games to play today</span></div>
+  <div class="num rv" style="--d:.12s"><b data-count="8">0</b><span>players around one board</span></div>
+  <div class="num rv" style="--d:.18s"><b data-count="0" data-suffix=" lines">0</b><span>of lobby code in your game</span></div>
+</div>
 
 <!-- ============ PATHS ============ -->
 <section class="paths" id="paths">
   <div class="wrap grid">
-    <a class="path dev rv" href="#build">
+    <a class="path dev rv spot" href="#build">
       <span class="badge">Start here</span>
       <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 9l-4 3 4 3M16 9l4 3-4 3M13.5 5l-3 14"/></svg></span>
       <h3>Game developers</h3>
       <p>Turn your game idea into something people play together, fast. Describe it to your AI, and the platform supplies the lobby, seats, phones, AI scheduling, remote play, logs and replay.</p>
       <span class="go">Build a game →</span>
     </a>
-    <a class="path rv" style="--d:.08s" href="#install">
+    <a class="path rv spot" style="--d:.08s" href="#install">
       <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="3"/><circle cx="9" cy="9" r="1.2" fill="currentColor"/><circle cx="15" cy="15" r="1.2" fill="currentColor"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/></svg></span>
       <h3>Gamers</h3>
       <p>Run a table at home with Docker and play the free games with friends around any screen. No cloud, no accounts.</p>
       <span class="go">Play at home →</span>
     </a>
-    <a class="path rv" style="--d:.16s" href="#table">
+    <a class="path rv spot" style="--d:.16s" href="#table">
       <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9h18M5 9v10M19 9v10M7 6h10l2 3H5z"/></svg></span>
       <h3>Tinkerers</h3>
       <p>Build a table with a flat touchscreen and a small Linux PC. A kiosk kit boots straight into the board.</p>
@@ -508,14 +592,14 @@ footer .version { display: inline; margin: 0; }
       <div class="steps" id="steps"></div>
     </div>
     <div class="features">
-      <div class="feature rv"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3M21 14v7h-7"/></svg><h3>Join by QR code</h3><p>One code for everyone at the table. When no seat is free, the board and the phone say so.</p></div>
-      <div class="feature rv" style="--d:.05s"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="4" y="5" width="16" height="14" rx="2"/><path d="M4 10h16M10 5v14"/></svg><h3>Seats and colours</h3><p>2 to 8 seats around the edges, each with a name and colour; the board turns toward each side.</p></div>
-      <div class="feature rv" style="--d:.1s"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="6" y="2" width="12" height="20" rx="3"/><path d="M10 18h4"/></svg><h3>Away phones keep their seat</h3><p>A locked screen or a dead battery doesn't end the game. The seat waits, then the table decides.</p></div>
-      <div class="feature rv" style="--d:.15s"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h13l-3-3M20 17H7l3 3"/></svg><h3>Exchange a player</h3><p>Mid-game, hand a seat to someone at the table, a remote friend, a watcher or an AI. The game carries on.</p></div>
-      <div class="feature rv"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10 14a5 5 0 007 0l3-3a5 5 0 00-7-7l-1 1"/><path d="M14 10a5 5 0 00-7 0l-3 3a5 5 0 007 7l1-1"/></svg><h3>Remote invites</h3><p>A link, optionally with a name. The browser connects straight to the table over WebRTC.</p></div>
-      <div class="feature rv" style="--d:.05s"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg><h3>Watchers</h3><p>Friends can follow along without a seat. Tap the eye to see who's watching, let them play, or remove them.</p></div>
-      <div class="feature rv" style="--d:.1s"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/><path d="M18 3l3 3-3 3"/></svg><h3>Rejoin by name</h3><p>Left by accident? Scan again with the same name and you're back in your seat.</p></div>
-      <div class="feature rv" style="--d:.15s"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9h10M7 13h6M7 17h8"/></svg><h3>Logs, replay, viewer</h3><p>Every game is logged and replayed to check it. The board's Game Viewer walks through each move.</p></div>
+      <div class="feature rv spot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3M21 14v7h-7"/></svg><h3>Join by QR code</h3><p>One code for everyone at the table. When no seat is free, the board and the phone say so.</p></div>
+      <div class="feature rv spot" style="--d:.05s"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="4" y="5" width="16" height="14" rx="2"/><path d="M4 10h16M10 5v14"/></svg><h3>Seats and colours</h3><p>2 to 8 seats around the edges, each with a name and colour; the board turns toward each side.</p></div>
+      <div class="feature rv spot" style="--d:.1s"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="6" y="2" width="12" height="20" rx="3"/><path d="M10 18h4"/></svg><h3>Away phones keep their seat</h3><p>A locked screen or a dead battery doesn't end the game. The seat waits, then the table decides.</p></div>
+      <div class="feature rv spot" style="--d:.15s"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h13l-3-3M20 17H7l3 3"/></svg><h3>Exchange a player</h3><p>Mid-game, hand a seat to someone at the table, a remote friend, a watcher or an AI. The game carries on.</p></div>
+      <div class="feature rv spot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10 14a5 5 0 007 0l3-3a5 5 0 00-7-7l-1 1"/><path d="M14 10a5 5 0 00-7 0l-3 3a5 5 0 007 7l1-1"/></svg><h3>Remote invites</h3><p>A link, optionally with a name. The browser connects straight to the table over WebRTC.</p></div>
+      <div class="feature rv spot" style="--d:.05s"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg><h3>Watchers</h3><p>Friends can follow along without a seat. Tap the eye to see who's watching, let them play, or remove them.</p></div>
+      <div class="feature rv spot" style="--d:.1s"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/><path d="M18 3l3 3-3 3"/></svg><h3>Rejoin by name</h3><p>Left by accident? Scan again with the same name and you're back in your seat.</p></div>
+      <div class="feature rv spot" style="--d:.15s"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9h10M7 13h6M7 17h8"/></svg><h3>Logs, replay, viewer</h3><p>Every game is logged and replayed to check it. The board's Game Viewer walks through each move.</p></div>
     </div>
   </div>
 </section>
@@ -529,12 +613,16 @@ footer .version { display: inline; margin: 0; }
       <p class="lede rv" style="--d:.12s">A game is a folder: a manifest, pure TypeScript rules, and optional board and phone screens in plain JavaScript. The developer guide is written for language models as much as for people, so your AI can read the contract and build a complete game.</p>
     </div>
 
-    <div class="case rv">
-      <div class="pic"><img src="/site/backgammon.webp" alt="Backgammon on the board: checkers, dice, and each player's panel" loading="lazy"></div>
+    <div class="case rv" id="case">
+      <div class="agent" id="agent">
+        <div class="bar"><i></i><i></i><i></i><span>Claude · extra-games</span></div>
+        <div class="lines" id="agent-lines"></div>
+        <img class="result" src="/site/backgammon.webp" alt="Backgammon on the board: checkers, dice, and each player's panel" loading="lazy">
+      </div>
       <div class="txt">
-        <span class="clock"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Built in hours, with Claude</span>
-        <h3>Backgammon: from idea to table in an afternoon</h3>
-        <p class="muted">Backgammon in extra-games was written with Claude in a few hours: about 2,000 lines for the rules, the board and the phone screen, with matches to 100 points, the doubling cube and the Crawford rule. Everything else came from the platform:</p>
+        <span class="clock"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>One prompt · no supervision</span>
+        <h3>“Create a backgammon game for the game platform.”</h3>
+        <p class="muted">That was the whole prompt. Claude read the developer guide and came back with a working Backgammon, without anyone looking over its shoulder. A few hours of polish later it plays matches to 100 points with the doubling cube and the Crawford rule. Everything else it simply gets from the platform:</p>
         <ul>
           <li>AI players, three strengths</li>
           <li>A touch board: tap, then move</li>
@@ -543,6 +631,7 @@ footer .version { display: inline; margin: 0; }
           <li>Timers, pauses, exchanges</li>
           <li>Logs, replay and statistics</li>
         </ul>
+        <p class="faint" style="font-size:13px">The session on the left is a re-enactment; the prompt is the real one.</p>
       </div>
     </div>
 
@@ -646,10 +735,10 @@ footer .version { display: inline; margin: 0; }
     </div>
 
     <div class="links">
-      <a class="lnk rv" href="/docs/game-development.md"><b>Developer guide</b><span>The full contract, with a checklist.</span><code>/docs/game-development.md</code></a>
-      <a class="lnk rv" style="--d:.05s" href="/llms.txt"><b>llms.txt</b><span>The index for your AI agent.</span><code>/llms.txt</code></a>
-      <a class="lnk rv" style="--d:.1s" href="/llms-full.txt"><b>Everything in one file</b><span>Index, guide and runbook together.</span><code>/llms-full.txt</code></a>
-      <a class="lnk rv" style="--d:.15s" href="https://github.com/klaushofrichter/extra-games" target="_blank" rel="noopener noreferrer"><b>Example repository</b><span>Chess, Liar's Dice, Backgammon.</span><code>klaushofrichter/extra-games</code></a>
+      <a class="lnk rv spot" href="/docs/game-development.md"><b>Developer guide</b><span>The full contract, with a checklist.</span><code>/docs/game-development.md</code></a>
+      <a class="lnk rv spot" style="--d:.05s" href="/llms.txt"><b>llms.txt</b><span>The index for your AI agent.</span><code>/llms.txt</code></a>
+      <a class="lnk rv spot" style="--d:.1s" href="/llms-full.txt"><b>Everything in one file</b><span>Index, guide and runbook together.</span><code>/llms-full.txt</code></a>
+      <a class="lnk rv spot" style="--d:.15s" href="https://github.com/klaushofrichter/extra-games" target="_blank" rel="noopener noreferrer"><b>Example repository</b><span>Chess, Liar's Dice, Backgammon.</span><code>klaushofrichter/extra-games</code></a>
     </div>
   </div>
 </section>
@@ -730,6 +819,22 @@ docker compose -f deploy/local/docker-compose.yml up -d --build">Copy</button></
     </div>
   </div>
 </section>
+<!-- ============ OPEN ============ -->
+<section class="open" id="open">
+  <div class="wrap">
+    <div class="section-head">
+      <p class="eyebrow rv">Fork everything</p>
+      <h2 class="rv" style="--d:.06s">All of it is on GitHub, under the MIT licence.</h2>
+      <p class="lede rv" style="--d:.12s">The platform, the games, the tests, the table PC kit and the reasons behind every decision. Clone it, fork it, run your own service, or take just the parts you need.</p>
+    </div>
+    <div class="opengrid">
+      <a class="og rv spot" href="https://github.com/klaushofrichter/games-service/blob/main/LICENSE" target="_blank" rel="noopener noreferrer"><b>MIT</b><h3>Yours to use</h3><p>Platform and example games under the MIT licence: commercial use, changes and forks welcome. No warranty.</p></a>
+      <a class="og rv spot" style="--d:.06s" href="https://github.com/klaushofrichter/games-service/blob/main/docs/decisions.md" target="_blank" rel="noopener noreferrer"><b data-count="170" data-suffix="+">0</b><h3>Architecture Decision Records</h3><p>Every product and design decision, with who made it, why, and how it was built. Your AI can read the history, not just the code.</p></a>
+      <a class="og rv spot" style="--d:.12s" href="https://github.com/klaushofrichter/games-service/tree/main/tests" target="_blank" rel="noopener noreferrer"><b data-count="490" data-suffix="+">0</b><h3>Automated tests</h3><p>Rules, lobby, remote play and every game, plus browser checks on real boards and phones, on every pull request.</p></a>
+      <a class="og rv spot" style="--d:.18s" href="https://github.com/klaushofrichter/games-service/blob/main/AGENTS.md" target="_blank" rel="noopener noreferrer"><b>AI</b><h3>Ready for agents</h3><p><code>AGENTS.md</code>, <code>llms.txt</code> and a developer guide written for language models: point your agent at the repository and go.</p></a>
+    </div>
+  </div>
+</section>
 </main>
 
 <footer>
@@ -740,7 +845,7 @@ docker compose -f deploy/local/docker-compose.yml up -d --build">Copy</button></
       <p style="margin-top:14px">Version {{version}}</p>
     </div>
     <div><h4>Play</h4><a href="#games">Games</a><a href="#install">Play at home</a><a href="/docs/local-docker.md">Local runbook</a><a href="#table">The table</a></div>
-    <div><h4>Build</h4><a href="/docs/game-development.md">Developer guide</a><a href="/llms.txt">llms.txt</a><a href="/llms-full.txt">llms-full.txt</a><a href="#repos">Game repositories</a></div>
+    <div><h4>Build</h4><a href="/docs/game-development.md">Developer guide</a><a href="/llms.txt">llms.txt</a><a href="/llms-full.txt">llms-full.txt</a><a href="#repos">Game repositories</a><a href="https://github.com/klaushofrichter/games-service/blob/main/docs/decisions.md" target="_blank" rel="noopener noreferrer">Decision records</a></div>
     <div><h4>Source</h4><a href="https://github.com/klaushofrichter/games-service" target="_blank" rel="noopener noreferrer">games-service</a><a href="https://github.com/klaushofrichter/extra-games" target="_blank" rel="noopener noreferrer">extra-games</a><a href="https://github.com/klaushofrichter/games-service/releases" target="_blank" rel="noopener noreferrer">Releases</a><a href="https://github.com/klaushofrichter/games-service/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">MIT licence</a></div>
   </div>
 </footer>
@@ -753,6 +858,8 @@ docker compose -f deploy/local/docker-compose.yml up -d --build">Copy</button></
 <script>
 (() => {
   "use strict";
+  // Sections fade in as they scroll into view; without this script everything simply shows.
+  document.documentElement.classList.add("js");
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => [...r.querySelectorAll(s)];
   const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -770,11 +877,75 @@ docker compose -f deploy/local/docker-compose.yml up -d --build">Copy</button></
   const shots = $$("#hero-shots img");
   let shot = 0;
   if (!still) setInterval(() => { shots[shot].classList.remove("on"); shot = (shot + 1) % shots.length; shots[shot].classList.add("on"); }, 3200);
-  const tt = $("#tabletop"), scene = $("#scene");
-  if (!still) addEventListener("mousemove", (e) => {
-    const x = e.clientX / innerWidth - 0.5, y = e.clientY / innerHeight - 0.5;
-    tt.style.setProperty("--rz", `${-14 + x * 8}deg`);
-    tt.style.setProperty("--rx", `${50 - y * 6}deg`);
+  // Hero: the camera moves overhead as you scroll (the section is pinned), and follows the mouse a little.
+  const hero = $("#hero"), tt = $("#tabletop"), caps = $$("#hero-caption span");
+  let mx = 0, my = 0, p = 0;
+  const pinned = () => getComputedStyle($(".hero-pin")).position === "sticky";
+  function camera() {
+    tt.style.setProperty("--rz", `${(-14 + mx * 8) * (1 - p)}deg`);
+    tt.style.setProperty("--rx", `${50 - p * 40 - my * 6 * (1 - p)}deg`);
+  }
+  function heroScroll() {
+    if (still || !pinned()) { p = 0; hero.style.setProperty("--p", 0); return; }
+    const span = hero.offsetHeight - innerHeight;
+    p = Math.min(1, Math.max(0, (scrollY - hero.offsetTop) / span));
+    hero.style.setProperty("--p", p.toFixed(3));
+    caps.forEach((c, k) => c.classList.toggle("on", p > 0.42 + k * 0.17 && (k === caps.length - 1 ? p <= 1 : p <= 0.42 + (k + 1) * 0.17)));
+    camera();
+  }
+  addEventListener("scroll", heroScroll, { passive: true });
+  addEventListener("resize", heroScroll);
+  heroScroll();
+  if (!still) addEventListener("mousemove", (e) => { mx = e.clientX / innerWidth - 0.5; my = e.clientY / innerHeight - 0.5; camera(); }, { passive: true });
+
+  // Numbers count up when they come into view.
+  const counters = new IntersectionObserver((es) => es.forEach((e) => {
+    if (!e.isIntersecting) return;
+    counters.unobserve(e.target);
+    const el = e.target, to = Number(el.dataset.count), suffix = el.dataset.suffix || "";
+    if (still || to === 0) return void (el.textContent = to + suffix);
+    const t0 = performance.now();
+    const step = (t) => { const k = Math.min(1, (t - t0) / 1400); el.textContent = Math.round(to * (1 - Math.pow(1 - k, 3))) + suffix; if (k < 1) requestAnimationFrame(step); };
+    requestAnimationFrame(step);
+  }), { threshold: 0.6 });
+  $$("[data-count]").forEach((el) => counters.observe(el));
+
+  // The Backgammon session, re-enacted line by line, then the board it made.
+  const LINES = [
+    ["me", "Create a backgammon game for the game platform"],
+    ["dim", "Reading https://games.skylar.technology/llms.txt"],
+    ["dim", "Reading the developer guide and games/coin-flip"],
+    ["file", "+ games/backgammon/manifest.json"],
+    ["file", "+ games/backgammon/rules.ts       moves, bearing off, AI"],
+    ["file", "+ games/backgammon/board.js       the touch board"],
+    ["file", "+ games/backgammon/deck.js        each player's phone"],
+    ["file", "+ games/backgammon/how-to-play.md"],
+    ["dim", "Running the tests on a real Table Host"],
+    ["ok", "✓ whole games with AI players replay exactly"],
+    ["ok", "✓ no seat sees another seat's secrets"],
+    ["ok", "✓ board and phones in the browser"],
+    ["done", "Backgammon is ready to play."],
+  ];
+  const agent = $("#agent"), agentLines = $("#agent-lines");
+  const play = () => {
+    agentLines.textContent = ""; agent.classList.remove("done");
+    let t = 400;
+    LINES.forEach(([cls, text], k) => {
+      setTimeout(() => {
+        const d = document.createElement("div"); d.className = cls; d.textContent = text; agentLines.append(d);
+        if (k === LINES.length - 1) setTimeout(() => agent.classList.add("done"), 500);
+      }, still ? 0 : t);
+      t += cls === "me" ? 1100 : cls === "dim" ? 750 : 380;
+    });
+  };
+  new IntersectionObserver(([e], obs) => { if (e.isIntersecting) { obs.disconnect(); play(); } }, { threshold: 0.45 }).observe(agent);
+
+  // A soft light follows the pointer over cards.
+  document.addEventListener("pointermove", (e) => {
+    const c = e.target.closest && e.target.closest(".spot");
+    if (!c) return;
+    const r = c.getBoundingClientRect();
+    c.style.setProperty("--mx", `${e.clientX - r.left}px`); c.style.setProperty("--my", `${e.clientY - r.top}px`);
   }, { passive: true });
 
   // Games.
@@ -798,7 +969,7 @@ docker compose -f deploy/local/docker-compose.yml up -d --build">Copy</button></
   ];
   const grid = $("#games-grid");
   grid.innerHTML = GAMES.map((g, i) => `
-    <button class="game rv${g.wide ? " wide" : ""}" style="--d:${(i % 3) * 0.06}s" data-src="${g.src}" data-i="${i}">
+    <button class="game rv spot${g.wide ? " wide" : ""}" style="--d:${(i % 3) * 0.06}s" data-src="${g.src}" data-i="${i}">
       <span class="src${g.src === "extra" ? " extra" : ""}">${g.src === "extra" ? "extra-games" : "Built in"}</span>
       <div class="pic"><img src="/site/${g.id}.webp" alt="${g.name} on the board" loading="lazy" width="1600" height="900"></div>
       <div class="info"><div class="row"><h3>${g.name}</h3><span class="players">${g.players}</span></div><p>${g.text}</p></div>
