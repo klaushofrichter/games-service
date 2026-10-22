@@ -1,10 +1,12 @@
 """Screenshots of the public games for the website (D-176): a Table Host with the built-in games and the games of
 extra-games plays each game with AI players (and a phone where a game has one), and the boards (1600 x 900), the phones
-(500 px wide) and the statistics window after a game of Hold'em (D-178) are saved as WebP in apps/cloud/public/site/.
+(500 px wide), the statistics window after a game of Hold'em (D-178) and the Game Viewer with a simulation (D-180)
+are saved as WebP in apps/cloud/public/site/.
 Needs Pillow and a checkout of extra-games.
   python3 scripts/site-screenshots.py ../extra-games            # every game
   python3 scripts/site-screenshots.py ../extra-games chess      # only some
   python3 scripts/site-screenshots.py ../extra-games statistics # the statistics window after a game of Hold'em
+  python3 scripts/site-screenshots.py ../extra-games viewer     # the Game Viewer with a Hold'em simulation
 """
 import os, shutil, sys, tempfile, time
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "e2e"))
@@ -136,6 +138,19 @@ try:
             time.sleep(1)
             board.screenshot(path=os.path.join(OUT, "statistics-board.png"))
             print("shot statistics", [x["title"] for x in a("GET", "/state")["summary"].get("awards", [])])
+        # The Game Viewer (D-180): the move list of a Hold'em simulation, twenty games with six AI players.
+        if not ONLY or "viewer" in ONLY:
+            reset()
+            a("POST", "/simulation", {"gameId": "holdem", "players": 6, "games": 20, "seed": 42, "settings": {"hands": 10}})
+            board.click("#tools-button")
+            board.click(".overlay.advanced button[data-adv=logs]")
+            board.wait_for_selector(".vtable.logs tbody tr")
+            board.locator(".vtable.logs tbody tr").nth(0).click()
+            board.wait_for_selector(".vtable.moves tbody tr[data-line]")
+            time.sleep(0.5)
+            board.screenshot(path=os.path.join(OUT, "viewer-board.png"))
+            board.click("button[data-close]")
+            print("shot viewer")
         b.close()
 finally:
     proc.terminate()
@@ -159,5 +174,10 @@ if not ONLY:
 if os.path.exists(os.path.join(OUT, "statistics-board.png")):
     im = Image.open(os.path.join(OUT, "statistics-board.png")).convert("RGB").crop((350, 30, 1570, 1050))
     im.save(os.path.join(SITE, "statistics.webp"), "WEBP", quality=80, method=6)
+# The viewer's panel, down to its fifteenth move (the board is 1920 x 1080).
+if os.path.exists(os.path.join(OUT, "viewer-board.png")):
+    im = Image.open(os.path.join(OUT, "viewer-board.png")).convert("RGB").crop((181, 45, 1739, 820))
+    im.thumbnail((1400, 800))
+    im.save(os.path.join(SITE, "game-viewer.webp"), "WEBP", quality=82, method=6)
     save("lobby-phone.png", "lobby-phone.webp", (500, 1100))
 print(f"saved in {SITE}")

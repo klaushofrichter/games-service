@@ -107,7 +107,7 @@ try:
         board.click("form.goto button")
         board.wait_for_selector(f".vtable.moves tr.target td.n:text-is('{target}')")
         board.screenshot(path=os.path.join(OUT, "viewer-goto.png"))
-        # A simulation's times are virtual, from its start (D-180): "+t s" as the API and scripts/game-log.ts have them,
+        # A simulation's times are virtual, from its start (D-181): "+t s" as the API and scripts/game-log.ts have them,
         # on a page without the start row too, and in a move's detail.
         want = {str(r["line"]): f"+{r['t'] / 1000:.1f} s" for r in t("GET", f"/history/{sim['logId']}/1/moves?limit=200")["rows"]}
         shown = {r.get_attribute("data-line"): r.locator("td.time").inner_text().strip() for r in board.locator(".vtable.moves tbody tr[data-line]").all()}

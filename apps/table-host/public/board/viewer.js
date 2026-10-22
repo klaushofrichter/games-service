@@ -22,7 +22,7 @@ export function openViewer({ api, overlayRoot, face, toast, openStats }) {
   relayout();
 
   const tz = () => v.log?.meta?.timeZone;
-  // A simulation's clock is virtual, from 0 (D-180): it shows the row's time since the start record (`t`), never a
+  // A simulation's clock is virtual, from 0 (D-181): it shows the row's time since the start record (`t`), never a
   // difference to the wall-clock `startedAt`. A played game shows the time of day.
   const fmtTime = (r, sim) => {
     if (sim || r.at < 1e12) return `+${(r.t / 1000).toFixed(1)} s`;
