@@ -1614,12 +1614,25 @@ function openJoinCode() {
 
 // ---------- Advanced (D-128) ----------
 /**
+ * The versions running on this table (D-182), at the bottom of Advanced, also on remote boards: the platform (its
+ * release, "dev" outside a release build, and protocol) and every game the lobby offers, with games added from a
+ * game repository marked.
+ */
+function versionsGroup(platform) {
+  const list = [...games].sort((a, b) => a.name.localeCompare(b.name));
+  return `<div class="group versions"><div class="eyebrow">Versions</div>
+    <div class="vlist"><span>Platform</span><span class="v">${platform ? `${esc(platform.version)} <span class="faint">· protocol ${esc(String(platform.protocol))}</span>` : `<span class="faint">…</span>`}</span>
+      ${list.map((g) => `<span data-game="${esc(g.id)}">${esc(g.name)}${g.extra ? ` <span class="faint">(added)</span>` : ""}</span><span class="v">${esc(g.version)}</span>`).join("")}</div></div>`;
+}
+
+/**
  * Tools that are not part of playing: AI-only simulations, the game logs and the developer setting, behind the
  * hammer-and-wrench button beside the gear. A remote board with board control gets the game logs only.
  */
 function openAdvanced() {
   const o = document.createElement("div");
   o.className = "overlay advanced";
+  let platform = null;
   const draw = () => {
     if (!state) return;
     const dev = !!state.developer?.allowNoLocalPlayer;
@@ -1635,10 +1648,12 @@ function openAdvanced() {
         <div class="row" style="margin-top:10px"><span>Play from the board: one player's deck beside the board, no phone</span><button data-adv="board-deck" class="${state.developer?.boardDeck ? "on" : ""}" role="switch" aria-checked="${!!state.developer?.boardDeck}">${state.developer?.boardDeck ? "On" : "Off"}</button></div>
         <div class="faint" style="font-size:.7em;margin-top:6px">For developing games without a phone: the board shows one player's deck, like a remote player's page, and nobody else joins at the table (the QR code goes); remote and AI players as usual. Off again when the table restarts; that player stays.</div>
         <div class="row" style="margin-top:10px"><span>What holds the game up right now: AI players, the board, the phones</span><button data-adv="live">Live status…</button></div></div>`}
+      ${versionsGroup(platform)}
       <div class="actions settings-actions"><button class="primary" data-close-overlay>Done</button></div></div>`);
   };
   draw();
   const unsub = onState(draw);
+  api("GET", "/version").then((v) => ((platform = v), draw())).catch(() => {});
   const close = () => (unsub(), o.remove());
   // Choices with more options than fit as buttons are pulldowns (D-129).
   o.addEventListener("change", (e) => {
