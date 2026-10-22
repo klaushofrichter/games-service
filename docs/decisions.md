@@ -1075,3 +1075,13 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   `GET /games`, which the board loads anyway. Checks: `tests/remote.test.ts` (`/version` through a remote board),
   `scripts/e2e/developer.py` (the table's board: the platform and every game with its version, as the last group),
   `scripts/e2e/remote.py` (the same on a remote board).
+
+## The Game Viewer screenshot on the public website, after D-181 (22 Oct 2026)
+
+- **D-183 · 2026-10-22 · Klaus** — The website's Game Viewer screenshot (D-180) is taken again after D-181 fixed a
+  simulation's move times, and now shows the page where the second hand starts. *Why:* Klaus: "Do we need to recreate
+  the screenshots for the games.skylar.technology site?" and "wait for #169 and then do it". *Implementation
+  (Claude):* only `site/game-viewer.webp` showed anything D-181 or D-182 changed. Its first fifteen moves were at
+  `+0.0 s`, which is right: AI players in a simulation move at once, and the game's clock moves on only with its
+  timers. So `scripts/site-screenshots.py` (`viewer`) now jumps to move 19, where the timer between hands shows and
+  the times move to `+8.0 s`. The example prompt names the new log, and the caption says how simulated time moves.

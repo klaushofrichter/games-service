@@ -138,7 +138,7 @@ try:
             time.sleep(1)
             board.screenshot(path=os.path.join(OUT, "statistics-board.png"))
             print("shot statistics", [x["title"] for x in a("GET", "/state")["summary"].get("awards", [])])
-        # The Game Viewer (D-180): the move list of a Hold'em simulation, twenty games with six AI players.
+        # The Game Viewer (D-180): the move list of a Hold'em simulation, twenty games with six AI players, at move 19.
         if not ONLY or "viewer" in ONLY:
             reset()
             a("POST", "/simulation", {"gameId": "holdem", "players": 6, "games": 20, "seed": 42, "settings": {"hands": 10}})
@@ -147,6 +147,10 @@ try:
             board.wait_for_selector(".vtable.logs tbody tr")
             board.locator(".vtable.logs tbody tr").nth(0).click()
             board.wait_for_selector(".vtable.moves tbody tr[data-line]")
+            # The page where the second hand starts: the timer between hands moves the game's clock on (D-181).
+            board.fill("form.goto input", "19")
+            board.click("form.goto button")
+            board.wait_for_selector(".vtable.moves tr.target td.n:text-is('19')")
             time.sleep(0.5)
             board.screenshot(path=os.path.join(OUT, "viewer-board.png"))
             board.click("button[data-close]")
