@@ -8,6 +8,10 @@ history.
 
 ## [Unreleased]
 
+- A new public website at `games.skylar.technology`: local play around one touchscreen, the seven free games with
+  real screenshots, the lobby's player and watcher handling, a developer section on building games with AI
+  (Backgammon as the example), game repositories, installing at home, and the table hardware to come; the admin
+  sign-in is a small link in the top right corner (D-176). The README was checked against the code and corrected.
 - *Play from the board*, a developer setting under Advanced: one player at the table plays from a deck beside the
   board, laid out like a remote player's page, without a phone; no QR code meanwhile; remote players, watchers and AI
   players as usual (D-175, `BOARD_DECK=1`).

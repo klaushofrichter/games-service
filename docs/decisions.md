@@ -961,3 +961,36 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   watchers and AI players are unchanged. Switched off, the page returns to `/board/` and the player keeps their seat
   as an ordinary player (the platform's away and exchange rules apply). In memory until restart, like D-118. Checks:
   `tests/board-deck.test.ts`, `scripts/e2e/board_deck.py`.
+
+## The public website (21 Oct 2026)
+
+- **D-176 · 2026-10-21 · Klaus** — `games.skylar.technology` gets a public website as its landing page, advertising
+  the platform; the admin pages stay as they are. *Why:* Klaus: "come up with a website as new landing page at
+  games.skylar.technology that showcases the service, offers developer help, and supports installation … specifically
+  want to help developers to create their own games and add them to the platform. We are specifically targeting
+  developers who use AI to create new games and components. The "admin login" should be unobstrusive in the top right
+  corner. There should be a section about the game board hardware (a placehoder right now …)"; a feature overview of
+  the lobby and how players and watchers are managed, the integrated games and extra-games ("not the private repos"),
+  the developer section; "engaging, modern and dynamic … focussing with the public part of the website on desktop
+  users"; screenshots of the public games; paths for gamers, game developers and tinkerers; a list of third-party
+  repositories. Then: "The main audience are actually game developers. We want to emphasize the local board game with
+  friends, only aided by a touchscreen that is shared by several people, with some option to invite remote players.
+  But the local play is the key." and "the Backgammon game was created in hours with Claude and it offers all the
+  features of the platform". *Implementation (Claude):* one self-contained page, `apps/cloud/public/home.html`
+  (inline CSS and JavaScript, the board's felt-and-brass look and fonts, no external requests), served at `/` with
+  the admin link (`#admin-link`: Google sign-in, or the portal when signed in), the signed-out note and the version
+  label the deploy checks filled in; images under `/site/` (`apps/cloud/public/site/`, WebP, made by
+  `scripts/site-screenshots.py` from a host running every public game). Sections: a hero with the table seen from
+  above (the board cycling through the games, phones around it, cards dealt), three paths, local play first with
+  remote play as an option, the games with filters and a close-up, an animated lobby that acts out joining, AI seats,
+  away phones, exchanges, remote invites, watchers and *Play from the board*, the developer section (Backgammon as the
+  case, a prompt for the agent, five steps, code tabs, what you write and what the platform does, links to the guide
+  and `llms.txt`), game repositories (games-service and extra-games only, with "Add yours" as an issue), installing
+  with Docker, the table hardware as a placeholder, and "Fork everything" (Klaus: "everything in github for your use under MIT
+  license, with Architecture Decision Records"). After the first draft ("Perhaps a bit too conservative") the hero became
+  a pinned scene whose camera moves overhead as one scrolls, with dice and chips, a marquee of the games and counters;
+  the Backgammon case re-enacts the session from Klaus's real prompt ("Create a backgammon game for the game
+  platform"; "a working version came out by way of Claude without supervision"). Klaus reviews a live preview before
+  it is deployed. Motion stops with `prefers-reduced-motion`. Checks:
+  `tests/website.test.ts`, `scripts/e2e/website.py`; the deploy's smoke test still finds the version on `/`.
+

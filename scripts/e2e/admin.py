@@ -49,7 +49,7 @@ try:
         # Anonymous: /admin goes to the public page, which offers Google sign-in.
         page.goto(CLOUD + "/admin")
         assert page.url == CLOUD + "/", page.url
-        assert page.get_attribute("a.btn", "href") == "/auth/google/login"
+        assert page.get_attribute("#admin-link", "href") == "/auth/google/login"
         page.screenshot(path=os.path.join(OUT, "admin-anonymous.png"))
 
         # Signed in (the cookie Google's callback would have set).
@@ -106,7 +106,7 @@ try:
         page.click("#signout")
         page.wait_for_selector("text=You are signed out")
         assert page.url == CLOUD + "/?signed-out=1", page.url
-        assert page.get_attribute("a.btn", "href") == "/auth/google/login"
+        assert page.get_attribute("#admin-link", "href") == "/auth/google/login"
         assert not [c for c in ctx.cookies() if c["name"] == "games_admin"], ctx.cookies()
         page.screenshot(path=os.path.join(OUT, "admin-signed-out.png"))
         page.go_back()
