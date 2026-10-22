@@ -24,6 +24,10 @@ const GAME_GUIDE = fileURLToPath(new URL("../../../docs/developers/game-developm
 const LOCAL_RUNBOOK = fileURLToPath(new URL("../../../docs/runbooks/local-docker.md", import.meta.url));
 const REMOTE_SW = fileURLToPath(new URL("../public/remote-sw.js", import.meta.url));
 const FAVICON = fileURLToPath(new URL("../public/favicon.svg", import.meta.url));
+// The public website (D-176): one page and its images.
+const HOME_PAGE = fileURLToPath(new URL("../public/home.html", import.meta.url));
+const SITE_DIR = fileURLToPath(new URL("../public/site/", import.meta.url));
+const SITE_TYPES: Record<string, string> = { webp: "image/webp", png: "image/png", svg: "image/svg+xml", jpg: "image/jpeg" };
 export const REPO_URL = "https://github.com/klaushofrichter/games-service";
 
 /** The running version (APP_VERSION, stamped at build time; "dev" otherwise), as shown in the top bar and on "/". */
@@ -519,16 +523,28 @@ export function startCloud(o: CloudOptions) {
       }
       if (await auth.handle(req, res, p)) return;
       if (m === "GET" && p === "/") {
-        // Public landing page; also where logout lands (200, with a Sign in link, never a bounce to Google).
+        // The public website (D-176); also where logout lands (200, never a bounce to Google). The admin sign-in is a
+        // small link in the top right corner.
         const signedIn = auth.session(req);
-        const note = url.searchParams.has("signed-out") ? `<p class="muted">You are signed out.</p>` : "";
-        const action = signedIn
-          ? `<p class="muted">Signed in as ${esc(signedIn)}.</p><p><a class="btn" href="/admin">Open the admin portal</a></p>`
+        const note = url.searchParams.has("signed-out") ? `<p class="note-toast" role="status">You are signed out.</p>` : "";
+        const admin = signedIn
+          ? `<a id="admin-link" href="/admin" title="Signed in as ${esc(signedIn)}">Admin portal</a>`
           : auth.enabled
-            ? `<p><a class="btn" href="/auth/google/login">Administrators: sign in with Google</a></p>`
-            : `<p><a class="btn" href="/admin">Admin portal</a></p>`;
+            ? `<a id="admin-link" href="/auth/google/login">Admin</a>`
+            : `<a id="admin-link" href="/admin">Admin</a>`;
         // The version label is part of the public page (and checked by the deploy's smoke test).
-        return sendPage(res, 200, "Game Table", `<p class="muted">The service behind Game Table: it pairs tables, relays invites for remote players and keeps game logs.</p>${note}${action}<p class="faint">Writing a game? <a href="/docs/game-development.md">Developer guide</a> · <a href="/llms.txt">llms.txt</a></p><p class="faint">${versionLabel()}</p>`);
+        const html = (await readFile(HOME_PAGE, "utf8")).replace("{{admin}}", admin).replace("{{note}}", note).replace("{{version}}", versionLabel());
+        res.writeHead(200, { ...HTML_HEADERS, "cache-control": "no-cache" });
+        return res.end(html);
+      }
+      if (m === "GET" && (match = p.match(/^\/site\/([a-z0-9-]+)\.(webp|png|svg|jpg)$/))) {
+        try {
+          const body = await readFile(`${SITE_DIR}${match[1]}.${match[2]}`);
+          res.writeHead(200, { "content-type": SITE_TYPES[match[2]]!, "cache-control": "public, max-age=86400" });
+          return res.end(body);
+        } catch {
+          return json(res, 404, { error: "not found" });
+        }
       }
       if (m === "GET" && (p === "/admin" || p === "/admin/")) {
         // With Google sign-in configured the portal is for signed-in admins only; anonymous visitors go to the public

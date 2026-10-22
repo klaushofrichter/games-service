@@ -1,0 +1,917 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Game Table: board games around one screen</title>
+<meta name="description" content="An open platform for board and card games around a touchscreen lying flat on the table, with phones as private hands. Free, MIT licensed, and made for developers who build games with AI.">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<!-- The public website (D-176). Served by the cloud service at "/"; server.ts fills in the admin link, the signed-out
+     note and the version label. Images live in site/ (scripts/site-screenshots.py makes them). No external requests. -->
+<style>
+:root {
+  --felt: #0f2a24; --felt-deep: #0a1d19; --felt-mid: #133a31; --line: #1f4a40; --line-2: #2f6457;
+  --ink: #f3eee2; --soft: #b9b3a3; --faint: #7d8a83; --brass: #d6a94a; --brass-deep: #a57c28; --brass-hi: #f0c86a;
+  --ruby: #d2574a; --jade: #5fbf8f; --sky: #63a8e0; --violet: #9b7be0;
+  --display: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+  --text: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --wrap: 1180px;
+}
+* { box-sizing: border-box; }
+html { color-scheme: dark; scroll-behavior: smooth; scrollbar-color: var(--line-2) var(--felt-deep); scroll-padding-top: 72px; }
+body { margin: 0; background: var(--felt-deep); color: var(--ink); font: 17px/1.6 var(--text); }
+main { overflow-x: clip; }
+a { color: var(--brass-hi); text-decoration: none; }
+a:hover { text-decoration: underline; }
+img { display: block; max-width: 100%; height: auto; }
+code, pre { font-family: var(--mono); }
+h1, h2, h3 { font-family: var(--display); font-weight: 600; line-height: 1.12; margin: 0; letter-spacing: .005em; }
+h2 { font-size: clamp(34px, 4vw, 52px); }
+h3 { font-size: 24px; }
+p { margin: 0; }
+.wrap { width: min(var(--wrap), calc(100% - 48px)); margin: 0 auto; }
+.eyebrow { font: 600 13px/1 var(--text); letter-spacing: .22em; text-transform: uppercase; color: var(--brass); }
+.lede { font-size: 20px; color: var(--soft); max-width: 720px; }
+.muted { color: var(--soft); }
+.faint { color: var(--faint); }
+.btn { display: inline-flex; align-items: center; gap: 10px; padding: 14px 24px; border-radius: 999px; font-weight: 600; border: 1px solid var(--line-2); color: var(--ink); background: rgba(255,255,255,.03); transition: transform .2s, background .2s, border-color .2s, box-shadow .2s; }
+.btn:hover { text-decoration: none; transform: translateY(-2px); border-color: var(--brass-deep); }
+.btn.primary { background: var(--brass); color: #1b1407; border-color: var(--brass); box-shadow: 0 10px 30px rgba(214,169,74,.25); }
+.btn.primary:hover { background: var(--brass-hi); box-shadow: 0 14px 40px rgba(214,169,74,.35); }
+.btn svg { width: 18px; height: 18px; }
+section { position: relative; padding: 120px 0; }
+.section-head { display: grid; gap: 18px; margin-bottom: 56px; max-width: 820px; }
+
+/* ---------- top bar ---------- */
+header.top { position: fixed; inset: 0 0 auto 0; z-index: 50; transition: background .3s, border-color .3s, backdrop-filter .3s; border-bottom: 1px solid transparent; }
+header.top.scrolled { background: rgba(10,29,25,.82); backdrop-filter: blur(14px); border-color: var(--line); }
+.top .wrap { display: flex; align-items: center; height: 68px; gap: 28px; }
+.logo { display: flex; align-items: center; gap: 12px; color: var(--ink); font: 600 21px/1 var(--display); }
+.logo:hover { text-decoration: none; }
+.logo img { width: 30px; height: 30px; }
+nav.main { display: flex; gap: 24px; margin-left: 12px; }
+nav.main a { color: var(--soft); font-size: 15px; }
+nav.main a:hover, nav.main a.on { color: var(--ink); text-decoration: none; }
+.top .spacer { flex: 1; }
+.top .gh { color: var(--soft); font-size: 15px; display: flex; align-items: center; gap: 8px; }
+.top .gh svg { width: 18px; height: 18px; }
+#admin-link { color: var(--faint); font-size: 13px; padding: 5px 11px; border: 1px solid var(--line); border-radius: 999px; }
+#admin-link:hover { color: var(--soft); border-color: var(--line-2); text-decoration: none; }
+.note-toast { position: fixed; top: 78px; right: 24px; z-index: 60; background: var(--felt); border: 1px solid var(--line-2); padding: 10px 16px; border-radius: 12px; color: var(--soft); font-size: 14px; animation: toast 6s forwards; }
+@keyframes toast { 0%, 85% { opacity: 1; } 100% { opacity: 0; visibility: hidden; } }
+
+/* ---------- hero ---------- */
+.hero { min-height: 100vh; padding: 120px 0 80px; display: flex; align-items: center; overflow: hidden; }
+.hero::before { content: ""; position: absolute; inset: -20%; background:
+  radial-gradient(60% 50% at 70% 45%, rgba(47,100,87,.55), transparent 70%),
+  radial-gradient(40% 40% at 15% 20%, rgba(214,169,74,.10), transparent 70%),
+  radial-gradient(50% 60% at 50% 110%, rgba(19,58,49,.9), transparent 70%); z-index: -1; }
+.hero .wrap > div:first-child { position: relative; z-index: 2; }
+.hero .wrap { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: 40px; align-items: center; }
+.hero h1 { font-size: clamp(46px, 5.6vw, 82px); }
+.hero h1 em { font-style: italic; color: var(--brass); }
+.hero .lede { margin: 26px 0 36px; }
+.hero .ctas { display: flex; gap: 14px; flex-wrap: wrap; }
+.hero .facts { display: flex; gap: 22px; flex-wrap: wrap; margin-top: 44px; color: var(--faint); font-size: 14px; }
+.hero .facts span::before { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--jade); margin-right: 8px; vertical-align: middle; }
+
+/* The table seen from above, tilted: the board in the middle, phones around it. */
+.scene { position: relative; height: 640px; perspective: 1700px; perspective-origin: 50% 30%; }
+.tabletop { position: absolute; left: 50%; top: 50%; width: 820px; height: 560px; margin: -280px 0 0 -410px; transform-style: preserve-3d;
+  transform: translateX(60px) scale(.84) rotateX(var(--rx, 50deg)) rotateZ(var(--rz, -14deg)); transition: transform .8s cubic-bezier(.2,.7,.2,1); }
+.wood { position: absolute; inset: 0; border-radius: 40px; background:
+  repeating-linear-gradient(92deg, rgba(0,0,0,.08) 0 3px, transparent 3px 19px),
+  linear-gradient(135deg, #5a3a22, #3b2615 60%, #2c1c10); box-shadow: 0 60px 120px rgba(0,0,0,.6), inset 0 0 0 2px rgba(255,255,255,.04); }
+.screen { position: absolute; left: 110px; top: 105px; width: 600px; height: 350px; border-radius: 14px; background: #050807; padding: 12px;
+  box-shadow: 0 0 0 2px #1a1a1a, 0 30px 60px rgba(0,0,0,.55), 0 0 80px rgba(95,191,143,.12); transform: translateZ(2px); }
+.screen .glass { position: relative; width: 100%; height: 100%; border-radius: 6px; overflow: hidden; background: var(--felt-deep); }
+.screen .glass img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 1.2s; }
+.screen .glass img.on { opacity: 1; }
+.screen .glass::after { content: ""; position: absolute; inset: 0; background: linear-gradient(120deg, rgba(255,255,255,.10), transparent 35%, transparent 70%, rgba(255,255,255,.04)); pointer-events: none; }
+.phone { position: absolute; width: 86px; height: 180px; border-radius: 16px; background: #0b0b0b; padding: 5px; transform-style: preserve-3d;
+  box-shadow: 0 0 0 1.5px #2a2a2a, 0 18px 30px rgba(0,0,0,.5); }
+.phone img { width: 100%; height: 100%; object-fit: cover; object-position: top; border-radius: 12px; }
+.phone.s1 { left: 250px; top: 470px; transform: translateZ(3px) rotate(-6deg); }
+.phone.s2 { left: 480px; top: 466px; transform: translateZ(3px) rotate(5deg); }
+.phone.e { left: 740px; top: 190px; transform: translateZ(3px) rotate(-84deg); }
+.phone.n { left: 380px; top: -95px; transform: translateZ(3px) rotate(178deg); }
+.phone.w { left: -5px; top: 200px; transform: translateZ(3px) rotate(88deg); }
+.glow { position: absolute; inset: 0; border-radius: 16px; box-shadow: 0 0 0 2px var(--brass); opacity: 0; animation: ping 6s infinite; }
+.phone.s2 .glow { animation-delay: 2s; } .phone.e .glow { animation-delay: 4s; }
+@keyframes ping { 0%, 70%, 100% { opacity: 0; } 78% { opacity: 1; } 90% { opacity: 0; } }
+/* cards dealt from the board to the phones */
+.fly { position: absolute; left: 395px; top: 255px; width: 30px; height: 42px; border-radius: 4px; background: repeating-linear-gradient(45deg, #8b2a22 0 3px, #a8362c 3px 6px); border: 2px solid #f3eee2; opacity: 0; transform-style: preserve-3d; }
+.fly.f1 { animation: deal1 6s 0s infinite cubic-bezier(.3,.6,.3,1); }
+.fly.f2 { animation: deal2 6s 2s infinite cubic-bezier(.3,.6,.3,1); }
+.fly.f3 { animation: deal3 6s 4s infinite cubic-bezier(.3,.6,.3,1); }
+@keyframes deal1 { 0% { opacity: 0; transform: translate3d(0,0,4px); } 8% { opacity: 1; } 40% { transform: translate3d(-60px,120px,90px) rotate(-90deg); } 65% { opacity: 1; transform: translate3d(-110px,250px,8px) rotate(-186deg); } 75%, 100% { opacity: 0; transform: translate3d(-110px,250px,8px) rotate(-186deg); } }
+@keyframes deal2 { 0% { opacity: 0; transform: translate3d(0,0,4px); } 8% { opacity: 1; } 40% { transform: translate3d(70px,120px,90px) rotate(80deg); } 65% { opacity: 1; transform: translate3d(120px,246px,8px) rotate(185deg); } 75%, 100% { opacity: 0; transform: translate3d(120px,246px,8px) rotate(185deg); } }
+@keyframes deal3 { 0% { opacity: 0; transform: translate3d(0,0,4px); } 8% { opacity: 1; } 40% { transform: translate3d(180px,-20px,90px) rotate(-40deg); } 65% { opacity: 1; transform: translate3d(360px,-50px,8px) rotate(-84deg); } 75%, 100% { opacity: 0; transform: translate3d(360px,-50px,8px) rotate(-84deg); } }
+.tag { position: absolute; z-index: 3; font-size: 13px; color: var(--soft); background: rgba(10,29,25,.85); border: 1px solid var(--line-2); padding: 7px 12px; border-radius: 999px; backdrop-filter: blur(6px); white-space: nowrap; animation: bob 5s ease-in-out infinite; }
+.tag b { color: var(--ink); font-weight: 600; }
+.tag i { font-style: normal; color: var(--brass); margin-right: 6px; }
+.tag.t1 { left: 4%; top: 6%; } .tag.t2 { right: 0; bottom: 8%; animation-delay: 1.5s; } .tag.t3 { right: 2%; top: 12%; animation-delay: .8s; }
+@keyframes bob { 50% { transform: translateY(-8px); } }
+.scroll-cue { position: absolute; left: 50%; bottom: 26px; width: 26px; height: 42px; border: 2px solid var(--line-2); border-radius: 14px; transform: translateX(-50%); }
+.scroll-cue::after { content: ""; position: absolute; left: 50%; top: 8px; width: 4px; height: 8px; margin-left: -2px; border-radius: 2px; background: var(--brass); animation: cue 1.8s infinite; }
+@keyframes cue { 0% { opacity: 0; transform: translateY(0); } 40% { opacity: 1; } 100% { opacity: 0; transform: translateY(14px); } }
+
+/* ---------- audience strip ---------- */
+.paths { padding: 30px 0 100px; }
+.paths .grid { display: grid; grid-template-columns: 1.25fr 1fr 1fr; gap: 20px; }
+.path { position: relative; padding: 30px; border-radius: 22px; background: linear-gradient(160deg, var(--felt-mid), var(--felt)); border: 1px solid var(--line); overflow: hidden; transition: transform .3s, border-color .3s; display: grid; gap: 12px; align-content: start; color: var(--ink); }
+.path:hover { transform: translateY(-6px); border-color: var(--brass-deep); text-decoration: none; }
+.path.dev { background: linear-gradient(160deg, #1d4a3e, var(--felt) 70%); border-color: var(--brass-deep); }
+.path .ico { width: 46px; height: 46px; border-radius: 14px; display: grid; place-items: center; background: rgba(214,169,74,.12); color: var(--brass); }
+.path .ico svg { width: 24px; height: 24px; }
+.path h3 { font-size: 26px; }
+.path p { color: var(--soft); font-size: 16px; }
+.path .go { color: var(--brass-hi); font-weight: 600; font-size: 15px; margin-top: 6px; }
+.path .badge { position: absolute; top: 22px; right: 22px; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: #1b1407; background: var(--brass); padding: 4px 9px; border-radius: 999px; font-weight: 700; }
+
+/* ---------- the room ---------- */
+.room { background: linear-gradient(180deg, var(--felt-deep), var(--felt) 50%, var(--felt-deep)); }
+.room .grid { display: grid; grid-template-columns: 1.15fr 1fr; gap: 60px; align-items: center; }
+.room .shots { position: relative; }
+.room .shots .big { border-radius: 16px; border: 1px solid var(--line-2); box-shadow: 0 40px 80px rgba(0,0,0,.5); }
+.room .shots .small { position: absolute; width: 27%; right: -4%; bottom: -12%; border-radius: 22px; border: 6px solid #0b0b0b; box-shadow: 0 30px 60px rgba(0,0,0,.6); transform: rotate(4deg); }
+.points { display: grid; gap: 26px; margin-top: 36px; }
+.point { display: grid; grid-template-columns: 44px 1fr; gap: 16px; }
+.point .n { width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--brass-deep); display: grid; place-items: center; font: 600 18px var(--display); color: var(--brass); }
+.point h3 { font-size: 21px; margin-bottom: 4px; }
+.point p { color: var(--soft); font-size: 16px; }
+.remote-note { margin-top: 36px; padding: 18px 22px; border-radius: 16px; border: 1px dashed var(--line-2); color: var(--soft); font-size: 15.5px; display: flex; gap: 14px; align-items: flex-start; }
+.remote-note svg { flex: none; width: 22px; height: 22px; color: var(--sky); margin-top: 2px; }
+
+/* ---------- games ---------- */
+.filters { display: flex; gap: 10px; margin-bottom: 30px; }
+.chipbtn { font: inherit; font-size: 15px; color: var(--soft); background: transparent; border: 1px solid var(--line); border-radius: 999px; padding: 8px 16px; cursor: pointer; transition: all .2s; }
+.chipbtn:hover { border-color: var(--line-2); color: var(--ink); }
+.chipbtn.on { background: var(--ink); color: var(--felt-deep); border-color: var(--ink); }
+.games { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; }
+.game { position: relative; border-radius: 20px; overflow: hidden; background: var(--felt); border: 1px solid var(--line); cursor: pointer; transition: transform .35s, border-color .35s, box-shadow .35s, opacity .35s; text-align: left; padding: 0; font: inherit; color: inherit; }
+.game:hover { transform: translateY(-6px); border-color: var(--brass-deep); box-shadow: 0 30px 60px rgba(0,0,0,.45); }
+.game.wide { grid-column: span 2; }
+.game .pic { height: 240px; overflow: hidden; }
+.game .pic img { width: 100%; height: 100%; object-fit: cover; object-position: center; transition: transform .8s cubic-bezier(.2,.7,.2,1); }
+.game:hover .pic img { transform: scale(1.05); }
+.game .info { padding: 20px 22px 22px; display: grid; gap: 6px; }
+.game .row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.game h3 { font-size: 25px; }
+.game .players { color: var(--faint); font-size: 14px; white-space: nowrap; }
+.game p { color: var(--soft); font-size: 15.5px; }
+.game .src { position: absolute; top: 14px; left: 14px; font-size: 11.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; padding: 5px 10px; border-radius: 999px; background: rgba(10,29,25,.85); border: 1px solid var(--line-2); color: var(--soft); backdrop-filter: blur(6px); }
+.game .src.extra { color: var(--brass-hi); border-color: var(--brass-deep); }
+.game.hide { display: none; }
+.games-foot { margin-top: 26px; color: var(--faint); font-size: 15px; }
+
+/* lightbox */
+.lightbox { position: fixed; inset: 0; z-index: 100; background: rgba(5,12,10,.86); backdrop-filter: blur(10px); display: none; place-items: center; padding: 40px; }
+.lightbox.open { display: grid; animation: fade .3s; }
+@keyframes fade { from { opacity: 0; } }
+.lb-card { width: min(1240px, 100%); display: grid; grid-template-columns: 1fr auto; gap: 26px; align-items: center; }
+.lb-card .main { border-radius: 14px; border: 1px solid var(--line-2); box-shadow: 0 40px 100px rgba(0,0,0,.6); }
+.lb-card .side { width: 230px; display: grid; gap: 16px; }
+.lb-card .side img { border-radius: 20px; border: 5px solid #0b0b0b; }
+.lb-card h3 { font-size: 32px; }
+.lb-card .side p { color: var(--soft); font-size: 15px; }
+.lb-close { position: absolute; top: 22px; right: 26px; font: inherit; font-size: 15px; background: none; border: 1px solid var(--line-2); color: var(--soft); border-radius: 999px; padding: 8px 16px; cursor: pointer; }
+
+/* ---------- lobby demo ---------- */
+.lobby { background: radial-gradient(70% 60% at 30% 40%, rgba(19,58,49,.8), transparent 70%); }
+.demo { display: grid; grid-template-columns: 1.3fr 1fr; gap: 50px; align-items: center; }
+.stage { position: relative; aspect-ratio: 16 / 10.4; border-radius: 26px; background: linear-gradient(135deg, #4a301c, #2c1c10); padding: 26px; box-shadow: 0 40px 90px rgba(0,0,0,.5); }
+.board-mini { position: relative; width: 100%; height: 100%; transition: width .7s cubic-bezier(.2,.7,.2,1); border-radius: 14px; background: radial-gradient(80% 80% at 50% 50%, #1b4a3e, var(--felt) 80%); box-shadow: inset 0 0 0 2px #000, inset 0 0 60px rgba(0,0,0,.4); overflow: hidden; }
+.plate { position: absolute; width: 23%; padding: 10px 12px; border-radius: 12px; border: 2px dashed var(--line-2); background: rgba(10,29,25,.6); text-align: center; transition: all .5s cubic-bezier(.2,.7,.2,1); font-size: 14px; }
+.plate .nm { font: 600 18px/1.2 var(--display); color: var(--faint); transition: color .4s; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.plate .st { font-size: 12px; color: var(--faint); margin-top: 3px; min-height: 16px; }
+.plate.filled { border-style: solid; border-color: var(--c, var(--brass)); background: rgba(10,29,25,.9); }
+.plate.filled .nm { color: var(--ink); }
+.plate.away { opacity: .55; filter: saturate(.3); }
+.plate.flash { animation: flash .9s; }
+@keyframes flash { 30% { transform: scale(1.08); box-shadow: 0 0 0 6px rgba(214,169,74,.35); } }
+.plate .bdg { position: absolute; top: -10px; right: -10px; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: var(--sky); color: #06121c; opacity: 0; transform: scale(.6); transition: all .35s; }
+.plate .bdg.on { opacity: 1; transform: scale(1); }
+.p0 { left: 14%; bottom: 5%; } .p1 { left: 63%; bottom: 5%; } .p2 { right: 2.5%; top: 37%; transform: rotate(-90deg); }
+.p3 { left: 63%; top: 5%; transform: rotate(180deg); } .p4 { left: 14%; top: 5%; transform: rotate(180deg); } .p5 { left: 2.5%; top: 37%; transform: rotate(90deg); }
+.center-mini { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); text-align: center; width: 46%; }
+.center-mini .qr { width: 92px; height: 92px; margin: 0 auto 10px; border-radius: 6px; background: url(/site/qr.svg) center / contain no-repeat; }
+  conic-gradient(from 90deg at 30% 30%, #f3eee2 25%, transparent 0) 0 0 / 16px 16px, #0a1d19; border: 6px solid #f3eee2; transition: opacity .4s, transform .4s; }
+.center-mini .cap { font: 600 22px/1.2 var(--display); }
+.center-mini .sub { font-size: 13px; color: var(--soft); margin-top: 4px; min-height: 20px; }
+.eye { position: absolute; right: 16px; bottom: 14px; display: flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 999px; background: rgba(10,29,25,.9); border: 1px solid var(--line-2); font-size: 13px; color: var(--soft); opacity: 0; transition: opacity .4s; }
+.eye svg { width: 16px; height: 16px; }
+.eye.on { opacity: 1; }
+.stage.deck-on .board-mini { width: 75%; }
+.stage.deck-on .plate:not(.filled) { opacity: 0; }
+.side-deck { position: absolute; right: 26px; top: 26px; width: calc(25% - 26px); height: calc(100% - 52px); border-radius: 14px; background: #0b0b0b; border: 4px solid #0b0b0b; box-shadow: 0 20px 50px rgba(0,0,0,.6); opacity: 0; transform: translateX(40px); transition: transform .7s cubic-bezier(.2,.7,.2,1), opacity .5s; overflow: hidden; pointer-events: none; }
+.side-deck img { width: 100%; height: 100%; object-fit: cover; object-position: top; border-radius: 10px; }
+.side-deck.on { transform: translateX(0); opacity: 1; }
+.steps { display: grid; gap: 6px; }
+.step { text-align: left; font: inherit; color: inherit; background: transparent; border: 1px solid transparent; border-radius: 16px; padding: 16px 18px; cursor: pointer; transition: all .3s; display: grid; gap: 4px; position: relative; overflow: hidden; }
+.step h3 { font-size: 20px; color: var(--soft); transition: color .3s; }
+.step p { color: var(--faint); font-size: 15px; max-height: 0; overflow: hidden; transition: max-height .5s, color .3s; }
+.step.on { background: rgba(19,58,49,.55); border-color: var(--line-2); }
+.step.on h3 { color: var(--ink); }
+.step.on p { max-height: 120px; color: var(--soft); }
+.step .bar { position: absolute; left: 0; bottom: 0; height: 2px; background: var(--brass); width: 0; }
+.step.on .bar { animation: bar var(--dur, 5s) linear forwards; }
+.demo.paused .step.on .bar { animation-play-state: paused; }
+@keyframes bar { to { width: 100%; } }
+.features { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; margin-top: 80px; }
+.feature { padding: 22px; border-radius: 18px; border: 1px solid var(--line); background: rgba(15,42,36,.55); transition: border-color .3s, transform .3s; }
+.feature:hover { border-color: var(--line-2); transform: translateY(-3px); }
+.feature svg { width: 26px; height: 26px; color: var(--brass); margin-bottom: 12px; }
+.feature h3 { font: 600 17px/1.3 var(--text); margin-bottom: 6px; }
+.feature p { color: var(--soft); font-size: 14.5px; line-height: 1.5; }
+
+/* ---------- build ---------- */
+.build { background: linear-gradient(180deg, var(--felt-deep), #0d241f 30%, var(--felt-deep)); }
+.build::before { content: ""; position: absolute; inset: 0; background: radial-gradient(50% 40% at 80% 10%, rgba(214,169,74,.10), transparent 70%); pointer-events: none; }
+.case { display: grid; grid-template-columns: 1.2fr 1fr; gap: 0; border-radius: 26px; overflow: hidden; border: 1px solid var(--brass-deep); background: var(--felt); margin-bottom: 90px; box-shadow: 0 40px 100px rgba(0,0,0,.45); }
+.case .pic { position: relative; min-height: 380px; }
+.case .pic img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.case .txt { padding: 44px; display: grid; gap: 18px; align-content: center; }
+.case h3 { font-size: 34px; }
+.case .clock { display: inline-flex; align-items: center; gap: 10px; font: 600 14px var(--text); color: var(--brass-hi); letter-spacing: .08em; text-transform: uppercase; }
+.case ul { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: 1fr 1fr; gap: 8px 18px; color: var(--soft); font-size: 15px; }
+.case li::before { content: "✓"; color: var(--jade); margin-right: 8px; font-weight: 700; }
+.devgrid { display: grid; grid-template-columns: 1fr 1.15fr; gap: 50px; align-items: start; }
+.prompt { position: relative; border-radius: 18px; border: 1px solid var(--line-2); background: #07140f; padding: 22px 22px 18px; margin: 28px 0 36px; }
+.prompt .who { font-size: 12px; letter-spacing: .16em; text-transform: uppercase; color: var(--faint); margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+.prompt .who::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--jade); box-shadow: 0 0 10px var(--jade); }
+.prompt .say { font: 16px/1.6 var(--mono); color: var(--ink); min-height: 78px; }
+.prompt .say .caret { display: inline-block; width: 9px; height: 18px; background: var(--brass); vertical-align: -3px; animation: blink 1s steps(1) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+.copy { position: absolute; top: 14px; right: 14px; font: inherit; font-size: 13px; color: var(--soft); background: transparent; border: 1px solid var(--line-2); border-radius: 999px; padding: 5px 12px; cursor: pointer; }
+.copy:hover { color: var(--ink); border-color: var(--brass-deep); }
+.timeline { display: grid; gap: 0; }
+.tl { display: grid; grid-template-columns: 40px 1fr; gap: 16px; position: relative; padding-bottom: 26px; }
+.tl:not(:last-child)::before { content: ""; position: absolute; left: 19px; top: 40px; bottom: 0; width: 2px; background: linear-gradient(var(--brass-deep), var(--line)); }
+.tl .n { width: 40px; height: 40px; border-radius: 50%; background: var(--felt-mid); border: 1px solid var(--brass-deep); color: var(--brass); display: grid; place-items: center; font: 600 17px var(--display); }
+.tl h3 { font: 600 18px/1.3 var(--text); margin: 8px 0 4px; }
+.tl p { color: var(--soft); font-size: 15.5px; }
+.tl code { font-size: 13.5px; color: var(--brass-hi); background: rgba(214,169,74,.08); padding: 1px 6px; border-radius: 6px; }
+.code { border-radius: 18px; border: 1px solid var(--line-2); background: #07140f; overflow: hidden; box-shadow: 0 40px 80px rgba(0,0,0,.45); position: sticky; top: 100px; }
+.code .tabs { display: flex; gap: 2px; padding: 10px 10px 0; background: #0b1c17; border-bottom: 1px solid var(--line); }
+.code .tabs button { font: 13.5px var(--mono); color: var(--faint); background: transparent; border: 0; padding: 9px 14px; border-radius: 10px 10px 0 0; cursor: pointer; }
+.code .tabs button.on { color: var(--ink); background: #07140f; }
+.code .dots { display: flex; gap: 6px; padding: 0 10px 0 4px; align-items: center; }
+.code .dots i { width: 10px; height: 10px; border-radius: 50%; background: #2a3b35; }
+.code pre { margin: 0; padding: 20px 22px; font-size: 13px; line-height: 1.65; color: #d8d2c3; overflow: auto; max-height: 520px; display: none; }
+.code pre.on { display: block; }
+.k { color: #e08fb0; } .s { color: #9fd18b; } .c { color: #6f8a80; font-style: italic; } .f { color: #f0c86a; } .t { color: #7fc4e8; }
+.split { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 70px; }
+.split .col { border-radius: 20px; padding: 28px; border: 1px solid var(--line); background: rgba(15,42,36,.5); }
+.split .col.you { border-color: var(--brass-deep); }
+.split h3 { font-size: 22px; margin-bottom: 14px; }
+.split ul { margin: 0; padding-left: 20px; color: var(--soft); font-size: 15.5px; display: grid; gap: 6px; }
+.links { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-top: 40px; }
+.lnk { display: grid; gap: 6px; padding: 20px; border-radius: 16px; border: 1px solid var(--line); background: rgba(15,42,36,.55); color: var(--ink); transition: all .25s; }
+.lnk:hover { border-color: var(--brass-deep); transform: translateY(-3px); text-decoration: none; }
+.lnk b { font-size: 16px; } .lnk span { color: var(--soft); font-size: 14px; } .lnk code { color: var(--brass-hi); font-size: 13px; }
+
+/* ---------- repositories ---------- */
+.repos { display: grid; gap: 14px; }
+.repo { display: grid; grid-template-columns: 1.1fr 2fr auto; gap: 24px; align-items: center; padding: 22px 26px; border-radius: 18px; border: 1px solid var(--line); background: rgba(15,42,36,.55); }
+.repo .name { font: 600 16px var(--mono); color: var(--ink); }
+.repo .name small { display: block; font: 13px var(--text); color: var(--faint); margin-top: 4px; }
+.repo .gl { display: flex; gap: 8px; flex-wrap: wrap; }
+.repo .gl span { font-size: 13.5px; padding: 4px 11px; border-radius: 999px; border: 1px solid var(--line-2); color: var(--soft); }
+.repo.add { border-style: dashed; background: transparent; }
+
+/* ---------- install ---------- */
+.install .grid { display: grid; grid-template-columns: 1fr 1.1fr; gap: 50px; align-items: start; }
+.term { border-radius: 18px; background: #050d0a; border: 1px solid var(--line-2); overflow: hidden; box-shadow: 0 40px 80px rgba(0,0,0,.45); }
+.term .bar { position: relative; display: flex; gap: 6px; padding: 12px 14px; background: #0b1c17; border-bottom: 1px solid var(--line); align-items: center; }
+.term .bar i { width: 11px; height: 11px; border-radius: 50%; background: #2a3b35; }
+.term .bar span { margin-left: 10px; font: 12.5px var(--mono); color: var(--faint); }
+.term pre { margin: 0; padding: 20px 22px; font-size: 14px; line-height: 1.75; color: #d8d2c3; position: relative; }
+.term .p { color: var(--jade); user-select: none; }
+.term .o { color: var(--faint); }
+.needs { display: flex; flex-wrap: wrap; gap: 10px; margin: 26px 0; }
+.needs span { font-size: 14px; padding: 7px 14px; border-radius: 999px; border: 1px solid var(--line-2); color: var(--soft); }
+.agent-alt { margin-top: 22px; padding: 18px 20px; border-radius: 16px; border: 1px solid var(--line); background: rgba(15,42,36,.55); position: relative; }
+.agent-alt p { color: var(--soft); font-size: 15px; }
+.agent-alt q { display: block; margin-top: 8px; font: 14.5px/1.6 var(--mono); color: var(--ink); quotes: none; padding-right: 70px; }
+
+/* ---------- the table ---------- */
+.hw { overflow: hidden; }
+.hw .grid { display: grid; grid-template-columns: 1.1fr 1fr; gap: 60px; align-items: center; }
+.soon { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: #1b1407; background: var(--brass); padding: 6px 12px; border-radius: 999px; }
+.soon::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #1b1407; animation: pulse 1.6s infinite; }
+@keyframes pulse { 50% { opacity: .25; } }
+.explode { position: relative; height: 470px; perspective: 1400px; }
+.layers { position: absolute; left: 50%; top: 50%; width: 460px; height: 290px; margin: -145px 0 0 -230px; transform-style: preserve-3d; transform: rotateX(58deg) rotateZ(-32deg); }
+.layer { position: absolute; inset: 0; border-radius: 16px; transition: transform 1.2s cubic-bezier(.2,.7,.2,1); display: grid; place-items: center; }
+.layer span { font: 600 13px var(--text); letter-spacing: .08em; text-transform: uppercase; color: rgba(243,238,226,.85); transform: rotateZ(32deg); white-space: nowrap; }
+.l-wood { background: linear-gradient(135deg, #5a3a22, #2c1c10); box-shadow: 0 50px 80px rgba(0,0,0,.6); }
+.l-pc { inset: 30% 34%; background: #1d2421; border: 1px solid #3a4440; border-radius: 10px; }
+.l-panel { inset: 9% 7%; background: #050807; border: 2px solid #222; }
+.l-image { inset: 11% 9%; background: url(/site/pachisi.webp) center / cover; border-radius: 6px; }
+.l-glass { inset: 6% 4%; background: linear-gradient(120deg, rgba(255,255,255,.22), rgba(255,255,255,.04) 40%, rgba(255,255,255,.1)); border: 1px solid rgba(255,255,255,.35); }
+.explode.in .l-pc { transform: translateZ(-90px); }
+.explode.in .l-panel { transform: translateZ(40px); }
+.explode.in .l-image { transform: translateZ(70px); }
+.explode.in .l-glass { transform: translateZ(140px); }
+.legend { position: absolute; display: grid; gap: 8px; right: 0; bottom: 10px; font-size: 13.5px; color: var(--soft); }
+.legend div::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 8px; background: var(--c); vertical-align: middle; }
+.specs { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 30px 0; }
+.spec { padding: 16px 18px; border-radius: 14px; border: 1px solid var(--line); background: rgba(15,42,36,.55); }
+.spec b { display: block; font-size: 15px; } .spec span { color: var(--soft); font-size: 14px; }
+
+/* ---------- footer ---------- */
+footer { border-top: 1px solid var(--line); padding: 60px 0 50px; color: var(--faint); font-size: 14.5px; }
+footer .wrap { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 30px; }
+footer h4 { font: 600 13px var(--text); letter-spacing: .14em; text-transform: uppercase; color: var(--soft); margin: 0 0 12px; }
+footer a { color: var(--faint); display: block; margin: 6px 0; }
+footer a:hover { color: var(--ink); }
+footer .version { display: inline; margin: 0; }
+
+/* ---------- reveal on scroll ---------- */
+.rv { opacity: 0; transform: translateY(30px); transition: opacity .9s cubic-bezier(.2,.7,.2,1), transform .9s cubic-bezier(.2,.7,.2,1); transition-delay: var(--d, 0s); }
+.rv.in { opacity: 1; transform: none; }
+
+@media (max-width: 1080px) {
+  nav.main { display: none; }
+  .hero .wrap, .room .grid, .demo, .devgrid, .install .grid, .hw .grid, .case { grid-template-columns: 1fr; }
+  .scene { height: 520px; transform: scale(.8); }
+  .paths .grid, .games, .features, .links { grid-template-columns: 1fr 1fr; }
+  .game.wide { grid-column: span 2; }
+  .code { position: static; }
+  .repo { grid-template-columns: 1fr; }
+  footer .wrap { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 640px) {
+  .wrap { width: calc(100% - 32px); }
+  section { padding: 80px 0; }
+  .scene { height: 380px; transform: scale(.52); margin: -60px -120px; }
+  .paths .grid, .games, .features, .links, .split, .specs, .case ul { grid-template-columns: 1fr; }
+  .game.wide { grid-column: auto; }
+  .top .gh span { display: none; }
+  .lb-card { grid-template-columns: 1fr; } .lb-card .side { width: auto; }
+  .room .shots .small { right: 0; }
+  .filters { flex-wrap: wrap; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+  .rv { opacity: 1; transform: none; }
+}
+</style>
+</head>
+<body>
+
+<header class="top" id="top">
+  <div class="wrap">
+    <a class="logo" href="#"><img src="/favicon.svg" alt="">Game Table</a>
+    <nav class="main" aria-label="Sections">
+      <a href="#room">How it plays</a>
+      <a href="#games">Games</a>
+      <a href="#lobby">The lobby</a>
+      <a href="#build">Build a game</a>
+      <a href="#install">Play at home</a>
+      <a href="#table">The table</a>
+    </nav>
+    <span class="spacer"></span>
+    <a class="gh" href="https://github.com/klaushofrichter/games-service" target="_blank" rel="noopener noreferrer"><svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg><span>GitHub</span></a>
+    {{admin}}
+  </div>
+</header>
+{{note}}
+
+<main>
+<!-- ============ HERO ============ -->
+<section class="hero">
+  <div class="wrap">
+    <div>
+      <p class="eyebrow rv">Open source · MIT · Free games</p>
+      <h1 class="rv" style="--d:.08s">Gather round<br><em>one screen.</em></h1>
+      <p class="lede rv" style="--d:.16s">Game Table turns a touchscreen lying flat on the table into a board that everyone in the room shares. Phones are the private hands. And the games? <b style="color:var(--ink)">You build them, with your AI, in hours.</b></p>
+      <div class="ctas rv" style="--d:.24s">
+        <a class="btn primary" href="#build">Build a game <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+        <a class="btn" href="#install">Play at home</a>
+      </div>
+      <div class="facts rv" style="--d:.32s"><span>1–8 players per table</span><span>No app to install</span><span>AI players built in</span><span>Runs on your own WiFi</span></div>
+    </div>
+    <div class="scene" id="scene" aria-hidden="true">
+      <div class="tabletop" id="tabletop">
+        <div class="wood"></div>
+        <div class="screen"><div class="glass" id="hero-shots">
+          <img class="on" src="/site/holdem.webp" alt="">
+          <img src="/site/backgammon.webp" alt="" loading="lazy">
+          <img src="/site/roulette.webp" alt="" loading="lazy">
+          <img src="/site/liars-dice.webp" alt="" loading="lazy">
+          <img src="/site/pachisi.webp" alt="" loading="lazy">
+          <img src="/site/chess.webp" alt="" loading="lazy">
+        </div></div>
+        <div class="phone s1"><img src="/site/holdem-phone.webp" alt=""><i class="glow"></i></div>
+        <div class="phone s2"><img src="/site/liars-dice-phone.webp" alt=""><i class="glow"></i></div>
+        <div class="phone e"><img src="/site/roulette-phone.webp" alt=""><i class="glow"></i></div>
+        <div class="phone n"><img src="/site/coin-flip-phone.webp" alt=""></div>
+        <div class="phone w"><img src="/site/lobby-phone.webp" alt=""></div>
+        <i class="fly f1"></i><i class="fly f2"></i><i class="fly f3"></i>
+      </div>
+      <div class="tag t1"><i>●</i><b>The board</b> · shared by everyone</div>
+      <div class="tag t3"><i>◆</i><b>Your deck</b> · private, on your phone</div>
+      <div class="tag t2"><i>✦</i><b>AI players</b> fill the empty seats</div>
+    </div>
+  </div>
+  <a class="scroll-cue" href="#paths" aria-label="Scroll down"></a>
+</section>
+
+<!-- ============ PATHS ============ -->
+<section class="paths" id="paths">
+  <div class="wrap grid">
+    <a class="path dev rv" href="#build">
+      <span class="badge">Start here</span>
+      <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 9l-4 3 4 3M16 9l4 3-4 3M13.5 5l-3 14"/></svg></span>
+      <h3>Game developers</h3>
+      <p>Turn your game idea into something people play together, fast. Describe it to your AI, and the platform supplies the lobby, seats, phones, AI scheduling, remote play, logs and replay.</p>
+      <span class="go">Build a game →</span>
+    </a>
+    <a class="path rv" style="--d:.08s" href="#install">
+      <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="3"/><circle cx="9" cy="9" r="1.2" fill="currentColor"/><circle cx="15" cy="15" r="1.2" fill="currentColor"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/></svg></span>
+      <h3>Gamers</h3>
+      <p>Run a table at home with Docker and play the free games with friends around any screen. No cloud, no accounts.</p>
+      <span class="go">Play at home →</span>
+    </a>
+    <a class="path rv" style="--d:.16s" href="#table">
+      <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9h18M5 9v10M19 9v10M7 6h10l2 3H5z"/></svg></span>
+      <h3>Tinkerers</h3>
+      <p>Build a table with a flat touchscreen and a small Linux PC. A kiosk kit boots straight into the board.</p>
+      <span class="go">The table →</span>
+    </a>
+  </div>
+</section>
+
+<!-- ============ THE ROOM ============ -->
+<section class="room" id="room">
+  <div class="wrap grid">
+    <div class="shots rv">
+      <img class="big" src="/site/lobby.webp" alt="The board's lobby: seats around the edges, the chosen game, and a QR code to join" loading="lazy" width="1600" height="900">
+      <img class="small" src="/site/holdem-phone.webp" alt="A phone showing a player's two private cards" loading="lazy" width="500" height="1082">
+    </div>
+    <div>
+      <p class="eyebrow rv">Made for the room</p>
+      <h2 class="rv" style="--d:.06s">Real people, one table, no one staring at a TV.</h2>
+      <div class="points">
+        <div class="point rv" style="--d:.1s"><span class="n">1</span><div><h3>The board lies flat in the middle</h3><p>A touchscreen everyone can reach: dice roll, cards slide, pieces move under your finger. Each seat has its own edge, and the board turns its text toward whoever is playing.</p></div></div>
+        <div class="point rv" style="--d:.16s"><span class="n">2</span><div><h3>Your phone is your hand</h3><p>Scan the QR code and you have a seat. No app and no account. Your cards, dice cup and bets stay on your phone; the table sees only what it should.</p></div></div>
+        <div class="point rv" style="--d:.22s"><span class="n">3</span><div><h3>Empty seats? Add an AI</h3><p>Every game ships with AI players, some with several styles. They play at the board's pace and wait for the animations, so they feel like people at the table.</p></div></div>
+      </div>
+      <div class="remote-note rv" style="--d:.28s"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18"/></svg><span><b style="color:var(--ink)">Someone couldn't make it?</b> Send an invite link. They see the same board in their browser with their own deck beside it, connected straight to your table. Up to four can join from afar, as players or as watchers.</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ GAMES ============ -->
+<section id="games">
+  <div class="wrap">
+    <div class="section-head">
+      <p class="eyebrow rv">Free games</p>
+      <h2 class="rv" style="--d:.06s">Seven games, and room for yours.</h2>
+      <p class="lede rv" style="--d:.12s">Four games come with the platform; three more come from <a href="https://github.com/klaushofrichter/extra-games" target="_blank" rel="noopener noreferrer">extra-games</a>, a separate repository that shows how anyone can add games. All of them are free and play for points, never money.</p>
+    </div>
+    <div class="filters rv" role="tablist">
+      <button class="chipbtn on" data-f="all">All games</button>
+      <button class="chipbtn" data-f="built-in">Built in</button>
+      <button class="chipbtn" data-f="extra">From extra-games</button>
+    </div>
+    <div class="games" id="games-grid"></div>
+    <p class="games-foot rv">Click a game for a closer look. Every screenshot is the real board, taken by the platform's browser tests.</p>
+  </div>
+</section>
+
+<!-- ============ LOBBY ============ -->
+<section class="lobby" id="lobby">
+  <div class="wrap">
+    <div class="section-head">
+      <p class="eyebrow rv">The lobby</p>
+      <h2 class="rv" style="--d:.06s">Real life at the table, handled for you.</h2>
+      <p class="lede rv" style="--d:.12s">Phones run out of battery, people leave early, a friend joins halfway through. The platform deals with all of it, so a game only plays the game, and every game behaves the same way.</p>
+    </div>
+    <div class="demo" id="demo">
+      <div class="stage rv">
+        <div class="board-mini">
+          <div class="plate p0"><div class="nm">Open seat</div><div class="st"></div><span class="bdg"></span></div>
+          <div class="plate p1"><div class="nm">Open seat</div><div class="st"></div><span class="bdg"></span></div>
+          <div class="plate p2"><div class="nm">Open seat</div><div class="st"></div><span class="bdg"></span></div>
+          <div class="plate p3"><div class="nm">Open seat</div><div class="st"></div><span class="bdg"></span></div>
+          <div class="plate p4"><div class="nm">Open seat</div><div class="st"></div><span class="bdg"></span></div>
+          <div class="plate p5"><div class="nm">Open seat</div><div class="st"></div><span class="bdg"></span></div>
+          <div class="center-mini"><div class="qr" id="mini-qr"></div><div class="cap" id="mini-cap">Scan to join</div><div class="sub" id="mini-sub"></div></div>
+          <div class="eye" id="mini-eye"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg><span>2 watching</span></div>
+        </div>
+        <div class="side-deck" id="mini-deck"><img src="/site/coin-flip-phone.webp" alt=""></div>
+      </div>
+      <div class="steps" id="steps"></div>
+    </div>
+    <div class="features">
+      <div class="feature rv"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3M21 14v7h-7"/></svg><h3>Join by QR code</h3><p>One code for everyone at the table. When no seat is free, the board and the phone say so.</p></div>
+      <div class="feature rv" style="--d:.05s"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="4" y="5" width="16" height="14" rx="2"/><path d="M4 10h16M10 5v14"/></svg><h3>Seats and colours</h3><p>2 to 8 seats around the edges, each with a name and colour; the board turns toward each side.</p></div>
+      <div class="feature rv" style="--d:.1s"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="6" y="2" width="12" height="20" rx="3"/><path d="M10 18h4"/></svg><h3>Away phones keep their seat</h3><p>A locked screen or a dead battery doesn't end the game. The seat waits, then the table decides.</p></div>
+      <div class="feature rv" style="--d:.15s"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h13l-3-3M20 17H7l3 3"/></svg><h3>Exchange a player</h3><p>Mid-game, hand a seat to someone at the table, a remote friend, a watcher or an AI. The game carries on.</p></div>
+      <div class="feature rv"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10 14a5 5 0 007 0l3-3a5 5 0 00-7-7l-1 1"/><path d="M14 10a5 5 0 00-7 0l-3 3a5 5 0 007 7l1-1"/></svg><h3>Remote invites</h3><p>A link, optionally with a name. The browser connects straight to the table over WebRTC.</p></div>
+      <div class="feature rv" style="--d:.05s"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg><h3>Watchers</h3><p>Friends can follow along without a seat. Tap the eye to see who's watching, let them play, or remove them.</p></div>
+      <div class="feature rv" style="--d:.1s"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/><path d="M18 3l3 3-3 3"/></svg><h3>Rejoin by name</h3><p>Left by accident? Scan again with the same name and you're back in your seat.</p></div>
+      <div class="feature rv" style="--d:.15s"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9h10M7 13h6M7 17h8"/></svg><h3>Logs, replay, viewer</h3><p>Every game is logged and replayed to check it. The board's Game Viewer walks through each move.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ BUILD ============ -->
+<section class="build" id="build">
+  <div class="wrap">
+    <div class="section-head">
+      <p class="eyebrow rv">For game developers</p>
+      <h2 class="rv" style="--d:.06s">You bring the idea.<br>The platform brings the table.</h2>
+      <p class="lede rv" style="--d:.12s">A game is a folder: a manifest, pure TypeScript rules, and optional board and phone screens in plain JavaScript. The developer guide is written for language models as much as for people, so your AI can read the contract and build a complete game.</p>
+    </div>
+
+    <div class="case rv">
+      <div class="pic"><img src="/site/backgammon.webp" alt="Backgammon on the board: checkers, dice, and each player's panel" loading="lazy"></div>
+      <div class="txt">
+        <span class="clock"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Built in hours, with Claude</span>
+        <h3>Backgammon: from idea to table in an afternoon</h3>
+        <p class="muted">Backgammon in extra-games was written with Claude in a few hours: about 2,000 lines for the rules, the board and the phone screen, with matches to 100 points, the doubling cube and the Crawford rule. Everything else came from the platform:</p>
+        <ul>
+          <li>AI players, three strengths</li>
+          <li>A touch board: tap, then move</li>
+          <li>Private phone decks</li>
+          <li>Remote players and watchers</li>
+          <li>Timers, pauses, exchanges</li>
+          <li>Logs, replay and statistics</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="devgrid">
+      <div>
+        <h3 class="rv" style="font-size:30px">Five steps from idea to table</h3>
+        <div class="prompt rv" style="--d:.06s">
+          <div class="who">Tell your agent</div>
+          <div class="say" id="say" data-text="Read https://games.skylar.technology/llms.txt and write a new game for Game Table in my copy of extra-games: Yahtzee for 2–6 players, with an AI player."></div>
+          <button class="copy" data-copy="#say">Copy</button>
+        </div>
+        <div class="timeline">
+          <div class="tl rv"><span class="n">1</span><div><h3>Start from a working repository</h3><p>Copy <a href="https://github.com/klaushofrichter/extra-games" target="_blank" rel="noopener noreferrer">extra-games</a>: three complete games, tests that run them on the real platform, and CI. Or start inside the platform from <code>games/coin-flip</code>, the smallest complete game.</p></div></div>
+          <div class="tl rv"><span class="n">2</span><div><h3>Let your AI read the contract</h3><p><code>llms.txt</code> points to the developer guide: the manifest, every rules hook, what the platform does with players, and a checklist. One file holds it all: <code>llms-full.txt</code>.</p></div></div>
+          <div class="tl rv"><span class="n">3</span><div><h3>Write rules, not plumbing</h3><p>Rules are pure functions on a JSON state: <code>setup</code>, <code>onIntent</code>, <code>view</code>, <code>boardView</code>, <code>isOver</code>, plus an AI. Randomness comes from the context, so every game can be replayed and checked.</p></div></div>
+          <div class="tl rv"><span class="n">4</span><div><h3>Play it, even without a phone</h3><p>Run a table on your laptop. <em>Play from the board</em> puts a player's deck beside the board, AI players take the other seats, and the Game Viewer shows each move if something looks wrong.</p></div></div>
+          <div class="tl rv"><span class="n">5</span><div><h3>Bring it to every table</h3><p>Your repository's <code>games/</code> folder becomes an extra-game repository: clone it into a local table, or let a game service install it on its tables.</p></div></div>
+        </div>
+      </div>
+      <div class="code rv" style="--d:.1s">
+        <div class="tabs"><span class="dots"><i></i><i></i><i></i></span>
+          <button class="on" data-tab="0">rules.ts</button><button data-tab="1">manifest.json</button><button data-tab="2">games/</button>
+        </div>
+<pre class="on"><span class="k">import</span> { defineGame } <span class="k">from</span> <span class="s">"@game-table/sdk"</span>;
+
+<span class="c">// Coin Flip, shortened: everyone guesses, then the coin flips.</span>
+<span class="k">export default</span> <span class="f">defineGame</span>&lt;<span class="t">State</span>&gt;({
+  <span class="f">setup</span>(ctx, settings) {
+    <span class="k">const</span> seats = ctx.seats.<span class="f">map</span>((s) =&gt; s.seat);
+    <span class="k">const</span> rounds = <span class="t">Number</span>(settings.rounds);
+    <span class="k">return</span> { round: <span class="t">1</span>, rounds, seats, guesses: {}, scores: {} };
+  },
+
+  <span class="f">onIntent</span>(state, seat, intent, ctx) {
+    <span class="k">if</span> (intent.name !== <span class="s">"guess"</span>) <span class="k">return</span> { reject: <span class="s">"unknown move"</span> };
+    <span class="k">const</span> guesses = { ...state.guesses, [seat]: intent.payload };
+    <span class="k">const</span> next = { ...state, guesses };
+    <span class="k">return</span> <span class="f">allGuessed</span>(next) ? <span class="f">flip</span>(next, ctx) : { state: next };
+  },
+
+  <span class="c">// Each phone sees its own seat; the board sees what is public.</span>
+  <span class="f">view</span>: (state, seat) =&gt; ({ myGuess: state.guesses[seat] ?? <span class="k">null</span> }),
+  <span class="f">boardView</span>: (state) =&gt; ({ round: state.round, scores: state.scores }),
+  <span class="f">isOver</span>: (state) =&gt; (state.round &gt; state.rounds ? <span class="f">summary</span>(state) : <span class="k">null</span>),
+
+  <span class="c">// AI players read the same view a phone gets, nothing more.</span>
+  <span class="f">ai</span>: (view, seat, ctx) =&gt; ({
+    name: <span class="s">"guess"</span>,
+    payload: ctx.<span class="f">random</span>() &lt; <span class="t">0.5</span> ? <span class="s">"heads"</span> : <span class="s">"tails"</span>,
+  }),
+});
+
+<span class="c">// flip() draws from ctx.random(), never Math.random():</span>
+<span class="c">// every game replays exactly, and the platform checks it.</span></pre>
+<pre><span class="c">// games/coin-flip/manifest.json (shortened)</span>
+{
+  <span class="s">"id"</span>: <span class="s">"coin-flip"</span>,
+  <span class="s">"name"</span>: <span class="s">"Coin Flip"</span>,
+  <span class="s">"version"</span>: <span class="s">"2026.10.19.1"</span>,
+  <span class="s">"players"</span>: { <span class="s">"min"</span>: <span class="t">1</span>, <span class="s">"max"</span>: <span class="t">8</span> },
+  <span class="s">"turnModel"</span>: <span class="s">"simultaneous"</span>,
+  <span class="s">"seatLayouts"</span>: [<span class="t">2</span>, <span class="t">4</span>, <span class="t">6</span>, <span class="t">8</span>],
+  <span class="s">"dynamicPlayers"</span>: <span class="k">true</span>,
+  <span class="s">"settings"</span>: [
+    { <span class="s">"key"</span>: <span class="s">"rounds"</span>, <span class="s">"type"</span>: <span class="s">"int"</span>, <span class="s">"min"</span>: <span class="t">1</span>, <span class="s">"max"</span>: <span class="t">20</span>, <span class="s">"default"</span>: <span class="t">3</span>, <span class="s">"label"</span>: <span class="s">"Rounds"</span> }
+  ],
+  <span class="s">"ai"</span>: { <span class="s">"supported"</span>: <span class="k">true</span>, <span class="s">"options"</span>: [] },
+  <span class="s">"simulation"</span>: { <span class="s">"supported"</span>: <span class="k">true</span>, <span class="s">"headless"</span>: <span class="k">true</span> }
+}
+
+<span class="c">// The board shows the settings; the lobby checks the player count.</span></pre>
+<pre><span class="t">games/</span>
+└── <span class="t">yahtzee/</span>
+    ├── <span class="f">manifest.json</span>     <span class="c">id, players, seats, settings, AI options</span>
+    ├── <span class="f">rules.ts</span>          <span class="c">pure, deterministic rules + AI</span>
+    ├── <span class="f">board.js</span>          <span class="c">the shared touchscreen (optional)</span>
+    ├── <span class="f">deck.js</span>           <span class="c">each player's phone (optional)</span>
+    ├── <span class="f">how-to-play.md</span>    <span class="c">rules for players, shown on board and phone</span>
+    └── <span class="t">assets/</span>           <span class="c">images, sounds</span>
+
+<span class="c">// UI modules: mount(root, ctx) → { update(view, events, info), destroy() }</span>
+<span class="c">// No build step: TypeScript runs natively on Node 26.</span></pre>
+      </div>
+    </div>
+
+    <div class="split">
+      <div class="col you rv"><h3>You write</h3><ul>
+        <li>The rules of your game, as pure functions</li>
+        <li>What each phone and the board may see</li>
+        <li>An AI player (or several styles)</li>
+        <li>The board and phone screens, if you want your own look</li>
+        <li>Rules for players, in Markdown</li>
+      </ul></div>
+      <div class="col rv" style="--d:.08s"><h3>The platform does</h3><ul>
+        <li>Lobby, seats, names, colours, the QR code</li>
+        <li>Joining, leaving, away phones, exchanging players</li>
+        <li>AI scheduling at the board's pace, pauses, timers</li>
+        <li>Remote players and watchers over WebRTC</li>
+        <li>Logs, replay checks, the Game Viewer, statistics, simulations</li>
+      </ul></div>
+    </div>
+
+    <div class="links">
+      <a class="lnk rv" href="/docs/game-development.md"><b>Developer guide</b><span>The full contract, with a checklist.</span><code>/docs/game-development.md</code></a>
+      <a class="lnk rv" style="--d:.05s" href="/llms.txt"><b>llms.txt</b><span>The index for your AI agent.</span><code>/llms.txt</code></a>
+      <a class="lnk rv" style="--d:.1s" href="/llms-full.txt"><b>Everything in one file</b><span>Index, guide and runbook together.</span><code>/llms-full.txt</code></a>
+      <a class="lnk rv" style="--d:.15s" href="https://github.com/klaushofrichter/extra-games" target="_blank" rel="noopener noreferrer"><b>Example repository</b><span>Chess, Liar's Dice, Backgammon.</span><code>klaushofrichter/extra-games</code></a>
+    </div>
+  </div>
+</section>
+
+<!-- ============ REPOSITORIES ============ -->
+<section id="repos" style="padding-top:40px">
+  <div class="wrap">
+    <div class="section-head">
+      <p class="eyebrow rv">Game repositories</p>
+      <h2 class="rv" style="--d:.06s">Games from anywhere on GitHub.</h2>
+      <p class="lede rv" style="--d:.12s">Any repository with a <code style="color:var(--brass-hi)">games/</code> folder can bring games to a table. These work with the platform today.</p>
+    </div>
+    <div class="repos">
+      <div class="repo rv"><div class="name">klaushofrichter/games-service<small>The platform, with its built-in games</small></div><div class="gl"><span>Roulette</span><span>Hold'em</span><span>Pachisi</span><span>Coin Flip</span></div><a href="https://github.com/klaushofrichter/games-service" target="_blank" rel="noopener noreferrer">GitHub →</a></div>
+      <div class="repo rv" style="--d:.05s"><div class="name">klaushofrichter/extra-games<small>Example game repository, MIT</small></div><div class="gl"><span>Chess</span><span>Liar's Dice</span><span>Backgammon</span></div><a href="https://github.com/klaushofrichter/extra-games" target="_blank" rel="noopener noreferrer">GitHub →</a></div>
+      <div class="repo add rv" style="--d:.1s"><div class="name">your-name/your-games<small>Built a game? Tell us about it</small></div><div class="gl faint" style="font-size:15px">Open an issue with a link to your repository and we'll list it here.</div><a href="https://github.com/klaushofrichter/games-service/issues/new?title=Game%20repository%3A%20" target="_blank" rel="noopener noreferrer">Add yours →</a></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ INSTALL ============ -->
+<section class="install" id="install">
+  <div class="wrap grid">
+    <div>
+      <p class="eyebrow rv">Play at home</p>
+      <h2 class="rv" style="--d:.06s">A table on any computer, in three commands.</h2>
+      <p class="lede rv" style="--d:.12s;margin-top:20px">The table runs in Docker on a computer on your WiFi. Open the board in a browser, on a touchscreen if you have one, and everyone joins with their phone. No cloud service, no DNS entry and no HTTPS needed.</p>
+      <div class="needs rv" style="--d:.18s"><span>Docker with Compose</span><span>git</span><span>Phones on the same WiFi</span><span>A touchscreen (or a mouse)</span></div>
+      <p class="rv muted" style="--d:.22s">Games from other repositories, private ones too, are added by cloning them. The <a href="/docs/local-docker.md">runbook</a> has every step, with a check after each one.</p>
+      <div class="agent-alt rv" style="--d:.26s">
+        <p>Or let your AI agent do it:</p>
+        <q id="install-prompt">Check out https://games.skylar.technology and read the llms.txt. I want to do a local installation.</q>
+        <button class="copy" data-copy="#install-prompt">Copy</button>
+      </div>
+    </div>
+    <div class="term rv" style="--d:.1s">
+      <div class="bar"><i></i><i></i><i></i><span>your computer</span><button class="copy" style="top:7px;right:10px" data-copy-text="git clone https://github.com/klaushofrichter/games-service
+cd games-service && deploy/local/setup.sh
+docker compose -f deploy/local/docker-compose.yml up -d --build">Copy</button></div>
+<pre><span class="p">$</span> git clone https://github.com/klaushofrichter/games-service
+<span class="p">$</span> cd games-service && deploy/local/setup.sh
+<span class="o">PUBLIC_URL=http://192.168.1.20:8080</span>
+<span class="p">$</span> docker compose -f deploy/local/docker-compose.yml up -d --build
+<span class="o">✔ Container local-table-host-1  Started</span>
+
+<span class="o"># open the board on this computer:</span>
+<span class="p">$</span> open http://localhost:8080/board/
+<span class="o"># phones scan the QR code on the board</span></pre>
+    </div>
+  </div>
+</section>
+
+<!-- ============ THE TABLE ============ -->
+<section class="hw" id="table">
+  <div class="wrap grid">
+    <div class="explode rv" id="explode">
+      <div class="layers">
+        <div class="layer l-wood"></div>
+        <div class="layer l-pc"></div>
+        <div class="layer l-panel"></div>
+        <div class="layer l-image"></div>
+        <div class="layer l-glass"></div>
+      </div>
+      <div class="legend"><div style="--c:rgba(255,255,255,.4)">Touch glass, flush with the top</div><div style="--c:#2f6457">Display, 1080p or 4K</div><div style="--c:#3a4440">Linux mini PC, 16 GB</div><div style="--c:#5a3a22">Wooden table frame</div></div>
+    </div>
+    <div>
+      <span class="soon rv">In the workshop</span>
+      <h2 class="rv" style="--d:.06s;margin-top:18px">The table, with the screen built in.</h2>
+      <p class="lede rv" style="--d:.12s;margin-top:20px">We're building a real game table: a large touchscreen set flush into the tabletop, with a small Linux PC underneath. Photos and a build guide will be here in a few weeks.</p>
+      <div class="specs rv" style="--d:.18s">
+        <div class="spec"><b>Touchscreen</b><span>16:9, 1080p or 4K, lying flat</span></div>
+        <div class="spec"><b>Computer</b><span>A Linux mini PC, 16 GB RAM</span></div>
+        <div class="spec"><b>Network</b><span>The same WiFi as the phones</span></div>
+        <div class="spec"><b>Software</b><span>Debian 12, Docker and a kiosk browser</span></div>
+      </div>
+      <p class="rv muted" style="--d:.22s">Want to build your own now? The table PC kit installs Docker, the table and a full-screen kiosk that opens the board at boot.</p>
+      <p class="rv" style="--d:.26s;margin-top:22px"><a class="btn" href="https://github.com/klaushofrichter/games-service/tree/main/deploy/table-pc" target="_blank" rel="noopener noreferrer">Table PC kit on GitHub →</a></p>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div>
+      <a class="logo" href="#" style="margin:0 0 14px"><img src="/favicon.svg" alt="">Game Table</a>
+      <p>Board and card games around one touchscreen, with phones as private hands. Free and open source under the MIT licence, with no warranty.</p>
+      <p style="margin-top:14px">Version {{version}}</p>
+    </div>
+    <div><h4>Play</h4><a href="#games">Games</a><a href="#install">Play at home</a><a href="/docs/local-docker.md">Local runbook</a><a href="#table">The table</a></div>
+    <div><h4>Build</h4><a href="/docs/game-development.md">Developer guide</a><a href="/llms.txt">llms.txt</a><a href="/llms-full.txt">llms-full.txt</a><a href="#repos">Game repositories</a></div>
+    <div><h4>Source</h4><a href="https://github.com/klaushofrichter/games-service" target="_blank" rel="noopener noreferrer">games-service</a><a href="https://github.com/klaushofrichter/extra-games" target="_blank" rel="noopener noreferrer">extra-games</a><a href="https://github.com/klaushofrichter/games-service/releases" target="_blank" rel="noopener noreferrer">Releases</a><a href="https://github.com/klaushofrichter/games-service/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">MIT licence</a></div>
+  </div>
+</footer>
+
+<div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="Game">
+  <button class="lb-close" id="lb-close">Close ✕</button>
+  <div class="lb-card"><img class="main" id="lb-img" alt=""><div class="side"><h3 id="lb-name"></h3><p id="lb-desc"></p><img id="lb-phone" alt=""><a id="lb-link" target="_blank" rel="noopener noreferrer">Rules and code on GitHub →</a></div></div>
+</div>
+
+<script>
+(() => {
+  "use strict";
+  const $ = (s, r = document) => r.querySelector(s);
+  const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+  const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  // Top bar turns solid once scrolled.
+  const top = $("#top");
+  const onScroll = () => top.classList.toggle("scrolled", scrollY > 30);
+  addEventListener("scroll", onScroll, { passive: true }); onScroll();
+
+  // Reveal on scroll.
+  const io = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); } }), { threshold: 0.12 });
+  $$(".rv, #explode").forEach((el) => io.observe(el));
+
+  // Hero: the board cycles through the games; the table follows the mouse a little.
+  const shots = $$("#hero-shots img");
+  let shot = 0;
+  if (!still) setInterval(() => { shots[shot].classList.remove("on"); shot = (shot + 1) % shots.length; shots[shot].classList.add("on"); }, 3200);
+  const tt = $("#tabletop"), scene = $("#scene");
+  if (!still) addEventListener("mousemove", (e) => {
+    const x = e.clientX / innerWidth - 0.5, y = e.clientY / innerHeight - 0.5;
+    tt.style.setProperty("--rz", `${-14 + x * 8}deg`);
+    tt.style.setProperty("--rx", `${50 - y * 6}deg`);
+  }, { passive: true });
+
+  // Games.
+  const GS = "https://github.com/klaushofrichter/games-service/tree/main/games/";
+  const EX = "https://github.com/klaushofrichter/extra-games/tree/main/games/";
+  const GAMES = [
+    { id: "holdem", name: "Hold'em", players: "2–8 players", src: "built-in", wide: true, phone: "holdem-phone",
+      text: "Fixed-limit Texas Hold'em. Your two cards stay on your phone; the board shows the shared cards and the pot. AI players in two styles, side pots, awards." },
+    { id: "backgammon", name: "Backgammon", players: "2 players", src: "extra",
+      text: "Roll and move your checkers on the board, hit blots and bear off first. Matches to 100 points with the doubling cube; AI at three strengths." },
+    { id: "roulette", name: "Roulette", players: "1–6 players", src: "built-in", phone: "roulette-phone",
+      text: "European single-zero roulette. Everyone bets at once from their phone, then the wheel spins. Three AI styles." },
+    { id: "liars-dice", name: "Liar's Dice", players: "2–6 players", src: "extra", phone: "liars-dice-phone",
+      text: "Everyone rolls in secret under their phone. Bid how many dice show a face, or call the last bid a lie." },
+    { id: "chess", name: "Chess", players: "2 players", src: "extra",
+      text: "Tap a piece on the board, then its square. Clocks from bullet to classical, or none; AI at a strength you choose." },
+    { id: "pachisi", name: "Pachisi", players: "2–4 players", src: "built-in",
+      text: "Race your tokens around the board and home. Roll a 6 to leave the start, touch a token to move it, land on someone to send them back." },
+    { id: "coin-flip", name: "Coin Flip", players: "1–8 players", src: "built-in", wide: true, phone: "coin-flip-phone",
+      text: "Everyone guesses heads or tails, then the coin flips. The smallest complete game, and the one to copy when you start your own." },
+  ];
+  const grid = $("#games-grid");
+  grid.innerHTML = GAMES.map((g, i) => `
+    <button class="game rv${g.wide ? " wide" : ""}" style="--d:${(i % 3) * 0.06}s" data-src="${g.src}" data-i="${i}">
+      <span class="src${g.src === "extra" ? " extra" : ""}">${g.src === "extra" ? "extra-games" : "Built in"}</span>
+      <div class="pic"><img src="/site/${g.id}.webp" alt="${g.name} on the board" loading="lazy" width="1600" height="900"></div>
+      <div class="info"><div class="row"><h3>${g.name}</h3><span class="players">${g.players}</span></div><p>${g.text}</p></div>
+    </button>`).join("");
+  $$("#games-grid .rv").forEach((el) => io.observe(el));
+  $$(".filters .chipbtn").forEach((b) => b.addEventListener("click", () => {
+    $$(".filters .chipbtn").forEach((x) => x.classList.toggle("on", x === b));
+    const f = b.dataset.f;
+    $$(".game").forEach((g) => { g.classList.toggle("hide", f !== "all" && g.dataset.src !== f); g.classList.toggle("wide", f === "all" && !!GAMES[g.dataset.i].wide); });
+  }));
+  const lb = $("#lightbox");
+  grid.addEventListener("click", (e) => {
+    const card = e.target.closest(".game"); if (!card) return;
+    const g = GAMES[card.dataset.i];
+    $("#lb-img").src = `/site/${g.id}.webp`; $("#lb-img").alt = `${g.name} on the board`;
+    $("#lb-name").textContent = g.name; $("#lb-desc").textContent = `${g.players}. ${g.text}`;
+    const ph = $("#lb-phone"); ph.hidden = !g.phone; if (g.phone) { ph.src = `/site/${g.phone}.webp`; ph.alt = `${g.name} on a phone`; }
+    $("#lb-link").href = (g.src === "extra" ? EX : GS) + g.id;
+    lb.classList.add("open");
+  });
+  const close = () => lb.classList.remove("open");
+  $("#lb-close").addEventListener("click", close);
+  lb.addEventListener("click", (e) => { if (e.target === lb) close(); });
+  addEventListener("keydown", (e) => { if (e.key === "Escape") close(); });
+
+  // The lobby demo: a little table that acts out what the platform handles.
+  const C = { anna: "#d6a94a", ben: "#63a8e0", otto: "#d2574a", cleo: "#5fbf8f", dana: "#9b7be0", sam: "#e08fb0" };
+  const STEPS = [
+    { h: "Scan the code, take a seat", p: "One QR code on the board. Each phone that scans it gets a seat, a colour and a private deck.",
+      cap: "Scan to join", sub: "3 seated · 3 open", qr: true,
+      seats: [["Anna", "anna", "Ready"], ["Ben", "ben", "Ready"], null, null, ["Sam", "sam", "Not ready"], null] },
+    { h: "Fill the table with AI players", p: "Tap + AI player and the seat plays itself, in the style you pick. AI players wait for the board's animations, like a person would.",
+      cap: "Hold'em", sub: "Everyone taps Ready", qr: false,
+      seats: [["Anna", "anna", "Ready"], ["Ben", "ben", "Ready"], ["Otto (AI)", "otto", "Ready"], ["Ida (AI)", "cleo", "Ready"], ["Sam", "sam", "Ready"], null], flash: [2, 3] },
+    { h: "A phone goes away, the seat stays", p: "Ben's battery died. His seat waits for him, the board says so, and the table can wait, swap in an AI, or remove him.",
+      cap: "Hand 4 of 20", sub: "Ben's phone is away · 0:42", qr: false,
+      seats: [["Anna", "anna", "Playing"], ["Ben", "ben", "Away", "away"], ["Otto (AI)", "otto", "Playing"], ["Ida (AI)", "cleo", "Playing"], ["Sam", "sam", "Playing"], null] },
+    { h: "Exchange a player mid-game", p: "Tap a name in Settings and hand the seat to someone at the table, a remote friend, a watcher or an AI. The game keeps going with its score.",
+      cap: "Hand 5 of 20", sub: "Cleo took over Ben's seat", qr: false,
+      seats: [["Anna", "anna", "Playing"], ["Cleo", "cleo", "took over"], ["Otto (AI)", "otto", "Playing"], ["Ida (AI)", "cleo", "Playing"], ["Sam", "sam", "Playing"], null], flash: [1] },
+    { h: "Invite someone who couldn't come", p: "A link brings a remote player straight to the table over WebRTC: the same board in their browser, their deck beside it.",
+      cap: "Next game", sub: "Dana joined from afar", qr: false,
+      seats: [["Anna", "anna", "Ready"], ["Cleo", "cleo", "Ready"], ["Otto (AI)", "otto", "Ready"], ["Ida (AI)", "cleo", "Ready"], ["Sam", "sam", "Ready"], ["Dana", "dana", "Remote", null, "remote"]], flash: [5] },
+    { h: "Watchers follow along", p: "Friends can watch without a seat. Tap the eye to see who's watching, let them play, or remove them. Remote players and watchers: up to four.",
+      cap: "Hand 1 of 20", sub: "", qr: false, eye: true,
+      seats: [["Anna", "anna", "Playing"], ["Cleo", "cleo", "Playing"], ["Otto (AI)", "otto", "Playing"], ["Ida (AI)", "cleo", "Playing"], ["Sam", "sam", "Playing"], ["Dana", "dana", "Remote", null, "remote"]] },
+    { h: "Developing alone? Play from the board", p: "A developer setting puts one player's deck beside the board: test your game with AI players, no phone needed.",
+      cap: "Coin Flip", sub: "Round 2 of 5", qr: false, deck: true,
+      seats: [["Dev", "anna", "Playing"], ["Otto (AI)", "otto", "Playing"], null, ["Ida (AI)", "cleo", "Playing"], null, null] },
+  ];
+  const demo = $("#demo"), plates = $$(".plate", demo), stepsEl = $("#steps");
+  stepsEl.innerHTML = STEPS.map((s, i) => `<button class="step" data-i="${i}"><h3>${s.h}</h3><p>${s.p}</p><i class="bar"></i></button>`).join("");
+  const stepBtns = $$(".step", stepsEl);
+  let cur = -1, timer = null, visible = false;
+  function show(i) {
+    cur = i;
+    const s = STEPS[i];
+    stepBtns.forEach((b, k) => b.classList.toggle("on", k === i));
+    plates.forEach((pl, k) => {
+      const seat = s.seats[k];
+      pl.className = `plate p${k}`;
+      const bdg = $(".bdg", pl);
+      if (!seat) { $(".nm", pl).textContent = "Open seat"; $(".st", pl).textContent = ""; pl.style.removeProperty("--c"); bdg.classList.remove("on"); return; }
+      const [name, c, st, cls, badge] = seat;
+      pl.classList.add("filled"); if (cls) pl.classList.add(cls);
+      pl.style.setProperty("--c", C[c]);
+      $(".nm", pl).textContent = name; $(".st", pl).textContent = st;
+      bdg.textContent = badge || ""; bdg.classList.toggle("on", !!badge);
+      if ((s.flash || []).includes(k)) { void pl.offsetWidth; pl.classList.add("flash"); }
+    });
+    $("#mini-qr").style.display = s.qr ? "" : "none";
+    $("#mini-cap").textContent = s.cap; $("#mini-sub").textContent = s.sub;
+    $("#mini-eye").classList.toggle("on", !!s.eye);
+    $("#mini-deck").classList.toggle("on", !!s.deck);
+    $(".stage", demo).classList.toggle("deck-on", !!s.deck);
+    clearTimeout(timer);
+    if (!still && visible) timer = setTimeout(() => show((cur + 1) % STEPS.length), 5200);
+  }
+  stepBtns.forEach((b) => b.addEventListener("click", () => show(Number(b.dataset.i))));
+  new IntersectionObserver(([e]) => { visible = e.isIntersecting; if (visible) show(cur < 0 ? 0 : cur); else clearTimeout(timer); }, { threshold: 0.3 }).observe(demo);
+  demo.style.setProperty("--dur", "5.2s");
+  show(0);
+
+  // The prompt types itself once it scrolls into view.
+  const say = $("#say");
+  const full = say.dataset.text;
+  if (still) say.textContent = full;
+  else new IntersectionObserver(([e], obs) => {
+    if (!e.isIntersecting) return;
+    obs.disconnect();
+    let n = 0;
+    const caret = document.createElement("span"); caret.className = "caret";
+    const tick = () => { say.textContent = full.slice(0, n); say.append(caret); if (n++ < full.length) setTimeout(tick, 18 + Math.random() * 30); };
+    tick();
+  }, { threshold: 0.6 }).observe(say);
+
+  // Code tabs.
+  const pres = $$(".code pre"), tabs = $$(".code .tabs button");
+  tabs.forEach((t) => t.addEventListener("click", () => { tabs.forEach((x) => x.classList.toggle("on", x === t)); pres.forEach((p, k) => p.classList.toggle("on", k === Number(t.dataset.tab))); }));
+
+  // Copy buttons.
+  $$(".copy").forEach((b) => b.addEventListener("click", async () => {
+    const text = b.dataset.copyText ?? (b.dataset.copy === "#say" ? full : $(b.dataset.copy).textContent);
+    try { await navigator.clipboard.writeText(text); b.textContent = "Copied"; } catch { b.textContent = "Select and copy"; }
+    setTimeout(() => (b.textContent = "Copy"), 1600);
+  }));
+
+  // Highlight the section in the nav.
+  const links = $$("nav.main a");
+  const secs = links.map((a) => $(a.getAttribute("href")));
+  const navObs = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) links.forEach((a) => a.classList.toggle("on", a.getAttribute("href") === `#${e.target.id}`)); }), { rootMargin: "-45% 0px -50% 0px" });
+  secs.forEach((s) => s && navObs.observe(s));
+})();
+</script>
+</body>
+</html>
