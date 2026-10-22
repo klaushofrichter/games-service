@@ -1059,3 +1059,19 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   which the move list already carries); a played game still shows the time of day from `at`, unchanged. Checks:
   `scripts/e2e/viewer.py` (the simulation's list on a later page and a move's detail match the API's `t`),
   `tests/game-viewer.test.ts` (a simulation's rows: `t` from the start record, virtual times).
+
+## Versions on the board (22 Oct 2026)
+
+- **D-182 · 2026-10-22 · Klaus** — The board's Advanced window (the hammer and wrench, D-128) shows the versions
+  running on the table at its bottom, on the table's own board and on remote boards. *Why:* Klaus: "on the board
+  window, and the remote board, is there any place where we can see the deployed version numbers? If not, the
+  Developer Setting window seems suitable, at the bottom. We would like to see the version numbers of the platform and
+  the games that are available." There was none: only `/health` reported the platform's version. *Implementation
+  (Claude):* a group *Versions* below *Developer*, its own group because a remote board has no Developer group: the
+  platform's release (`APP_VERSION`, stamped at build time; `dev` outside a release build) with the protocol version,
+  then every game the lobby offers with its calendar version, sorted by name, those from a game repository (D-097)
+  marked *(added)*; small, in two pairs of columns, so the window stays short. The platform's version comes from a new
+  `GET /api/v1/version` (`{version, protocol}`, as on `/health`), which remote boards may read; the games' from
+  `GET /games`, which the board loads anyway. Checks: `tests/remote.test.ts` (`/version` through a remote board),
+  `scripts/e2e/developer.py` (the table's board: the platform and every game with its version, as the last group),
+  `scripts/e2e/remote.py` (the same on a remote board).

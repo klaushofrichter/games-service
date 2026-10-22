@@ -268,6 +268,10 @@ pre.raw { font-family: var(--mono); font-size: 0.7em; color: var(--ink-soft); ba
 #settings-button.along-y.tr { right: 32px; top: 102px; }
 #settings-button.along-y.br { right: 32px; bottom: 102px; }
 .overlay.settings .panel, .overlay.advanced .panel { min-width: 560px; }
+/* Advanced › Versions (D-182): name and version in two pairs of columns, small, so the panel stays short. */
+.overlay.advanced .versions .vlist { display: grid; grid-template-columns: auto auto auto auto; gap: 4px 14px; font-size: .8em; justify-content: start; }
+.overlay.advanced .versions .vlist .v { font-family: ui-monospace, monospace; }
+.overlay.advanced .versions .vlist > span:nth-child(4n + 3) { padding-left: 18px; }
 /* Terms of service (D-108): a title with ✕ on the right, the text from /shared/terms.md. */
 .overlay.terms { z-index: 45; }
 .terms-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }

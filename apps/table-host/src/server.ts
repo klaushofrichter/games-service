@@ -299,6 +299,8 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
     if (m === "GET" && path === "/join") return json(res, 200, table.currentJoin());
     if (m === "POST" && path === "/join/new") return json(res, 200, table.newJoinCode());
     if (m === "GET" && path === "/games") return json(res, 200, table.availability());
+    // The platform's version and protocol, as on /health, for the board's Advanced › Versions (D-182); remote boards too.
+    if (m === "GET" && path === "/version") return json(res, 200, platformMeta());
     if (m === "GET" && path === "/metrics") return json(res, 200, table.metrics);
     if (m === "POST" && path === "/layout") return (table.setLayout(Number(body.seats)), json(res, 200, table.state()));
     if (m === "POST" && path === "/rotate") return (table.rotate(Number(body.degrees)), json(res, 200, table.state()));

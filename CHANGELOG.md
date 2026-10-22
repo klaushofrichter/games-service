@@ -8,6 +8,8 @@ history.
 
 ## [Unreleased]
 
+- The board's Advanced window (hammer and wrench) shows the versions of the platform and of every game on the
+  table at its bottom, also on remote boards; `GET /api/v1/version` returns the platform's (D-182).
 - The Game Viewer shows a simulation's move times from its start (`+8.0 s`), in the list and a move's detail, as
   `scripts/game-log.ts` does; they were `+0.0 s` or huge negative numbers (D-181).
 - The public website's developer section shows how to test without players and debug with an AI: AI-only
