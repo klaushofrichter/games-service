@@ -10,8 +10,8 @@ afterEach(async () => {
   await cloud?.close();
   cloud = null;
 });
-async function start() {
-  cloud = await startCloud({ port: 0, host: "127.0.0.1", publicUrl: "http://127.0.0.1", adminToken: "t".repeat(20) } as never);
+async function start(extra: { previewBanner?: boolean } = {}) {
+  cloud = await startCloud({ port: 0, host: "127.0.0.1", publicUrl: "http://127.0.0.1", adminToken: "t".repeat(20), ...extra } as never);
   base = `http://127.0.0.1:${cloud.port}`;
 }
 const get = (path: string) => fetch(base + path, { redirect: "manual" });
@@ -33,6 +33,22 @@ describe("the public website (D-176)", () => {
     expect(html).not.toMatch(/(src|href)="https?:\/\/(?!github\.com\/klaushofrichter\/)/);
     // The private game repositories are never named on the public page.
     expect(html).not.toMatch(/loopy|starforge/i);
+  });
+
+  it("shows the PREVIEW / DRAFT sash on the public page only, unless it is turned off (D-177)", async () => {
+    await start();
+    const sash = '<div class="preview-sash" role="note"';
+    expect(await (await get("/")).text()).toContain(sash);
+    expect(await (await get("/?signed-out=1")).text()).toContain(sash);
+    // The admin portal and the remote player's invite page stay without it.
+    for (const page of ["admin.html", "remote.html"]) {
+      expect(await readFile(new URL(`../apps/cloud/public/${page}`, import.meta.url), "utf8"), page).not.toContain("preview-sash");
+    }
+    await cloud!.close();
+    await start({ previewBanner: false });
+    const off = await (await get("/")).text();
+    expect(off).not.toContain(sash);
+    expect(off).not.toMatch(/\{\{\w+\}\}/);
   });
 
   it("every image the page uses is served from /site/ with its type; other paths are not", async () => {

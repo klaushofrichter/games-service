@@ -8,6 +8,8 @@ history.
 
 ## [Unreleased]
 
+- The public website shows a PREVIEW / DRAFT sash in its top right corner while the service is not live;
+  `PREVIEW_BANNER=0` removes it (D-177).
 - A new public website at `games.skylar.technology`: local play around one touchscreen, the seven free games with
   real screenshots, the lobby's player and watcher handling, a developer section on building games with AI
   (Backgammon as the example), game repositories, installing at home, and the table hardware to come; the admin
