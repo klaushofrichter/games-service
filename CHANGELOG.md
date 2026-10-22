@@ -8,6 +8,8 @@ history.
 
 ## [Unreleased]
 
+- The public website's developer section shows how to test without players and debug with an AI: AI-only
+  simulations, game logs an AI can read, the Game Viewer's move references and the board control API (D-180).
 - The public website: on a phone, a game's close-up scrolls by itself and the page behind it no longer moves (D-179).
 - The public website has a section on statistics and awards, with a real screenshot of the window after a game of
   Hold'em and the awards of Hold'em, Chess and Backgammon (D-178).

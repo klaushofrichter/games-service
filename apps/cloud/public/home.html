@@ -347,6 +347,23 @@ html.lb-open, html.lb-open body { overflow: hidden; }
 .split .col.you { border-color: var(--brass-deep); }
 .split h3 { font-size: 22px; margin-bottom: 14px; }
 .split ul { margin: 0; padding-left: 20px; color: var(--soft); font-size: 15.5px; display: grid; gap: 6px; }
+/* test and debug with your AI (D-180) */
+.dbg { margin-top: 80px; display: grid; gap: 28px; }
+.dbg-head { display: grid; gap: 12px; max-width: 760px; }
+.dbg-head h3 { font-size: 30px; }
+.dbg-head p { color: var(--soft); font-size: 17px; }
+.dbg-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
+.dbg-card { display: grid; gap: 12px; align-content: start; padding: 26px; border-radius: 20px; border: 1px solid var(--line); background: rgba(15,42,36,.55); min-width: 0; }
+.dbg-card .k { font: 700 12px/1 var(--text); letter-spacing: .16em; text-transform: uppercase; color: var(--brass); }
+.dbg-card h4 { margin: 0; font: 600 22px/1.2 var(--display); }
+.dbg-card p { color: var(--soft); font-size: 15.5px; }
+.dbg-card code { font-size: 13.5px; color: var(--brass-hi); }
+.dbg-card pre { margin: 4px 0 0; padding: 14px 16px; border-radius: 12px; background: #07140f; border: 1px solid var(--line); font-size: 12.5px; line-height: 1.6; color: #d8d2c3; overflow-x: auto; }
+.dbg-card pre .c { color: var(--faint); } .dbg-card pre .s { color: #9fd3a8; } .dbg-card pre b { color: var(--brass-hi); font-weight: 600; }
+.dbg-card q { display: block; padding: 12px 14px; border-left: 2px solid var(--brass-deep); background: rgba(214,169,74,.06); border-radius: 0 10px 10px 0; color: var(--ink); font-size: 15px; quotes: none; }
+.dbg-shot { position: relative; margin: 14px 0 0; }
+.dbg-shot img { border-radius: 16px; border: 1px solid var(--line-2); box-shadow: 0 40px 90px rgba(0,0,0,.5); }
+.dbg-shot figcaption { margin-top: 14px; color: var(--faint); font-size: 14px; }
 .links { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-top: 40px; }
 .lnk { display: grid; gap: 6px; padding: 20px; border-radius: 16px; border: 1px solid var(--line); background: rgba(15,42,36,.55); color: var(--ink); transition: all .25s; }
 .lnk:hover { border-color: var(--brass-deep); transform: translateY(-3px); text-decoration: none; }
@@ -434,6 +451,7 @@ footer .version { display: inline; margin: 0; }
   .code { position: static; }
   .aw-grid { grid-template-columns: minmax(0, 1fr); gap: 44px; }
   .repo { grid-template-columns: 1fr; }
+  .dbg-cards { grid-template-columns: minmax(0, 1fr); }
   footer .wrap { grid-template-columns: 1fr 1fr; }
 }
 @media (max-width: 640px) {
@@ -821,6 +839,55 @@ awards: [
         <li>Remote players and watchers over WebRTC</li>
         <li>Logs, replay checks, the Game Viewer, statistics, simulations</li>
       </ul></div>
+    </div>
+
+    <!-- Test and debug with your AI (D-180): AI-only simulations, logs an AI can read, references to a move. -->
+    <div class="dbg" id="debug">
+      <div class="dbg-head">
+        <p class="eyebrow rv">Test and debug</p>
+        <h3 class="rv" style="--d:.06s">Test without players. Debug with your AI.</h3>
+        <p class="rv" style="--d:.1s">You don't need four friends to find a bug. Fill every seat with AI players and let the games run, then hand the log to your AI and point it at the move that went wrong.</p>
+      </div>
+      <div class="dbg-cards">
+        <div class="dbg-card rv spot" style="--d:.05s">
+          <span class="k">Simulations</span>
+          <h4>Games with nobody at the table</h4>
+          <p>Run whole games with only AI players: no board, no phones, no people. Twenty games of Hold'em with six AI players finish in under a second, and a seed makes a run repeat exactly.</p>
+<pre><span class="c"># the board control API</span>
+POST /api/v1/simulation
+{ <span class="s">"gameId"</span>: <span class="s">"holdem"</span>, <span class="s">"players"</span>: 6,
+  <span class="s">"games"</span>: 20, <span class="s">"seed"</span>: 42 }
+
+<span class="c"># every game, every player count</span>
+node scripts/soak.ts 100</pre>
+        </div>
+        <div class="dbg-card rv spot" style="--d:.1s">
+          <span class="k">Game logs</span>
+          <h4>Logs your AI can read</h4>
+          <p>Every game, played or simulated, is saved as a zip: every move, the state at the end, and a <code>README.md</code> that explains the format to whoever opens it. Each game is replayed when it ends to check it reaches the same state.</p>
+<pre><b>$</b> node scripts/game-log.ts \
+    run.zip moves 40-42
+  #40  L42   +8.0s   AI 1   raise
+  #41  L43   +8.0s   AI 3   call
+  #42  L44   +8.0s   AI 5   call
+<b>$</b> node scripts/game-log.ts \
+    run.zip move 42
+<span class="c">  … the intent, events and the state
+    before and after the move</span></pre>
+        </div>
+        <div class="dbg-card rv spot" style="--d:.15s">
+          <span class="k">Game Viewer</span>
+          <h4>Point at the exact move</h4>
+          <p>The board's Game Viewer lists every move of every finished game, simulations included. Open a move and copy its reference, then ask your AI about it:</p>
+          <q>Read the log 20261022203913-holdem-sim-b085, game 1 #42. Why did AI 5 call there?</q>
+          <p>Everything the board can do is also an HTTP call, including each finished game's moves and statistics, so an agent can start games, read the history and check its fix by itself.</p>
+        </div>
+      </div>
+      <figure class="dbg-shot rv" style="--d:.1s">
+        <span class="aw-ribbon">Real screenshot</span>
+        <img src="/site/game-viewer.webp" width="1400" height="696" loading="lazy" alt="The Game Viewer on the board: game 1 of 20 in a Hold'em simulation with six AI players, every move numbered with the player and what happened, filters by player, moves only and problems, and a field to jump to a move number.">
+        <figcaption>The Game Viewer on the board, showing game 1 of a 20-game Hold'em simulation with six AI players.</figcaption>
+      </figure>
     </div>
 
     <div class="links">
