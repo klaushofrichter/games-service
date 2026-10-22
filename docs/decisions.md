@@ -1034,3 +1034,16 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   at its top, and *Close* sticks to the top as one scrolls. The close-up is still centred when it fits, as on desktop.
   Checks: `scripts/e2e/website.py` (at phone width: the close-up scrolls, the page doesn't, Close stays in view, the
   page scrolls again after closing).
+
+## Testing and debugging on the public website (22 Oct 2026)
+
+- **D-180 · 2026-10-22 · Klaus** — The developer section of the public website shows how to test without players and
+  debug with an AI. *Why:* Klaus: "did we highlight the developer information, like game log and full-AI game
+  simulations (no real player needed for fully automated testing), and APIs for LLMs to debug games?" They were only
+  named in lists. Then: "Just add this content to the site directly". *Implementation (Claude):* a block *Test without
+  players. Debug with your AI.* (`#debug`) in the developer section, after *You write / The platform does*. Three
+  cards: AI-only simulations (`POST /api/v1/simulation`, `scripts/soak.ts`; twenty games of Hold'em with six AI
+  players took 0.6 s), game logs (the zip with its `README.md`, the replay check, `scripts/game-log.ts` with real
+  output) and the Game Viewer's move reference with a prompt for the AI, plus the board control API for agents. Below
+  them a real screenshot, `site/game-viewer.webp`: the move list of that simulation, made by
+  `scripts/site-screenshots.py` (`viewer` on its own). Checks: `tests/website.test.ts` (the block and its image).
