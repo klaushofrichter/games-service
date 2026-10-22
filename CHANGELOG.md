@@ -8,6 +8,7 @@ history.
 
 ## [Unreleased]
 
+- The public website: on a phone, a game's close-up scrolls by itself and the page behind it no longer moves (D-179).
 - The public website has a section on statistics and awards, with a real screenshot of the window after a game of
   Hold'em and the awards of Hold'em, Chess and Backgammon (D-178).
 - The public website shows a PREVIEW / DRAFT sash in its top right corner while the service is not live;
