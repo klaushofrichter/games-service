@@ -8,6 +8,8 @@ history.
 
 ## [Unreleased]
 
+- The public website has a section on statistics and awards, with a real screenshot of the window after a game of
+  Hold'em and the awards of Hold'em, Chess and Backgammon (D-178).
 - The public website shows a PREVIEW / DRAFT sash in its top right corner while the service is not live;
   `PREVIEW_BANNER=0` removes it (D-177).
 - A new public website at `games.skylar.technology`: local play around one touchscreen, the seven free games with

@@ -1,14 +1,16 @@
 """Screenshots of the public games for the website (D-176): a Table Host with the built-in games and the games of
-extra-games plays each game with AI players (and a phone where a game has one), and the boards (1600 x 900) and phones
-(500 px wide) are saved as WebP in apps/cloud/public/site/. Needs Pillow and a checkout of extra-games.
+extra-games plays each game with AI players (and a phone where a game has one), and the boards (1600 x 900), the phones
+(500 px wide) and the statistics window after a game of Hold'em (D-178) are saved as WebP in apps/cloud/public/site/.
+Needs Pillow and a checkout of extra-games.
   python3 scripts/site-screenshots.py ../extra-games            # every game
   python3 scripts/site-screenshots.py ../extra-games chess      # only some
+  python3 scripts/site-screenshots.py ../extra-games statistics # the statistics window after a game of Hold'em
 """
 import os, shutil, sys, tempfile, time
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "e2e"))
 from PIL import Image
 from playwright.sync_api import sync_playwright
-from common import call, start_table
+from common import call, start_table, wait
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
@@ -119,6 +121,21 @@ try:
                 ph.screenshot(path=os.path.join(OUT, f"{game}-phone.png"))
                 ph.close()
             print("shot", game, a("GET", "/state")["phase"])
+        # The statistics window (D-140, D-178): eight hands of Hold'em with six AI players, played to the end.
+        if not ONLY or "statistics" in ONLY:
+            reset()
+            a("POST", "/layout", {"seats": 6})
+            for _ in range(6):
+                a("POST", "/ai", {})
+            a("POST", "/game/select", {"gameId": "holdem", "settings": {"hands": 8}})
+            time.sleep(1)
+            a("POST", "/game/start", {})
+            wait(lambda: a("GET", "/state")["phase"] == "finished", 600, "the Hold'em game to end")
+            board.click("#stats-button", timeout=60000)
+            board.wait_for_selector(".overlay.statistics .stats-panel")
+            time.sleep(1)
+            board.screenshot(path=os.path.join(OUT, "statistics-board.png"))
+            print("shot statistics", [x["title"] for x in a("GET", "/state")["summary"].get("awards", [])])
         b.close()
 finally:
     proc.terminate()
@@ -138,5 +155,9 @@ for game, *_ in PLAN:
     save(f"{game}-phone.png", f"{game}-phone.webp", (500, 1100))
 if not ONLY:
     save("lobby-open.png", "lobby.webp", (1600, 900))
+# The window and a little of the table around it (the board is 1920 x 1080).
+if os.path.exists(os.path.join(OUT, "statistics-board.png")):
+    im = Image.open(os.path.join(OUT, "statistics-board.png")).convert("RGB").crop((350, 30, 1570, 1050))
+    im.save(os.path.join(SITE, "statistics.webp"), "WEBP", quality=80, method=6)
     save("lobby-phone.png", "lobby-phone.webp", (500, 1100))
 print(f"saved in {SITE}")
