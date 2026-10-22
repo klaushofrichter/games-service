@@ -100,6 +100,8 @@ export interface CloudOptions {
   dataDir?: string;
   /** How often the database snapshot is written (default hourly). */
   snapshotMs?: number;
+  /** The PREVIEW / DRAFT sash on the public website while the service is not live (D-177; default on, PREVIEW_BANNER=0). */
+  previewBanner?: boolean;
 }
 
 interface TableRecord {
@@ -533,7 +535,8 @@ export function startCloud(o: CloudOptions) {
             ? `<a id="admin-link" href="/auth/google/login">Admin</a>`
             : `<a id="admin-link" href="/admin">Admin</a>`;
         // The version label is part of the public page (and checked by the deploy's smoke test).
-        const html = (await readFile(HOME_PAGE, "utf8")).replace("{{admin}}", admin).replace("{{note}}", note).replace("{{version}}", versionLabel());
+        const preview = o.previewBanner === false ? "" : `<div class="preview-sash" role="note" aria-label="Preview: Game Table is not live yet"><span>PREVIEW / DRAFT<small>NOT LIVE YET</small></span></div>`;
+        const html = (await readFile(HOME_PAGE, "utf8")).replace("{{admin}}", admin).replace("{{note}}", note).replace("{{preview}}", preview).replace("{{version}}", versionLabel());
         res.writeHead(200, { ...HTML_HEADERS, "cache-control": "no-cache" });
         return res.end(html);
       }

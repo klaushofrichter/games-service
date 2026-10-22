@@ -35,6 +35,19 @@ try:
             assert wide <= 0, f"the page scrolls sideways by {wide}px at {width}px"
             hidden = page.evaluate("[...document.querySelectorAll('.rv')].filter((e) => getComputedStyle(e).opacity === '0').length")
             assert hidden == 0, f"{hidden} elements never revealed at {width}px"
+            # The PREVIEW / DRAFT sash (D-177) stays in the top right corner while one scrolls, and its band covers
+            # neither the admin link nor the GitHub link: each corner of theirs lies on the page's side of the band.
+            sash = page.locator(".preview-sash").bounding_box()
+            assert sash and sash["y"] == 0 and abs(sash["x"] + sash["width"] - width) < 1, f"the sash is not in the corner: {sash}"
+            clear = page.evaluate("""() => {
+                const band = document.querySelector('.preview-sash span'), r = band.getBoundingClientRect();
+                const cx = r.x + r.width / 2, cy = r.y + r.height / 2;
+                const half = band.offsetHeight * new DOMMatrix(getComputedStyle(band.parentElement).transform).a / 2;
+                const gap = (sel) => { const a = document.querySelector(sel).getBoundingClientRect();
+                    return Math.min(...[[a.left, a.top], [a.right, a.top], [a.left, a.bottom], [a.right, a.bottom]].map(([x, y]) => ((y - cy) - (x - cx)) / Math.SQRT2 - half)); };
+                return { admin: gap('#admin-link'), github: gap('.top .gh') };
+            }""")
+            assert clear["admin"] > 4 and (clear["github"] > 4 or not page.locator(".top .gh").is_visible()), f"the sash covers the top bar at {width}px: {clear}"
             if width >= 1000:
                 page.evaluate("window.scrollTo(0, 0)")
                 page.wait_for_timeout(400)
