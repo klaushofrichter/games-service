@@ -97,7 +97,11 @@ try:
         # Advanced (D-128): with board control, the game logs only; no simulations, no developer setting.
         rboard.locator("#tools-button").click()
         rboard.locator(".overlay.advanced button[data-adv=logs]").wait_for()
-        assert rboard.locator(".overlay.advanced button[data-adv=sim], .overlay.advanced [data-dev-no-local]").count() == 0, "remote Advanced: game logs only"
+        assert rboard.locator(".overlay.advanced button[data-adv=sim], .overlay.advanced [data-dev-no-local]").count() == 0, "remote Advanced: game logs only (and versions)"
+        # ... and the versions of the platform and the games (D-182).
+        rboard.locator(".overlay.advanced .versions .vlist .v:text-matches('^dev')").wait_for()
+        rv = rboard.locator(".overlay.advanced .versions").inner_text()
+        assert all(g["version"] in rv for g in call(TABLE, "GET", "/api/v1/games", headers={"x-table-key": "k"})), rv
         rboard.locator(".overlay.advanced [data-close-overlay]").click()
         assert not rboard.locator("#view-button").is_visible(), "the full-width view is only for east and west seats (D-101)"
 

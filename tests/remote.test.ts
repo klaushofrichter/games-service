@@ -5,6 +5,7 @@ import WebSocket from "ws";
 import { RTCPeerConnection, type RTCDataChannel } from "werift";
 import { startCloud } from "../apps/cloud/src/server.ts";
 import { pairTable, sleep, testHost, until } from "./helpers.ts";
+import { PROTOCOL_VERSION } from "../packages/protocol/src/index.ts";
 
 const ADMIN = "admin-token-for-tests-123";
 let cloud: Awaited<ReturnType<typeof startCloud>>;
@@ -168,6 +169,8 @@ describe("remote play", { timeout: 60_000 }, () => {
     const st = await peer.json("GET", "/api/v1/state");
     expect(st.status).toBe(200);
     expect(st.body.joinUrl).toBe("");
+    // Advanced › Versions on a remote board (D-182): the platform's version and protocol, like /health.
+    expect((await peer.json("GET", "/api/v1/version")).body).toEqual({ version: process.env.APP_VERSION || "dev", protocol: PROTOCOL_VERSION });
     for (const p of ["/api/v1/join", "/api/v1/logs", "/api/v1/saves", "/api/v1/qr?text=https://x.y/"]) expect((await peer.request("GET", p)).status).toBe(403);
     expect((await peer.request("POST", "/api/v1/invites")).status).toBe(403);
     expect((await peer.request("POST", "/api/v1/simulation", { gameId: "roulette" })).status).toBe(403);

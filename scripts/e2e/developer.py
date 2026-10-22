@@ -54,6 +54,12 @@ try:
         board.wait_for_selector(".overlay.advanced button[data-adv=logs]")
         board.click(".overlay.advanced [data-dev-no-local]")
         board.wait_for_selector(".overlay.advanced [data-dev-no-local].on")
+        # Versions at the bottom (D-182): the platform ("dev" outside a release build) and every game the lobby offers.
+        board.wait_for_selector(".overlay.advanced .versions .vlist .v:text-matches('^dev')")
+        vtext = board.inner_text(".overlay.advanced .versions")
+        for g in a("GET", "/games"):
+            assert g["name"] in vtext and g["version"] in vtext, (g["name"], g["version"], vtext)
+        assert board.locator(".overlay.advanced .group").last.get_attribute("class") == "group versions"
         board.screenshot(path=os.path.join(OUT, "developer-advanced.png"))
         board.click(".overlay.advanced [data-close-overlay]")
         board.wait_for_selector("#tools-button.dev")
