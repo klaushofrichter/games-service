@@ -8,6 +8,8 @@ history.
 
 ## [Unreleased]
 
+- The website's Game Viewer screenshot is taken again with D-181's simulation times, at the start of the second
+  hand (D-183).
 - The board's Advanced window (hammer and wrench) shows the versions of the platform and of every game on the
   table at its bottom, also on remote boards; `GET /api/v1/version` returns the platform's (D-182).
 - The Game Viewer shows a simulation's move times from its start (`+8.0 s`), in the list and a move's detail, as
