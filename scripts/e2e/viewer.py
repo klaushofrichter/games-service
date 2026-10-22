@@ -107,6 +107,17 @@ try:
         board.click("form.goto button")
         board.wait_for_selector(f".vtable.moves tr.target td.n:text-is('{target}')")
         board.screenshot(path=os.path.join(OUT, "viewer-goto.png"))
+        # A simulation's times are virtual, from its start (D-180): "+t s" as the API and scripts/game-log.ts have them,
+        # on a page without the start row too, and in a move's detail.
+        want = {str(r["line"]): f"+{r['t'] / 1000:.1f} s" for r in t("GET", f"/history/{sim['logId']}/1/moves?limit=200")["rows"]}
+        shown = {r.get_attribute("data-line"): r.locator("td.time").inner_text().strip() for r in board.locator(".vtable.moves tbody tr[data-line]").all()}
+        assert shown and all(want[line] == time for line, time in shown.items()), (shown, want)
+        board.click(f"tr[data-line]:has(td.n:text-is('{target}'))")
+        board.wait_for_selector(".viewer-panel .step")
+        row = t("GET", f"/history/{sim['logId']}/1/moves/{target}")["row"]
+        assert f"+{row['t'] / 1000:.1f} s" in board.inner_text(".viewer-panel .step"), board.inner_text(".viewer-panel .step")
+        board.click("button[data-back]")
+        board.wait_for_selector(f".vtable.moves tr.target td.n:text-is('{target}')")
         board.click("button[data-game='1']")
         board.wait_for_selector(".game-pick :text('Game 2 of 2')")
         board.wait_for_selector(".vtable.moves tbody tr[data-line]")

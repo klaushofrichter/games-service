@@ -22,12 +22,14 @@ export function openViewer({ api, overlayRoot, face, toast, openStats }) {
   relayout();
 
   const tz = () => v.log?.meta?.timeZone;
-  const fmtTime = (at, start, sim) => {
-    if (sim || at < 1e12) return `+${((at - start) / 1000).toFixed(1)} s`;
+  // A simulation's clock is virtual, from 0 (D-180): it shows the row's time since the start record (`t`), never a
+  // difference to the wall-clock `startedAt`. A played game shows the time of day.
+  const fmtTime = (r, sim) => {
+    if (sim || r.at < 1e12) return `+${(r.t / 1000).toFixed(1)} s`;
     try {
-      return new Intl.DateTimeFormat("en-GB", { timeZone: tz(), hour: "2-digit", minute: "2-digit", second: "2-digit" }).format(at);
+      return new Intl.DateTimeFormat("en-GB", { timeZone: tz(), hour: "2-digit", minute: "2-digit", second: "2-digit" }).format(r.at);
     } catch {
-      return new Date(at).toLocaleTimeString();
+      return new Date(r.at).toLocaleTimeString();
     }
   };
   const fmtDate = (iso, zone) => {
@@ -71,7 +73,7 @@ export function openViewer({ api, overlayRoot, face, toast, openStats }) {
     return val === null || val === undefined || val === "" ? `<span class="faint">·</span>` : esc(String(val));
   }
 
-  function moveRow(r, cols, start, sim) {
+  function moveRow(r, cols, sim) {
     const cls = [r.kind, ...r.flags].join(" ");
     const steps = subSteps(r.steps);
     const flags = [
@@ -79,8 +81,8 @@ export function openViewer({ api, overlayRoot, face, toast, openStats }) {
       r.flags.includes("error") ? `<span class="flag err">error</span>` : "",
       r.flags.includes("fallback") ? `<span class="flag fb">quick move</span>` : "",
     ].join("");
-    if (r.kind === "gap") return `<tr class="${cls}"><td></td><td>${esc(fmtTime(r.at, start, sim))}</td><td colspan="${cols.length + 2}">${esc(r.text)}</td></tr>`;
-    return `<tr class="${cls}${v.target !== null && r.n === v.target ? " target" : ""}" data-line="${r.line}" tabindex="0"><td class="num n">${r.n ?? ""}</td><td class="time">${esc(fmtTime(r.at, start, sim))}</td>
+    if (r.kind === "gap") return `<tr class="${cls}"><td></td><td>${esc(fmtTime(r, sim))}</td><td colspan="${cols.length + 2}">${esc(r.text)}</td></tr>`;
+    return `<tr class="${cls}${v.target !== null && r.n === v.target ? " target" : ""}" data-line="${r.line}" tabindex="0"><td class="num n">${r.n ?? ""}</td><td class="time">${esc(fmtTime(r, sim))}</td>
       <td class="who">${r.player ? esc(r.player) : r.kind === "move" ? "?" : `<span class="faint">${r.kind === "timer" ? "timer" : r.kind === "start" || r.kind === "end" ? "" : "table"}</span>`}${r.by === "board" ? ` <span class="faint by">board</span>` : ""}</td>
       ${cols.map((c) => `<td class="col">${cell(r.columns?.[c.key])}</td>`).join("")}
       <td class="what">${esc(r.text)}${flags}${steps}</td></tr>`;
@@ -92,7 +94,6 @@ export function openViewer({ api, overlayRoot, face, toast, openStats }) {
     const g = l.gameList[v.game - 1];
     const sim = l.kind === "simulation";
     const cols = p?.columns ?? l.columns ?? [];
-    const start = p?.rows?.find((r) => r.kind === "start")?.at ?? Date.parse(l.startedAt);
     const players = l.players;
     const f = v.filter;
     panel.innerHTML = `${head(`${l.gameName} · ${fmtDate(l.startedAt, l.meta?.timeZone)}`, "All logs")}
@@ -109,7 +110,7 @@ export function openViewer({ api, overlayRoot, face, toast, openStats }) {
         <form class="goto"><label>Move #<input name="move" type="number" min="1" max="${g?.moves ?? 1}" inputmode="numeric"></label><button>Go</button></form>
       </div>
       ${!p ? `<div class="empty faint">Loading…</div>` : p.total === 0 ? `<div class="empty faint">Nothing matches these filters.</div>` : `<div class="scroll"><table class="vtable moves"><thead><tr><th class="num">#</th><th>Time</th><th>Player</th>${cols.map((c) => `<th class="col">${esc(c.label)}</th>`).join("")}<th>What happened</th></tr></thead>
-        <tbody>${p.rows.map((r) => moveRow(r, cols, start, sim)).join("")}</tbody></table></div>`}
+        <tbody>${p.rows.map((r) => moveRow(r, cols, sim)).join("")}</tbody></table></div>`}
       ${p && p.total ? `<div class="pager-row"><button data-page="-1" ${p.offset === 0 ? "disabled" : ""}>‹ Earlier</button>
         <span class="faint">rows ${p.offset + 1}–${p.offset + p.rows.length} of ${p.total}${g ? ` · ${g.moves} moves` : ""}</span>
         <button data-page="1" ${p.offset + p.limit >= p.total ? "disabled" : ""}>Later ›</button></div>` : ""}`;
@@ -124,12 +125,11 @@ export function openViewer({ api, overlayRoot, face, toast, openStats }) {
     const s = v.step;
     const r = s.row;
     const sim = v.log.kind === "simulation";
-    const start = Date.parse(v.log.startedAt);
     const rec = s.record ?? {};
     const facts = [
       ["Move", r.n !== null ? `#${r.n}` : "—"],
       ["Line", `${r.line} of game-${String(v.game).padStart(3, "0")}.jsonl`],
-      ["Time", fmtTime(r.at, start, sim)],
+      ["Time", fmtTime(r, sim)],
       ["Player", r.player ?? "—"],
       r.by ? ["Sent from", r.by === "ai" ? "AI" : r.by === "board" ? "the board" : "phone"] : null,
       r.intent ? ["Intent", `${r.intent.name} ${r.intent.payload === undefined ? "" : JSON.stringify(r.intent.payload)}`] : null,

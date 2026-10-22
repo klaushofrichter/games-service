@@ -1034,3 +1034,15 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   at its top, and *Close* sticks to the top as one scrolls. The close-up is still centred when it fits, as on desktop.
   Checks: `scripts/e2e/website.py` (at phone width: the close-up scrolls, the page doesn't, Close stays in view, the
   page scrolls again after closing).
+
+## Simulation times in the Game Viewer (22 Oct 2026)
+
+- **D-180 · 2026-10-22 · Klaus** — The Game Viewer (D-120) shows a simulation's move times relative to its start, as
+  `scripts/game-log.ts` does. *Why:* Klaus: a Hold'em simulation showed `+0.0 s` for every move in the list and
+  `Time +-1792701431.6 s` in a move's detail, while `game-log.ts` showed `+8.0s`, `+16.0s`, … for the same zip.
+  A simulation's records carry virtual time from 0 (`ctx.now()`), but the viewer subtracted the run's wall-clock
+  `startedAt`: always in the detail, and in the list on every page that did not hold the start record.
+  *Implementation (Claude):* the viewer shows a simulation's time from the row's `t` (the time since the start record,
+  which the move list already carries); a played game still shows the time of day from `at`, unchanged. Checks:
+  `scripts/e2e/viewer.py` (the simulation's list on a later page and a move's detail match the API's `t`),
+  `tests/game-viewer.test.ts` (a simulation's rows: `t` from the start record, virtual times).

@@ -225,6 +225,11 @@ describe("the Game Viewer on the table (D-120)", { timeout: 30_000 }, () => {
     expect(info).toMatchObject({ kind: "simulation", games: 2, gameList: [{ game: 1, described: true }, { game: 2, described: true }] });
     const g2 = await t.ok("GET", `/history/${sim.logId}/2/moves?limit=5`);
     expect(g2.rows.find((r: any) => r.n === 1).text).toMatch(/^rolls a [1-6]/);
+    // A simulation's clock is virtual, from 0 (D-180): `t` is the time since the start record, what the viewer shows.
+    const all = (await t.ok("GET", `/history/${sim.logId}/2/moves?limit=200`)).rows;
+    expect(all[0]).toMatchObject({ kind: "start", t: 0 });
+    for (const r of all) expect(r.t).toBe(r.at - all[0].at);
+    expect(all.at(-1).at).toBeLessThan(1e12);
     expect((await t.ok("GET", `/history/${sim.logId}/2/moves/1`)).reference).toBe(`${sim.logId} game 2 #1`);
   });
 });
