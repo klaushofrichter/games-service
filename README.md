@@ -249,6 +249,7 @@ In the cluster these come from the `games-oauth` Secret (created by `scripts/syn
 | `DATA_LIMIT_MB`, `LOG_STORAGE_MB` | The service's storage budget in `DATA_DIR` (default 1024, the PVC's size) and the cap on game logs within it (default 256). The budget is counted from the service's own files, since a `local-path` volume has no quota; the oldest logs make way before free space in it drops below 15 % (at least 100 MB), and a log that can't fit is refused (the table keeps its copy). The console's Overview shows the use |
 | `GAME_REPO_TOKEN` | Read token for private extra-game repositories (D-097) |
 | `GAME_REPOS_FILE`, `GAME_REPOS` | The deploy-time repository list (default `deploy/game-repos.json`; `none` turns it off), and more repositories (`owner/name@ref`, comma-separated) for local development (D-098) |
+| `PREVIEW_BANNER` | `0` removes the PREVIEW / DRAFT sash from the public website's top right corner; it shows by default while the service is not live (D-177) |
 | `APP_VERSION` | Stamped into the image by the deploy (`YYYY.MM.DD.N`); `/health` (`{status, version}`, on the Table Host also `protocol`) reports it; `main` for main builds, `dev` when unset |
 
 ## The service's data

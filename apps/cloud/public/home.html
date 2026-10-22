@@ -58,6 +58,12 @@ nav.main a:hover, nav.main a.on { color: var(--ink); text-decoration: none; }
 .top .gh svg { width: 18px; height: 18px; }
 #admin-link { color: var(--faint); font-size: 13px; padding: 5px 11px; border: 1px solid var(--line); border-radius: 999px; }
 #admin-link:hover { color: var(--soft); border-color: var(--line-2); text-decoration: none; }
+/* PREVIEW / DRAFT sash across the top right corner while the service is not live (D-177); server.ts adds it (PREVIEW_BANNER).
+   Clicks pass through it; the top bar moves its right end clear of it where the page margin is narrower than the sash. */
+.preview-sash { position: fixed; top: 0; right: 0; width: 210px; height: 210px; overflow: hidden; z-index: 70; pointer-events: none; transform: scale(.8); transform-origin: top right; }
+.preview-sash span { position: absolute; top: 52px; right: -62px; width: 300px; transform: rotate(45deg); text-align: center; padding: 8px 0 7px; background: repeating-linear-gradient(-45deg, #e0b453 0 10px, #cfa040 10px 20px); color: #1b1407; font: 800 12px/1.15 var(--text); letter-spacing: .2em; box-shadow: 0 6px 18px rgba(0,0,0,.45); border-block: 1px solid rgba(27,20,7,.35); }
+.preview-sash small { display: block; font-weight: 600; font-size: 9.5px; letter-spacing: .14em; opacity: .8; }
+body:has(.preview-sash) .top .wrap { padding-right: clamp(0px, calc(150px - (100vw - var(--wrap)) / 2), 126px); }
 .note-toast { position: fixed; top: 78px; right: 24px; z-index: 60; background: var(--felt); border: 1px solid var(--line-2); padding: 10px 16px; border-radius: 12px; color: var(--soft); font-size: 14px; animation: toast 6s forwards; }
 @keyframes toast { 0%, 85% { opacity: 1; } 100% { opacity: 0; visibility: hidden; } }
 
@@ -415,10 +421,19 @@ footer .version { display: inline; margin: 0; }
   .paths .grid, .games, .features, .links, .split, .specs, .case ul, .opengrid { grid-template-columns: 1fr; }
   .game.wide { grid-column: auto; }
   .top .gh span { display: none; }
+  .logo { white-space: nowrap; }
+  .preview-sash { transform: scale(.55); }
+  body:has(.preview-sash) .top .wrap { padding-right: 100px; gap: 10px; }
   .lb-card { grid-template-columns: 1fr; } .lb-card .side { width: auto; }
   .room .shots .small { right: 0; }
   .filters { flex-wrap: wrap; }
 }
+@media (min-width: 641px) and (max-width: 1320px) {
+  body:has(.preview-sash) .top .wrap { gap: 18px; }
+  body:has(.preview-sash) nav.main { gap: 16px; margin-left: 4px; }
+  body:has(.preview-sash) nav.main a { white-space: nowrap; }
+}
+@media (max-width: 360px) { body:has(.preview-sash) .top .gh { display: none; } }
 @media (prefers-reduced-motion: reduce) {
   .hero { height: auto; } .hero-pin { position: relative; height: auto; min-height: 100vh; } .hero-caption { display: none; }
   *, *::before, *::after { animation: none !important; transition: none !important; }
@@ -445,6 +460,7 @@ footer .version { display: inline; margin: 0; }
   </div>
 </header>
 {{note}}
+{{preview}}
 
 <main>
 <!-- ============ HERO ============ -->

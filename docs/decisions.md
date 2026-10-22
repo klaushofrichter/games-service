@@ -994,3 +994,18 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   it is deployed. Motion stops with `prefers-reduced-motion`. Checks:
   `tests/website.test.ts`, `scripts/e2e/website.py`; the deploy's smoke test still finds the version on `/`.
 
+
+## Preview marker on the public website (22 Oct 2026)
+
+- **D-177 · 2026-10-22 · Klaus** — Until the service goes live, the public website carries a PREVIEW / DRAFT sash
+  in its top right corner. *Why:* Klaus: "the service is not actually live, but we deployed the landing page. I would
+  like to add a badge "PREVIEW / DRAFT" and banner to all the public webcontent on the webapp. The banner should be
+  always on-screen, in the top right." Of three mockups (a corner sash, a floating notice card, a hanging pennant) he
+  chose the sash, and: "The actual admin pages does not need that banner, and remote.html does not need it either. The
+  banner is just for the landing page." *Implementation (Claude):* `server.ts` fills `{{preview}}` in `home.html`
+  with a fixed, diagonal, brass-striped band ("PREVIEW / DRAFT", "NOT LIVE YET") that clicks pass through; where
+  the page margin is narrower than the sash, the top bar moves its right end clear of it (smaller on phones, the
+  GitHub link hidden below 360 px). `llms.txt` and the `/docs/` files are plain text and stay as they are. It is on by
+  default; `PREVIEW_BANNER=0` removes it at launch without a code change, which is why the deploy's smoke test does
+  not require it. Checks: `tests/website.test.ts` (on, off, not on the admin and invite pages),
+  `scripts/e2e/website.py` (in the corner after scrolling, clear of the admin and GitHub links at both widths).

@@ -107,6 +107,8 @@ const cloud = await startCloud({
   maxLogBytes: env.LOG_STORAGE_MB ? Number(env.LOG_STORAGE_MB) * 1024 * 1024 : undefined,
   // The service's whole budget in DATA_DIR, in MB (default 1024, the PVC's size): a local-path PVC has no quota itself.
   dataLimitBytes: env.DATA_LIMIT_MB ? Number(env.DATA_LIMIT_MB) * 1024 * 1024 : undefined,
+  // The PREVIEW / DRAFT sash on the public website (D-177): on until the launch sets PREVIEW_BANNER=0.
+  previewBanner: env.PREVIEW_BANNER !== "0",
 });
 console.log(`[cloud] ${env.APP_VERSION || "dev"} listening on ${cloud.port}; admin sign-in: ${google ? `Google (${google.allowedEmails.length} allowed)` : "ADMIN_TOKEN only (development)"}`);
 for (const sig of ["SIGINT", "SIGTERM"] as const) process.on(sig, async () => (await cloud.close(), process.exit(0)));
