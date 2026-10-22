@@ -68,6 +68,13 @@ try:
                 page.screenshot(path=os.path.join(OUT, "website-game.png"))
                 page.keyboard.press("Escape")
                 page.wait_for_selector("#lightbox.open", state="detached")
+                # Statistics and awards (D-178): the real window's screenshot, and one game's awards at a time.
+                page.locator("#awards").scroll_into_view_if_needed()
+                assert page.locator("#awards [data-aw-list]:visible").count() == 1, "one game's awards"
+                page.click("#awards [data-aw=chess]")
+                assert page.locator("#awards [data-aw-list=chess]:visible >> text=Homebody").count() == 1, "the chess awards"
+                assert page.locator("#awards [data-aw-list=holdem]:visible").count() == 0
+                page.screenshot(path=os.path.join(OUT, "website-awards.png"))
                 # The lobby demo: a click on a step shows its scene.
                 page.locator("#demo").scroll_into_view_if_needed()
                 page.click(".step[data-i='5']")

@@ -227,6 +227,25 @@ body:has(.preview-sash) .top .wrap { padding-right: clamp(0px, calc(150px - (100
 .lb-card .side p { color: var(--soft); font-size: 15px; }
 .lb-close { position: absolute; top: 22px; right: 26px; font: inherit; font-size: 15px; background: none; border: 1px solid var(--line-2); color: var(--soft); border-radius: 999px; padding: 8px 16px; cursor: pointer; }
 
+/* ---------- statistics and awards (D-178) ---------- */
+.awards-sec { background: radial-gradient(60% 70% at 85% 45%, rgba(214,169,74,.07), transparent 70%); }
+.aw-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 56px; align-items: center; }
+.aw-tabs { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 22px; }
+.aw-list { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.aw-list[hidden] { display: none; }
+.aw { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; align-items: start; padding: 16px 18px; border-radius: 16px; background: var(--felt); border: 1px solid var(--line); }
+.aw .ic { grid-row: span 2; font-size: 30px; line-height: 1; }
+.aw h3 { font-size: 20px; }
+.aw p { color: var(--soft); font-size: 14.5px; line-height: 1.45; }
+.aw-plat { margin-top: 24px; color: var(--soft); font-size: 15.5px; }
+.aw-code { display: block; max-width: 100%; margin-top: 16px; padding: 12px 16px; border-radius: 12px; background: #06120f; border: 1px solid var(--line); font-size: 13.5px; color: var(--soft); overflow-x: auto; white-space: pre; }
+.aw-code b { color: var(--brass-hi); font-weight: 600; }
+.aw-shot { position: relative; margin: 0; }
+.aw-shot img { border-radius: 18px; border: 1px solid var(--line-2); box-shadow: 0 40px 90px rgba(0,0,0,.55); transform: rotate(1.2deg); transition: transform .6s cubic-bezier(.2,.7,.2,1); }
+.aw-shot:hover img { transform: rotate(0deg) scale(1.01); }
+.aw-shot figcaption { margin-top: 18px; color: var(--faint); font-size: 14px; }
+.aw-ribbon { position: absolute; top: -16px; left: -10px; z-index: 2; font: 700 12px/1 var(--text); letter-spacing: .14em; text-transform: uppercase; color: #1b1407; background: var(--brass); padding: 8px 14px; border-radius: 999px; box-shadow: 0 10px 24px rgba(0,0,0,.4); }
+
 /* ---------- lobby demo ---------- */
 .lobby { background: radial-gradient(70% 60% at 30% 40%, rgba(19,58,49,.8), transparent 70%); }
 .demo { display: grid; grid-template-columns: 1.3fr 1fr; gap: 50px; align-items: center; }
@@ -411,6 +430,7 @@ footer .version { display: inline; margin: 0; }
   .paths .grid, .games, .features, .links, .opengrid, .numbers { grid-template-columns: 1fr 1fr; }
   .game.wide { grid-column: span 2; }
   .code { position: static; }
+  .aw-grid { grid-template-columns: minmax(0, 1fr); gap: 44px; }
   .repo { grid-template-columns: 1fr; }
   footer .wrap { grid-template-columns: 1fr 1fr; }
 }
@@ -427,6 +447,7 @@ footer .version { display: inline; margin: 0; }
   .lb-card { grid-template-columns: 1fr; } .lb-card .side { width: auto; }
   .room .shots .small { right: 0; }
   .filters { flex-wrap: wrap; }
+  .aw-list { grid-template-columns: 1fr; }
 }
 @media (min-width: 641px) and (max-width: 1320px) {
   body:has(.preview-sash) .top .wrap { gap: 18px; }
@@ -580,6 +601,55 @@ footer .version { display: inline; margin: 0; }
     </div>
     <div class="games" id="games-grid"></div>
     <p class="games-foot rv">Click a game for a closer look. Every screenshot is the real board, taken by the platform's browser tests.</p>
+  </div>
+</section>
+
+<!-- ============ STATISTICS AND AWARDS ============ -->
+<section class="awards-sec" id="awards">
+  <div class="wrap">
+    <div class="section-head">
+      <p class="eyebrow rv">Statistics and awards</p>
+      <h2 class="rv" style="--d:.06s">Every game ends with a story.</h2>
+      <p class="lede rv" style="--d:.12s">When the last hand is played, the board opens the awards: who showed the best hand, who bet the most, whose king never left its square. It's a fun extra for classic games, and the table usually has something to say about it.</p>
+    </div>
+    <div class="aw-grid">
+      <div class="rv" style="--d:.08s">
+        <div class="aw-tabs" role="tablist" aria-label="Awards by game">
+      <button class="chipbtn on" type="button" role="tab" aria-selected="true" data-aw="holdem">Hold'em</button>
+      <button class="chipbtn" type="button" role="tab" aria-selected="false" data-aw="chess">Chess</button>
+      <button class="chipbtn" type="button" role="tab" aria-selected="false" data-aw="backgammon">Backgammon</button>
+        </div>
+        <div class="aw-list" data-aw-list="holdem" role="tabpanel">
+          <div class="aw"><span class="ic" aria-hidden="true">🃏</span><h3>Best of All</h3><p>Showed the best hand of the game.</p></div>
+          <div class="aw"><span class="ic" aria-hidden="true">🦈</span><h3>The Shark</h3><p>Won the most hands.</p></div>
+          <div class="aw"><span class="ic" aria-hidden="true">🔥</span><h3>Firestarter</h3><p>Bet and raised the most.</p></div>
+          <div class="aw"><span class="ic" aria-hidden="true">🐢</span><h3>Careful</h3><p>Folded the most.</p></div>
+        </div>
+        <div class="aw-list" data-aw-list="chess" role="tabpanel" hidden>
+          <div class="aw"><span class="ic" aria-hidden="true">💀</span><h3>Killer</h3><p>Took the most pieces off the board.</p></div>
+          <div class="aw"><span class="ic" aria-hidden="true">👑</span><h3>Crowning</h3><p>Promoted the most pawns.</p></div>
+          <div class="aw"><span class="ic" aria-hidden="true">🗺️</span><h3>Marathon</h3><p>Owned the piece that travelled the farthest.</p></div>
+          <div class="aw"><span class="ic" aria-hidden="true">🏠</span><h3>Homebody</h3><p>Owned the king that never moved.</p></div>
+        </div>
+        <div class="aw-list" data-aw-list="backgammon" role="tabpanel" hidden>
+          <div class="aw"><span class="ic" aria-hidden="true">🎯</span><h3>Hitman</h3><p>Hit the most checkers.</p></div>
+          <div class="aw"><span class="ic" aria-hidden="true">🎲</span><h3>Doublets</h3><p>Rolled the most doubles.</p></div>
+          <div class="aw"><span class="ic" aria-hidden="true">🚪</span><h3>Back from the Bar</h3><p>Came in from the bar most often.</p></div>
+          <div class="aw"><span class="ic" aria-hidden="true">🧊</span><h3>Cube Handler</h3><p>Doubled the most.</p></div>
+        </div>
+        <p class="aw-plat">Each game picks its own awards. The platform adds moves and time per player, plus <b style="color:var(--ink)">⚡ Quick Draw</b> and <b style="color:var(--ink)">🤔 Deep Thinker</b> for the people at the table. The same window opens again from the Game Viewer for any finished game.</p>
+        <code class="aw-code">// in your game's summary, one line per award
+awards: [
+  <b>mostAward</b>({ id: "shark", icon: "🦈", title: "The Shark" },
+            handsWon),
+]</code>
+      </div>
+      <figure class="aw-shot rv" style="--d:.16s">
+        <span class="aw-ribbon">Real screenshot</span>
+        <img src="/site/statistics.webp" width="1220" height="1020" loading="lazy" alt="The statistics window on the board after a game of Hold'em: award cards for Best of All, Rich, The Best Pot, The Shark, Firestarter and Careful, then a table of points, hands won, biggest pot, bets, folds and best hand for six players.">
+        <figcaption>The board after eight hands of Hold'em with six AI players. The window turns to face any edge of the table.</figcaption>
+      </figure>
+    </div>
   </div>
 </section>
 
@@ -991,6 +1061,11 @@ docker compose -f deploy/local/docker-compose.yml up -d --build">Copy</button></
       <div class="info"><div class="row"><h3>${g.name}</h3><span class="players">${g.players}</span></div><p>${g.text}</p></div>
     </button>`).join("");
   $$("#games-grid .rv").forEach((el) => io.observe(el));
+  // Statistics and awards (D-178): one game's awards at a time.
+  $$("[data-aw]").forEach((b) => b.addEventListener("click", () => {
+    $$("[data-aw]").forEach((x) => { x.classList.toggle("on", x === b); x.setAttribute("aria-selected", String(x === b)); });
+    $$("[data-aw-list]").forEach((l) => { l.hidden = l.dataset.awList !== b.dataset.aw; });
+  }));
   $$(".filters .chipbtn").forEach((b) => b.addEventListener("click", () => {
     $$(".filters .chipbtn").forEach((x) => x.classList.toggle("on", x === b));
     const f = b.dataset.f;

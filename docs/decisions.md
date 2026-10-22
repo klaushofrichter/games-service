@@ -1009,3 +1009,17 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   default; `PREVIEW_BANNER=0` removes it at launch without a code change, which is why the deploy's smoke test does
   not require it. Checks: `tests/website.test.ts` (on, off, not on the admin and invite pages),
   `scripts/e2e/website.py` (in the corner after scrolling, clear of the admin and GitHub links at both widths).
+
+## Statistics and awards on the public website (22 Oct 2026)
+
+- **D-178 · 2026-10-22 · Klaus** — The public website shows the statistics and awards window (D-140) in a section
+  of its own. *Why:* Klaus: "can we add the "Statistics and Awards" as a feature to the Web page? We can make a
+  screenshot or simulate one from a award window that shows a few awards as this is a fun addition to classic games,
+  e.g. Backgammon or Chess or Texas Hold em. Find a good place for it on the page". *Implementation (Claude):* a
+  section *Every game ends with a story* (`#awards`) right after the games and before the lobby, so it follows the
+  games it belongs to. On the right a real screenshot, `site/statistics.webp`: the board's window after eight hands
+  of Hold'em with six AI players, made by `scripts/site-screenshots.py` (`statistics` on its own). On the left four
+  awards each from Hold'em, Chess and Backgammon (their real titles and blurbs) behind tabs, the platform's own part
+  (moves and time, *Quick Draw* and *Deep Thinker*, the Game Viewer) and the `mostAward` line a game writes, for the
+  developers the page is for. Not in the top bar's menu, which is full. Checks: `tests/website.test.ts` (the
+  section), `scripts/e2e/website.py` (the tabs).
