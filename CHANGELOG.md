@@ -8,6 +8,8 @@ history.
 
 ## [Unreleased]
 
+- The public website: the Mexican Train picture changes to a second look (Lava lamp, numbers) as one scrolls,
+  and a new section at the end shows the game service's admin console and what a service needs and adds (D-186).
 - The public website shows Mexican Train from extra-games, eight games in all, and a *Demo game* block in the
   developer section on what the game customises within the platform (D-185).
 - With *Play from the board*, Fullscreen takes the whole page, so the deck beside the board stays on screen (D-184).

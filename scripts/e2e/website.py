@@ -87,7 +87,14 @@ try:
                 page.wait_for_function("document.querySelector('#showcase img').complete && document.querySelector('#showcase img').naturalWidth > 0")
                 assert page.locator("#showcase .show-list li").count() == 6
                 page.locator("#showcase").screenshot(path=os.path.join(OUT, "website-showcase.png"))
-                for sid in ["build", "install", "table"]:
+                # Its picture changes to the second look once it is above the middle of the window (D-186).
+                page.evaluate("window.scrollBy(0, document.querySelector('#show-shot').getBoundingClientRect().bottom - innerHeight * 0.4)")
+                page.wait_for_selector("#show-shot.alt")
+                page.wait_for_timeout(1400)
+                page.locator("#show-shot").screenshot(path=os.path.join(OUT, "website-showcase-lava.png"))
+                page.evaluate("window.scrollBy(0, -innerHeight)")
+                page.wait_for_selector("#show-shot:not(.alt)")
+                for sid in ["build", "install", "table", "service"]:
                     page.locator(f"#{sid}").scroll_into_view_if_needed()
                     page.wait_for_timeout(600)
                     page.screenshot(path=os.path.join(OUT, f"website-{sid}.png"))
