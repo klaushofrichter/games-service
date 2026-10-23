@@ -8,6 +8,8 @@ history.
 
 ## [Unreleased]
 
+- The public website shows Last Card (nine games), and a new block shows the sling: a card pushed off a phone and
+  coming onto the board at that seat, with the few lines a game writes for it (D-196).
 - A board opened in another browser (an iPad, another computer, the table's network address) plays sound after the
   first tap: a finger's tap on a touchscreen now counts, and until then the board shows *Tap to turn the sound on*
   (D-195).

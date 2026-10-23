@@ -1274,3 +1274,15 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   pointerdown alone does not turn the sound on, a tap does and the note goes; sound taken away again brings the note
   back and a tap the sound; and a browser that allows sound never
   shows it. With the old wake-up on pointerdown, the check fails.
+- **D-196 · 2026-10-23 · Klaus** — The public website shows Last Card and the sling. Klaus: "update the landing page
+  with the new game. Come up with an idea to showcase the sling feature, at minimum mention it as part of the platform
+  features that games can use." *Implementation (Claude):* Last Card joins the games (nine in all, five from
+  extra-games) with its board and phone, and four of its awards get a tab. *The platform does* lists the sling. A new
+  block after the Mexican Train demo, *Platform feature: the sling*, shows one moment twice: Klaus's phone with a card
+  pushed half off the top, and the board with the back of that card coming in over Klaus's seat plate; a dotted arc
+  joins them and a card back travels along it (SVG, hidden with reduced motion). Beside it: live gestures, push, flick
+  or let go, the rules still decide, and the few lines a game writes (`slingDeck`, `slingBoard`, the `gesture` hook).
+  `scripts/site-screenshots.py` plays Last Card from Klaus's phone (tap to play), waits for a turn with a card that
+  fits, holds one at the top edge and takes both screens (the board cropped around the seat). Check:
+  `scripts/e2e/website.py` counts five extra games, and the phone sits beside the board in the sling block with both
+  pictures loaded.
