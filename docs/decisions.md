@@ -1162,6 +1162,8 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   branches rewrites the file bash is reading. `npm ci` runs again when `package-lock.json` differs from the one the
   dependencies were installed for. On Linux the QR code's address comes from `ip route`, the table's name from the
   host name, and the board opens with `xdg-open`. An existing `~/.gametable-mac` is still used, so a Mac stays the same
-  table; new installs use `~/.gametable-local`. `scripts/mac-table.sh` remains as a two-line wrapper. Tried in a fresh
+  table; new installs use `~/.gametable-local`. `scripts/mac-table.sh` remains as a two-line wrapper. `--extra DIR` (repeatable) links this repository's games and
+  those of another checkout into one folder (`GAMES_DIR`), to try games not released yet, e.g. `CLOUD_URL=
+  scripts/local-table.sh --extra ../extra-games`; relative paths count from where the script is started. Tried in a fresh
   clone on Linux: `--branch experiment/card-sling` (installs, serves Card Sling), then the default (back on `main`, no
   reinstall), and a refusal with a local change.

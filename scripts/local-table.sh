@@ -5,6 +5,8 @@
 #   scripts/local-table.sh --branch production            the same with another branch, e.g. production or
 #   scripts/local-table.sh --branch experiment/card-sling   an experiment (also -b NAME)
 #   scripts/local-table.sh --no-pull    start this checkout as it is: no fetch, no switching branches
+#   scripts/local-table.sh --extra ../extra-games      also the games of another checkout, as it is (repeatable);
+#                                                      with CLOUD_URL= the live service adds none of its own
 #   scripts/local-table.sh --no-open    start it without opening the board
 #   scripts/local-table.sh --code ABCD-EFGH    approved at once with an access code from the console (D-113)
 # Updating (D-188) switches to the branch and fast-forwards it to GitHub's; it stops instead when this checkout has
@@ -22,7 +24,7 @@ if [ -z "${LOCAL_TABLE_REPO:-}" ]; then
   repo="$(cd "$(dirname "$0")/.." && pwd)"
   copy="$(mktemp "${TMPDIR:-/tmp}/local-table.XXXXXX")"
   cp "$0" "$copy"
-  LOCAL_TABLE_REPO="$repo" exec bash "$copy" "$@"
+  LOCAL_TABLE_REPO="$repo" LOCAL_TABLE_CWD="$PWD" exec bash "$copy" "$@"
 fi
 case "$0" in "${TMPDIR:-/tmp}"/local-table.*) rm -f "$0" ;; esac # bash has it open; the copy goes when it ends
 cd "$LOCAL_TABLE_REPO"
@@ -30,15 +32,18 @@ cd "$LOCAL_TABLE_REPO"
 OPEN=1
 PULL=1
 BRANCH=main
+EXTRA=()
 while [ $# -gt 0 ]; do
   case "$1" in
     --no-open) OPEN=0 ;;
     --no-pull) PULL=0 ;;
     --branch | -b) [ $# -ge 2 ] || { echo "$1 needs a branch, e.g. --branch production" >&2; exit 2; }; BRANCH="$2"; shift ;;
     --branch=*) BRANCH="${1#--branch=}" ;;
+    --extra) [ $# -ge 2 ] || { echo "--extra needs a checkout, e.g. --extra ../extra-games" >&2; exit 2; }; EXTRA+=("$2"); shift ;;
+    --extra=*) EXTRA+=("${1#--extra=}") ;;
     --code) [ $# -ge 2 ] || { echo "--code needs a value, e.g. --code ABCD-EFGH" >&2; exit 2; }; TABLE_CODE="$2"; shift ;;
     --code=*) TABLE_CODE="${1#--code=}" ;;
-    *) echo "unknown option: $1 (use --branch NAME, --no-pull, --no-open, --code ABCD-EFGH)" >&2; exit 2 ;;
+    *) echo "unknown option: $1 (use --branch NAME, --extra DIR, --no-pull, --no-open, --code ABCD-EFGH)" >&2; exit 2 ;;
   esac
   shift
 done
@@ -101,6 +106,20 @@ fi
 default_name="$(hostname -s 2>/dev/null || echo "Game Table")"
 [ "$(uname)" = "Darwin" ] && default_name="$(scutil --get ComputerName 2>/dev/null || echo "$default_name")"
 
+# Extra games from other checkouts (D-188): this repository's games and theirs, linked into one folder.
+if [ ${#EXTRA[@]} -gt 0 ]; then
+  GAMES_DIR="$DATA_DIR/games"
+  rm -rf "$GAMES_DIR"
+  mkdir -p "$GAMES_DIR"
+  for g in "$PWD"/games/*/; do ln -s "${g%/}" "$GAMES_DIR/"; done
+  for dir in "${EXTRA[@]}"; do
+    case "$dir" in /*) ;; *) dir="${LOCAL_TABLE_CWD:-$PWD}/$dir" ;; esac
+    [ -d "$dir/games" ] || { echo "--extra $dir: no games/ folder there" >&2; exit 1; }
+    for g in "$dir"/games/*/; do ln -sfn "$(cd "$g" && pwd)" "$GAMES_DIR/"; done
+    echo "Extra games from $dir ($(git -C "$dir" rev-parse --abbrev-ref HEAD 2>/dev/null || echo '?')): $(cd "$dir/games" && ls -d */ | tr -d / | tr '\n' ' ')"
+  done
+  export GAMES_DIR
+fi
 export PORT DATA_DIR
 export TABLE_KEY="$(cat "$KEY_FILE")"
 export TABLE_NAME="${TABLE_NAME:-$default_name}"
