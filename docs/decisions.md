@@ -1278,11 +1278,17 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   with the new game. Come up with an idea to showcase the sling feature, at minimum mention it as part of the platform
   features that games can use." *Implementation (Claude):* Last Card joins the games (nine in all, five from
   extra-games) with its board and phone, and four of its awards get a tab. *The platform does* lists the sling. A new
-  block after the Mexican Train demo, *Platform feature: the sling*, shows one moment twice: Klaus's phone with a card
-  pushed half off the top, and the board with the back of that card coming in over Klaus's seat plate; a dotted arc
-  joins them and a card back travels along it (SVG, hidden with reduced motion). Beside it: live gestures, push, flick
-  or let go, the rules still decide, and the few lines a game writes (`slingDeck`, `slingBoard`, the `gesture` hook).
+  block after the Mexican Train demo, *Platform feature: the sling*: a schematic in the style of the page's first
+  animation (Klaus then: "we could make a schematic demo that shows how a card moves from the deck to the board,
+  perhaps similar to the first animation on the landing page"), an SVG of a phone in front of the tilted board: a card
+  is pushed off the top of the phone, its back peeks in at Klaus's seat while the finger is down, then it turns face
+  up and flies onto the pile; three numbered steps light up with it (one 6 s CSS loop, still with reduced motion).
+  Beside it: live gestures, push, flick or let go, the rules still decide, and the few lines a game writes
+  (`slingDeck`, `slingBoard`, the `gesture` hook). Below, the real thing: one moment of Last Card on Klaus's phone (a
+  card half off the top) and on the board (its back over Klaus's seat plate). And *Play at home* says an iPad makes a
+  small game board, good enough to try or test a game (*Board on another screen…*, D-190); Klaus: "We can mention that
+  an iPad can be used as a small game board, at least for testing." The marquee lists Mexican Train and Last Card.
   `scripts/site-screenshots.py` plays Last Card from Klaus's phone (tap to play), waits for a turn with a card that
   fits, holds one at the top edge and takes both screens (the board cropped around the seat). Check:
-  `scripts/e2e/website.py` counts five extra games, and the phone sits beside the board in the sling block with both
-  pictures loaded.
+  `scripts/e2e/website.py` counts five extra games, checks that the schematic moves and has its three steps, that
+  the real phone sits beside the board with both pictures loaded, and the iPad note.

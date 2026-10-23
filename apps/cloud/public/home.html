@@ -383,7 +383,28 @@ html.lb-open, html.lb-open body { overflow: hidden; }
 .sling-stage { position: relative; display: grid; grid-template-columns: 22% 74%; column-gap: 4%; align-items: center; aspect-ratio: 1000 / 476; }
 .sling-stage img { width: 100%; border-radius: 14px; border: 1px solid var(--line-2); box-shadow: 0 30px 70px rgba(0,0,0,.5); }
 .sling-stage .sl-phone { border: 4px solid #0b0b0b; border-radius: 18px; }
-.sl-arc { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.sling-real { max-width: 860px; margin: 0 auto; }
+.sling-demo svg { display: block; width: 100%; height: auto; }
+.slx-pc, .slx-bc, .slx-bci, .slx-finger, .slx-bback, .slx-bface, .slx-steps li { animation: 6s infinite both; }
+.slx-pc { animation-name: slx-pc; animation-timing-function: cubic-bezier(.45, 0, .55, 1); }
+.slx-finger { animation-name: slx-finger; animation-timing-function: cubic-bezier(.45, 0, .55, 1); }
+.slx-bc { animation-name: slx-bc; }
+.slx-bci { animation-name: slx-bci; }
+.slx-bback { animation-name: slx-bback; animation-timing-function: steps(1, end); }
+.slx-bface { animation-name: slx-bface; animation-timing-function: steps(1, end); }
+@keyframes slx-pc { 0%, 8% { transform: translate(80px, 326px); opacity: 1; } 34% { transform: translate(86px, 112px); opacity: 1; } 35%, 97% { transform: translate(86px, 112px); opacity: 0; } 100% { transform: translate(80px, 326px); opacity: 0; } }
+@keyframes slx-finger { 0% { transform: translate(80px, 340px); opacity: 0; } 6% { opacity: 1; } 8% { transform: translate(80px, 340px); } 34% { transform: translate(86px, 160px); opacity: 1; } 46% { transform: translate(86px, 160px); opacity: 1; } 52%, 100% { transform: translate(86px, 160px); opacity: 0; } }
+@keyframes slx-bc { 0%, 20% { transform: translate(398px, 336px); opacity: 0; } 21% { opacity: 1; } 34%, 46% { transform: translate(400px, 296px); } 50% { transform: translate(402px, 282px); } 66% { transform: translate(418px, 160px); } 88% { transform: translate(418px, 160px); opacity: 1; } 96%, 100% { transform: translate(418px, 160px); opacity: 0; } }
+@keyframes slx-bci { 0%, 46% { transform: rotate(0) scale(1, 1); } 48% { transform: rotate(1deg) scale(0, 1); } 50% { transform: rotate(2deg) scale(1, 1); } 66%, 100% { transform: rotate(10deg) scale(.82, .82); } }
+@keyframes slx-bback { 0% { opacity: 1; } 48% { opacity: 0; } 100% { opacity: 0; } }
+@keyframes slx-bface { 0% { opacity: 0; } 48% { opacity: 1; } 100% { opacity: 1; } }
+.slx-steps { list-style: none; margin: 14px 0 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.slx-steps li { color: var(--soft); font-size: 14px; line-height: 1.4; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--line); opacity: .45; }
+.slx-steps b { display: block; font: 600 15px var(--display); color: var(--brass); margin-bottom: 2px; }
+.slx-steps li:nth-child(1) { animation-name: slx-s1; } .slx-steps li:nth-child(2) { animation-name: slx-s2; } .slx-steps li:nth-child(3) { animation-name: slx-s3; }
+@keyframes slx-s1 { 0%, 34% { opacity: 1; border-color: var(--brass-deep); } 40%, 100% { opacity: .45; } }
+@keyframes slx-s2 { 0%, 20% { opacity: .45; } 24%, 46% { opacity: 1; border-color: var(--brass-deep); } 52%, 100% { opacity: .45; } }
+@keyframes slx-s3 { 0%, 46% { opacity: .45; } 50%, 80% { opacity: 1; border-color: var(--brass-deep); } 88%, 100% { opacity: .45; } }
 .sl-code { margin-top: 18px; font-size: 12.5px; }
 .links { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-top: 40px; }
 .lnk { display: grid; gap: 6px; padding: 20px; border-radius: 16px; border: 1px solid var(--line); background: rgba(15,42,36,.55); color: var(--ink); transition: all .25s; }
@@ -481,6 +502,7 @@ footer .version { display: inline; margin: 0; }
   footer .wrap { grid-template-columns: 1fr 1fr; }
 }
 @media (max-width: 640px) {
+  .slx-steps { grid-template-columns: minmax(0, 1fr); gap: 6px; }
   .wrap { width: calc(100% - 32px); }
   section { padding: 80px 0; }
   .scene { height: 380px; transform: scale(.52); margin: -60px -120px; }
@@ -503,7 +525,8 @@ footer .version { display: inline; margin: 0; }
 }
 @media (max-width: 360px) { body:has(.preview-sash) .top .gh { display: none; } }
 @media (prefers-reduced-motion: reduce) {
-  .sl-card { display: none; }
+  .slx-pc, .slx-finger, .slx-bc { display: none; }
+  .slx-steps li { opacity: 1; }
   .hero { height: auto; } .hero-pin { position: relative; height: auto; min-height: 100vh; } .hero-caption { display: none; }
   *, *::before, *::after { animation: none !important; transition: none !important; }
   .js .rv { opacity: 1; transform: none; }
@@ -578,8 +601,8 @@ footer .version { display: inline; margin: 0; }
 </section>
 
 <div class="marquee" aria-hidden="true"><div class="track">
-  <span>Hold'em</span><i>✦</i><span>Backgammon</span><i>✦</i><span>Roulette</span><i>✦</i><span>Liar's Dice</span><i>✦</i><span>Chess</span><i>✦</i><span>Pachisi</span><i>✦</i><span>Coin Flip</span><i>✦</i><span class="you">your game here</span><i>✦</i>
-  <span>Hold'em</span><i>✦</i><span>Backgammon</span><i>✦</i><span>Roulette</span><i>✦</i><span>Liar's Dice</span><i>✦</i><span>Chess</span><i>✦</i><span>Pachisi</span><i>✦</i><span>Coin Flip</span><i>✦</i><span class="you">your game here</span><i>✦</i>
+  <span>Hold'em</span><i>✦</i><span>Backgammon</span><i>✦</i><span>Roulette</span><i>✦</i><span>Liar's Dice</span><i>✦</i><span>Chess</span><i>✦</i><span>Pachisi</span><i>✦</i><span>Coin Flip</span><i>✦</i><span>Mexican Train</span><i>✦</i><span>Last Card</span><i>✦</i><span class="you">your game here</span><i>✦</i>
+  <span>Hold'em</span><i>✦</i><span>Backgammon</span><i>✦</i><span>Roulette</span><i>✦</i><span>Liar's Dice</span><i>✦</i><span>Chess</span><i>✦</i><span>Pachisi</span><i>✦</i><span>Coin Flip</span><i>✦</i><span>Mexican Train</span><i>✦</i><span>Last Card</span><i>✦</i><span class="you">your game here</span><i>✦</i>
 </div></div>
 
 <div class="numbers wrap">
@@ -909,18 +932,49 @@ awards: [
         <p class="rv" style="--d:.1s">A game can let players push a card up and off the top of their phone. While the finger is still on the glass, the board shows the card coming in at that player's edge; let go and it flies onto the pile. Drawn cards fly the other way. Last Card, the newest game in extra-games, is built on it.</p>
       </div>
       <div class="show-grid">
-        <figure class="dbg-shot rv" style="--d:.05s">
-          <div class="sling-stage">
-            <img class="sl-phone" src="/site/last-card-sling-phone.webp" alt="Klaus's phone in Last Card: a yellow card pushed half off the top of the screen, the rest of the hand below" loading="lazy" width="500" height="1082">
-            <img class="sl-board" src="/site/last-card-sling.webp" alt="The board at the same moment: the back of the card slides in over Klaus's seat plate, below the draw pile and the discard pile" loading="lazy" width="1120" height="630">
-            <svg class="sl-arc" viewBox="0 0 1000 476" aria-hidden="true">
-              <path id="sl-path" d="M86 26 C 230 -70 470 120 548 372" fill="none" stroke="rgba(214,169,74,.55)" stroke-width="3" stroke-dasharray="2 12" stroke-linecap="round"/>
-              <g class="sl-card"><rect x="-17" y="-25" width="34" height="50" rx="5" fill="#1d2142" stroke="#fff" stroke-width="2.5"/><path d="M-15 10 L15 -6 L15 2 L-15 18 Z" fill="#e8b23a"/>
-                <animateMotion dur="2.6s" repeatCount="indefinite" keyPoints="0;1;1" keyTimes="0;.6;1" calcMode="spline" keySplines=".4 0 .2 1;0 0 1 1"><mpath href="#sl-path"/></animateMotion>
-                <animate attributeName="opacity" dur="2.6s" repeatCount="indefinite" values="0;1;1;0;0" keyTimes="0;.1;.55;.66;1"/></g>
-            </svg>
-          </div>
-          <figcaption>Real screenshots of one moment: the phone, and the board showing the same card at the same seat.</figcaption>
+        <!-- A schematic, like the hero's table: a card pushed off the phone peeks in at the player's seat on the board
+             while the finger is down, then flies onto the pile. One 6 s loop; the steps below light up with it. -->
+        <figure class="dbg-shot rv sling-demo" style="--d:.05s">
+          <svg viewBox="0 0 640 400" role="img" aria-label="A card pushed off the top of a phone comes onto the board at that player's seat, then flies onto the pile">
+            <defs>
+              <clipPath id="slx-board"><path d="M196 62 H600 L628 302 H168 Z"/></clipPath>
+              <clipPath id="slx-glass"><rect x="27" y="157" width="106" height="216" rx="11"/></clipPath>
+              <linearGradient id="slx-wood" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5a3a22"/><stop offset=".6" stop-color="#3b2615"/><stop offset="1" stop-color="#2c1c10"/></linearGradient>
+              <radialGradient id="slx-felt" cx=".5" cy=".5" r=".7"><stop offset="0" stop-color="#1d4e41"/><stop offset="1" stop-color="#0d2a22"/></radialGradient>
+              <g id="slx-back"><rect x="-15" y="-21" width="30" height="42" rx="4" fill="#1d2142" stroke="#f3eee2" stroke-width="2"/><path d="M-13 7 L13 -6 L13 0 L-13 13 Z" fill="#e8b23a"/><path d="M-13 13 L13 0 L13 3 L-13 16 Z" fill="#3c7fd0"/></g>
+              <g id="slx-face"><rect x="-15" y="-21" width="30" height="42" rx="4" fill="#e8b23a" stroke="#f3eee2" stroke-width="2"/><rect x="-9" y="-13" width="18" height="26" rx="5" fill="#fffaf0"/><text y="7" text-anchor="middle" font-size="17" font-weight="800" fill="#e8b23a" font-family="Inter, sans-serif">7</text></g>
+              <g id="slx-face3"><rect x="-15" y="-21" width="30" height="42" rx="4" fill="#3c7fd0" stroke="#f3eee2" stroke-width="2"/><rect x="-9" y="-13" width="18" height="26" rx="5" fill="#fffaf0"/><text y="7" text-anchor="middle" font-size="17" font-weight="800" fill="#3c7fd0" font-family="Inter, sans-serif">7</text></g>
+            </defs>
+            <!-- the table and its board, seen from the player's side -->
+            <path d="M172 34 H624 L660 330 H136 Z" fill="url(#slx-wood)"/>
+            <path d="M196 62 H600 L628 302 H168 Z" fill="url(#slx-felt)" stroke="#050807" stroke-width="8" stroke-linejoin="round"/>
+            <g clip-path="url(#slx-board)">
+              <g transform="translate(352 160)"><use href="#slx-back"/><use href="#slx-back" x="-2" y="-2"/></g>
+              <g transform="translate(412 162) rotate(-14)"><use href="#slx-face3"/></g>
+              <g transform="translate(416 159) rotate(-4)"><use href="#slx-face3"/></g>
+              <circle cx="414" cy="160" r="34" fill="none" stroke="#e8b23a" stroke-opacity=".5" stroke-width="2.5"/>
+              <rect x="350" y="266" width="96" height="26" rx="7" fill="#08130f" stroke="#e8b23a" stroke-width="2"/>
+              <text x="398" y="284" text-anchor="middle" font-size="12" fill="#efe8d8" font-family="Inter, sans-serif">● Klaus</text>
+              <g class="slx-bc"><g class="slx-bci"><g transform="scale(1.3)"><use class="slx-bback" href="#slx-back"/><use class="slx-bface" href="#slx-face"/></g></g></g>
+            </g>
+            <!-- Klaus's phone, held at the table's edge -->
+            <rect x="20" y="150" width="120" height="230" rx="17" fill="#0b0b0b" stroke="#2a2a2a" stroke-width="1.5"/>
+            <rect x="27" y="157" width="106" height="216" rx="11" fill="#0d211b"/>
+            <g clip-path="url(#slx-glass)">
+              <rect x="34" y="168" width="92" height="34" rx="6" fill="none" stroke="#e8b23a" stroke-opacity=".7"/>
+              <text x="42" y="189" font-size="10.5" fill="#efe8d8" font-family="Inter, sans-serif">Your turn</text>
+              <line x1="34" y1="212" x2="126" y2="212" stroke="#e8b23a" stroke-dasharray="3 3" stroke-opacity=".6"/>
+              <g transform="translate(50 326)" opacity=".55"><use href="#slx-back" transform="scale(1.1)"/></g>
+              <g transform="translate(110 326)" opacity=".55"><use href="#slx-back" transform="scale(1.1)"/></g>
+              <g class="slx-pc"><use href="#slx-face" transform="scale(1.1)"/></g>
+            </g>
+            <circle class="slx-finger" r="13" fill="#fff" fill-opacity=".28" stroke="#fff" stroke-opacity=".6"/>
+          </svg>
+          <ol class="slx-steps">
+            <li><b>1</b>Push a card off the top of your phone.</li>
+            <li><b>2</b>The board shows it at your seat while your finger is down.</li>
+            <li><b>3</b>Let go: it flies onto the pile.</li>
+          </ol>
         </figure>
         <div class="rv" style="--d:.1s">
           <ul class="show-list">
@@ -938,6 +992,13 @@ const sling = <b>slingBoard</b>(root, { render });
 gesture(seat, data) { sling.gesture(seat, data); }</code>
         </div>
       </div>
+        <figure class="dbg-shot rv sling-real">
+          <div class="sling-stage">
+            <img class="sl-phone" src="/site/last-card-sling-phone.webp" alt="Klaus's phone in Last Card: a yellow card pushed half off the top of the screen, the rest of the hand below" loading="lazy" width="500" height="1082">
+            <img class="sl-board" src="/site/last-card-sling.webp" alt="The board at the same moment: the back of the card slides in over Klaus's seat plate, below the draw pile and the discard pile" loading="lazy" width="1120" height="630">
+          </div>
+          <figcaption>The real thing in Last Card: one moment on Klaus's phone and on the board, the same card at the same seat.</figcaption>
+        </figure>
     </div>
 
     <!-- Test and debug with your AI (D-180): AI-only simulations, logs an AI can read, references to a move. -->
@@ -1021,8 +1082,9 @@ node scripts/soak.ts 100</pre>
       <p class="eyebrow rv">Play at home</p>
       <h2 class="rv" style="--d:.06s">A table on any computer, in three commands.</h2>
       <p class="lede rv" style="--d:.12s;margin-top:20px">The table runs in Docker on a computer on your WiFi. Open the board in a browser, on a touchscreen if you have one, and everyone joins with their phone. No cloud service, no DNS entry and no HTTPS needed.</p>
-      <div class="needs rv" style="--d:.18s"><span>Docker with Compose</span><span>git</span><span>Phones on the same WiFi</span><span>A touchscreen (or a mouse)</span></div>
+      <div class="needs rv" style="--d:.18s"><span>Docker with Compose</span><span>git</span><span>Phones on the same WiFi</span><span>A touchscreen, an iPad or a mouse</span></div>
       <p class="rv muted" style="--d:.22s">Games from other repositories, private ones too, are added by cloning them. The <a href="/docs/local-docker.md">runbook</a> has every step, with a check after each one.</p>
+      <p class="rv muted" style="--d:.24s;margin-top:14px"><b style="color:var(--ink)">No touchscreen table yet?</b> An iPad makes a small game board, good enough to try a game or test your own: in the board's settings, <em>Board on another screen…</em> shows a QR code, the iPad scans it, and the board moves there while the table keeps running on the computer.</p>
       <div class="agent-alt rv" style="--d:.26s">
         <p>Or let your AI agent do it:</p>
         <q id="install-prompt">Check out https://games.skylar.technology and read the llms.txt. I want to do a local installation.</q>
