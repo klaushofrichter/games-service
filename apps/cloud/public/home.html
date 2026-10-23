@@ -406,6 +406,11 @@ html.lb-open, html.lb-open body { overflow: hidden; }
 .needs span { font-size: 14px; padding: 7px 14px; border-radius: 999px; border: 1px solid var(--line-2); color: var(--soft); }
 .agent-alt { margin-top: 22px; padding: 18px 20px; border-radius: 16px; border: 1px solid var(--line); background: rgba(15,42,36,.55); position: relative; }
 .agent-alt p { color: var(--soft); font-size: 15px; }
+.story-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 10px; }
+.story-cols h3 { font-size: 24px; margin-bottom: 18px; }
+.story-cols a { color: var(--brass-hi); }
+.story-try { margin-top: 44px; max-width: 900px; }
+.story-try p { padding-right: 70px; }
 .agent-alt q { display: block; margin-top: 8px; font: 14.5px/1.6 var(--mono); color: var(--ink); quotes: none; padding-right: 70px; }
 
 /* ---------- the table ---------- */
@@ -473,7 +478,7 @@ footer .version { display: inline; margin: 0; }
   .wrap { width: calc(100% - 32px); }
   section { padding: 80px 0; }
   .scene { height: 380px; transform: scale(.52); margin: -60px -120px; }
-  .paths .grid, .games, .features, .links, .split, .specs, .case ul, .opengrid { grid-template-columns: 1fr; }
+  .paths .grid, .games, .features, .links, .split, .specs, .case ul, .opengrid, .story-cols { grid-template-columns: 1fr; }
   .game.wide { grid-column: auto; }
   .top .gh span { display: none; }
   .logo { white-space: nowrap; }
@@ -1052,6 +1057,41 @@ docker compose -f deploy/local/docker-compose.yml up -d --build">Copy</button></
     </div>
   </div>
 </section>
+<!-- ============ ABOUT ============ -->
+<!-- Where the project and its code come from (D-187). -->
+<section class="story" id="about">
+  <div class="wrap">
+    <div class="section-head">
+      <p class="eyebrow rv">About</p>
+      <h2 class="rv" style="--d:.06s">Human players first.</h2>
+      <p class="lede rv" style="--d:.12s">Game Table began with a do-it-yourself game table that friends built, and with a love of board games. Klaus and those friends kept coming back to one idea: a game platform designed for the people at the table, helped by computer graphics and a referee that never tires. The rules are observed automatically, and the chores, like setting up the board and keeping the game moving, happen by themselves. What matters is the people playing together.</p>
+    </div>
+    <div class="story-cols">
+      <div class="rv" style="--d:.05s">
+        <h3>The idea</h3>
+        <ul class="show-list">
+          <li><b>The table is the centrepiece.</b> One shared touchscreen in the middle, and each player's phone as a private deck for the games that hide cards, like poker.</li>
+          <li><b>Remote players, on the side.</b> Friends far away can join, but there is no video, voice or chat in the game, on purpose. Talk to them the way you already do, with Google Meet or FaceTime running alongside.</li>
+          <li><b>AI players fill the seats.</b> Mainly so that a game that needs a certain number of players can start at all.</li>
+        </ul>
+      </div>
+      <div class="rv" style="--d:.1s">
+        <h3>The code</h3>
+        <ul class="show-list">
+          <li><b>Prompted, not typed.</b> The ideas went to Claude, and Claude Opus 5.5 developed all of the code, step by step. Every decision is in the <a href="https://github.com/klaushofrichter/games-service/blob/main/docs/decisions.md" target="_blank" rel="noopener noreferrer">decision records</a>: who asked, why, and how it was built.</li>
+          <li><b>A platform, and games from anywhere.</b> The platform and its lobby are separate from the games, with clear ways to bring in games from other repositories that fit the table.</li>
+          <li><b>The table stays at home.</b> The game service's lobby lets remote players find their game through an invite link, without the game table itself being exposed to the internet.</li>
+          <li><b>Open.</b> The project is hosted by Klaus's engineering company, <a href="https://skylar.technology" target="_blank" rel="noopener noreferrer">Skylar Technology</a>, and every source for a complete game runtime and development environment is public on GitHub.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="agent-alt rv story-try" style="--d:.15s">
+      <p><b style="color:var(--ink)">Try it with your own AI agent.</b> Ask it to set up a table on your computer and start playing, or to write a new game from a single sentence. Then play it, and ask the agent to fix whatever could be better: that fine-tuning is usually worth it. Your games can stay private or be shared with everyone.</p>
+      <q id="story-prompt">Read https://games.skylar.technology/llms.txt, set up Game Table on my computer, and write a new game for it: Yahtzee for 2–6 players.</q>
+      <button class="copy" data-copy="#story-prompt">Copy</button>
+    </div>
+  </div>
+</section>
 </main>
 
 <footer>
@@ -1063,7 +1103,7 @@ docker compose -f deploy/local/docker-compose.yml up -d --build">Copy</button></
     </div>
     <div><h4>Play</h4><a href="#games">Games</a><a href="#install">Play at home</a><a href="/docs/local-docker.md">Local runbook</a><a href="#table">The table</a><a href="#service">Game service</a></div>
     <div><h4>Build</h4><a href="/docs/game-development.md">Developer guide</a><a href="/llms.txt">llms.txt</a><a href="/llms-full.txt">llms-full.txt</a><a href="#repos">Game repositories</a><a href="https://github.com/klaushofrichter/games-service/blob/main/docs/decisions.md" target="_blank" rel="noopener noreferrer">Decision records</a></div>
-    <div><h4>Source</h4><a href="https://github.com/klaushofrichter/games-service" target="_blank" rel="noopener noreferrer">games-service</a><a href="https://github.com/klaushofrichter/extra-games" target="_blank" rel="noopener noreferrer">extra-games</a><a href="https://github.com/klaushofrichter/games-service/releases" target="_blank" rel="noopener noreferrer">Releases</a><a href="https://github.com/klaushofrichter/games-service/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">MIT licence</a></div>
+    <div><h4>Source</h4><a href="https://github.com/klaushofrichter/games-service" target="_blank" rel="noopener noreferrer">games-service</a><a href="https://github.com/klaushofrichter/extra-games" target="_blank" rel="noopener noreferrer">extra-games</a><a href="https://github.com/klaushofrichter/games-service/releases" target="_blank" rel="noopener noreferrer">Releases</a><a href="https://github.com/klaushofrichter/games-service/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">MIT licence</a><a href="#about">About</a></div>
   </div>
 </footer>
 
