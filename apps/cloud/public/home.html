@@ -367,6 +367,15 @@ html.lb-open, html.lb-open body { overflow: hidden; }
 .showcase { margin-top: 80px; display: grid; gap: 28px; }
 .show-grid { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: 40px; align-items: center; }
 .show-grid .dbg-shot { margin: 0; }
+.show-shot .pair { position: relative; }
+.show-shot .pair img.alt { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; transition: opacity 1.2s ease; }
+.show-shot.alt .pair img.alt { opacity: 1; }
+.show-shot .cap { transition: opacity .6s; }
+.show-shot .cap.alt, .show-shot.alt .cap:not(.alt) { display: none; }
+.show-shot.alt .cap.alt { display: inline; }
+.service .grid { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 50px; align-items: start; }
+.service .shot img { border-radius: 16px; border: 1px solid var(--line-2); box-shadow: 0 40px 90px rgba(0,0,0,.5); }
+.service .shot figcaption { margin-top: 14px; color: var(--faint); font-size: 14px; }
 .show-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
 .show-list li { color: var(--soft); font-size: 15.5px; padding-left: 18px; border-left: 2px solid var(--brass-deep); }
 .show-list b { color: var(--ink); font-weight: 600; }
@@ -457,7 +466,7 @@ footer .version { display: inline; margin: 0; }
   .code { position: static; }
   .aw-grid { grid-template-columns: minmax(0, 1fr); gap: 44px; }
   .repo { grid-template-columns: 1fr; }
-  .dbg-cards, .show-grid { grid-template-columns: minmax(0, 1fr); }
+  .dbg-cards, .show-grid, .service .grid { grid-template-columns: minmax(0, 1fr); }
   footer .wrap { grid-template-columns: 1fr 1fr; }
 }
 @media (max-width: 640px) {
@@ -855,7 +864,11 @@ awards: [
         <p class="rv" style="--d:.1s">Mexican Train, in extra-games, is a demo for developers: a game that changes nearly everything you see and hear, and still lets the platform handle the lobby, the seats and the players. Copy any part of it into your own game.</p>
       </div>
       <div class="show-grid">
-        <figure class="dbg-shot rv" style="--d:.05s"><img src="/site/mexican-train.webp" alt="The Mexican Train board: trains of dominoes run out from a glowing hub over an animated aurora, with glass seat plates around the edge" loading="lazy" width="1600" height="900"></figure>
+        <!-- Two looks of the same moment; the second fades in as the picture passes the middle of the window (D-186). -->
+        <figure class="dbg-shot show-shot rv" style="--d:.05s" id="show-shot">
+          <div class="pair"><img src="/site/mexican-train.webp" alt="The Mexican Train board: trains of dominoes run out from a glowing hub over an animated aurora, with glass seat plates around the edge" loading="lazy" width="1600" height="900"><img class="alt" src="/site/mexican-train-lava.webp" alt="The same moment with the Lava lamp background and tiles showing numbers instead of pips" loading="lazy" width="1600" height="900"></div>
+          <figcaption><span class="cap">Aurora, coloured pips</span><span class="cap alt">Lava lamp, numbers</span> · the same game, two choices in the board's settings</figcaption>
+        </figure>
         <ul class="show-list rv" style="--d:.1s">
           <li><b>A board that sizes itself.</b> A train can grow to 47 tiles: it bends into rows, and the tiles shrink only as far as they must.</li>
           <li><b>Animated backgrounds.</b> Aurora, lava, plasma, fireflies, a starfield or clouds, drawn by the game itself; or a new one each round.</li>
@@ -1001,6 +1014,28 @@ docker compose -f deploy/local/docker-compose.yml up -d --build">Copy</button></
     </div>
   </div>
 </section>
+<!-- ============ THE GAME SERVICE ============ -->
+<!-- The admin console of a game service (D-186): what a service adds to tables, and what it needs. -->
+<section class="service" id="service">
+  <div class="wrap">
+    <div class="section-head">
+      <p class="eyebrow rv">Run a game service</p>
+      <h2 class="rv" style="--d:.06s">Every table, one console.</h2>
+      <p class="lede rv" style="--d:.12s">A table plays fine on its own. Add a game service and your tables reach past the room: it runs on a server with a DNS name and HTTPS, and its admin console looks after every table that connects to it. This page comes from one.</p>
+      <div class="needs rv" style="--d:.18s"><span>A server with Docker</span><span>A DNS name</span><span>HTTPS</span><span>Google sign-in for admins</span></div>
+    </div>
+    <div class="grid">
+      <ul class="show-list rv" style="--d:.05s">
+        <li><b>Remote players from anywhere.</b> An invite link brings a player or a watcher to your table from any browser, not just from your WiFi. The service introduces them, then they connect straight to the table.</li>
+        <li><b>Many tables, approved by you.</b> A new table shows a pairing code on its board for you to approve, or starts with an access code you issued: a token for one table, valid for a week, a year or for good. Disconnect a table, or revoke its code, at any time.</li>
+        <li><b>The games each table gets.</b> Add extra-game repositories from GitHub, and tick which tables get them, one by one or with their access code.</li>
+        <li><b>Game logs for analysis.</b> Every game and simulation sends its log to the service. Filter by game, table and date, download the zips, or give a pipeline or a Claude session a download token. You choose how long logs are kept.</li>
+        <li><b>This website.</b> The service serves this page, the developer guide and <code>llms.txt</code>.</li>
+      </ul>
+      <figure class="shot rv" style="--d:.1s"><img src="/site/admin.webp" alt="The admin console: an overview, two tables online, and the logs of their games and simulations with filters and Download buttons" loading="lazy"><figcaption>The admin console: two tables, the Living room approved by its pairing code and the Den by an access code, and the logs of their games and simulations (access codes and repositories are further down, left out here).</figcaption></figure>
+    </div>
+  </div>
+</section>
 <!-- ============ OPEN ============ -->
 <section class="open" id="open">
   <div class="wrap">
@@ -1026,7 +1061,7 @@ docker compose -f deploy/local/docker-compose.yml up -d --build">Copy</button></
       <p>Board and card games around one touchscreen, with phones as private hands. Free and open source under the MIT licence, with no warranty.</p>
       <p style="margin-top:14px">Version {{version}}</p>
     </div>
-    <div><h4>Play</h4><a href="#games">Games</a><a href="#install">Play at home</a><a href="/docs/local-docker.md">Local runbook</a><a href="#table">The table</a></div>
+    <div><h4>Play</h4><a href="#games">Games</a><a href="#install">Play at home</a><a href="/docs/local-docker.md">Local runbook</a><a href="#table">The table</a><a href="#service">Game service</a></div>
     <div><h4>Build</h4><a href="/docs/game-development.md">Developer guide</a><a href="/llms.txt">llms.txt</a><a href="/llms-full.txt">llms-full.txt</a><a href="#repos">Game repositories</a><a href="https://github.com/klaushofrichter/games-service/blob/main/docs/decisions.md" target="_blank" rel="noopener noreferrer">Decision records</a></div>
     <div><h4>Source</h4><a href="https://github.com/klaushofrichter/games-service" target="_blank" rel="noopener noreferrer">games-service</a><a href="https://github.com/klaushofrichter/extra-games" target="_blank" rel="noopener noreferrer">extra-games</a><a href="https://github.com/klaushofrichter/games-service/releases" target="_blank" rel="noopener noreferrer">Releases</a><a href="https://github.com/klaushofrichter/games-service/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">MIT licence</a></div>
   </div>
@@ -1185,6 +1220,19 @@ docker compose -f deploy/local/docker-compose.yml up -d --build">Copy</button></
   $("#lb-close").addEventListener("click", close);
   lb.addEventListener("click", (e) => { if (e.target === lb) close(); });
   addEventListener("keydown", (e) => { if (e.key === "Escape") close(); });
+
+  // The demo game's picture (D-186): the second look fades in once the picture is above the middle of the window.
+  const looks = $("#show-shot");
+  if (looks) {
+    let ticking = false;
+    const swap = () => {
+      ticking = false;
+      const r = looks.getBoundingClientRect();
+      looks.classList.toggle("alt", r.top + r.height / 2 < innerHeight / 2);
+    };
+    addEventListener("scroll", () => { if (!ticking) { ticking = true; requestAnimationFrame(swap); } }, { passive: true });
+    swap();
+  }
 
   // The lobby demo: a little table that acts out what the platform handles.
   const C = { anna: "#d6a94a", ben: "#63a8e0", otto: "#d2574a", cleo: "#5fbf8f", dana: "#9b7be0", sam: "#e08fb0" };

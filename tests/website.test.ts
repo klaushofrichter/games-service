@@ -23,7 +23,7 @@ describe("the public website (D-176)", () => {
     expect(r.status).toBe(200);
     expect(r.headers.get("content-type")).toMatch(/^text\/html/);
     const html = await r.text();
-    for (const id of ["room", "games", "awards", "lobby", "build", "showcase", "debug", "repos", "install", "table"]) expect(html).toContain(`id="${id}"`);
+    for (const id of ["room", "games", "awards", "lobby", "build", "showcase", "debug", "repos", "install", "table", "service"]) expect(html).toContain(`id="${id}"`);
     expect(html).toContain('<a id="admin-link" href="/admin">Admin</a>'); // without Google sign-in: the portal itself
     expect(html).toContain('class="version"');
     expect(html).not.toMatch(/\{\{\w+\}\}/);
