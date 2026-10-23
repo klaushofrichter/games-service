@@ -250,12 +250,16 @@ export function slingBoard(root, opts = {}) {
     raf = 0;
     let moving = false;
     for (const s of slots.values()) {
+      // Half the way per frame follows a finger closely; a thrown card slips off the edge more gently (s.ease).
+      const k = s.ease ?? 0.5;
       for (const [v, t] of [["f", "tf"], ["x", "tx"], ["a", "ta"]]) {
-        s[v] += (s[t] - s[v]) * 0.5;
+        s[v] += (s[t] - s[v]) * k;
         if (Math.abs(s[t] - s[v]) < 0.002) s[v] = s[t];
         else moving = true;
       }
-      s.item.style.transform = `translate(${o.spread + s.x * o.spread}px, ${CH * 0.2 + (1 - s.f) * CH}px) rotate(${s.a}deg)`;
+      // The slot starts spread + CW left of the edge point, so the thing's centre is at spread + CW / 2 + x · spread
+      // (D-194): where pose() puts it, and so where flights start and end. (It was half a card to the left.)
+      s.item.style.transform = `translate(${o.spread + CW / 2 + s.x * o.spread}px, ${CH * 0.2 + (1 - s.f) * CH}px) rotate(${s.a}deg)`;
       s.item.style.visibility = s.f > 0.001 ? "visible" : "hidden";
     }
     if (moving && !gone) raf = requestAnimationFrame(tick);
@@ -297,6 +301,7 @@ export function slingBoard(root, opts = {}) {
       if (d.end) s.tf = 0;
       else {
         if (s.id !== d.id) ((s.id = d.id), (s.f = 0));
+        s.ease = null;
         show(s, d.item ? `i:${JSON.stringify(d.item)}` : "back", o.render(d.item ?? null, { back: !d.item }));
         s.tf = clamp(Number(d.f) || 0, 0, 1);
         s.tx = clamp(Number(d.x) || 0, -1, 1);
@@ -329,6 +334,7 @@ export function slingBoard(root, opts = {}) {
       s.x = s.tx = s.a = s.ta = 0;
       s.f = 1;
       s.tf = 0;
+      s.ease = 0.12 / k(); // from where the flight ended, without a jump (D-194)
       kick();
     },
     /** A flight between any two poses on the board (a die rolling to its place, a card moving between piles). */

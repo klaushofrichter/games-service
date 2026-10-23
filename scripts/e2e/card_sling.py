@@ -65,6 +65,21 @@ try:
         assert shown, "the board shows nothing at the seat"
         assert shown["back"], "the board shows the card's face before it is played"
         assert "rotate(0deg)" not in shown["t"], "the tilt on the phone is not on the board"
+        # Where the board shows it: in front of the player's seat, where its flight will start (D-194).
+        here = board.evaluate("""(() => {
+          const c = [...document.querySelectorAll('.sling-item')].find(e => e.style.visibility === 'visible').getBoundingClientRect();
+          const p = [...document.querySelectorAll('.kit-plate')].find(e => e.textContent.includes('Klaus')).getBoundingClientRect();
+          const s = innerWidth / 1920;
+          return { card: (c.left + c.width / 2) / s, plate: (p.left + p.width / 2) / s };
+        })()""")
+        # The phone says where across it the card is (−1…1); the board puts it that far along the edge (spread 160).
+        x = phone.evaluate("""(() => {
+          const a = document.querySelector('.csd').getBoundingClientRect(), c = document.querySelector('.sling-drag').getBoundingClientRect();
+          return Math.max(-1, Math.min(1, (c.left + c.width / 2 - a.left - a.width / 2) / (a.width / 2)));
+        })()""")
+        want = here["plate"] + x * 160
+        print("card centre", round(here["card"]), "expected", round(want))
+        assert abs(here["card"] - want) < 12, f"the card at the seat is off its place: {here}, x={x}"
         # 2. Back down a little and fling it up: it leaves and flies to the pile.
         for i in range(1, 6):
             phone.mouse.move(x + 30, third - 40 * i)
@@ -77,6 +92,14 @@ try:
         assert board.locator(".cs-pile > div").count() >= 1, "the card is on the pile"
         assert phone.locator(".csd-card").count() == 6
         # 3. Draw: the card flies to the seat, then comes in at the top of the phone.
+        # A draw: the card thrown to the seat lands exactly where it then slips off the edge (no jump, D-194).
+        board.evaluate("""window.__landed = null; window.__slot = null;
+          new MutationObserver((ms, obs) => { for (const m of ms) for (const n of m.removedNodes) if (n.classList?.contains('sling-flight')) {
+            window.__landed = window.__lastFlight; obs.disconnect();
+            requestAnimationFrame(() => requestAnimationFrame(() => { const it = [...document.querySelectorAll('.sling-item')].find(e => e.style.visibility === 'visible');
+              if (it) { const r = it.getBoundingClientRect(); window.__slot = { x: r.left + r.width / 2, y: r.top + r.height / 2 }; } })); } })
+            .observe(document.querySelector('.sling-layer'), { childList: true });
+          setInterval(() => { const f = document.querySelector('.sling-flight'); if (f) { const r = f.getBoundingClientRect(); window.__lastFlight = { x: r.left + r.width / 2, y: r.top + r.height / 2 }; } }, 10);""")
         phone.click(".csd-draw")
         time.sleep(0.35)
         board.screenshot(path=os.path.join(OUT, "sling-4-board-draw.png"))
@@ -84,6 +107,9 @@ try:
         phone.screenshot(path=os.path.join(OUT, "sling-5-phone-draw.png"))
         time.sleep(1.2)
         assert phone.locator(".csd-card").count() == 7
+        landed, slot = board.evaluate("window.__landed"), board.evaluate("window.__slot")
+        print("drawn card: flight ended at", landed, "slot shows it at", slot)
+        assert landed and slot and abs(landed["x"] - slot["x"]) < 12 and abs(landed["y"] - slot["y"]) < 30, "the drawn card jumps at the seat"
         print("gestures received by the board:", board.evaluate("window.__g"))
         # 4. An AI player's card flies in from its seat.
         board.wait_for_selector(".sling-flight", timeout=20000)

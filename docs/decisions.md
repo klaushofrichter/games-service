@@ -1245,3 +1245,15 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   the game to show it); letting go there glides it straight up and off (220 ms, its last poses reaching the board),
   then `onSling(id, { direction: "middle" })`. Without `line` nothing changes. Documented in the developer guide
   (section 10).
+
+## Slung and drawn cards without a jump at the seat (23 Oct 2026)
+
+- **D-194 · 2026-10-23 · Klaus** — A card thrown to a player's seat (a draw) lands and slips off the board's edge in
+  one movement, and a card being slung shows exactly where its flight then starts. *Why:* Klaus: "The board
+  animation for the draw is also a bit imprecise. The card travels from the deck to the player, pauses for a split
+  second, then jumps to the left by about 1/2 card to disappear. It should not jump." *Implementation (Claude):* the
+  slot at a seat's edge placed the card half its width left of the point `pose()` (and so every flight) uses; it is
+  centred now. And a thrown card slipped off the edge at the speed that follows a finger (half the way per frame),
+  dropping half a card in the first frame; it eases off gently now (`ease`, about a third of a second at normal
+  speed). Checks in `scripts/e2e/card_sling.py`: the card at the seat is where the phone says (within 12 px), and a
+  drawn card's first frame in the slot is where its flight ended (same x, within 30 px down).
