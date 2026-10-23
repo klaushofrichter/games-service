@@ -31,6 +31,9 @@ export const SLING_MS = { flyMin: 390, flyPerPx: 0.68, flyMax: 840, toSeat: 630,
  * - `onSling(id, { direction })`: make the move (send the intent); resolve true if it was accepted. `direction` is
  *   `"left"`, `"middle"` or `"right"`: where the flick went, for games that care (most don't).
  * - `threshold` (0.5): the share that must be out when letting go; `flick` (0.8 px/ms upward) also counts.
+ * - `line()`: optional, a height on the page (clientY, e.g. the bottom of a status box): let go with the thing's
+ *   middle above it and it is played toward the middle, without pushing it all the way off (D-193). While it is above
+ *   the line, it and `area` have the class `sling-armed`. Off the top, left, middle or right still count.
  * - `speed()`: the board's animation speed (1 = normal), for `receive`.
  * - `tilt` (true): the thing leans with sideways movement, and the board shows the same angle.
  */
@@ -63,6 +66,12 @@ export function slingDeck(area, ctx, opts = {}) {
     d.el.style.transform = `translate(${dx}px, ${dy}px) rotate(${d.a}deg) scale(1.05)`;
     const { f, x } = measure(d);
     d.f = f;
+    if (o.line) {
+      const r = d.el.getBoundingClientRect();
+      d.armed = !d.blocked && r.top + r.height / 2 < o.line();
+      d.el.classList.toggle("sling-armed", d.armed);
+      area.classList.toggle("sling-armed", d.armed);
+    }
     if (d.blocked && f > 0.35) {
       // Not allowed: it may peek out a little, then it goes back.
       d.dy -= (f - 0.35) * d.h;
@@ -89,7 +98,8 @@ export function slingDeck(area, ctx, opts = {}) {
   function back(d, why) {
     glide(d, 0, 0, 200, () => {
       if (d.sent) send({ id: d.id, end: true }, true);
-      d.el.classList.remove("sling-drag");
+      d.el.classList.remove("sling-drag", "sling-armed");
+      area.classList.remove("sling-armed");
       d.el.style.transform = "";
       d.el.style.visibility = "";
       drag = null;
@@ -118,14 +128,18 @@ export function slingDeck(area, ctx, opts = {}) {
     const d = drag;
     const s = d.samples, a = s[0], b = s.at(-1), dt = Math.max(1, b.t - a.t);
     const vy = (b.y - a.y) / dt, vx = (b.x - a.x) / dt;
-    const out = d.f >= o.threshold || (vy < -o.flick && d.f > 0.02);
+    const pushed = d.f >= o.threshold || (vy < -o.flick && d.f > 0.02);
+    // Let go above the line (D-193): played toward the middle.
+    const out = pushed || !!d.armed;
     if (!out || d.blocked) return back(d, d.blocked ? d.why : "");
+    area.classList.remove("sling-armed");
     const { x } = measure(d);
     const lean = x + vx * 0.6;
-    const direction = lean < -0.35 ? "left" : lean > 0.35 ? "right" : "middle";
+    const direction = !pushed ? "middle" : lean < -0.35 ? "left" : lean > 0.35 ? "right" : "middle";
     // Out it goes: off the top while its last poses reach the board, then the move.
     const box = area.getBoundingClientRect(), r = d.el.getBoundingClientRect();
-    glide(d, d.dx + vx * 40, d.dy - (r.bottom - box.top) - 6, Math.max(70, 160 * (1 - d.f)), async () => {
+    // From above the line it goes straight up and off; pushed out, it keeps its sideways drift.
+    glide(d, pushed ? d.dx + vx * 40 : d.dx * 0.5, d.dy - (r.bottom - box.top) - 6, pushed ? Math.max(70, 160 * (1 - d.f)) : 220, async () => {
       send({ id: d.id, f: 1, x: measure(d).x, a: d.a, ...(o.reveal === "drag" && o.item ? { item: o.item(d.id) } : {}) }, true);
       d.el.style.visibility = "hidden";
       ctx.vibrate?.(20);

@@ -1232,3 +1232,16 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   the default for `graceMs`; `GRACE_MS` still overrides it for tests and the e2e checks (which use 1.5 s). No setting
   on the board. Unchanged: during a running game a seat is held with no time limit (D-144, D-159), and the board shows
   the player as away and offers to exchange them.
+
+## The sling's release line (23 Oct 2026)
+
+- **D-193 · 2026-10-23 · Klaus** — A game can give the sling a release line (`line()`): let go of a card with its
+  middle above it and it is played, flying to the board toward the middle; below it, it slides back; pushed on to the
+  top edge, left, middle or right count as before. *Why:* Klaus, playing Last Card: "I would like to see the notice
+  "push a card off the top…" closer to the status box on the deck. If the card is on the status box (ie above the
+  "push a card…" text), and let go, it should move to the board to the middle direction. If it is not let go, the
+  player can move it back or go to the top for left, middle, right." *Implementation (Claude):* `slingDeck` takes
+  `line()` (a clientY); while the card's middle is above it, the card and the area have the class `sling-armed` (for
+  the game to show it); letting go there glides it straight up and off (220 ms, its last poses reaching the board),
+  then `onSling(id, { direction: "middle" })`. Without `line` nothing changes. Documented in the developer guide
+  (section 10).

@@ -8,6 +8,7 @@ history.
 
 ## [Unreleased]
 
+- The sling can have a release line: let go of a card above it and it is played toward the middle (`line()`, D-193).
 - A phone that lost its connection keeps its seat in the lobby for five minutes instead of one (`DECK_GRACE_MS`, D-192).
 - A phone's short messages (a refused move) float over the top of the screen instead of pushing the game down (D-191).
 - The board on another screen (D-190): the board's settings show a QR code and link that move the board to an iPad,
