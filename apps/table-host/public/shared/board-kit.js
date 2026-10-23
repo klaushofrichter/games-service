@@ -42,8 +42,11 @@ export async function copyText(text) {
 let actx = null;
 export function audio() {
   try {
+    if (actx?.state === "closed") actx = null;
     actx ??= new (window.AudioContext || window.webkitAudioContext)();
-    if (actx.state === "suspended") actx.resume().catch(() => {});
+    // Not only "suspended": Safari "interrupts" it (a locked screen, a call, the tab in the background) and it stays
+    // so until resumed (D-195).
+    if (actx.state !== "running") actx.resume().catch(() => {});
     return actx;
   } catch {
     return null;
