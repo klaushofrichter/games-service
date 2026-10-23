@@ -350,6 +350,8 @@ export function settings({ info, setPrefs }) { return []; } // optional: items f
   label, value, options, onChange }`. `setPrefs(patch)` stores display choices for this game (`info.prefs`), never
   rules.
 - **Sound:** `playSound(info, name, make)` from the board kit plays only when the table's sound is on (`info.sound`).
+  A browser other than the table's kiosk plays it only after the board has been touched; the platform wakes it on the
+  first tap and shows *Tap to turn the sound on* until then (D-195), so a game does nothing about it.
 - **Performance:** the board may be a modest PC driving a large screen. Avoid endless CSS animations on large layers
   and rebuilding big SVG or DOM trees per frame; split static and moving layers, update only what changed, and move
   pieces with transforms or the Web Animations API (one animation along the whole path, not a step per frame).

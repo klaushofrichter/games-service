@@ -397,8 +397,27 @@ cornersEl.addEventListener("click", (e) => {
   if (b && b.dataset.face !== state.frontEdge) act("POST", "/face", { edge: b.dataset.face });
 });
 
-// Browsers keep sound off until the page is touched: wake the audio on the first touch (D-092).
-window.addEventListener("pointerdown", () => audio(), { capture: true });
+// Browsers keep sound off until the page is touched: wake the audio on the first touch (D-092). A finger's pointerdown
+// does not count as one (Chrome and Safari take its pointerup, a click or a key), so all of these do; until the sound
+// runs, a board with sound on says so (D-195). The table PC's kiosk browser allows it from the start.
+const soundHint = document.getElementById("sound-hint");
+let soundShown = false;
+function showSoundHint() {
+  const c = soundShown && state?.display?.sound !== false ? audio() : null;
+  soundHint.hidden = !c || c.state === "running";
+}
+function wakeAudio() {
+  const c = audio();
+  if (c && !c.onstatechange) c.onstatechange = showSoundHint;
+  c?.resume().then(showSoundHint, () => {});
+}
+for (const t of ["pointerdown", "pointerup", "touchend", "click", "keydown"]) window.addEventListener(t, wakeAudio, { capture: true });
+wakeAudio();
+// Not at once: a browser that allows sound resumes the audio a moment after the page loads.
+setTimeout(() => {
+  soundShown = true;
+  showSoundHint();
+}, 1500);
 
 let lastPhase = null;
 let holdFinal = false;
@@ -2110,6 +2129,7 @@ function connect() {
       // The games list serves only the lobby and its dialogs: skip it while a game runs.
       if (state.phase !== "active" && state.phase !== "paused" && state.phase !== "terminating") await refreshGames();
       render();
+      showSoundHint();
       stateListeners.forEach((f) => f());
       // The invite page shows the deck only to a player or to one let in to play; else it is a watcher's (D-168).
       if (REMOTE) tellPage({ type: "gt-seat", mayJoin: state.remote?.mayJoin !== false, watching: !!state.remote?.watching });

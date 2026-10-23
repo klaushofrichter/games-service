@@ -55,6 +55,8 @@ board moves there; the table's own window says "The board moved to another scree
 - The screen is remembered (a cookie derived from the table key), so it shows the board again after a reload or a
   restart. The link carries the table key: whoever opens it can run the table, so show it only on your own screens.
 - One board at a time (D-132): opening it on another screen moves it, and *Show the board here* moves it back.
+- Sound: browsers play sound only after the page has been touched, except the table's own kiosk browser. Until then a
+  board with sound on shows *Tap to turn the sound on* at the top; any tap or click on the board does it (D-195).
 - No configuration and no extra port: the table already listens on the network for the phones. `ALLOW_REMOTE_BOARD=1`
   (every device on the network gets the board) is for Docker setups and not needed for this.
 
