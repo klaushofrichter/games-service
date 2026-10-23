@@ -8,6 +8,9 @@ history.
 
 ## [Unreleased]
 
+- A board opened in another browser (an iPad, another computer, the table's network address) plays sound after the
+  first tap: a finger's tap on a touchscreen now counts, and until then the board shows *Tap to turn the sound on*
+  (D-195).
 - Slung and drawn cards no longer jump at the player's seat on the board (D-194).
 - The sling can have a release line: let go of a card above it and it is played toward the middle (`line()`, D-193).
 - A phone that lost its connection keeps its seat in the lobby for five minutes instead of one (`DECK_GRACE_MS`, D-192).

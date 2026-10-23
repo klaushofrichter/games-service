@@ -1257,3 +1257,20 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   dropping half a card in the first frame; it eases off gently now (`ease`, about a third of a second at normal
   speed). Checks in `scripts/e2e/card_sling.py`: the card at the seat is where the phone says (within 12 px), and a
   drawn card's first frame in the slot is where its flight ended (same x, within 30 px down).
+- **D-195 · 2026-10-23 · Klaus** — A board in a browser that holds sound back until the page is touched plays sound
+  after the first tap, and says so until then. *Why:* Klaus: "Backgammon sounds: I could not hear them on the main
+  board on a different URL, not localhost." Browsers allow sound only after the user has touched the page; the
+  table's kiosk browser allows it from the start, so this showed only elsewhere (an iPad, another computer, the
+  table's network address, D-190). *Implementation (Claude):* the board woke the audio on `pointerdown` only (D-092),
+  and a finger's pointerdown is no permission for sound (Chrome and Safari take its pointerup, `touchend`, a click or
+  a key), so on a touchscreen the sound stayed off for good, and nothing said why. It now wakes on all of these. A
+  board with sound on whose audio is not running 1.5 s after loading (a browser that allows sound runs by then) shows
+  a small *Tap to turn the sound on* at the top; any tap on the board turns the sound on and the note goes. Not with
+  sound switched off in the settings. Klaus then found Coin Flip silent too: "It looks like the browser lost the audio
+  access." A browser can also take the sound away later (Safari's "interrupted": a locked screen, the tab in the
+  background), and the board kit resumed only a "suspended" audio; it now resumes any that is not running (and makes a
+  new one if it was closed), and the note comes back whenever the sound stops. Check: `scripts/e2e/sound_hint.py` gives the page the strict rule (headless
+  Chromium plays sound whatever its autoplay flag): the note shows and goes with the sound setting, a finger's
+  pointerdown alone does not turn the sound on, a tap does and the note goes; sound taken away again brings the note
+  back and a tap the sound; and a browser that allows sound never
+  shows it. With the old wake-up on pointerdown, the check fails.

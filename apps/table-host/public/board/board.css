@@ -501,3 +501,9 @@ button.copy:hover, button.copy.done { color: var(--brass); border-color: var(--b
 .overlay.watchers .watchers-panel { width: 560px; }
 .invite-watch { margin: 10px 0 4px; }
 .tile.view-only { pointer-events: none; }
+
+/* Sound on, but this browser has not allowed it yet (D-195): any tap on the board turns it on. */
+#sound-hint { position: absolute; left: 50%; top: 14px; transform: translateX(-50%); z-index: 30; padding: 8px 18px;
+  border-radius: 999px; font-size: 20px; background: rgba(10, 29, 25, 0.9); border: 1px solid var(--brass-deep);
+  color: var(--brass); }
+#sound-hint[hidden] { display: none; }
