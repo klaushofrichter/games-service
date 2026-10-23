@@ -6,6 +6,8 @@
   away phones, exchanging players, pauses, AI scheduling).
 - **Asked to set it up and run it?** Follow [`docs/runbooks/local-docker.md`](docs/runbooks/local-docker.md): the
   Table Host with the built-in games in Docker on one machine, no cloud service, DNS or HTTPS.
+  Without Docker: `scripts/local-table.sh` (Node 26) runs one from the latest `main`, `--branch NAME`, and
+  `--extra ../other-repo` for games not released yet (developer guide, section 14).
 - **Changing the platform?** Decisions are recorded in [`docs/decisions.md`](docs/decisions.md) (D-nnn); add one for
   every product decision in the same pull request. Keep the developer guide, `llms.txt` and the SDK comments in step:
   `tests/developer-docs.test.ts` checks that every rules hook, manifest field and UI `info` field is documented.

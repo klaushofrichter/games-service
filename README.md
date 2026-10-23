@@ -41,7 +41,7 @@ Or skip the pairing code: create an access code in the console (*Access codes*) 
 
 ## A table on a Mac (development)
 
-`scripts/mac-table.sh` runs a Table Host on a Mac against the live service at `games.skylar.technology` (Node 26 needed). It opens the board in the browser, puts the Mac's WiFi address in the QR code, and keeps the table's identity and API key in `~/.gametable-mac`, so a restart is the same table. The first time, the board shows a pairing code: approve it in the console at `https://games.skylar.technology/admin`. Allow `node` to accept incoming connections when macOS asks, or phones cannot join. `scripts/mac-table.sh --code ABCD-EFGH` uses an access code from the console instead, so no approval is needed. `CLOUD_URL= scripts/mac-table.sh` runs it without the service.
+`scripts/local-table.sh` runs a Table Host on a Mac or a Linux computer against the live service at `games.skylar.technology` (Node 26 needed), without containers (`scripts/mac-table.sh` is its old name). It first updates the checkout to the latest `main`; `--branch production` or `--branch experiment/card-sling` runs another branch, and `--no-pull` runs the checkout as it is. `CLOUD_URL= scripts/local-table.sh --extra ../extra-games` adds the games of another checkout as they are (e.g. a branch of extra-games not released yet). It opens the board in the browser, puts the Mac's WiFi address in the QR code, and keeps the table's identity and API key in `~/.gametable-local` (or `~/.gametable-mac`, where an older table lives), so a restart is the same table. The first time, the board shows a pairing code: approve it in the console at `https://games.skylar.technology/admin`. Allow `node` to accept incoming connections when the system asks, or phones cannot join. `scripts/local-table.sh --code ABCD-EFGH` uses an access code from the console instead, so no approval is needed. `CLOUD_URL= scripts/local-table.sh` runs it without the service.
 
 ## Layout
 
@@ -66,7 +66,7 @@ Or skip the pairing code: create an access code in the console (*Access codes*) 
 | `scripts/release-notes.sh`, `release.sh` | The release step of the deploy |
 | `scripts/site-screenshots.py` | Takes the game screenshots for the public website (`apps/cloud/public/site/`) from a host running every public game |
 | `scripts/soak.ts` | AI-only soak run over every game and player count |
-| `scripts/mac-table.sh` | A Table Host on a Mac against the live service (see above) |
+| `scripts/local-table.sh` | A Table Host on this computer against the live service, from any branch (see above) |
 | `docs/` | Decision log; `developers/` (the game developer guide); the request to the kube-setup session for the cluster side; `runbooks/` for running a table locally with Docker and for resetting and restoring the service's state |
 | `tests/` | Vitest suites that drive a real host through the board control API and fake decks |
 | `deploy/` | Dockerfiles, docker-compose, the local Docker setup (`local/`), the table PC kit |
@@ -165,7 +165,7 @@ codes*: a label, a validity (one week, one month, one year or forever) and the g
 repositories, or chosen ones). The console shows the code, like `ABCD-EFGH`, once; the service keeps only a hash.
 
 - **On the table:** `TABLE_CODE=ABCD-EFGH` in the environment (the table PC's `.env`), `--code ABCD-EFGH` on the
-  command line (also `scripts/mac-table.sh --code …`), or *Access code* in the board's settings, which has a keypad.
+  command line (also `scripts/local-table.sh --code …`), or *Access code* in the board's settings, which has a keypad.
   A code given at start wins and can't be changed on the board. The board shows what the service said about it.
 - **One table per code:** the first table that uses a code keeps it; any other is refused (*in use*) and waits with
   its pairing code. *Release* frees a code for a new table, for example after reinstalling the PC, and disconnects

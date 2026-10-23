@@ -469,6 +469,21 @@ Tests use Vitest and run against the real host code.
   `rt.state` and `rt.over`, and check `expect(expectReplay(game, rt)).toBe(true)` once the game has ended.
 - **Host:** `tests/helpers.ts` starts a real Table Host (`testHost()`) with fake phones (`joinDeck(name)`,
   `deck.request("game", "intent", …)`, `deck.waitView(…)`) and the board API (`t.ok("POST", "/game/start")`).
+- **A table on your computer:** `scripts/local-table.sh` (macOS or Linux, Node 26, no containers) starts a Table
+  Host from this repository and opens the board; phones on the same WiFi join with the QR code (D-188). It first
+  brings the checkout up to the latest `main`; `--branch NAME` runs another branch (`production`, a feature branch),
+  `--no-pull` runs the checkout as it is. `--extra ../my-games` adds the games of another checkout, so you can play a
+  game from your own repository before it is released; start it with `CLOUD_URL=` to leave the live service out (it
+  would otherwise also install its own extra games). `--code ABCD-EFGH` connects the table to a game service with an
+  access code. The table keeps its identity and key in `~/.gametable-local`. A table in Docker instead:
+  [`docs/runbooks/local-docker.md`](../runbooks/local-docker.md).
+
+  ```
+  scripts/local-table.sh                                   # latest main, against the live service
+  scripts/local-table.sh --branch my-feature               # a branch
+  CLOUD_URL= scripts/local-table.sh --extra ../my-games    # your own games, no service
+  ```
+
 - **By hand, without a phone:** *Advanced › Developer › Play from the board* on the board (or `BOARD_DECK=1`) puts one
   player's deck beside the board, as on a remote player's page, so you can play your game at one screen with AI players
   (D-175). Only one person plays at the table meanwhile, since the deck is private; remote players can still join.
