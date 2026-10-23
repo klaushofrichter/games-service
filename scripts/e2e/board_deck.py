@@ -1,7 +1,8 @@
 """Browser check of "Play from the board" (D-175), a developer setting: switched on under Advanced › Developer, the
 board moves into a page with one player's deck beside it, laid out like a remote player's page; the deck takes a seat
 without a phone or join code; the QR code goes and a phone with the code is turned away; the player plays a game of
-Coin Flip from the deck against an AI; Hide and Show fold the deck; switched off, the board is alone again and the
+Coin Flip from the deck against an AI; Hide and Show fold the deck; Fullscreen takes the whole page, deck included
+(D-184); switched off, the board is alone again and the
 player stays at the table.
 A Table Host of its own (port 8139), without the cloud service.
   python3 scripts/e2e/board_deck.py out/
@@ -76,6 +77,19 @@ try:
         page.wait_for_selector("#play.deck-min")
         page.click("#deck-min")
         page.wait_for_selector("#play:not(.deck-min)")
+
+        # Fullscreen from the board's settings takes the whole page, board and deck (D-184), not just the board's frame,
+        # which would cover the deck.
+        board.locator("#settings-button").click()
+        board.locator(".overlay.settings [data-fs]").click()
+        wait(lambda: page.evaluate("() => document.fullscreenElement === document.documentElement"), 5, "the page to go fullscreen")
+        box = page.locator("#deck-wrap").bounding_box()
+        assert box and box["width"] > 300 and box["x"] + box["width"] <= 1600, f"the deck is not on screen in fullscreen: {box}"
+        assert board.locator(".overlay.settings [data-fs]").inner_text() == "Leave fullscreen"
+        page.screenshot(path=os.path.join(OUT, "board-deck-fullscreen.png"))
+        board.locator(".overlay.settings [data-fs]").click()
+        wait(lambda: page.evaluate("() => document.fullscreenElement === null"), 5, "the page to leave fullscreen")
+        board.locator(".overlay.settings [data-close-overlay]").first.click()
 
         # Switched off: the board is alone again, with its QR code; the player stays.
         a("POST", "/developer", {"boardDeck": False})

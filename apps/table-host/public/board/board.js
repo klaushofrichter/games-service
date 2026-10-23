@@ -25,6 +25,17 @@ const flipBtn = document.getElementById("flip-button");
 const toolsBtn = document.getElementById("tools-button");
 /** The board inside "Play from the board" (D-175, board/play.html), beside one player's deck. */
 const IN_PLAY = new URLSearchParams(location.search).get("in") === "play" && window.parent !== window;
+/**
+ * The document Fullscreen applies to (D-184): inside "Play from the board" the whole page (board and deck), not just
+ * the board's frame, which would cover the deck. The page is served by the table itself, so it is the same origin.
+ */
+const fsDoc = (() => {
+  try {
+    return IN_PLAY && window.parent.document ? window.parent.document : document;
+  } catch {
+    return document;
+  }
+})();
 const watchBtn = document.getElementById("watchers-button");
 const viewBtn = document.getElementById("view-button");
 const resultBtn = document.getElementById("result-button");
@@ -617,7 +628,7 @@ function openSettings() {
       console.error("game settings failed", err);
       items = [];
     }
-    const fs = document.fullscreenEnabled;
+    const fs = fsDoc.fullscreenEnabled;
     // The chosen game's own settings from its manifest (D-090): editable until it starts, then shown read-only.
     const fields = gameFields();
     const editable = state.phase === "ready";
@@ -661,7 +672,7 @@ function openSettings() {
     setPanel(o, `<div class="panel"><h2>Settings</h2>
       <div class="group"><div class="eyebrow">Display</div>
         <div class="row"><span>Sound effects</span><button data-sound class="${state.display?.sound !== false ? "on" : ""}" role="switch" aria-checked="${state.display?.sound !== false}">${state.display?.sound !== false ? "On" : "Off"}</button></div>
-        <div class="row"><span>Fullscreen</span>${fs ? `<button data-fs class="${document.fullscreenElement ? "on" : ""}">${document.fullscreenElement ? "Leave fullscreen" : "Fullscreen"}</button>` : `<span class="faint">not available in this browser</span>`}</div></div>
+        <div class="row"><span>Fullscreen</span>${fs ? `<button data-fs class="${fsDoc.fullscreenElement ? "on" : ""}">${fsDoc.fullscreenElement ? "Leave fullscreen" : "Fullscreen"}</button>` : `<span class="faint">not available in this browser</span>`}</div></div>
       <div class="group"><div class="eyebrow">Joining</div>
         ${state.developer?.boardDeck ? `<div class="row"><span class="faint">Played from the board (Advanced › Developer): no phone joins at the table</span></div>` : `<div class="row"><span>The QR code and address for phones, to join or rejoin, also during a game</span><button data-join-code>Show join code…</button></div>`}
         <div class="row"><span>${remoteJoinText()}</span>${inviteButton("Invite remote player…")}</div></div>
@@ -675,7 +686,7 @@ function openSettings() {
   const close = () => {
     unsub();
     clearInterval(tick);
-    document.removeEventListener("fullscreenchange", draw);
+    fsDoc.removeEventListener("fullscreenchange", draw);
     o.remove();
     settingsOverlay = null;
   };
@@ -683,7 +694,7 @@ function openSettings() {
   const unsub = onState(draw);
   // The code's "valid for …" counts down while the settings are open (down to minutes).
   const tick = setInterval(() => state?.cloud?.code?.expiresAt && draw(), 30_000);
-  document.addEventListener("fullscreenchange", draw);
+  fsDoc.addEventListener("fullscreenchange", draw);
   // Choices with more options than fit as buttons are pulldowns (D-129).
   o.addEventListener("change", (e) => {
     const sel = e.target.closest("select");
@@ -701,7 +712,7 @@ function openSettings() {
     if (e.target === o || b?.dataset.closeOverlay !== undefined) return close();
     if (!b) return;
     if (b.dataset.fs !== undefined) {
-      (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()).catch(() => toast("Fullscreen was refused by the browser"));
+      (fsDoc.fullscreenElement ? fsDoc.exitFullscreen() : fsDoc.documentElement.requestFullscreen()).catch(() => toast("Fullscreen was refused by the browser"));
     }
     if (b.dataset.sound !== undefined) return void act("POST", "/display", { sound: state.display?.sound === false });
     if (b.dataset.accessCode !== undefined) return openCodePad();

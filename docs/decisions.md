@@ -1085,3 +1085,13 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   `+0.0 s`, which is right: AI players in a simulation move at once, and the game's clock moves on only with its
   timers. So `scripts/site-screenshots.py` (`viewer`) now jumps to move 19, where the timer between hands shows and
   the times move to `+8.0 s`. The example prompt names the new log, and the caption says how simulated time moves.
+
+## Fullscreen while playing from the board (23 Oct 2026)
+
+- **D-184 · 2026-10-23 · Klaus** — With *Play from the board* (D-175), Fullscreen takes the whole page, the board and
+  the deck beside it. *Why:* Klaus: "when we have the developer option "one player with a on-screen deck" active:
+  Fullscreen hides that on-screen deck." The board runs in a frame of `board/play.html`; its Fullscreen button made
+  only that frame fullscreen, which covered the deck. *Implementation (Claude):* inside that page the board's
+  Fullscreen (and its *Leave fullscreen* label) works on the page around it (`fsDoc`; the page is served by the table
+  itself, so it is the same origin). A board on its own is unchanged. `scripts/e2e/board_deck.py`: Fullscreen from the
+  board's settings makes the page fullscreen with the deck on screen, and leaves it again; on the old code it fails.

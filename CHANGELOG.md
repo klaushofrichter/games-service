@@ -8,6 +8,7 @@ history.
 
 ## [Unreleased]
 
+- With *Play from the board*, Fullscreen takes the whole page, so the deck beside the board stays on screen (D-184).
 - The website's Game Viewer screenshot is taken again with D-181's simulation times, at the start of the second
   hand (D-183).
 - The board's Advanced window (hammer and wrench) shows the versions of the platform and of every game on the
