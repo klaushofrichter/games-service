@@ -364,6 +364,12 @@ html.lb-open, html.lb-open body { overflow: hidden; }
 .dbg-shot { position: relative; margin: 14px 0 0; }
 .dbg-shot img { border-radius: 16px; border: 1px solid var(--line-2); box-shadow: 0 40px 90px rgba(0,0,0,.5); }
 .dbg-shot figcaption { margin-top: 14px; color: var(--faint); font-size: 14px; }
+.showcase { margin-top: 80px; display: grid; gap: 28px; }
+.show-grid { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: 40px; align-items: center; }
+.show-grid .dbg-shot { margin: 0; }
+.show-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+.show-list li { color: var(--soft); font-size: 15.5px; padding-left: 18px; border-left: 2px solid var(--brass-deep); }
+.show-list b { color: var(--ink); font-weight: 600; }
 .links { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-top: 40px; }
 .lnk { display: grid; gap: 6px; padding: 20px; border-radius: 16px; border: 1px solid var(--line); background: rgba(15,42,36,.55); color: var(--ink); transition: all .25s; }
 .lnk:hover { border-color: var(--brass-deep); transform: translateY(-3px); text-decoration: none; }
@@ -451,7 +457,7 @@ footer .version { display: inline; margin: 0; }
   .code { position: static; }
   .aw-grid { grid-template-columns: minmax(0, 1fr); gap: 44px; }
   .repo { grid-template-columns: 1fr; }
-  .dbg-cards { grid-template-columns: minmax(0, 1fr); }
+  .dbg-cards, .show-grid { grid-template-columns: minmax(0, 1fr); }
   footer .wrap { grid-template-columns: 1fr 1fr; }
 }
 @media (max-width: 640px) {
@@ -557,7 +563,7 @@ footer .version { display: inline; margin: 0; }
 
 <div class="numbers wrap">
   <div class="num rv"><b data-count="1">0</b><span>prompt to a working Backgammon</span></div>
-  <div class="num rv" style="--d:.06s"><b data-count="7">0</b><span>free games to play today</span></div>
+  <div class="num rv" style="--d:.06s"><b data-count="8">0</b><span>free games to play today</span></div>
   <div class="num rv" style="--d:.12s"><b data-count="8">0</b><span>players around one board</span></div>
   <div class="num rv" style="--d:.18s"><b data-count="0" data-suffix=" lines">0</b><span>of lobby code in your game</span></div>
 </div>
@@ -612,8 +618,8 @@ footer .version { display: inline; margin: 0; }
   <div class="wrap">
     <div class="section-head">
       <p class="eyebrow rv">Free games</p>
-      <h2 class="rv" style="--d:.06s">Seven games, and room for yours.</h2>
-      <p class="lede rv" style="--d:.12s">Four games come with the platform; three more come from <a href="https://github.com/klaushofrichter/extra-games" target="_blank" rel="noopener noreferrer">extra-games</a>, a separate repository that shows how anyone can add games. All of them are free and play for points, never money.</p>
+      <h2 class="rv" style="--d:.06s">Eight games, and room for yours.</h2>
+      <p class="lede rv" style="--d:.12s">Four games come with the platform; four more come from <a href="https://github.com/klaushofrichter/extra-games" target="_blank" rel="noopener noreferrer">extra-games</a>, a separate repository that shows how anyone can add games. All of them are free and play for points, never money.</p>
     </div>
     <div class="filters rv" role="tablist">
       <button class="chipbtn on" data-f="all">All games</button>
@@ -751,7 +757,7 @@ awards: [
           <button class="copy" data-copy="#say">Copy</button>
         </div>
         <div class="timeline">
-          <div class="tl rv"><span class="n">1</span><div><h3>Start from a working repository</h3><p>Copy <a href="https://github.com/klaushofrichter/extra-games" target="_blank" rel="noopener noreferrer">extra-games</a>: three complete games, tests that run them on the real platform, and CI. Or start inside the platform from <code>games/coin-flip</code>, the smallest complete game.</p></div></div>
+          <div class="tl rv"><span class="n">1</span><div><h3>Start from a working repository</h3><p>Copy <a href="https://github.com/klaushofrichter/extra-games" target="_blank" rel="noopener noreferrer">extra-games</a>: four complete games, tests that run them on the real platform, and CI. Or start inside the platform from <code>games/coin-flip</code>, the smallest complete game.</p></div></div>
           <div class="tl rv"><span class="n">2</span><div><h3>Let your AI read the contract</h3><p><code>llms.txt</code> points to the developer guide: the manifest, every rules hook, what the platform does with players, and a checklist. One file holds it all: <code>llms-full.txt</code>.</p></div></div>
           <div class="tl rv"><span class="n">3</span><div><h3>Write rules, not plumbing</h3><p>Rules are pure functions on a JSON state: <code>setup</code>, <code>onIntent</code>, <code>view</code>, <code>boardView</code>, <code>isOver</code>, plus an AI. Randomness comes from the context, so every game can be replayed and checked.</p></div></div>
           <div class="tl rv"><span class="n">4</span><div><h3>Play it, even without a phone</h3><p>Run a table on your laptop. <em>Play from the board</em> puts a player's deck beside the board, AI players take the other seats, and the Game Viewer shows each move if something looks wrong.</p></div></div>
@@ -841,6 +847,26 @@ awards: [
       </ul></div>
     </div>
 
+    <!-- A demo of how far a game can make the table its own (D-185): Mexican Train from extra-games. -->
+    <div class="showcase" id="showcase">
+      <div class="dbg-head">
+        <p class="eyebrow rv">Demo game</p>
+        <h3 class="rv" style="--d:.06s">Make the table your own: Mexican Train.</h3>
+        <p class="rv" style="--d:.1s">Mexican Train, in extra-games, is a demo for developers: a game that changes nearly everything you see and hear, and still lets the platform handle the lobby, the seats and the players. Copy any part of it into your own game.</p>
+      </div>
+      <div class="show-grid">
+        <figure class="dbg-shot rv" style="--d:.05s"><img src="/site/mexican-train.webp" alt="The Mexican Train board: trains of dominoes run out from a glowing hub over an animated aurora, with glass seat plates around the edge" loading="lazy" width="1600" height="900"></figure>
+        <ul class="show-list rv" style="--d:.1s">
+          <li><b>A board that sizes itself.</b> A train can grow to 47 tiles: it bends into rows, and the tiles shrink only as far as they must.</li>
+          <li><b>Animated backgrounds.</b> Aurora, lava, plasma, fireflies, a starfield or clouds, drawn by the game itself; or a new one each round.</li>
+          <li><b>The platform's seat plates, restyled.</b> Glass you can see the background through, glowing on the player whose turn it is.</li>
+          <li><b>Its own sound and music.</b> Tile clacks and a train whistle, and tunes the game composes as it plays.</li>
+          <li><b>Rule options and table preferences.</b> House rules picked when the game starts; tile faces, background and music changed any time from the board's settings.</li>
+          <li><b>Its own phone screen.</b> Your hand, the trains you may play on and two taps to play, in the platform's phone layout.</li>
+        </ul>
+      </div>
+    </div>
+
     <!-- Test and debug with your AI (D-180): AI-only simulations, logs an AI can read, references to a move. -->
     <div class="dbg" id="debug">
       <div class="dbg-head">
@@ -894,7 +920,7 @@ node scripts/soak.ts 100</pre>
       <a class="lnk rv spot" href="/docs/game-development.md"><b>Developer guide</b><span>The full contract, with a checklist.</span><code>/docs/game-development.md</code></a>
       <a class="lnk rv spot" style="--d:.05s" href="/llms.txt"><b>llms.txt</b><span>The index for your AI agent.</span><code>/llms.txt</code></a>
       <a class="lnk rv spot" style="--d:.1s" href="/llms-full.txt"><b>Everything in one file</b><span>Index, guide and runbook together.</span><code>/llms-full.txt</code></a>
-      <a class="lnk rv spot" style="--d:.15s" href="https://github.com/klaushofrichter/extra-games" target="_blank" rel="noopener noreferrer"><b>Example repository</b><span>Chess, Liar's Dice, Backgammon.</span><code>klaushofrichter/extra-games</code></a>
+      <a class="lnk rv spot" style="--d:.15s" href="https://github.com/klaushofrichter/extra-games" target="_blank" rel="noopener noreferrer"><b>Example repository</b><span>Chess, Liar's Dice, Backgammon, Mexican Train.</span><code>klaushofrichter/extra-games</code></a>
     </div>
   </div>
 </section>
@@ -909,7 +935,7 @@ node scripts/soak.ts 100</pre>
     </div>
     <div class="repos">
       <div class="repo rv"><div class="name">klaushofrichter/games-service<small>The platform, with its built-in games</small></div><div class="gl"><span>Roulette</span><span>Hold'em</span><span>Pachisi</span><span>Coin Flip</span></div><a href="https://github.com/klaushofrichter/games-service" target="_blank" rel="noopener noreferrer">GitHub →</a></div>
-      <div class="repo rv" style="--d:.05s"><div class="name">klaushofrichter/extra-games<small>Example game repository, MIT</small></div><div class="gl"><span>Chess</span><span>Liar's Dice</span><span>Backgammon</span></div><a href="https://github.com/klaushofrichter/extra-games" target="_blank" rel="noopener noreferrer">GitHub →</a></div>
+      <div class="repo rv" style="--d:.05s"><div class="name">klaushofrichter/extra-games<small>Example game repository, MIT</small></div><div class="gl"><span>Chess</span><span>Liar's Dice</span><span>Backgammon</span><span>Mexican Train</span></div><a href="https://github.com/klaushofrichter/extra-games" target="_blank" rel="noopener noreferrer">GitHub →</a></div>
       <div class="repo add rv" style="--d:.1s"><div class="name">your-name/your-games<small>Built a game? Tell us about it</small></div><div class="gl faint" style="font-size:15px">Open an issue with a link to your repository and we'll list it here.</div><a href="https://github.com/klaushofrichter/games-service/issues/new?title=Game%20repository%3A%20" target="_blank" rel="noopener noreferrer">Add yours →</a></div>
     </div>
   </div>
@@ -1120,7 +1146,9 @@ docker compose -f deploy/local/docker-compose.yml up -d --build">Copy</button></
       text: "Tap a piece on the board, then its square. Clocks from bullet to classical, or none; AI at a strength you choose." },
     { id: "pachisi", name: "Pachisi", players: "2–4 players", src: "built-in",
       text: "Race your tokens around the board and home. Roll a 6 to leave the start, touch a token to move it, land on someone to send them back." },
-    { id: "coin-flip", name: "Coin Flip", players: "1–8 players", src: "built-in", wide: true, phone: "coin-flip-phone",
+    { id: "mexican-train", name: "Mexican Train", players: "2–8 players", src: "extra", phone: "mexican-train-phone",
+      text: "Dominoes up to double twelve: grow your own train from the hub, or the Mexican train everyone shares. Your tiles stay on your phone. A demo game for developers that customises nearly everything." },
+    { id: "coin-flip", name: "Coin Flip", players: "1–8 players", src: "built-in", phone: "coin-flip-phone",
       text: "Everyone guesses heads or tails, then the coin flips. The smallest complete game, and the one to copy when you start your own." },
   ];
   const grid = $("#games-grid");

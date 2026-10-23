@@ -23,7 +23,7 @@ describe("the public website (D-176)", () => {
     expect(r.status).toBe(200);
     expect(r.headers.get("content-type")).toMatch(/^text\/html/);
     const html = await r.text();
-    for (const id of ["room", "games", "awards", "lobby", "build", "debug", "repos", "install", "table"]) expect(html).toContain(`id="${id}"`);
+    for (const id of ["room", "games", "awards", "lobby", "build", "showcase", "debug", "repos", "install", "table"]) expect(html).toContain(`id="${id}"`);
     expect(html).toContain('<a id="admin-link" href="/admin">Admin</a>'); // without Google sign-in: the portal itself
     expect(html).toContain('class="version"');
     expect(html).not.toMatch(/\{\{\w+\}\}/);
@@ -55,7 +55,7 @@ describe("the public website (D-176)", () => {
     await start();
     const html = await readFile(new URL("../apps/cloud/public/home.html", import.meta.url), "utf8");
     const used = new Set([...html.matchAll(/\/site\/([a-z0-9-]+\.(?:webp|svg))/g)].map((m) => m[1]));
-    for (const g of ["holdem", "roulette", "pachisi", "coin-flip", "chess", "liars-dice", "backgammon"]) used.add(`${g}.webp`);
+    for (const g of ["holdem", "roulette", "pachisi", "coin-flip", "chess", "liars-dice", "backgammon", "mexican-train"]) used.add(`${g}.webp`);
     const files = new Set(await readdir(new URL("../apps/cloud/public/site/", import.meta.url)));
     for (const f of used) {
       expect(files.has(f), f).toBe(true);
