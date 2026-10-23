@@ -1266,7 +1266,11 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   a key), so on a touchscreen the sound stayed off for good, and nothing said why. It now wakes on all of these. A
   board with sound on whose audio is not running 1.5 s after loading (a browser that allows sound runs by then) shows
   a small *Tap to turn the sound on* at the top; any tap on the board turns the sound on and the note goes. Not with
-  sound switched off in the settings. Check: `scripts/e2e/sound_hint.py` gives the page the strict rule (headless
+  sound switched off in the settings. Klaus then found Coin Flip silent too: "It looks like the browser lost the audio
+  access." A browser can also take the sound away later (Safari's "interrupted": a locked screen, the tab in the
+  background), and the board kit resumed only a "suspended" audio; it now resumes any that is not running (and makes a
+  new one if it was closed), and the note comes back whenever the sound stops. Check: `scripts/e2e/sound_hint.py` gives the page the strict rule (headless
   Chromium plays sound whatever its autoplay flag): the note shows and goes with the sound setting, a finger's
-  pointerdown alone does not turn the sound on, a tap does and the note goes, and a browser that allows sound never
+  pointerdown alone does not turn the sound on, a tap does and the note goes; sound taken away again brings the note
+  back and a tap the sound; and a browser that allows sound never
   shows it. With the old wake-up on pointerdown, the check fails.

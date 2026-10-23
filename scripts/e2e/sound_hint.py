@@ -3,6 +3,7 @@ opened anywhere but the table's own kiosk: an iPad, another computer, the table'
 
   - a board in such a browser says "Tap to turn the sound on"; it does not with the sound switched off;
   - a finger's tap on the board (touchscreen: pointerdown alone does not count) turns the sound on and the hint goes;
+  - when the browser takes the sound away again (a locked screen), the hint is back and a tap brings the sound back;
   - a browser that allows sound from the start (the kiosk) never shows the hint.
 
   python3 scripts/e2e/sound_hint.py out/
@@ -71,6 +72,14 @@ try:
         # A finger's tap on an empty spot of the board turns it on.
         board.touchscreen.tap(590, 780)
         wait(lambda: audio_state(board) == "running", 5, "the sound to run after a tap")
+        board.wait_for_selector("#sound-hint", state="hidden")
+
+        # The browser takes the sound away again (a locked screen, the tab in the background): the note is back, and a
+        # tap brings the sound back.
+        board.evaluate("window.testAudio[0].suspend()")
+        board.wait_for_selector("#sound-hint:not([hidden])", timeout=5000)
+        board.touchscreen.tap(590, 780)
+        wait(lambda: audio_state(board) == "running", 5, "the sound to run again after a tap")
         board.wait_for_selector("#sound-hint", state="hidden")
         strict.close()
 
