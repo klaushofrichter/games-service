@@ -23,14 +23,15 @@ describe("the public website (D-176)", () => {
     expect(r.status).toBe(200);
     expect(r.headers.get("content-type")).toMatch(/^text\/html/);
     const html = await r.text();
-    for (const id of ["room", "games", "awards", "lobby", "build", "showcase", "debug", "repos", "install", "table", "service"]) expect(html).toContain(`id="${id}"`);
+    for (const id of ["room", "games", "awards", "lobby", "build", "showcase", "debug", "repos", "install", "table", "service", "about"]) expect(html).toContain(`id="${id}"`);
     expect(html).toContain('<a id="admin-link" href="/admin">Admin</a>'); // without Google sign-in: the portal itself
     expect(html).toContain('class="version"');
     expect(html).not.toMatch(/\{\{\w+\}\}/);
     expect(html).not.toContain("You are signed out");
     expect(await (await get("/?signed-out=1")).text()).toContain("You are signed out");
-    // Only first-party resources: no fonts, scripts or images from elsewhere.
-    expect(html).not.toMatch(/(src|href)="https?:\/\/(?!github\.com\/klaushofrichter\/)/);
+    // Only first-party resources: no fonts, scripts or images from elsewhere. Links go to the GitHub repositories and
+    // to skylar.technology, the company that hosts the project (D-187).
+    expect(html).not.toMatch(/(src|href)="https?:\/\/(?!github\.com\/klaushofrichter\/|skylar\.technology")/);
     // The private game repositories are never named on the public page.
     expect(html).not.toMatch(/loopy|starforge/i);
   });

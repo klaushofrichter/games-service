@@ -94,7 +94,7 @@ try:
                 page.locator("#show-shot").screenshot(path=os.path.join(OUT, "website-showcase-lava.png"))
                 page.evaluate("window.scrollBy(0, -innerHeight)")
                 page.wait_for_selector("#show-shot:not(.alt)")
-                for sid in ["build", "install", "table", "service"]:
+                for sid in ["build", "install", "table", "service", "about"]:
                     page.locator(f"#{sid}").scroll_into_view_if_needed()
                     page.wait_for_timeout(600)
                     page.screenshot(path=os.path.join(OUT, f"website-{sid}.png"))
