@@ -1,0 +1,4 @@
+/* Card Sling board (test game). */
+.cs-root { position: absolute; inset: 0; background: radial-gradient(60% 60% at 50% 48%, #1d5b45, #0c2a21 75%); overflow: hidden; }
+.cs-pile > div { position: absolute; left: 0; top: 0; width: 120px; height: 180px; filter: drop-shadow(0 8px 14px rgba(0,0,0,.5)); }
+.cs-count { position: absolute; left: 50%; top: 760px; transform: translateX(-50%); color: rgba(255,255,255,.7); font: 600 22px system-ui, sans-serif; }

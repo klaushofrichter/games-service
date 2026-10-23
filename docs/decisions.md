@@ -1148,3 +1148,28 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   own agent: set up a table and write a game in one sentence, then fine-tune by playing. The footer links to it.
   Checks: `tests/website.test.ts` (the section; besides the GitHub repositories, the page may link to
   `https://skylar.technology`, still with no resources from elsewhere), `scripts/e2e/website.py` (a screenshot of it).
+
+## Slinging cards from the phone to the board (23 Oct 2026)
+
+- **D-189 · 2026-10-23 · Klaus** — The platform lets a player push a card (or a die, a token) up and off the top of
+  their phone and see it come onto the board at their seat while they drag; once played, it flies to where the game
+  wants it, and a drawn card flies the other way. *Why:* Klaus, after trying the experiment: "The "Sling" works really
+  well, looks fantastic", with: the board slower ("perhaps taking 1.5x time. This could be a setting"), starting "on
+  the edge of the window, and not on the edge of the player name box … ON TOP of the name box", the phone's tilt "also
+  on the board", and "this should be a Platform feature. Consider how to separate platform (i.e. APIs that games can
+  use) from games (e.g. the card graphics)"; showing the back "as long as the move is not final" as a toggle; a
+  direction of the sling (middle, left or right); other uses such as dice. *Implementation (Claude):*
+  - **Live gestures.** `ctx.gesture(data)` on the phone goes over its socket with no answer; the host passes it to
+    every board, local and remote, as `{ seat, data }`, and the board calls the game's `gesture(seat, data)` hook.
+    Not an intent: no rules, no log, no replay, no other phones. Dropped outside a running game, for players without
+    a seat, over 512 bytes or more than one per 8 ms. Remote players' sockets arrive over WebRTC on the same handler.
+  - **`/shared/sling.js`.** `slingDeck` on the phone: drag, tilt, threshold (half out) or flick, direction,
+    `canSling` (bounce back), `onSling` (the game's intent), `receive` (a drawn card comes in at the top). `slingBoard`
+    on the board: a slot at each seat's edge of the window, above the plates, easing toward the latest gesture with
+    the phone's tilt; `fly` from where the drag left the card to the game's target; `toSeat` for draws; `flight` for
+    anything else. Timings are 1.5 times the experiment's, and `speed()` scales them for a board setting.
+  - **The split.** The platform owns gestures, geometry, timing and animation; the game owns the markup
+    (`render(item, { back })`), where things land, what a move means and whether a sling is allowed. The board sees
+    only the back while dragging unless the game passes `reveal: "drag"`; the face appears when the flight starts.
+  - `games/card-sling` (a test game, shown with `SHOW_TEST_GAMES=1`) is the smallest user;
+    `scripts/e2e/card_sling.py` checks the back while dragging, the tilt on the board, a fling, a draw and an AI card.
