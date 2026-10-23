@@ -8,6 +8,9 @@ history.
 
 ## [Unreleased]
 
+- The board on another screen (D-190): the board's settings show a QR code and link that move the board to an iPad,
+  a TV or another computer on the same network, which is then remembered; the table's window says where it went and
+  can take it back.
 - Sling (D-189): games can let players push a card off the top of their phone and see it come onto the board at
   their seat while they drag, then fly to the pile; drawn cards fly the other way (`/shared/sling.js`,
   `ctx.gesture`, the board's `gesture` hook). Card Sling is a test game for it.

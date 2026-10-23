@@ -1192,3 +1192,24 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
     only the back while dragging unless the game passes `reveal: "drag"`; the face appears when the flight starts.
   - `games/card-sling` (a test game, shown with `SHOW_TEST_GAMES=1`) is the smallest user;
     `scripts/e2e/card_sling.py` checks the back while dragging, the tilt on the board, a fling, a draw and an AI card.
+
+## The board on another screen (23 Oct 2026)
+
+- **D-190 · 2026-10-23 · Klaus** — The board can show on another screen on the same network (an iPad, a TV, a second
+  computer) while the table runs on its computer: the board's settings › *Board on another screen…* show a QR code and
+  link that move it there. *Why:* Klaus: "I have an iPad and want to use that as a Game Board monitor … the game board
+  engine needs to run on the mac … I am OK with it for LAN only", "build the setting for the external monitor or
+  iPad. Once we move the board to another browser, we will show the "other board connected" in the mac?", and "add
+  documentation about this behavior as a platform feature … so that humans and LLMs can find it". *Implementation
+  (Claude):* an exception to D-034 that keeps its point (devices on the network don't get the table's controls on
+  their own): `/board/screen?key=<table key>` from a private address (10/8, 172.16/12, 192.168/16, link-local, IPv6
+  ULA) sets an HttpOnly, SameSite=Strict cookie derived from the key and redirects to the board, which takes the board
+  over at once (`#screen`); later loads of `/board/` from that browser are allowed by the cookie. Never through a
+  remote player's channel, never from a public address, never with a wrong key. The window it replaces (D-132) is
+  told where it went: "The board moved to another screen … at 192.168.1.34" with *Show the board here*; taken back,
+  the screen says "The board moved back to the table's computer". The dialog warns that the link runs the table.
+  Changing the table key (`TABLE_KEY`, or the key file of `scripts/local-table.sh`) forgets every screen. No extra
+  port: the table already listens on the network for phones. Documented in the README, `llms.txt`, the developer guide
+  (section 14), `AGENTS.md` and the Docker runbook. Check: `scripts/e2e/board_screen.py` (an iPad through a relay from
+  127.0.0.2, so the table sees another device: no board without the link or with a wrong key, the link and QR code
+  in the settings, the takeover, remembered after a reload, the table's notice and taking it back).
