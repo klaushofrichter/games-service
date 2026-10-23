@@ -73,7 +73,7 @@ function send(ch, type, payload) {
 // A short message (a refused move, D-191) floats over the top of the screen for three seconds instead of pushing the
 // page down: the game's status stays where it is.
 const toastEl = document.createElement("div");
-toastEl.className = "toast";
+toastEl.className = "deck-toast"; // not .toast: that is the board's, at the bottom (shared theme)
 toastEl.setAttribute("role", "status");
 toastEl.setAttribute("aria-live", "polite");
 document.body.appendChild(toastEl);
