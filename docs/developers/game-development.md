@@ -403,7 +403,9 @@ the move means. The test game `games/card-sling` is the smallest example; Last C
   in `area` draggable. `area` clips its content; its top edge is where things leave the phone. Letting go with half
   of it out (`threshold`), or a flick, calls `onSling(id, { direction })`, where the game sends its intent and returns
   whether it was accepted; `direction` (`"left"`, `"middle"`, `"right"`) says where the flick went. `canSling(id)`
-  returning false or a reason lets the thing peek out and bounce back. The thing leans with sideways movement
+  returning false or a reason lets the thing peek out and bounce back. `line()` (a page height, e.g. the bottom of
+  a status box) lets players play a thing by letting go above it, toward the middle, without pushing it all the way
+  off; above the line, the thing and `area` have the class `sling-armed`. The thing leans with sideways movement
   (`tilt`), and the board shows the same angle. `reveal: "move"` (default) shows the board only the back while
   dragging; `"drag"` sends `item(id)`, so the board shows the face at once. `receive(el)` lets a drawn thing come in
   at the top, after the board has thrown it; `busy()` is true while something is under a finger (re-render after).
