@@ -1219,6 +1219,6 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
 - **D-191 · 2026-10-23 · Klaus** — A short message on a phone (a refused move, `ctx.toast`) floats over the top of the
   screen for its three seconds instead of being inserted above the tabs. *Why:* Klaus, playing Last Card: "The warning
   on the deck "not a valid card" or similar moves the game status box. Make this warning on top of the status, it
-  disappears after a few seconds anyway." *Implementation (Claude):* one `.toast` element fixed at the top (below the
+  disappears after a few seconds anyway." *Implementation (Claude):* one `.deck-toast` element fixed at the top (not the shared theme's `.toast`, the board's, which sits at the bottom) (below the
   safe area), fading in and out, `role="status"`; it covers the tabs for a moment and moves nothing. Pause messages
   ("Waiting for …") stay in the page as before: they last as long as the pause. Every game gets this.
