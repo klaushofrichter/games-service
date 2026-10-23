@@ -1213,3 +1213,12 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   (section 14), `AGENTS.md` and the Docker runbook. Check: `scripts/e2e/board_screen.py` (an iPad through a relay from
   127.0.0.2, so the table sees another device: no board without the link or with a wrong key, the link and QR code
   in the settings, the takeover, remembered after a reload, the table's notice and taking it back).
+
+## A phone's short messages float over the top (23 Oct 2026)
+
+- **D-191 · 2026-10-23 · Klaus** — A short message on a phone (a refused move, `ctx.toast`) floats over the top of the
+  screen for its three seconds instead of being inserted above the tabs. *Why:* Klaus, playing Last Card: "The warning
+  on the deck "not a valid card" or similar moves the game status box. Make this warning on top of the status, it
+  disappears after a few seconds anyway." *Implementation (Claude):* one `.toast` element fixed at the top (below the
+  safe area), fading in and out, `role="status"`; it covers the tabs for a moment and moves nothing. Pause messages
+  ("Waiting for …") stay in the page as before: they last as long as the pause. Every game gets this.

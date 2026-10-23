@@ -8,6 +8,7 @@ history.
 
 ## [Unreleased]
 
+- A phone's short messages (a refused move) float over the top of the screen instead of pushing the game down (D-191).
 - The board on another screen (D-190): the board's settings show a QR code and link that move the board to an iPad,
   a TV or another computer on the same network, which is then remembered; the table's window says where it went and
   can take it back.
