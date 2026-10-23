@@ -8,6 +8,9 @@ history.
 
 ## [Unreleased]
 
+- Sling (D-189): games can let players push a card off the top of their phone and see it come onto the board at
+  their seat while they drag, then fly to the pile; drawn cards fly the other way (`/shared/sling.js`,
+  `ctx.gesture`, the board's `gesture` hook). Card Sling is a test game for it.
 - `scripts/local-table.sh` (was `mac-table.sh`, which still works) runs a table on macOS or Linux from the latest
   `main`, or from any branch with `--branch production` or `--branch experiment/card-sling`; `--no-pull` runs the
   checkout as it is (D-188).

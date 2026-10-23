@@ -321,6 +321,7 @@ export function mount(root, ctx) {
     update(view, events, info) { /* draw boardView; animate events */ },
     destroy() { /* stop timers, remove listeners */ },
     whenIdle() { return Promise.resolve(); }, // optional: resolves once everything sent so far has been shown
+    gesture(seat, data) { /* optional: a phone's live gesture, e.g. a card being slung (section 10) */ },
   };
 }
 export function settings({ info, setPrefs }) { return []; } // optional: items for the board's settings window
@@ -372,7 +373,7 @@ export function settings({ info, setPrefs }) { return []; } // optional: items f
 
 ```js
 export function mount(root, ctx) {
-  // ctx: { gameId, seat, send(name, payload) → Promise<{ ok, reason? }>, toast(text), vibrate(ms), assetUrl(path) }
+  // ctx: { gameId, seat, send(name, payload) → Promise<{ ok, reason? }>, gesture(data), toast(text), vibrate(ms), assetUrl(path) }
   return { update(view, events, info) { … }, destroy() { … } };
 }
 ```
@@ -387,6 +388,32 @@ export function mount(root, ctx) {
   updates at once rather than animating the move again.
 - **Facing:** `info.viewEdge` (the edge this player looks from) and `info.boardEdge` (the edge the board's game faces)
   let a phone turn a map the way the player sees the table.
+
+### Slinging things from the phone to the board
+
+A player can push a card (a die, a token…) up and off the top of their phone and see it come onto the board at their
+seat (D-189). The platform does the gesture and the animation; the game draws the thing, says where it lands and what
+the move means. The test game `games/card-sling` is the smallest example; Last Card in extra-games a full one.
+
+- **Live gestures:** `ctx.gesture(data)` on the phone sends a small JSON object (512 bytes at most) to every board,
+  local and remote, where the game's `gesture(seat, data)` hook gets it. No rules run, nothing is logged or replayed,
+  nothing reaches other phones; the host drops gestures outside a running game, from players without a seat, and more
+  than one per 8 ms from a phone. The move itself is still an intent.
+- **On the phone,** `slingDeck(area, ctx, opts)` from `/shared/sling.js` makes every element with `data-sling="<id>"`
+  in `area` draggable. `area` clips its content; its top edge is where things leave the phone. Letting go with half
+  of it out (`threshold`), or a flick, calls `onSling(id, { direction })`, where the game sends its intent and returns
+  whether it was accepted; `direction` (`"left"`, `"middle"`, `"right"`) says where the flick went. `canSling(id)`
+  returning false or a reason lets the thing peek out and bounce back. The thing leans with sideways movement
+  (`tilt`), and the board shows the same angle. `reveal: "move"` (default) shows the board only the back while
+  dragging; `"drag"` sends `item(id)`, so the board shows the face at once. `receive(el)` lets a drawn thing come in
+  at the top, after the board has thrown it; `busy()` is true while something is under a finger (re-render after).
+- **On the board,** `slingBoard(root, { render, size, speed })` draws what comes in at each seat's edge of the board,
+  above the seat plates, and the flights. Pass gestures on with `sling.gesture(seat, data)` and keep `sling.info(info)`
+  current in `update`. When the move's event arrives, `sling.fly(seat, { id, item, to })` flies the thing face up from
+  where the drag left it (or from the seat, for AI players) to `to = { x, y, angle }`, and resolves when it lands;
+  `sling.toSeat(seat, { item, from })` throws one to a seat (a drawn card), where it slips off the edge.
+  `render(item, { back })` returns the thing's markup; `speed()` slows everything down (1 = normal, offer it as a
+  board setting); `sling.flight(markup, from, to)` flies anything between two poses.
 
 ### `info` on the phone
 
@@ -442,6 +469,21 @@ Tests use Vitest and run against the real host code.
   `rt.state` and `rt.over`, and check `expect(expectReplay(game, rt)).toBe(true)` once the game has ended.
 - **Host:** `tests/helpers.ts` starts a real Table Host (`testHost()`) with fake phones (`joinDeck(name)`,
   `deck.request("game", "intent", …)`, `deck.waitView(…)`) and the board API (`t.ok("POST", "/game/start")`).
+- **A table on your computer:** `scripts/local-table.sh` (macOS or Linux, Node 26, no containers) starts a Table
+  Host from this repository and opens the board; phones on the same WiFi join with the QR code (D-188). It first
+  brings the checkout up to the latest `main`; `--branch NAME` runs another branch (`production`, a feature branch),
+  `--no-pull` runs the checkout as it is. `--extra ../my-games` adds the games of another checkout, so you can play a
+  game from your own repository before it is released; start it with `CLOUD_URL=` to leave the live service out (it
+  would otherwise also install its own extra games). `--code ABCD-EFGH` connects the table to a game service with an
+  access code. The table keeps its identity and key in `~/.gametable-local`. A table in Docker instead:
+  [`docs/runbooks/local-docker.md`](../runbooks/local-docker.md).
+
+  ```
+  scripts/local-table.sh                                   # latest main, against the live service
+  scripts/local-table.sh --branch my-feature               # a branch
+  CLOUD_URL= scripts/local-table.sh --extra ../my-games    # your own games, no service
+  ```
+
 - **By hand, without a phone:** *Advanced › Developer › Play from the board* on the board (or `BOARD_DECK=1`) puts one
   player's deck beside the board, as on a remote player's page, so you can play your game at one screen with AI players
   (D-175). Only one person plays at the table meanwhile, since the deck is private; remote players can still join.

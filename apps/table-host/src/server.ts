@@ -627,6 +627,20 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
           const r = table.boardIntent(b.playerId, { name: b.name, payload: b.payload }, remoteCtx ? remoteCtx.session : null);
           return r.ok ? reply("ack", {}, msg.seq) : reply("reject", { reason: r.reason }, msg.seq);
         }
+        if (c.role === "deck" && msg.ch === "game" && msg.type === "gesture") {
+          // EXPERIMENT (card sling): a live, unlogged gesture from a phone (a card being dragged), passed to every
+          // board with the player's seat. Not state: no answer, dropped when too fast or too big, or outside a game.
+          const now = Date.now();
+          if (now - (c.lastGesture ?? 0) < 8) return;
+          c.lastGesture = now;
+          const seat = table.player(c.playerId)?.seat;
+          if (seat === null || seat === undefined || table.phase !== "active") return;
+          const data = JSON.stringify(msg.payload ?? null);
+          if (data.length > 512) return;
+          const text = `{"v":1,"ch":"game","type":"gesture","payload":{"seat":${seat},"data":${data}}}`;
+          for (const o of clients) if (o.role === "board") sendText(o.ws, text);
+          return;
+        }
         if (c.role === "deck" && msg.ch === "game" && msg.type === "intent") {
           const r = table.intent(c.playerId, msg.payload);
           return r.ok ? reply("ack", {}, msg.seq) : reply("reject", { reason: r.reason }, msg.seq);
