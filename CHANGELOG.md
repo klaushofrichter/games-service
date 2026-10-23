@@ -8,6 +8,8 @@ history.
 
 ## [Unreleased]
 
+- The public website shows Mexican Train from extra-games, eight games in all, and a *Demo game* block in the
+  developer section on what the game customises within the platform (D-185).
 - With *Play from the board*, Fullscreen takes the whole page, so the deck beside the board stays on screen (D-184).
 - The website's Game Viewer screenshot is taken again with D-181's simulation times, at the start of the second
   hand (D-183).
