@@ -1128,3 +1128,23 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   approved by pairing or access codes, the games each table gets, game logs with filters and download tokens, and
   this website. Checks: `tests/website.test.ts` (the section and images), `scripts/e2e/website.py` (the picture swaps
   and swaps back; the section).
+
+## Agentic coding, and an About section, on the public website (23 Oct 2026)
+
+- **D-187 · 2026-10-23 · Klaus** — The website's developer section says the platform is made for agentic coding, and a
+  new *About* section (`#about`) ends the page with where the project and its code come from. *Why:* Klaus: "the
+  card "You write": we should rather say "You prompt your AI Agent", because it is actually not expected for humans to
+  code. Only Prompting", "the platform is optimized for agentic coding, with the developer focusing on the game idea,
+  design and user experience", and a short section "about the origin of this project and the origin of the code".
+  *Implementation (Claude):* the section's lede says the developer brings the idea, design and experience and the AI
+  agent writes the code; the card *You write* is *You prompt your AI agent*, listing what one asks for. *About*, in
+  Klaus's words: a do-it-yourself table by friends and a love of board games led to "Human Player First": the rules
+  observed and the chores automated, the people at the table paramount; the table as the centrepiece with phones as
+  private decks; remote players supported but on the side, with no video, voice or chat on purpose (Meet or FaceTime
+  alongside); AI players mainly so a game can start at all. The code: the ideas went to Claude, and Claude Opus 5.5
+  developed all of it iteratively; the platform and lobby are separate from the games, which come from other
+  repositories; the service's lobby brings remote players in by invite link without exposing the table to the
+  internet; hosted by Skylar Technology, with every source public on GitHub. It ends with a prompt to copy for one's
+  own agent: set up a table and write a game in one sentence, then fine-tune by playing. The footer links to it.
+  Checks: `tests/website.test.ts` (the section; besides the GitHub repositories, the page may link to
+  `https://skylar.technology`, still with no resources from elsewhere), `scripts/e2e/website.py` (a screenshot of it).
