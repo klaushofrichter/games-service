@@ -24,7 +24,7 @@ if [ -z "${LOCAL_TABLE_REPO:-}" ]; then
   repo="$(cd "$(dirname "$0")/.." && pwd)"
   copy="$(mktemp "${TMPDIR:-/tmp}/local-table.XXXXXX")"
   cp "$0" "$copy"
-  LOCAL_TABLE_REPO="$repo" LOCAL_TABLE_CWD="$PWD" exec bash "$copy" "$@"
+  LOCAL_TABLE_REPO="$repo" LOCAL_TABLE_CWD="$PWD" exec bash "$copy" ${1+"$@"} # ${1+...}: bash 3.2 with set -u and no arguments
 fi
 case "$0" in "${TMPDIR:-/tmp}"/local-table.*) rm -f "$0" ;; esac # bash has it open; the copy goes when it ends
 cd "$LOCAL_TABLE_REPO"
@@ -33,14 +33,15 @@ OPEN=1
 PULL=1
 BRANCH=main
 EXTRA=()
+NEXTRA=0 # bash 3.2 (macOS) calls an empty array unbound under set -u: count instead
 while [ $# -gt 0 ]; do
   case "$1" in
     --no-open) OPEN=0 ;;
     --no-pull) PULL=0 ;;
     --branch | -b) [ $# -ge 2 ] || { echo "$1 needs a branch, e.g. --branch production" >&2; exit 2; }; BRANCH="$2"; shift ;;
     --branch=*) BRANCH="${1#--branch=}" ;;
-    --extra) [ $# -ge 2 ] || { echo "--extra needs a checkout, e.g. --extra ../extra-games" >&2; exit 2; }; EXTRA+=("$2"); shift ;;
-    --extra=*) EXTRA+=("${1#--extra=}") ;;
+    --extra) [ $# -ge 2 ] || { echo "--extra needs a checkout, e.g. --extra ../extra-games" >&2; exit 2; }; EXTRA+=("$2"); NEXTRA=$((NEXTRA + 1)); shift ;;
+    --extra=*) EXTRA+=("${1#--extra=}"); NEXTRA=$((NEXTRA + 1)) ;;
     --code) [ $# -ge 2 ] || { echo "--code needs a value, e.g. --code ABCD-EFGH" >&2; exit 2; }; TABLE_CODE="$2"; shift ;;
     --code=*) TABLE_CODE="${1#--code=}" ;;
     *) echo "unknown option: $1 (use --branch NAME, --extra DIR, --no-pull, --no-open, --code ABCD-EFGH)" >&2; exit 2 ;;
@@ -54,7 +55,7 @@ if [ "$PULL" = 1 ]; then
     git status --short --untracked-files=no >&2
     exit 1
   fi
-  echo "Updating to origin/$BRANCH…"
+  echo "Updating to origin/${BRANCH}..." # braces: bash 3.2 (macOS) may read non-ASCII text after a name as part of it
   git fetch origin "$BRANCH" || { echo "No branch \"$BRANCH\" on GitHub (git fetch failed)." >&2; exit 1; }
   if git show-ref --verify --quiet "refs/heads/$BRANCH"; then
     git checkout --quiet "$BRANCH"
@@ -107,7 +108,7 @@ default_name="$(hostname -s 2>/dev/null || echo "Game Table")"
 [ "$(uname)" = "Darwin" ] && default_name="$(scutil --get ComputerName 2>/dev/null || echo "$default_name")"
 
 # Extra games from other checkouts (D-188): this repository's games and theirs, linked into one folder.
-if [ ${#EXTRA[@]} -gt 0 ]; then
+if [ "$NEXTRA" -gt 0 ]; then
   GAMES_DIR="$DATA_DIR/games"
   rm -rf "$GAMES_DIR"
   mkdir -p "$GAMES_DIR"
