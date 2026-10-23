@@ -8,11 +8,11 @@ Needs Pillow and a checkout of extra-games.
   python3 scripts/site-screenshots.py ../extra-games statistics # the statistics window after a game of Hold'em
   python3 scripts/site-screenshots.py ../extra-games viewer     # the Game Viewer with a Hold'em simulation
 """
-import os, shutil, sys, tempfile, time
+import json, os, shutil, sys, tempfile, time
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "e2e"))
 from PIL import Image
 from playwright.sync_api import sync_playwright
-from common import call, start_table, wait
+from common import call, start_cloud, start_table, wait
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
@@ -58,7 +58,7 @@ PLAN = [
     ("chess", {}, 2, [], 2, 9),
     ("liars-dice", {}, 4, ["Klaus"], 3, 6),
     ("backgammon", {}, 2, [], 2, 11),
-    ("mexican-train", {"rounds": 1}, 6, ["Klaus"], 5, 45),
+    ("mexican-train", {"rounds": 3, "turnSeconds": 0}, 6, ["Klaus"], 5, 240),
 ]
 
 try:
@@ -113,14 +113,15 @@ try:
             a("POST", "/game/start", {})
             if game == "mexican-train":
                 # Klaus plays from the phone (a tile that fits, then a highlighted train, else Draw or Done) until the
-                # trains have grown, and stops on a turn of theirs with a tile picked.
+                # trains have grown, then stops on a turn of theirs with a tile picked: with no turn limit the game
+                # waits there, so both looks below show the same moment.
                 ph, end = phones[0], time.time() + secs
                 while time.time() < end:
                     if ph.locator(".mtd-status.go").count():
                         ok = ph.locator(".mtd-tile.ok")
                         if ok.count():
                             ok.first.click()
-                            if time.time() > end - 8:
+                            if board.locator(".mt-root .mt-tile").count() >= 40:
                                 break
                             hit = ph.locator(".mtd-train.hit")
                             (hit.first.click(force=True) if hit.count() else ok.first.click())
@@ -140,6 +141,11 @@ try:
                         print("call", e)
                     time.sleep(4)
             board.screenshot(path=os.path.join(OUT, f"{game}-board.png"))
+            if game == "mexican-train":
+                # The same moment with other preferences, for the website's demo block (D-186).
+                a("POST", "/game/prefs", {"prefs": {"background": "lava", "faces": "numbers"}})
+                time.sleep(2.5)
+                board.screenshot(path=os.path.join(OUT, "mexican-train-lava-board.png"))
             for ph in phones:
                 ph.screenshot(path=os.path.join(OUT, f"{game}-phone.png"))
                 ph.close()
@@ -177,6 +183,56 @@ try:
             board.click("button[data-close]")
             print("shot viewer")
         b.close()
+        # The admin console (D-186): a service with extra-games, two tables (one approved by its pairing code, one by
+        # an access code), a spare code, a download token, and logs of games and simulations from both tables.
+        if not ONLY or "admin" in ONLY:
+            CLOUD, ADMIN = "http://127.0.0.1:8178", "site-admin-token-0123456789"
+            AUTH = {"authorization": f"Bearer {ADMIN}"}
+            repos = os.path.join(OUT, "repos.json")
+            with open(repos, "w") as f:
+                json.dump({"repos": [{"repo": "klaushofrichter/extra-games", "ref": "production"}]}, f)
+            cloud = start_cloud(8178, PUBLIC_URL=CLOUD, ADMIN_TOKEN=ADMIN, GAME_REPOS_FILE=repos, NODE_USE_ENV_PROXY="1",
+                                DATA_DIR=tempfile.mkdtemp(prefix="site-cloud-"))
+            ad = lambda m, path, body=None: call(CLOUD, m, "/admin/api" + path, body, AUTH)
+            wait(lambda: ad("GET", "/repos")["repos"][0].get("bundle"), 60, "extra-games at the service")
+            code = ad("POST", "/codes", {"label": "Den", "validity": "year", "scope": {"kind": "repos", "repos": ["klaushofrichter/extra-games"]}})["code"]
+            ad("POST", "/codes", {"label": "Office", "validity": "month", "scope": {"kind": "none"}})
+            living = start_table(8179, TABLE_KEY="k", TABLE_NAME="Living room", CLOUD_URL=CLOUD, AI_DELAY_MS="100", PUBLIC_URL="http://127.0.0.1:8179")
+            den = start_table(8180, TABLE_KEY="k", TABLE_NAME="Den", CLOUD_URL=CLOUD, AI_DELAY_MS="100", TABLE_CODE=code, PUBLIC_URL="http://127.0.0.1:8180")
+            tb = lambda port, m, path, body=None: call(f"http://127.0.0.1:{port}", m, "/api/v1" + path, body, {"x-table-key": "k"})
+            pairing = wait(lambda: tb(8179, "GET", "/state")["cloud"].get("pairingCode"), 20, "the pairing code")
+            ad("POST", f"/tables/pair/{pairing}", {"repos": ["extra-games"]})
+            for port in (8179, 8180):
+                wait(lambda: tb(port, "GET", "/state")["cloud"]["status"] == "online", 20, "the table to be online")
+                wait(lambda: any(g["id"] == "mexican-train" for g in tb(port, "GET", "/games")), 60, "extra-games on the table")
+            # A game of AI players on each table, then simulations.
+            for port, game, settings in ((8179, "coin-flip", {"rounds": 3, "roundSeconds": 0}), (8180, "liars-dice", {})):
+                tb(port, "POST", "/developer", {"allowNoLocalPlayer": True})
+                for _ in range(4):
+                    tb(port, "POST", "/ai", {})
+                tb(port, "POST", "/game/select", {"gameId": game, "settings": settings})
+                tb(port, "POST", "/game/start", {})
+            tb(8179, "POST", "/simulation", {"gameId": "holdem", "players": 6, "games": 3, "seed": 7})
+            tb(8180, "POST", "/simulation", {"gameId": "mexican-train", "players": 4, "games": 2, "seed": 7})
+            tb(8179, "POST", "/simulation", {"gameId": "backgammon", "players": 2, "games": 2, "seed": 7})
+            wait(lambda: len([l for l in ad("GET", "/logs") if not l["simulation"]]) >= 2, 180, "the played games' logs")
+            wait(lambda: all(t["metrics"]["gamesPlayed"] for t in ad("GET", "/tables")), 60, "both tables' games counted")
+            ad("POST", "/download-tokens", {"label": "Claude session", "gameId": "mexican-train", "hours": 168})
+            ab = p.chromium.launch()  # a fresh browser: the board's has been animating for minutes
+            page = ab.new_page(viewport={"width": 1440, "height": 900}, device_scale_factor=1)
+            page.goto(CLOUD + "/admin")
+            page.fill("#token", ADMIN)
+            page.click("#signin-form button")
+            page.wait_for_selector("#tables tr")
+            page.wait_for_timeout(1500)
+            # The overview and the tables, then the game logs (the access codes and repositories in between are left
+            # out, to keep the picture short).
+            page.screenshot(path=os.path.join(OUT, "admin-top.png"), clip={"x": 0, "y": 0, "width": 1440, "height": 640})
+            page.locator("section:has(#logs)").screenshot(path=os.path.join(OUT, "admin-logs.png"))
+            ab.close()
+            for pr in (living, den, cloud):
+                pr.terminate()
+            print("shot admin")
 finally:
     proc.terminate()
     shutil.rmtree(GAMES, ignore_errors=True)
@@ -193,6 +249,7 @@ def save(name, out, size):
 for game, *_ in PLAN:
     save(f"{game}-board.png", f"{game}.webp", (1600, 900))
     save(f"{game}-phone.png", f"{game}-phone.webp", (500, 1100))
+save("mexican-train-lava-board.png", "mexican-train-lava.webp", (1600, 900))
 if not ONLY:
     save("lobby-open.png", "lobby.webp", (1600, 900))
 # The window and a little of the table around it (the board is 1920 x 1080).
@@ -205,4 +262,13 @@ if os.path.exists(os.path.join(OUT, "viewer-board.png")):
     im.thumbnail((1400, 800))
     im.save(os.path.join(SITE, "game-viewer.webp"), "WEBP", quality=82, method=6)
     save("lobby-phone.png", "lobby-phone.webp", (500, 1100))
+# The console: its overview and tables, and its game logs below.
+if os.path.exists(os.path.join(OUT, "admin-logs.png")):
+    top = Image.open(os.path.join(OUT, "admin-top.png")).convert("RGB")
+    logs = Image.open(os.path.join(OUT, "admin-logs.png")).convert("RGB")
+    im = Image.new("RGB", (top.width, top.height + logs.height + 22), top.getpixel((5, top.height - 5)))
+    im.paste(top, (0, 0))
+    im.paste(logs, ((top.width - logs.width) // 2, top.height))
+    im.thumbnail((1440, 1600))
+    im.save(os.path.join(SITE, "admin.webp"), "WEBP", quality=82, method=6)
 print(f"saved in {SITE}")

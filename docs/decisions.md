@@ -1109,3 +1109,22 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   backgrounds, the restyled seat plates, its sound and music, rule options and table preferences, and its own phone
   screen, all while the platform keeps the lobby, seats and players. Checks: `tests/website.test.ts` (the section and
   the images), `scripts/e2e/website.py` (four extra-games, the block with its image).
+
+## A second look of Mexican Train, and the game service on the public website (23 Oct 2026)
+
+- **D-186 · 2026-10-23 · Klaus** — The website's *Demo game* block (D-185) shows Mexican Train in two looks, and a
+  new section at the end, *Run a game service* (`#service`), shows the admin console. *Why:* Klaus: "we could
+  showcase also "Lava Lamp" with the numbers instead of tiles - the screenshots exchange when scrolling down the
+  page?" and "add one section at the end about the admin console: needs a DNS, but enables remote players to join
+  from anywhere, manages multiple boards by issuing tokens and configures games that are made available. Allows to
+  download game logs for analysis, and shows this landing page." *Implementation (Claude):* `scripts/site-screenshots.py`
+  takes the same moment again with the board preferences Lava lamp and Numbers (`site/mexican-train-lava.webp`); the
+  second picture fades in once the first is above the middle of the window, and back when it is below, with a caption
+  naming each look. The `admin` step starts a service with extra-games, two tables (the Living room approved by its
+  pairing code, the Den by an access code), a spare code, a download token, an AI game on each table and three
+  simulations, and photographs the signed-in console: its overview and tables, with its game logs below
+  (`site/admin.webp`; the access codes and repositories between them are left out to keep the picture short). The section names what a service needs (a
+  server, a DNS name, HTTPS, Google sign-in for admins) and what it adds: remote players from anywhere, tables
+  approved by pairing or access codes, the games each table gets, game logs with filters and download tokens, and
+  this website. Checks: `tests/website.test.ts` (the section and images), `scripts/e2e/website.py` (the picture swaps
+  and swaps back; the section).
