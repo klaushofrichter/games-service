@@ -1222,3 +1222,13 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   disappears after a few seconds anyway." *Implementation (Claude):* one `.deck-toast` element fixed at the top (not the shared theme's `.toast`, the board's, which sits at the bottom) (below the
   safe area), fading in and out, `role="status"`; it covers the tabs for a moment and moves nothing. Pause messages
   ("Waiting for …") stay in the page as before: they last as long as the pause. Every game gets this.
+
+## A phone keeps its seat for five minutes (23 Oct 2026)
+
+- **D-192 · 2026-10-23 · Klaus** — A phone that lost its connection keeps its seat in the lobby for five minutes,
+  not one, before its player is removed. *Why:* Klaus: "How fast is a "session" for a deck expiring? I think it should
+  take longer, like 5 minutes. It should be a default in the code somewhere so that it is easy to change. We do not
+  need a user overwrite at this time." *Implementation (Claude):* `DECK_GRACE_MS` in `apps/table-host/src/host.ts`,
+  the default for `graceMs`; `GRACE_MS` still overrides it for tests and the e2e checks (which use 1.5 s). No setting
+  on the board. Unchanged: during a running game a seat is held with no time limit (D-144, D-159), and the board shows
+  the player as away and offers to exchange them.

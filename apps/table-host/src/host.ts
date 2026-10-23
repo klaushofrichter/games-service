@@ -13,6 +13,13 @@ import { ExtraGames } from "./extra-games.ts";
 
 const here = fileURLToPath(new URL(".", import.meta.url));
 
+/**
+ * How long a phone that lost its connection keeps its seat in the lobby before the player is removed (D-192): long
+ * enough to lock the phone, switch apps or walk out of the WiFi for a moment. A running game holds seats with no time
+ * limit (D-144, D-159). Change it here; `GRACE_MS` overrides it for tests.
+ */
+export const DECK_GRACE_MS = 5 * 60_000;
+
 export interface HostOptions extends Partial<TableConfig> {
   port?: number;
   host?: string;
@@ -44,7 +51,7 @@ export async function startHost(o: HostOptions = {}) {
   const config: TableConfig = {
     tableName: o.tableName ?? "Game Table",
     publicUrl: o.publicUrl ?? "",
-    graceMs: o.graceMs ?? 60_000,
+    graceMs: o.graceMs ?? DECK_GRACE_MS,
     aiDelayMs: o.aiDelayMs ?? 800,
     boardPacing: o.boardPacing ?? true,
     boardPaceTimeoutMs: o.boardPaceTimeoutMs ?? 20_000,
