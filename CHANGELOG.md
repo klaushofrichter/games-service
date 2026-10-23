@@ -8,6 +8,9 @@ history.
 
 ## [Unreleased]
 
+- The public website shows Last Card (nine games), and a new block shows the sling: an animated schematic of a card
+  pushed off a phone, coming onto the board at that seat and flying onto the pile, the real screenshots of that
+  moment, and the few lines a game writes for it. *Play at home* mentions an iPad as a small game board (D-196).
 - A board opened in another browser (an iPad, another computer, the table's network address) plays sound after the
   first tap: a finger's tap on a touchscreen now counts, and until then the board shows *Tap to turn the sound on*
   (D-195).

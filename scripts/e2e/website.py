@@ -58,7 +58,7 @@ try:
                 # The games: filters and the close-up.
                 page.locator("#games").scroll_into_view_if_needed()
                 page.click(".filters [data-f=extra]")
-                assert page.locator(".game:not(.hide)").count() == 4, "extra-games has four games"
+                assert page.locator(".game:not(.hide)").count() == 5, "extra-games has five games"
                 page.click(".filters [data-f=built-in]")
                 assert page.locator(".game:not(.hide)").count() == 4, "four built-in games"
                 page.click(".filters [data-f=all]")
@@ -94,6 +94,18 @@ try:
                 page.locator("#show-shot").screenshot(path=os.path.join(OUT, "website-showcase-lava.png"))
                 page.evaluate("window.scrollBy(0, -innerHeight)")
                 page.wait_for_selector("#show-shot:not(.alt)")
+                # The sling (D-196): the real phone and board at the same moment, side by side.
+                page.locator("#sling").scroll_into_view_if_needed()
+                page.wait_for_function("[...document.querySelectorAll('#sling img')].every((i) => i.complete && i.naturalWidth > 0)")
+                ph, bd = (page.locator(f"#sling {c}").bounding_box() for c in (".sl-phone", ".sl-board"))
+                assert ph["x"] + ph["width"] < bd["x"] and abs((ph["y"] + ph["height"] / 2) - (bd["y"] + bd["height"] / 2)) < 4, "the phone beside the board"
+                assert page.locator("text=An iPad makes a small game board").count() == 1, "the iPad as a board"
+                # The schematic above them: the card on the phone and on the board move, and the three steps take turns.
+                assert page.locator("#sling .slx-steps li").count() == 3
+                moving = page.evaluate("document.getAnimations().filter((a) => a.animationName?.startsWith('slx-')).length")
+                assert moving >= 6, f"the sling schematic does not move ({moving} animations)"
+                page.wait_for_timeout(1300)
+                page.locator("#sling").screenshot(path=os.path.join(OUT, "website-sling.png"))
                 for sid in ["build", "install", "table", "service", "about"]:
                     page.locator(f"#{sid}").scroll_into_view_if_needed()
                     page.wait_for_timeout(600)

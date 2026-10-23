@@ -379,6 +379,33 @@ html.lb-open, html.lb-open body { overflow: hidden; }
 .show-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
 .show-list li { color: var(--soft); font-size: 15.5px; padding-left: 18px; border-left: 2px solid var(--brass-deep); }
 .show-list b { color: var(--ink); font-weight: 600; }
+/* The sling (D-196): the phone and the board side by side, a card looping along the arc between them. */
+.sling-stage { position: relative; display: grid; grid-template-columns: 22% 74%; column-gap: 4%; align-items: center; aspect-ratio: 1000 / 476; }
+.sling-stage img { width: 100%; border-radius: 14px; border: 1px solid var(--line-2); box-shadow: 0 30px 70px rgba(0,0,0,.5); }
+.sling-stage .sl-phone { border: 4px solid #0b0b0b; border-radius: 18px; }
+.sling-real { max-width: 860px; margin: 0 auto; }
+.sling-demo svg { display: block; width: 100%; height: auto; }
+.slx-pc, .slx-bc, .slx-bci, .slx-finger, .slx-bback, .slx-bface, .slx-steps li { animation: 6s infinite both; }
+.slx-pc { animation-name: slx-pc; animation-timing-function: cubic-bezier(.45, 0, .55, 1); }
+.slx-finger { animation-name: slx-finger; animation-timing-function: cubic-bezier(.45, 0, .55, 1); }
+.slx-bc { animation-name: slx-bc; }
+.slx-bci { animation-name: slx-bci; }
+.slx-bback { animation-name: slx-bback; animation-timing-function: steps(1, end); }
+.slx-bface { animation-name: slx-bface; animation-timing-function: steps(1, end); }
+@keyframes slx-pc { 0%, 8% { transform: translate(80px, 326px); opacity: 1; } 34% { transform: translate(86px, 112px); opacity: 1; } 35%, 97% { transform: translate(86px, 112px); opacity: 0; } 100% { transform: translate(80px, 326px); opacity: 0; } }
+@keyframes slx-finger { 0% { transform: translate(80px, 340px); opacity: 0; } 6% { opacity: 1; } 8% { transform: translate(80px, 340px); } 34% { transform: translate(86px, 160px); opacity: 1; } 46% { transform: translate(86px, 160px); opacity: 1; } 52%, 100% { transform: translate(86px, 160px); opacity: 0; } }
+@keyframes slx-bc { 0%, 20% { transform: translate(398px, 336px); opacity: 0; } 21% { opacity: 1; } 34%, 46% { transform: translate(400px, 296px); } 50% { transform: translate(402px, 282px); } 66% { transform: translate(418px, 160px); } 88% { transform: translate(418px, 160px); opacity: 1; } 96%, 100% { transform: translate(418px, 160px); opacity: 0; } }
+@keyframes slx-bci { 0%, 46% { transform: rotate(0) scale(1, 1); } 48% { transform: rotate(1deg) scale(0, 1); } 50% { transform: rotate(2deg) scale(1, 1); } 66%, 100% { transform: rotate(10deg) scale(.82, .82); } }
+@keyframes slx-bback { 0% { opacity: 1; } 48% { opacity: 0; } 100% { opacity: 0; } }
+@keyframes slx-bface { 0% { opacity: 0; } 48% { opacity: 1; } 100% { opacity: 1; } }
+.slx-steps { list-style: none; margin: 14px 0 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.slx-steps li { color: var(--soft); font-size: 14px; line-height: 1.4; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--line); opacity: .45; }
+.slx-steps b { display: block; font: 600 15px var(--display); color: var(--brass); margin-bottom: 2px; }
+.slx-steps li:nth-child(1) { animation-name: slx-s1; } .slx-steps li:nth-child(2) { animation-name: slx-s2; } .slx-steps li:nth-child(3) { animation-name: slx-s3; }
+@keyframes slx-s1 { 0%, 34% { opacity: 1; border-color: var(--brass-deep); } 40%, 100% { opacity: .45; } }
+@keyframes slx-s2 { 0%, 20% { opacity: .45; } 24%, 46% { opacity: 1; border-color: var(--brass-deep); } 52%, 100% { opacity: .45; } }
+@keyframes slx-s3 { 0%, 46% { opacity: .45; } 50%, 80% { opacity: 1; border-color: var(--brass-deep); } 88%, 100% { opacity: .45; } }
+.sl-code { margin-top: 18px; font-size: 12.5px; }
 .links { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-top: 40px; }
 .lnk { display: grid; gap: 6px; padding: 20px; border-radius: 16px; border: 1px solid var(--line); background: rgba(15,42,36,.55); color: var(--ink); transition: all .25s; }
 .lnk:hover { border-color: var(--brass-deep); transform: translateY(-3px); text-decoration: none; }
@@ -475,6 +502,7 @@ footer .version { display: inline; margin: 0; }
   footer .wrap { grid-template-columns: 1fr 1fr; }
 }
 @media (max-width: 640px) {
+  .slx-steps { grid-template-columns: minmax(0, 1fr); gap: 6px; }
   .wrap { width: calc(100% - 32px); }
   section { padding: 80px 0; }
   .scene { height: 380px; transform: scale(.52); margin: -60px -120px; }
@@ -497,6 +525,8 @@ footer .version { display: inline; margin: 0; }
 }
 @media (max-width: 360px) { body:has(.preview-sash) .top .gh { display: none; } }
 @media (prefers-reduced-motion: reduce) {
+  .slx-pc, .slx-finger, .slx-bc { display: none; }
+  .slx-steps li { opacity: 1; }
   .hero { height: auto; } .hero-pin { position: relative; height: auto; min-height: 100vh; } .hero-caption { display: none; }
   *, *::before, *::after { animation: none !important; transition: none !important; }
   .js .rv { opacity: 1; transform: none; }
@@ -571,13 +601,13 @@ footer .version { display: inline; margin: 0; }
 </section>
 
 <div class="marquee" aria-hidden="true"><div class="track">
-  <span>Hold'em</span><i>✦</i><span>Backgammon</span><i>✦</i><span>Roulette</span><i>✦</i><span>Liar's Dice</span><i>✦</i><span>Chess</span><i>✦</i><span>Pachisi</span><i>✦</i><span>Coin Flip</span><i>✦</i><span class="you">your game here</span><i>✦</i>
-  <span>Hold'em</span><i>✦</i><span>Backgammon</span><i>✦</i><span>Roulette</span><i>✦</i><span>Liar's Dice</span><i>✦</i><span>Chess</span><i>✦</i><span>Pachisi</span><i>✦</i><span>Coin Flip</span><i>✦</i><span class="you">your game here</span><i>✦</i>
+  <span>Hold'em</span><i>✦</i><span>Backgammon</span><i>✦</i><span>Roulette</span><i>✦</i><span>Liar's Dice</span><i>✦</i><span>Chess</span><i>✦</i><span>Pachisi</span><i>✦</i><span>Coin Flip</span><i>✦</i><span>Mexican Train</span><i>✦</i><span>Last Card</span><i>✦</i><span class="you">your game here</span><i>✦</i>
+  <span>Hold'em</span><i>✦</i><span>Backgammon</span><i>✦</i><span>Roulette</span><i>✦</i><span>Liar's Dice</span><i>✦</i><span>Chess</span><i>✦</i><span>Pachisi</span><i>✦</i><span>Coin Flip</span><i>✦</i><span>Mexican Train</span><i>✦</i><span>Last Card</span><i>✦</i><span class="you">your game here</span><i>✦</i>
 </div></div>
 
 <div class="numbers wrap">
   <div class="num rv"><b data-count="1">0</b><span>prompt to a working Backgammon</span></div>
-  <div class="num rv" style="--d:.06s"><b data-count="8">0</b><span>free games to play today</span></div>
+  <div class="num rv" style="--d:.06s"><b data-count="9">0</b><span>free games to play today</span></div>
   <div class="num rv" style="--d:.12s"><b data-count="8">0</b><span>players around one board</span></div>
   <div class="num rv" style="--d:.18s"><b data-count="0" data-suffix=" lines">0</b><span>of lobby code in your game</span></div>
 </div>
@@ -632,8 +662,8 @@ footer .version { display: inline; margin: 0; }
   <div class="wrap">
     <div class="section-head">
       <p class="eyebrow rv">Free games</p>
-      <h2 class="rv" style="--d:.06s">Eight games, and room for yours.</h2>
-      <p class="lede rv" style="--d:.12s">Four games come with the platform; four more come from <a href="https://github.com/klaushofrichter/extra-games" target="_blank" rel="noopener noreferrer">extra-games</a>, a separate repository that shows how anyone can add games. All of them are free and play for points, never money.</p>
+      <h2 class="rv" style="--d:.06s">Nine games, and room for yours.</h2>
+      <p class="lede rv" style="--d:.12s">Four games come with the platform; five more come from <a href="https://github.com/klaushofrichter/extra-games" target="_blank" rel="noopener noreferrer">extra-games</a>, a separate repository that shows how anyone can add games. All of them are free and play for points, never money.</p>
     </div>
     <div class="filters rv" role="tablist">
       <button class="chipbtn on" data-f="all">All games</button>
@@ -659,6 +689,7 @@ footer .version { display: inline; margin: 0; }
       <button class="chipbtn on" type="button" role="tab" aria-selected="true" data-aw="holdem">Hold'em</button>
       <button class="chipbtn" type="button" role="tab" aria-selected="false" data-aw="chess">Chess</button>
       <button class="chipbtn" type="button" role="tab" aria-selected="false" data-aw="backgammon">Backgammon</button>
+      <button class="chipbtn" type="button" role="tab" aria-selected="false" data-aw="last-card">Last Card</button>
         </div>
         <div class="aw-list" data-aw-list="holdem" role="tabpanel">
           <div class="aw"><span class="ic" aria-hidden="true">🃏</span><h3>Best of All</h3><p>Showed the best hand of the game.</p></div>
@@ -677,6 +708,12 @@ footer .version { display: inline; margin: 0; }
           <div class="aw"><span class="ic" aria-hidden="true">🎲</span><h3>Doublets</h3><p>Rolled the most doubles.</p></div>
           <div class="aw"><span class="ic" aria-hidden="true">🚪</span><h3>Back from the Bar</h3><p>Came in from the bar most often.</p></div>
           <div class="aw"><span class="ic" aria-hidden="true">🧊</span><h3>Cube Handler</h3><p>Doubled the most.</p></div>
+        </div>
+        <div class="aw-list" data-aw-list="last-card" role="tabpanel" hidden>
+          <div class="aw"><span class="ic" aria-hidden="true">😈</span><h3>Troublemaker</h3><p>Played the most Skips, Reverses and Draw cards.</p></div>
+          <div class="aw"><span class="ic" aria-hidden="true">🦎</span><h3>Chameleon</h3><p>Changed the colour to play most often.</p></div>
+          <div class="aw"><span class="ic" aria-hidden="true">📚</span><h3>Piled On</h3><p>Was made to draw the most cards by others.</p></div>
+          <div class="aw"><span class="ic" aria-hidden="true">🔄</span><h3>Comeback</h3><p>Won a round after holding the most cards in it.</p></div>
         </div>
         <p class="aw-plat">Each game picks its own awards. The platform adds moves and time per player, plus <b style="color:var(--ink)">⚡ Quick Draw</b> and <b style="color:var(--ink)">🤔 Deep Thinker</b> for the people at the table. The same window opens again from the Game Viewer for any finished game.</p>
         <code class="aw-code">// in your game's summary, one line per award
@@ -771,7 +808,7 @@ awards: [
           <button class="copy" data-copy="#say">Copy</button>
         </div>
         <div class="timeline">
-          <div class="tl rv"><span class="n">1</span><div><h3>Start from a working repository</h3><p>Copy <a href="https://github.com/klaushofrichter/extra-games" target="_blank" rel="noopener noreferrer">extra-games</a>: four complete games, tests that run them on the real platform, and CI. Or start inside the platform from <code>games/coin-flip</code>, the smallest complete game.</p></div></div>
+          <div class="tl rv"><span class="n">1</span><div><h3>Start from a working repository</h3><p>Copy <a href="https://github.com/klaushofrichter/extra-games" target="_blank" rel="noopener noreferrer">extra-games</a>: five complete games, tests that run them on the real platform, and CI. Or start inside the platform from <code>games/coin-flip</code>, the smallest complete game.</p></div></div>
           <div class="tl rv"><span class="n">2</span><div><h3>Let your AI read the contract</h3><p><code>llms.txt</code> points to the developer guide: the manifest, every rules hook, what the platform does with players, and a checklist. One file holds it all: <code>llms-full.txt</code>.</p></div></div>
           <div class="tl rv"><span class="n">3</span><div><h3>Write rules, not plumbing</h3><p>Rules are pure functions on a JSON state: <code>setup</code>, <code>onIntent</code>, <code>view</code>, <code>boardView</code>, <code>isOver</code>, plus an AI. Randomness comes from the context, so every game can be replayed and checked.</p></div></div>
           <div class="tl rv"><span class="n">4</span><div><h3>Play it, even without a phone</h3><p>Run a table on your laptop. <em>Play from the board</em> puts a player's deck beside the board, AI players take the other seats, and the Game Viewer shows each move if something looks wrong.</p></div></div>
@@ -856,6 +893,7 @@ awards: [
         <li>Lobby, seats, names, colours, the QR code</li>
         <li>Joining, leaving, away phones, exchanging players</li>
         <li>AI scheduling at the board's pace, pauses, timers</li>
+        <li>The sling: cards pushed off a phone come onto the board at that seat</li>
         <li>Remote players and watchers over WebRTC</li>
         <li>Logs, replay checks, the Game Viewer, statistics, simulations</li>
       </ul></div>
@@ -883,6 +921,84 @@ awards: [
           <li><b>Its own phone screen.</b> Your hand, the trains you may play on and two taps to play, in the platform's phone layout.</li>
         </ul>
       </div>
+    </div>
+
+    <!-- A platform feature to build on (D-189, D-196): the sling, as Last Card uses it. Both pictures are the same
+         moment: the card half off Klaus's phone, and its back coming onto the board at Klaus's seat. -->
+    <div class="showcase sling-show" id="sling">
+      <div class="dbg-head">
+        <p class="eyebrow rv">Platform feature</p>
+        <h3 class="rv" style="--d:.06s">The sling: push a card off your phone, onto the table.</h3>
+        <p class="rv" style="--d:.1s">A game can let players push a card up and off the top of their phone. While the finger is still on the glass, the board shows the card coming in at that player's edge; let go and it flies onto the pile. Drawn cards fly the other way. Last Card, the newest game in extra-games, is built on it.</p>
+      </div>
+      <div class="show-grid">
+        <!-- A schematic, like the hero's table: a card pushed off the phone peeks in at the player's seat on the board
+             while the finger is down, then flies onto the pile. One 6 s loop; the steps below light up with it. -->
+        <figure class="dbg-shot rv sling-demo" style="--d:.05s">
+          <svg viewBox="0 0 640 400" role="img" aria-label="A card pushed off the top of a phone comes onto the board at that player's seat, then flies onto the pile">
+            <defs>
+              <clipPath id="slx-board"><path d="M196 62 H600 L628 302 H168 Z"/></clipPath>
+              <clipPath id="slx-glass"><rect x="27" y="157" width="106" height="216" rx="11"/></clipPath>
+              <linearGradient id="slx-wood" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5a3a22"/><stop offset=".6" stop-color="#3b2615"/><stop offset="1" stop-color="#2c1c10"/></linearGradient>
+              <radialGradient id="slx-felt" cx=".5" cy=".5" r=".7"><stop offset="0" stop-color="#1d4e41"/><stop offset="1" stop-color="#0d2a22"/></radialGradient>
+              <g id="slx-back"><rect x="-15" y="-21" width="30" height="42" rx="4" fill="#1d2142" stroke="#f3eee2" stroke-width="2"/><path d="M-13 7 L13 -6 L13 0 L-13 13 Z" fill="#e8b23a"/><path d="M-13 13 L13 0 L13 3 L-13 16 Z" fill="#3c7fd0"/></g>
+              <g id="slx-face"><rect x="-15" y="-21" width="30" height="42" rx="4" fill="#e8b23a" stroke="#f3eee2" stroke-width="2"/><rect x="-9" y="-13" width="18" height="26" rx="5" fill="#fffaf0"/><text y="7" text-anchor="middle" font-size="17" font-weight="800" fill="#e8b23a" font-family="Inter, sans-serif">7</text></g>
+              <g id="slx-face3"><rect x="-15" y="-21" width="30" height="42" rx="4" fill="#3c7fd0" stroke="#f3eee2" stroke-width="2"/><rect x="-9" y="-13" width="18" height="26" rx="5" fill="#fffaf0"/><text y="7" text-anchor="middle" font-size="17" font-weight="800" fill="#3c7fd0" font-family="Inter, sans-serif">7</text></g>
+            </defs>
+            <!-- the table and its board, seen from the player's side -->
+            <path d="M172 34 H624 L660 330 H136 Z" fill="url(#slx-wood)"/>
+            <path d="M196 62 H600 L628 302 H168 Z" fill="url(#slx-felt)" stroke="#050807" stroke-width="8" stroke-linejoin="round"/>
+            <g clip-path="url(#slx-board)">
+              <g transform="translate(352 160)"><use href="#slx-back"/><use href="#slx-back" x="-2" y="-2"/></g>
+              <g transform="translate(412 162) rotate(-14)"><use href="#slx-face3"/></g>
+              <g transform="translate(416 159) rotate(-4)"><use href="#slx-face3"/></g>
+              <circle cx="414" cy="160" r="34" fill="none" stroke="#e8b23a" stroke-opacity=".5" stroke-width="2.5"/>
+              <rect x="350" y="266" width="96" height="26" rx="7" fill="#08130f" stroke="#e8b23a" stroke-width="2"/>
+              <text x="398" y="284" text-anchor="middle" font-size="12" fill="#efe8d8" font-family="Inter, sans-serif">● Klaus</text>
+              <g class="slx-bc"><g class="slx-bci"><g transform="scale(1.3)"><use class="slx-bback" href="#slx-back"/><use class="slx-bface" href="#slx-face"/></g></g></g>
+            </g>
+            <!-- Klaus's phone, held at the table's edge -->
+            <rect x="20" y="150" width="120" height="230" rx="17" fill="#0b0b0b" stroke="#2a2a2a" stroke-width="1.5"/>
+            <rect x="27" y="157" width="106" height="216" rx="11" fill="#0d211b"/>
+            <g clip-path="url(#slx-glass)">
+              <rect x="34" y="168" width="92" height="34" rx="6" fill="none" stroke="#e8b23a" stroke-opacity=".7"/>
+              <text x="42" y="189" font-size="10.5" fill="#efe8d8" font-family="Inter, sans-serif">Your turn</text>
+              <line x1="34" y1="212" x2="126" y2="212" stroke="#e8b23a" stroke-dasharray="3 3" stroke-opacity=".6"/>
+              <g transform="translate(50 326)" opacity=".55"><use href="#slx-back" transform="scale(1.1)"/></g>
+              <g transform="translate(110 326)" opacity=".55"><use href="#slx-back" transform="scale(1.1)"/></g>
+              <g class="slx-pc"><use href="#slx-face" transform="scale(1.1)"/></g>
+            </g>
+            <circle class="slx-finger" r="13" fill="#fff" fill-opacity=".28" stroke="#fff" stroke-opacity=".6"/>
+          </svg>
+          <ol class="slx-steps">
+            <li><b>1</b>Push a card off the top of your phone.</li>
+            <li><b>2</b>The board shows it at your seat while your finger is down.</li>
+            <li><b>3</b>Let go: it flies onto the pile.</li>
+          </ol>
+        </figure>
+        <div class="rv" style="--d:.1s">
+          <ul class="show-list">
+            <li><b>Live, not after the fact.</b> The phone sends the gesture as it happens, and every board, at the table or remote, shows the card at the right seat and the same angle.</li>
+            <li><b>Push, flick or let go.</b> Off the top of the phone, flicked left, middle or right, or let go above a line under the game's status.</li>
+            <li><b>The rules still decide.</b> The game says which cards may go and what a move means; a card that doesn't fit peeks out and bounces back with the reason.</li>
+          </ul>
+          <code class="aw-code sl-code">// deck.js: anything with data-sling="&lt;id&gt;"
+<b>slingDeck</b>(hand, ctx, {
+  canSling: (id) =&gt; fits(id) || "Doesn't match",
+  onSling: async (id) =&gt; (await ctx.send("play", { id })).ok,
+});
+// board.js: at the seat, then onto the pile
+const sling = <b>slingBoard</b>(root, { render });
+gesture(seat, data) { sling.gesture(seat, data); }</code>
+        </div>
+      </div>
+        <figure class="dbg-shot rv sling-real">
+          <div class="sling-stage">
+            <img class="sl-phone" src="/site/last-card-sling-phone.webp" alt="Klaus's phone in Last Card: a yellow card pushed half off the top of the screen, the rest of the hand below" loading="lazy" width="500" height="1082">
+            <img class="sl-board" src="/site/last-card-sling.webp" alt="The board at the same moment: the back of the card slides in over Klaus's seat plate, below the draw pile and the discard pile" loading="lazy" width="1120" height="630">
+          </div>
+          <figcaption>The real thing in Last Card: one moment on Klaus's phone and on the board, the same card at the same seat.</figcaption>
+        </figure>
     </div>
 
     <!-- Test and debug with your AI (D-180): AI-only simulations, logs an AI can read, references to a move. -->
@@ -938,7 +1054,7 @@ node scripts/soak.ts 100</pre>
       <a class="lnk rv spot" href="/docs/game-development.md"><b>Developer guide</b><span>The full contract, with a checklist.</span><code>/docs/game-development.md</code></a>
       <a class="lnk rv spot" style="--d:.05s" href="/llms.txt"><b>llms.txt</b><span>The index for your AI agent.</span><code>/llms.txt</code></a>
       <a class="lnk rv spot" style="--d:.1s" href="/llms-full.txt"><b>Everything in one file</b><span>Index, guide and runbook together.</span><code>/llms-full.txt</code></a>
-      <a class="lnk rv spot" style="--d:.15s" href="https://github.com/klaushofrichter/extra-games" target="_blank" rel="noopener noreferrer"><b>Example repository</b><span>Chess, Liar's Dice, Backgammon, Mexican Train.</span><code>klaushofrichter/extra-games</code></a>
+      <a class="lnk rv spot" style="--d:.15s" href="https://github.com/klaushofrichter/extra-games" target="_blank" rel="noopener noreferrer"><b>Example repository</b><span>Chess, Liar's Dice, Backgammon, Mexican Train, Last Card.</span><code>klaushofrichter/extra-games</code></a>
     </div>
   </div>
 </section>
@@ -953,7 +1069,7 @@ node scripts/soak.ts 100</pre>
     </div>
     <div class="repos">
       <div class="repo rv"><div class="name">klaushofrichter/games-service<small>The platform, with its built-in games</small></div><div class="gl"><span>Roulette</span><span>Hold'em</span><span>Pachisi</span><span>Coin Flip</span></div><a href="https://github.com/klaushofrichter/games-service" target="_blank" rel="noopener noreferrer">GitHub →</a></div>
-      <div class="repo rv" style="--d:.05s"><div class="name">klaushofrichter/extra-games<small>Example game repository, MIT</small></div><div class="gl"><span>Chess</span><span>Liar's Dice</span><span>Backgammon</span><span>Mexican Train</span></div><a href="https://github.com/klaushofrichter/extra-games" target="_blank" rel="noopener noreferrer">GitHub →</a></div>
+      <div class="repo rv" style="--d:.05s"><div class="name">klaushofrichter/extra-games<small>Example game repository, MIT</small></div><div class="gl"><span>Chess</span><span>Liar's Dice</span><span>Backgammon</span><span>Mexican Train</span><span>Last Card</span></div><a href="https://github.com/klaushofrichter/extra-games" target="_blank" rel="noopener noreferrer">GitHub →</a></div>
       <div class="repo add rv" style="--d:.1s"><div class="name">your-name/your-games<small>Built a game? Tell us about it</small></div><div class="gl faint" style="font-size:15px">Open an issue with a link to your repository and we'll list it here.</div><a href="https://github.com/klaushofrichter/games-service/issues/new?title=Game%20repository%3A%20" target="_blank" rel="noopener noreferrer">Add yours →</a></div>
     </div>
   </div>
@@ -966,8 +1082,9 @@ node scripts/soak.ts 100</pre>
       <p class="eyebrow rv">Play at home</p>
       <h2 class="rv" style="--d:.06s">A table on any computer, in three commands.</h2>
       <p class="lede rv" style="--d:.12s;margin-top:20px">The table runs in Docker on a computer on your WiFi. Open the board in a browser, on a touchscreen if you have one, and everyone joins with their phone. No cloud service, no DNS entry and no HTTPS needed.</p>
-      <div class="needs rv" style="--d:.18s"><span>Docker with Compose</span><span>git</span><span>Phones on the same WiFi</span><span>A touchscreen (or a mouse)</span></div>
+      <div class="needs rv" style="--d:.18s"><span>Docker with Compose</span><span>git</span><span>Phones on the same WiFi</span><span>A touchscreen, an iPad or a mouse</span></div>
       <p class="rv muted" style="--d:.22s">Games from other repositories, private ones too, are added by cloning them. The <a href="/docs/local-docker.md">runbook</a> has every step, with a check after each one.</p>
+      <p class="rv muted" style="--d:.24s;margin-top:14px"><b style="color:var(--ink)">No touchscreen table yet?</b> An iPad makes a small game board, good enough to try a game or test your own: in the board's settings, <em>Board on another screen…</em> shows a QR code, the iPad scans it, and the board moves there while the table keeps running on the computer.</p>
       <div class="agent-alt rv" style="--d:.26s">
         <p>Or let your AI agent do it:</p>
         <q id="install-prompt">Check out https://games.skylar.technology and read the llms.txt. I want to do a local installation.</q>
@@ -1223,6 +1340,8 @@ docker compose -f deploy/local/docker-compose.yml up -d --build">Copy</button></
       text: "Race your tokens around the board and home. Roll a 6 to leave the start, touch a token to move it, land on someone to send them back." },
     { id: "mexican-train", name: "Mexican Train", players: "2–8 players", src: "extra", phone: "mexican-train-phone",
       text: "Dominoes up to double twelve: grow your own train from the hub, or the Mexican train everyone shares. Your tiles stay on your phone. A demo game for developers that customises nearly everything." },
+    { id: "last-card", name: "Last Card", players: "2–8 players", src: "extra", phone: "last-card-phone",
+      text: "Match the colour or the number, and push your card off the top of your phone: it lands on the pile in the middle. Skips, reverses, draw cards and wilds; shout your last card and be first to 200 points." },
     { id: "coin-flip", name: "Coin Flip", players: "1–8 players", src: "built-in", phone: "coin-flip-phone",
       text: "Everyone guesses heads or tails, then the coin flips. The smallest complete game, and the one to copy when you start your own." },
   ];

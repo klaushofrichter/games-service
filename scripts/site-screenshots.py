@@ -23,7 +23,7 @@ OUT = tempfile.mkdtemp(prefix="site-shots-")
 GAMES = tempfile.mkdtemp(prefix="site-games-")
 for g in ["coin-flip", "holdem", "pachisi", "roulette"]:
     os.symlink(os.path.join(REPO, "games", g), os.path.join(GAMES, g))
-for g in ["chess", "liars-dice", "backgammon", "mexican-train"]:
+for g in ["chess", "liars-dice", "backgammon", "mexican-train", "last-card"]:
     os.symlink(os.path.join(EXTRA, "games", g), os.path.join(GAMES, g))
 PORT = 8177
 BASE = f"http://127.0.0.1:{PORT}"
@@ -59,7 +59,15 @@ PLAN = [
     ("liars-dice", {}, 4, ["Klaus"], 3, 6),
     ("backgammon", {}, 2, [], 2, 11),
     ("mexican-train", {"rounds": 3, "turnSeconds": 0}, 6, ["Klaus"], 5, 240),
+    ("last-card", {"turnSeconds": 0, "tapToPlay": True}, 6, ["Klaus"], 5, 60),
 ]
+
+# Last Card (extra-games): a point of a card on the phone that no other card covers (the hand overlaps).
+SPOT = """e => { const r = e.getBoundingClientRect();
+  for (const fy of [0.3, 0.5, 0.15]) for (const fx of [0.3, 0.15, 0.5]) {
+    const x = r.left + r.width * fx, y = r.top + r.height * fy, t = document.elementFromPoint(x, y);
+    if (t && e.contains(t)) return [x, y]; }
+  return null; }"""
 
 try:
     with sync_playwright() as p:
@@ -131,6 +139,28 @@ try:
                             ph.locator(".mtd-draw").click()
                     time.sleep(0.4)
                 time.sleep(1.5)
+            elif game == "last-card":
+                # Klaus plays from the phone (a tap plays a card that fits; a wild takes the first colour; else Draw,
+                # then Keep) for a while, then stops on a turn of theirs with cards that fit: with no turn limit the
+                # game waits there.
+                ph, end, plays = phones[0], time.time() + secs, 0
+                while time.time() < end:
+                    pick = ph.locator(".lcd-pick:not([hidden]) [data-color]")
+                    if pick.count():
+                        pick.first.click()
+                    elif ph.locator(".lcd-card.ok").count() and not ph.locator(".lcd-result:not([hidden])").count():
+                        if plays >= 4 and board.locator(".lc-pile > div").count() >= 6:
+                            break
+                        spot = ph.locator(".lcd-card.ok").first.evaluate(SPOT)
+                        if spot:
+                            ph.mouse.click(*spot)
+                            plays += 1
+                    elif ph.locator(".lcd-keep:not([hidden])").count():
+                        ph.locator(".lcd-keep").click()
+                    elif ph.locator(".lcd-draw:not([disabled])").count() and "your turn" in ph.inner_text(".lcd-status").lower():
+                        ph.locator(".lcd-draw").click()
+                    time.sleep(0.5)
+                time.sleep(2)
             else:
                 time.sleep(secs)
             if game == "holdem":
@@ -148,6 +178,37 @@ try:
                 board.screenshot(path=os.path.join(OUT, "mexican-train-lava-board.png"))
             for ph in phones:
                 ph.screenshot(path=os.path.join(OUT, f"{game}-phone.png"))
+            if game == "last-card" and phones:
+                # The sling (D-189), for the website: a card held half off the top of the phone, and the board showing it
+                # coming in at Klaus's seat while the finger is still down.
+                ph, end = phones[0], time.time() + 60
+                while time.time() < end and not ph.locator(".lcd-card.ok").count():  # until a turn with a card that fits
+                    if ph.locator(".lcd-keep:not([hidden])").count():
+                        ph.locator(".lcd-keep").click()
+                    elif ph.locator(".lcd-draw:not([disabled])").count() and "your turn" in ph.inner_text(".lcd-status").lower():
+                        ph.locator(".lcd-draw").click()
+                    time.sleep(0.5)
+                time.sleep(1.5)
+                spot = ph.locator(".lcd-card.ok").first.evaluate(SPOT) if ph.locator(".lcd-card.ok").count() else None
+                if spot:
+                    x, y = spot
+                    ph.mouse.move(x, y)
+                    ph.mouse.down()
+                    top = 46  # past the top of the phone: the board shows only the part that has left it
+                    for k in range(1, 21):
+                        ph.mouse.move(x + k * 2, y + (top - 40 - y) * k / 20)
+                        time.sleep(0.03)
+                    time.sleep(0.8)
+                    ph.screenshot(path=os.path.join(OUT, "last-card-sling-phone.png"))
+                    board.screenshot(path=os.path.join(OUT, "last-card-sling-board.png"))
+                    box = board.evaluate("(() => { const r = document.querySelector('.sling-item')?.getBoundingClientRect(); return r && r.width ? [r.x, r.y, r.width, r.height] : null; })()")
+                    with open(os.path.join(OUT, "last-card-sling.json"), "w") as f:
+                        json.dump(box, f)
+                    for k in range(20, -1, -1):  # back down into the hand: nothing is played
+                        ph.mouse.move(x + k * 2, y + (top - 40 - y) * k / 20)
+                        time.sleep(0.02)
+                    ph.mouse.up()
+            for ph in phones:
                 ph.close()
             print("shot", game, a("GET", "/state")["phase"])
         # The statistics window (D-140, D-178): eight hands of Hold'em with six AI players, played to the end.
@@ -250,6 +311,17 @@ for game, *_ in PLAN:
     save(f"{game}-board.png", f"{game}.webp", (1600, 900))
     save(f"{game}-phone.png", f"{game}-phone.webp", (500, 1100))
 save("mexican-train-lava-board.png", "mexican-train-lava.webp", (1600, 900))
+save("last-card-sling-phone.png", "last-card-sling-phone.webp", (500, 1100))
+# The board around the incoming card: its seat, and toward the middle of the table (the board is 1920 x 1080).
+if os.path.exists(os.path.join(OUT, "last-card-sling.json")):
+    box = json.load(open(os.path.join(OUT, "last-card-sling.json")))
+    if box:
+        cx, cy = box[0] + box[2] / 2, box[1] + box[3] / 2
+        cx, cy = cx + (960 - cx) * 0.35, cy + (540 - cy) * 0.35  # a little toward the pile
+        w, h = 1120, 630
+        l = int(min(max(cx - w / 2, 0), 1920 - w)); t = int(min(max(cy - h / 2, 0), 1080 - h))
+        im = Image.open(os.path.join(OUT, "last-card-sling-board.png")).convert("RGB").crop((l, t, l + w, t + h))
+        im.save(os.path.join(SITE, "last-card-sling.webp"), "WEBP", quality=82, method=6)
 if not ONLY:
     save("lobby-open.png", "lobby.webp", (1600, 900))
 # The window and a little of the table around it (the board is 1920 x 1080).
