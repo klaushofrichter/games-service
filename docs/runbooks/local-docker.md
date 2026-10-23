@@ -127,6 +127,10 @@ No phone at hand (a developer trying a game alone): on the board, open *Advanced
 *Play from the board*. The board then shows one player's deck beside it, like a remote player's page; enter a name
 there instead of scanning the QR code. It lasts until the Table Host restarts, or set `BOARD_DECK=1` in `.env`.
 
+**The board on an iPad or a TV:** the board's settings › *Board on another screen…* show a QR code and link that move
+the board to another screen on the same network, and remember it there (D-190). With this compose file every device on
+the network gets the board anyway (see *Security notes*); on a table without `ALLOW_REMOTE_BOARD=1` the link is the way.
+
 **Check:** a phone (or the deck beside the board) joined, and a game started and ended. *How to play* on the board and on the phones explains each
 game.
 

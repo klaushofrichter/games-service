@@ -19,6 +19,7 @@ Key rules for every game: rules are pure and deterministic (randomness only from
 - [Cards helpers](https://raw.githubusercontent.com/klaushofrichter/games-service/main/packages/sdk/src/cards.ts): deck, seeded shuffle, poker hand evaluation
 - [Manifest schema and lobby types](https://raw.githubusercontent.com/klaushofrichter/games-service/main/packages/protocol/src/index.ts): `manifestSchema`, `GameSummary`, `GameAward`, `PlayerInfo`, `LobbyState`
 - [Board kit for UI modules](https://raw.githubusercontent.com/klaushofrichter/games-service/main/apps/table-host/public/shared/board-kit.js): seat plates, player colours, rotation, countdowns, sounds, styles
+- [Sling](https://raw.githubusercontent.com/klaushofrichter/games-service/main/apps/table-host/public/shared/sling.js): a card (or die, token) pushed off the top of a phone comes onto the board at the player's seat and flies to its place; drawn cards fly back (developer guide, section 10)
 - [Game log format](https://raw.githubusercontent.com/klaushofrichter/games-service/main/apps/table-host/src/log-format.md): records, move lists, replay
 
 ## Example games
@@ -32,6 +33,9 @@ Key rules for every game: rules are pure and deterministic (randomness only from
 ## Running it
 
 - [Run Game Table locally with Docker](https://games.skylar.technology/docs/local-docker.md): the runbook for a local installation, written for agents: the Table Host with the built-in games on one machine, phones on the LAN, no cloud service, DNS or HTTPS; games from other repositories, private ones by cloning; optionally a local cloud service (the same file in the repository: https://raw.githubusercontent.com/klaushofrichter/games-service/main/docs/runbooks/local-docker.md)
+
+- **Without Docker:** `scripts/local-table.sh` (macOS or Linux, Node 26) runs a table from the latest `main` or any `--branch`, with `--extra ../other-repo` for games not released yet (developer guide, section 14).
+- **The board on another screen:** an iPad, a TV or a second computer on the same network can show the board while the table runs elsewhere: board settings › *Board on another screen…* gives a QR code and link that move the board there and remember that screen. Same network only; the link carries the table key, so only for your own screens (README, "The board on another screen").
 
 ## Testing
 

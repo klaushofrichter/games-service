@@ -2,7 +2,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { readFile } from "node:fs/promises";
 import { extname, join, normalize } from "node:path";
-import { timingSafeEqual } from "node:crypto";
+import { createHash, timingSafeEqual } from "node:crypto";
 import { WebSocketServer, type WebSocket } from "ws";
 import QRCode from "qrcode";
 import { envelope, type AccessCodeStatus, type Envelope } from "../../../packages/protocol/src/index.ts";
@@ -78,7 +78,14 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
     const a = req.socket.remoteAddress ?? "";
     return a === "127.0.0.1" || a === "::1" || a === "::ffff:127.0.0.1";
   };
-  const boardAllowed = (req: IncomingMessage) => opts.allowRemoteBoard || isLoopback(req);
+  // Another screen for the board (D-190): an iPad or a TV on the same network, given the board's link once (it carries
+  // the table key). The table then remembers that browser by a cookie derived from the key; only private addresses.
+  const address = (req: IncomingMessage) => (req.socket.remoteAddress ?? "").replace(/^::ffff:/, "");
+  const isPrivate = (req: IncomingMessage) => /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|169\.254\.|127\.|::1$|f[cd]|fe80:)/i.test(address(req));
+  const SCREEN_COOKIE = "gt_screen";
+  const screenToken = createHash("sha256").update(`board-screen:${opts.tableKey}`).digest("hex").slice(0, 40);
+  const screenCookieOk = (req: IncomingMessage) => (req.headers.cookie ?? "").split(/;\s*/).includes(`${SCREEN_COOKIE}=${screenToken}`);
+  const boardAllowed = (req: IncomingMessage) => opts.allowRemoteBoard || isLoopback(req) || (isPrivate(req) && screenCookieOk(req));
 
   // ---------- broadcasting ----------
 
@@ -435,7 +442,19 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
         res.writeHead(302, { location: `/deck/?t=${match[1].toUpperCase()}` });
         return res.end();
       }
+      // The board's link for another screen (D-190): opened there, it remembers that browser and shows the board.
+      if (path === "/board/screen") {
+        if (remoteOf(req)) return json(res, 403, { error: "the board's link works only on the table's own network" });
+        if (!isPrivate(req)) return json(res, 403, { error: "the board's link works only on the table's own network" });
+        if (!keyOk(url.searchParams.get("key"))) return json(res, 403, { error: "this board link is not valid for this table" });
+        res.writeHead(302, { location: "/board/#screen", "set-cookie": `${SCREEN_COOKIE}=${screenToken}; HttpOnly; SameSite=Strict; Path=/; Max-Age=31536000` });
+        return res.end();
+      }
       if (path === "/qr.svg") {
+        if (url.searchParams.get("screen") !== null) {
+          if (remoteOf(req) || !boardAllowed(req)) return json(res, 403, { error: "board only" });
+          return await qrSvg(res, `${table.config.publicUrl}/board/screen?key=${encodeURIComponent(opts.tableKey)}`);
+        }
         // ?exchange: the open exchange's code instead of the table's join code (D-159). A remote player's invite also
         // on a remote board with board control, which sees the link anyway (D-166); a seat's join code only here.
         const ex = table.state().exchange;
@@ -490,8 +509,9 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
       o.ws.close(4010, "removed");
     }
   });
-  const replaceClient = (o: Client) => {
-    send(o.ws, envelope("system", "replaced", {}));
+  const replaceClient = (o: Client, by?: IncomingMessage) => {
+    // Where the board went (D-190): the table's own computer, or another screen on the network.
+    send(o.ws, envelope("system", "replaced", by ? { from: address(by), local: isLoopback(by) } : {}));
     o.ws.close(4009, "opened in another window");
     clients.delete(o as Client & { alive?: boolean });
   };
@@ -540,7 +560,7 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
               // the table serves no more remote boards than it has remote seats.
               c.session = remoteCtx!.session;
               const remoteBoards = [...clients].filter((o) => o !== client && o.role === "board" && o.remote);
-              remoteBoards.filter((o) => o.session === c.session).forEach(replaceClient);
+              remoteBoards.filter((o) => o.session === c.session).forEach((o) => replaceClient(o));
               if (remoteBoards.filter((o) => o.session !== c.session).length >= table.config.maxRemotePlayers) throw new TableError(409, REMOTE_FULL, "remote-full");
               table.remoteBoardOpened(c.session, remoteCtx!.invite, p.name); // watchers are counted by their boards (D-168)
               c.counted = true;
@@ -554,7 +574,7 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
             c.tab = tab;
             const others = () => [...clients].filter((o) => o !== client && o.role === "board" && !o.remote && o.ws.readyState === o.ws.OPEN);
             const replace = () => {
-              others().forEach(replaceClient);
+              others().forEach((o) => replaceClient(o, req));
               acceptBoard();
             };
             const live = others();
@@ -577,7 +597,7 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
           } else if (p.sessionToken) {
             const info = table.resume(String(p.sessionToken));
             // One deck per player (D-133): the player's newest window replaces the older one, which is told so.
-            [...clients].filter((o) => o !== client && o.role === "deck" && o.playerId === info.id).forEach(replaceClient);
+            [...clients].filter((o) => o !== client && o.role === "deck" && o.playerId === info.id).forEach((o) => replaceClient(o));
             if ([...clients].filter((o) => o.role === "deck").length >= MAX_DECKS) throw new TableError(409, "the table serves eight phones at most");
             c.role = "deck";
             c.playerId = info.id;

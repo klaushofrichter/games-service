@@ -39,9 +39,24 @@ curl -X POST -H "Authorization: Bearer ${ADMIN_TOKEN:-change-me-dev-admin-token}
 Or skip the pairing code: create an access code in the console (*Access codes*) and start with
 `TABLE_CODE=ABCD-EFGH docker compose …`, or type it in the board's settings (*Access codes* below).
 
-## A table on a Mac (development)
+## A table on your computer (development)
 
 `scripts/local-table.sh` runs a Table Host on a Mac or a Linux computer against the live service at `games.skylar.technology` (Node 26 needed), without containers (`scripts/mac-table.sh` is its old name). It first updates the checkout to the latest `main`; `--branch production` or `--branch experiment/card-sling` runs another branch, and `--no-pull` runs the checkout as it is. `CLOUD_URL= scripts/local-table.sh --extra ../extra-games` adds the games of another checkout as they are (e.g. a branch of extra-games not released yet). It opens the board in the browser, puts the Mac's WiFi address in the QR code, and keeps the table's identity and API key in `~/.gametable-local` (or `~/.gametable-mac`, where an older table lives), so a restart is the same table. The first time, the board shows a pairing code: approve it in the console at `https://games.skylar.technology/admin`. Allow `node` to accept incoming connections when the system asks, or phones cannot join. `scripts/local-table.sh --code ABCD-EFGH` uses an access code from the console instead, so no approval is needed. `CLOUD_URL= scripts/local-table.sh` runs it without the service.
+
+## The board on another screen
+
+The board can show on another screen on the same network, such as an iPad, a TV or a second computer, while the table
+runs on its computer (D-190). On the board, open the settings (gear) › *Board on another screen…*: it shows a QR code
+and a link. Open it on the other screen (scan it with the iPad's camera, or type the link into its browser), and the
+board moves there; the table's own window says "The board moved to another screen" and offers to take it back.
+
+- Same network only: the link works from private addresses (home WiFi), never from the internet, and not through a
+  remote player's invite.
+- The screen is remembered (a cookie derived from the table key), so it shows the board again after a reload or a
+  restart. The link carries the table key: whoever opens it can run the table, so show it only on your own screens.
+- One board at a time (D-132): opening it on another screen moves it, and *Show the board here* moves it back.
+- No configuration and no extra port: the table already listens on the network for the phones. `ALLOW_REMOTE_BOARD=1`
+  (every device on the network gets the board) is for Docker setups and not needed for this.
 
 ## Layout
 

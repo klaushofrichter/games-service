@@ -475,7 +475,9 @@ Tests use Vitest and run against the real host code.
   `--no-pull` runs the checkout as it is. `--extra ../my-games` adds the games of another checkout, so you can play a
   game from your own repository before it is released; start it with `CLOUD_URL=` to leave the live service out (it
   would otherwise also install its own extra games). `--code ABCD-EFGH` connects the table to a game service with an
-  access code. The table keeps its identity and key in `~/.gametable-local`. A table in Docker instead:
+  access code. The table keeps its identity and key in `~/.gametable-local`. To see the board on an iPad or a TV
+  while the table runs on your computer, use the board's settings › *Board on another screen…* (a QR code and link
+  for any screen on the same network, D-190). A table in Docker instead:
   [`docs/runbooks/local-docker.md`](../runbooks/local-docker.md).
 
   ```
