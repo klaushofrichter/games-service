@@ -70,13 +70,21 @@ function send(ch, type, payload) {
   });
 }
 
+// A short message (a refused move, D-191) floats over the top of the screen for three seconds instead of pushing the
+// page down: the game's status stays where it is.
+const toastEl = document.createElement("div");
+toastEl.className = "deck-toast"; // not .toast: that is the board's, at the bottom (shared theme)
+toastEl.setAttribute("role", "status");
+toastEl.setAttribute("aria-live", "polite");
+document.body.appendChild(toastEl);
 function toast(msg) {
   banner = msg;
-  renderTop();
+  toastEl.textContent = msg;
+  toastEl.classList.add("on");
   setTimeout(() => {
     if (banner === msg) {
       banner = "";
-      renderTop();
+      toastEl.classList.remove("on");
     }
   }, 3000);
 }
@@ -181,7 +189,7 @@ function renderTop() {
       : pause.reason === "player"
       ? `<div class="banner">Waiting for ${esc((pause.players ?? []).map((w) => w.name).join(" and ") || "a player")} to come back. ${esc((pause.players ?? [])[0]?.text ?? "")}</div>`
       : `<div class="banner">Game paused: the table lost its connection. It continues by itself when the connection is back.</div>`;
-  const banners = `${paused}${banner ? `<div class="banner">${esc(banner)}</div>` : ""}`;
+  const banners = paused;
   if (inGame) {
     const color = p?.seat == null ? null : colorOf(p.seat);
     top.innerHTML = `${banners}<div class="tabs" role="tablist" aria-label="Deck">
@@ -597,6 +605,10 @@ async function showGame() {
           if (!r.ok) toast(r.reason);
           return r;
         }),
+      // EXPERIMENT (card sling): a live gesture for the board, fire and forget (no answer, not logged).
+      gesture: (data) => {
+        if (ws?.readyState === 1) ws.send(JSON.stringify({ v: 1, ch: "game", type: "gesture", payload: data }));
+      },
       toast,
       vibrate: (ms = 40) => navigator.vibrate?.(ms),
       assetUrl: (p) => `/games/${state.game.id}/assets/${p}`,

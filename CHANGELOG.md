@@ -8,6 +8,19 @@ history.
 
 ## [Unreleased]
 
+- Slung and drawn cards no longer jump at the player's seat on the board (D-194).
+- The sling can have a release line: let go of a card above it and it is played toward the middle (`line()`, D-193).
+- A phone that lost its connection keeps its seat in the lobby for five minutes instead of one (`DECK_GRACE_MS`, D-192).
+- A phone's short messages (a refused move) float over the top of the screen instead of pushing the game down (D-191).
+- The board on another screen (D-190): the board's settings show a QR code and link that move the board to an iPad,
+  a TV or another computer on the same network, which is then remembered; the table's window says where it went and
+  can take it back.
+- Sling (D-189): games can let players push a card off the top of their phone and see it come onto the board at
+  their seat while they drag, then fly to the pile; drawn cards fly the other way (`/shared/sling.js`,
+  `ctx.gesture`, the board's `gesture` hook). Card Sling is a test game for it.
+- `scripts/local-table.sh` (was `mac-table.sh`, which still works) runs a table on macOS or Linux from the latest
+  `main`, or from any branch with `--branch production` or `--branch experiment/card-sling`; `--no-pull` runs the
+  checkout as it is (D-188).
 - The public website: the developer section says the platform is made for agentic coding (*You prompt your AI
   agent*), and a new About section at the end tells where the project and its code come from (D-187).
 - The public website: the Mexican Train picture changes to a second look (Lava lamp, numbers) as one scrolls,

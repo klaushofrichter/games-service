@@ -1148,3 +1148,112 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   own agent: set up a table and write a game in one sentence, then fine-tune by playing. The footer links to it.
   Checks: `tests/website.test.ts` (the section; besides the GitHub repositories, the page may link to
   `https://skylar.technology`, still with no resources from elsewhere), `scripts/e2e/website.py` (a screenshot of it).
+
+## A local table from any branch: scripts/local-table.sh (23 Oct 2026)
+
+- **D-188 · 2026-10-23 · Klaus** — `scripts/mac-table.sh` is now `scripts/local-table.sh`, for macOS and Linux, and
+  it first brings the checkout up to date: the latest `main` by default, or the branch named with `--branch`
+  (`production`, `experiment/card-sling`). No containers are built: Node runs the code. *Why:* Klaus: "Can you update
+  that script so that it also does a "git pull" of main per default, or that it accepts a branch, such as
+  "production" or "experiment/card-sling" and launches that?" and "This is probably not mac specific. We can rename
+  the script "local-table"?" *Implementation (Claude):* the script fetches the branch, switches to it and
+  fast-forwards it; it stops instead when the checkout has changes of its own or the local branch has commits GitHub
+  doesn't, and `--no-pull` starts the checkout as it is. It runs from a temporary copy of itself, because switching
+  branches rewrites the file bash is reading. `npm ci` runs again when `package-lock.json` differs from the one the
+  dependencies were installed for. On Linux the QR code's address comes from `ip route`, the table's name from the
+  host name, and the board opens with `xdg-open`. An existing `~/.gametable-mac` is still used, so a Mac stays the same
+  table; new installs use `~/.gametable-local`. `scripts/mac-table.sh` remains as a two-line wrapper. `--extra DIR` (repeatable) links this repository's games and
+  those of another checkout into one folder (`GAMES_DIR`), to try games not released yet, e.g. `CLOUD_URL=
+  scripts/local-table.sh --extra ../extra-games`; relative paths count from where the script is started. Tried in a fresh
+  clone on Linux: `--branch experiment/card-sling` (installs, serves Card Sling), then the default (back on `main`, no
+  reinstall), and a refusal with a local change.
+
+## Slinging cards from the phone to the board (23 Oct 2026)
+
+- **D-189 · 2026-10-23 · Klaus** — The platform lets a player push a card (or a die, a token) up and off the top of
+  their phone and see it come onto the board at their seat while they drag; once played, it flies to where the game
+  wants it, and a drawn card flies the other way. *Why:* Klaus, after trying the experiment: "The "Sling" works really
+  well, looks fantastic", with: the board slower ("perhaps taking 1.5x time. This could be a setting"), starting "on
+  the edge of the window, and not on the edge of the player name box … ON TOP of the name box", the phone's tilt "also
+  on the board", and "this should be a Platform feature. Consider how to separate platform (i.e. APIs that games can
+  use) from games (e.g. the card graphics)"; showing the back "as long as the move is not final" as a toggle; a
+  direction of the sling (middle, left or right); other uses such as dice. *Implementation (Claude):*
+  - **Live gestures.** `ctx.gesture(data)` on the phone goes over its socket with no answer; the host passes it to
+    every board, local and remote, as `{ seat, data }`, and the board calls the game's `gesture(seat, data)` hook.
+    Not an intent: no rules, no log, no replay, no other phones. Dropped outside a running game, for players without
+    a seat, over 512 bytes or more than one per 8 ms. Remote players' sockets arrive over WebRTC on the same handler.
+  - **`/shared/sling.js`.** `slingDeck` on the phone: drag, tilt, threshold (half out) or flick, direction,
+    `canSling` (bounce back), `onSling` (the game's intent), `receive` (a drawn card comes in at the top). `slingBoard`
+    on the board: a slot at each seat's edge of the window, above the plates, easing toward the latest gesture with
+    the phone's tilt; `fly` from where the drag left the card to the game's target; `toSeat` for draws; `flight` for
+    anything else. Timings are 1.5 times the experiment's, and `speed()` scales them for a board setting.
+  - **The split.** The platform owns gestures, geometry, timing and animation; the game owns the markup
+    (`render(item, { back })`), where things land, what a move means and whether a sling is allowed. The board sees
+    only the back while dragging unless the game passes `reveal: "drag"`; the face appears when the flight starts.
+  - `games/card-sling` (a test game, shown with `SHOW_TEST_GAMES=1`) is the smallest user;
+    `scripts/e2e/card_sling.py` checks the back while dragging, the tilt on the board, a fling, a draw and an AI card.
+
+## The board on another screen (23 Oct 2026)
+
+- **D-190 · 2026-10-23 · Klaus** — The board can show on another screen on the same network (an iPad, a TV, a second
+  computer) while the table runs on its computer: the board's settings › *Board on another screen…* show a QR code and
+  link that move it there. *Why:* Klaus: "I have an iPad and want to use that as a Game Board monitor … the game board
+  engine needs to run on the mac … I am OK with it for LAN only", "build the setting for the external monitor or
+  iPad. Once we move the board to another browser, we will show the "other board connected" in the mac?", and "add
+  documentation about this behavior as a platform feature … so that humans and LLMs can find it". *Implementation
+  (Claude):* an exception to D-034 that keeps its point (devices on the network don't get the table's controls on
+  their own): `/board/screen?key=<table key>` from a private address (10/8, 172.16/12, 192.168/16, link-local, IPv6
+  ULA) sets an HttpOnly, SameSite=Strict cookie derived from the key and redirects to the board, which takes the board
+  over at once (`#screen`); later loads of `/board/` from that browser are allowed by the cookie. Never through a
+  remote player's channel, never from a public address, never with a wrong key. The window it replaces (D-132) is
+  told where it went: "The board moved to another screen … at 192.168.1.34" with *Show the board here*; taken back,
+  the screen says "The board moved back to the table's computer". The dialog warns that the link runs the table.
+  Changing the table key (`TABLE_KEY`, or the key file of `scripts/local-table.sh`) forgets every screen. No extra
+  port: the table already listens on the network for phones. Documented in the README, `llms.txt`, the developer guide
+  (section 14), `AGENTS.md` and the Docker runbook. Check: `scripts/e2e/board_screen.py` (an iPad through a relay from
+  127.0.0.2, so the table sees another device: no board without the link or with a wrong key, the link and QR code
+  in the settings, the takeover, remembered after a reload, the table's notice and taking it back).
+
+## A phone's short messages float over the top (23 Oct 2026)
+
+- **D-191 · 2026-10-23 · Klaus** — A short message on a phone (a refused move, `ctx.toast`) floats over the top of the
+  screen for its three seconds instead of being inserted above the tabs. *Why:* Klaus, playing Last Card: "The warning
+  on the deck "not a valid card" or similar moves the game status box. Make this warning on top of the status, it
+  disappears after a few seconds anyway." *Implementation (Claude):* one `.deck-toast` element fixed at the top (not the shared theme's `.toast`, the board's, which sits at the bottom) (below the
+  safe area), fading in and out, `role="status"`; it covers the tabs for a moment and moves nothing. Pause messages
+  ("Waiting for …") stay in the page as before: they last as long as the pause. Every game gets this.
+
+## A phone keeps its seat for five minutes (23 Oct 2026)
+
+- **D-192 · 2026-10-23 · Klaus** — A phone that lost its connection keeps its seat in the lobby for five minutes,
+  not one, before its player is removed. *Why:* Klaus: "How fast is a "session" for a deck expiring? I think it should
+  take longer, like 5 minutes. It should be a default in the code somewhere so that it is easy to change. We do not
+  need a user overwrite at this time." *Implementation (Claude):* `DECK_GRACE_MS` in `apps/table-host/src/host.ts`,
+  the default for `graceMs`; `GRACE_MS` still overrides it for tests and the e2e checks (which use 1.5 s). No setting
+  on the board. Unchanged: during a running game a seat is held with no time limit (D-144, D-159), and the board shows
+  the player as away and offers to exchange them.
+
+## The sling's release line (23 Oct 2026)
+
+- **D-193 · 2026-10-23 · Klaus** — A game can give the sling a release line (`line()`): let go of a card with its
+  middle above it and it is played, flying to the board toward the middle; below it, it slides back; pushed on to the
+  top edge, left, middle or right count as before. *Why:* Klaus, playing Last Card: "I would like to see the notice
+  "push a card off the top…" closer to the status box on the deck. If the card is on the status box (ie above the
+  "push a card…" text), and let go, it should move to the board to the middle direction. If it is not let go, the
+  player can move it back or go to the top for left, middle, right." *Implementation (Claude):* `slingDeck` takes
+  `line()` (a clientY); while the card's middle is above it, the card and the area have the class `sling-armed` (for
+  the game to show it); letting go there glides it straight up and off (220 ms, its last poses reaching the board),
+  then `onSling(id, { direction: "middle" })`. Without `line` nothing changes. Documented in the developer guide
+  (section 10).
+
+## Slung and drawn cards without a jump at the seat (23 Oct 2026)
+
+- **D-194 · 2026-10-23 · Klaus** — A card thrown to a player's seat (a draw) lands and slips off the board's edge in
+  one movement, and a card being slung shows exactly where its flight then starts. *Why:* Klaus: "The board
+  animation for the draw is also a bit imprecise. The card travels from the deck to the player, pauses for a split
+  second, then jumps to the left by about 1/2 card to disappear. It should not jump." *Implementation (Claude):* the
+  slot at a seat's edge placed the card half its width left of the point `pose()` (and so every flight) uses; it is
+  centred now. And a thrown card slipped off the edge at the speed that follows a finger (half the way per frame),
+  dropping half a card in the first frame; it eases off gently now (`ease`, about a third of a second at normal
+  speed). Checks in `scripts/e2e/card_sling.py`: the card at the seat is where the phone says (within 12 px), and a
+  drawn card's first frame in the slot is where its flight ended (same x, within 30 px down).

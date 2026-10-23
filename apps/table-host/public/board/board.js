@@ -672,6 +672,7 @@ function openSettings() {
     setPanel(o, `<div class="panel"><h2>Settings</h2>
       <div class="group"><div class="eyebrow">Display</div>
         <div class="row"><span>Sound effects</span><button data-sound class="${state.display?.sound !== false ? "on" : ""}" role="switch" aria-checked="${state.display?.sound !== false}">${state.display?.sound !== false ? "On" : "Off"}</button></div>
+        ${REMOTE || IN_PLAY ? "" : `<div class="row"><span>Another screen on this WiFi, such as an iPad or a TV, shows the board instead</span><button data-screen>Board on another screen…</button></div>`}
         <div class="row"><span>Fullscreen</span>${fs ? `<button data-fs class="${fsDoc.fullscreenElement ? "on" : ""}">${fsDoc.fullscreenElement ? "Leave fullscreen" : "Fullscreen"}</button>` : `<span class="faint">not available in this browser</span>`}</div></div>
       <div class="group"><div class="eyebrow">Joining</div>
         ${state.developer?.boardDeck ? `<div class="row"><span class="faint">Played from the board (Advanced › Developer): no phone joins at the table</span></div>` : `<div class="row"><span>The QR code and address for phones, to join or rejoin, also during a game</span><button data-join-code>Show join code…</button></div>`}
@@ -717,6 +718,7 @@ function openSettings() {
     if (b.dataset.sound !== undefined) return void act("POST", "/display", { sound: state.display?.sound === false });
     if (b.dataset.accessCode !== undefined) return openCodePad();
     if (b.dataset.joinCode !== undefined) return openJoinCode();
+    if (b.dataset.screen !== undefined) return openScreenLink();
     if (b.dataset.colorPlayer) return void act("POST", `/players/${encodeURIComponent(b.dataset.colorPlayer)}/color`, { color: b.dataset.color });
     if (b.dataset.watcherRemove || b.dataset.watcherPlay) return void watcherAction(b);
     if (b.dataset.invite !== undefined) return void openInvite(b.dataset.invite === "watch"); // D-169
@@ -1623,6 +1625,30 @@ function openJoinCode() {
   overlayRoot.appendChild(o);
 }
 
+/**
+ * The board on another screen (D-190): a QR code and link with the table key. Opened on an iPad, a TV or another
+ * computer on the same network, it remembers that browser and moves the board there; this window then offers to take
+ * it back. Only on the table's own board (remote boards have no key).
+ */
+function openScreenLink() {
+  const o = document.createElement("div");
+  o.className = "overlay join-code";
+  const link = `${new URL(state.joinUrl).origin}/board/screen?key=${encodeURIComponent(KEY)}`;
+  setPanel(o, `<div class="panel"><h2>The board on another screen</h2>
+    <div class="join-big">
+      <img src="/qr.svg?screen" alt="QR code that opens the board on another screen">
+      <div>${linkLine(link)}</div>
+      <div class="faint" style="font-size:.75em;text-align:center;max-width:520px">Scan it with the iPad's camera, or open the link in its browser. The screen must be on this WiFi. It shows the board from then on, also after a restart; this window offers to take the board back.<br><b>The link lets a screen run the table:</b> show it only on screens you own.</div>
+    </div>
+    <div class="actions settings-actions"><button class="primary" data-close-overlay>Done</button></div></div>`);
+  const close = () => o.remove();
+  o.addEventListener("click", (e) => {
+    const b = e.target.closest("button");
+    if (e.target === o || b?.dataset.closeOverlay !== undefined) close();
+  });
+  overlayRoot.appendChild(o);
+}
+
 // ---------- Advanced (D-128) ----------
 /**
  * The versions running on this table (D-182), at the bottom of Advanced, also on remote boards: the platform (its
@@ -1976,7 +2002,9 @@ const TAB = (() => {
   }
 })();
 let elsewhere = null; // why this window does not show the table: "elsewhere" (another window has it) or "replaced"
-let takeover = false;
+// Opened with the board's link for another screen (D-190): this screen takes the board over at once.
+let takeover = location.hash === "#screen";
+if (takeover) history.replaceState(null, "", location.pathname + location.search);
 const elsewhereLayer = document.createElement("div");
 elsewhereLayer.id = "elsewhere-layer";
 elsewhereLayer.hidden = true;
@@ -1986,9 +2014,14 @@ function renderElsewhere(why, info = {}) {
   elsewhereLayer.hidden = !why;
   if (!why) return void (elsewhereLayer.innerHTML = "");
   const playing = info.phase === "active" || info.phase === "paused";
-  const title = why === "replaced" ? "The board moved to another window" : "The board is open in another window";
+  // Where it went (D-190): another screen on the network, or back to the table's own computer.
+  const screen = why === "replaced" && info.from && !info.local;
+  const home = why === "replaced" && info.local && !["localhost", "127.0.0.1", "[::1]"].includes(location.hostname);
+  const title = screen ? "The board moved to another screen" : home ? "The board moved back to the table's computer" : why === "replaced" ? "The board moved to another window" : "The board is open in another window";
   const text =
-    why === "replaced"
+    screen
+      ? `It shows on the screen at ${esc(info.from)} now, opened with the board's link. Only one screen shows the board at a time, so that a game is never shown twice.`
+      : why === "replaced"
       ? "Another window took over the table. Only one window shows the board, so that a game is never shown twice."
       : playing
         ? `A game${info.game ? ` of ${esc(info.game)}` : ""} is running there. Only one window shows the board at a time.`
@@ -2084,6 +2117,9 @@ function connect() {
       // switched off (that page listens).
       else if (IN_PLAY) tellPage({ type: "gt-board-deck", on: !!state.developer?.boardDeck });
       else if (state.developer?.boardDeck && window.parent === window) location.replace("/board/play.html");
+    } else if (m.ch === "game" && m.type === "gesture") {
+      // EXPERIMENT (card sling): a phone's live gesture, for the game's board to show at once.
+      game?.inst?.gesture?.(m.payload.seat, m.payload.data);
     } else if (m.ch === "game" && m.type === "board") {
       gameMsg = { ...m.payload, receivedAt: Date.now() };
       if (game?.inst && state) game.inst.update(gameMsg.view, gameMsg.events ?? [], gameInfo());

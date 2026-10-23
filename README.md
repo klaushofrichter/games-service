@@ -39,9 +39,24 @@ curl -X POST -H "Authorization: Bearer ${ADMIN_TOKEN:-change-me-dev-admin-token}
 Or skip the pairing code: create an access code in the console (*Access codes*) and start with
 `TABLE_CODE=ABCD-EFGH docker compose …`, or type it in the board's settings (*Access codes* below).
 
-## A table on a Mac (development)
+## A table on your computer (development)
 
-`scripts/mac-table.sh` runs a Table Host on a Mac against the live service at `games.skylar.technology` (Node 26 needed). It opens the board in the browser, puts the Mac's WiFi address in the QR code, and keeps the table's identity and API key in `~/.gametable-mac`, so a restart is the same table. The first time, the board shows a pairing code: approve it in the console at `https://games.skylar.technology/admin`. Allow `node` to accept incoming connections when macOS asks, or phones cannot join. `scripts/mac-table.sh --code ABCD-EFGH` uses an access code from the console instead, so no approval is needed. `CLOUD_URL= scripts/mac-table.sh` runs it without the service.
+`scripts/local-table.sh` runs a Table Host on a Mac or a Linux computer against the live service at `games.skylar.technology` (Node 26 needed), without containers (`scripts/mac-table.sh` is its old name). It first updates the checkout to the latest `main`; `--branch production` or `--branch experiment/card-sling` runs another branch, and `--no-pull` runs the checkout as it is. `CLOUD_URL= scripts/local-table.sh --extra ../extra-games` adds the games of another checkout as they are (e.g. a branch of extra-games not released yet). It opens the board in the browser, puts the Mac's WiFi address in the QR code, and keeps the table's identity and API key in `~/.gametable-local` (or `~/.gametable-mac`, where an older table lives), so a restart is the same table. The first time, the board shows a pairing code: approve it in the console at `https://games.skylar.technology/admin`. Allow `node` to accept incoming connections when the system asks, or phones cannot join. `scripts/local-table.sh --code ABCD-EFGH` uses an access code from the console instead, so no approval is needed. `CLOUD_URL= scripts/local-table.sh` runs it without the service.
+
+## The board on another screen
+
+The board can show on another screen on the same network, such as an iPad, a TV or a second computer, while the table
+runs on its computer (D-190). On the board, open the settings (gear) › *Board on another screen…*: it shows a QR code
+and a link. Open it on the other screen (scan it with the iPad's camera, or type the link into its browser), and the
+board moves there; the table's own window says "The board moved to another screen" and offers to take it back.
+
+- Same network only: the link works from private addresses (home WiFi), never from the internet, and not through a
+  remote player's invite.
+- The screen is remembered (a cookie derived from the table key), so it shows the board again after a reload or a
+  restart. The link carries the table key: whoever opens it can run the table, so show it only on your own screens.
+- One board at a time (D-132): opening it on another screen moves it, and *Show the board here* moves it back.
+- No configuration and no extra port: the table already listens on the network for the phones. `ALLOW_REMOTE_BOARD=1`
+  (every device on the network gets the board) is for Docker setups and not needed for this.
 
 ## Layout
 
@@ -66,7 +81,7 @@ Or skip the pairing code: create an access code in the console (*Access codes*) 
 | `scripts/release-notes.sh`, `release.sh` | The release step of the deploy |
 | `scripts/site-screenshots.py` | Takes the game screenshots for the public website (`apps/cloud/public/site/`) from a host running every public game |
 | `scripts/soak.ts` | AI-only soak run over every game and player count |
-| `scripts/mac-table.sh` | A Table Host on a Mac against the live service (see above) |
+| `scripts/local-table.sh` | A Table Host on this computer against the live service, from any branch (see above) |
 | `docs/` | Decision log; `developers/` (the game developer guide); the request to the kube-setup session for the cluster side; `runbooks/` for running a table locally with Docker and for resetting and restoring the service's state |
 | `tests/` | Vitest suites that drive a real host through the board control API and fake decks |
 | `deploy/` | Dockerfiles, docker-compose, the local Docker setup (`local/`), the table PC kit |
@@ -83,7 +98,7 @@ Or skip the pairing code: create an access code in the console (*Access codes*) 
 | `CLOUD_URL` | unset | Cloud service; unset = development mode without cloud |
 | `TABLE_CODE` (or `--code`) | unset | An access code from the console (D-113): the table is approved without a pairing code. Wins over a code typed on the board |
 | `REQUIRE_CLOUD` | 0 | `1` blocks new games while the cloud is unreachable (production) |
-| `GRACE_MS` | 60000 | How long a disconnected deck keeps its seat |
+| `GRACE_MS` | 300000 | How long a disconnected phone keeps its seat in the lobby (`DECK_GRACE_MS` in `apps/table-host/src/host.ts`; a running game holds seats without a limit) |
 | `AI_DELAY_MS` | 800 | Pause before an AI player acts |
 | `MAX_REMOTE_PLAYERS` | 4 | Remote players and watchers together (D-168) |
 | `ALLOW_REMOTE_BOARD` | 0 | Serve the board to non-loopback clients (development only) |
@@ -165,7 +180,7 @@ codes*: a label, a validity (one week, one month, one year or forever) and the g
 repositories, or chosen ones). The console shows the code, like `ABCD-EFGH`, once; the service keeps only a hash.
 
 - **On the table:** `TABLE_CODE=ABCD-EFGH` in the environment (the table PC's `.env`), `--code ABCD-EFGH` on the
-  command line (also `scripts/mac-table.sh --code …`), or *Access code* in the board's settings, which has a keypad.
+  command line (also `scripts/local-table.sh --code …`), or *Access code* in the board's settings, which has a keypad.
   A code given at start wins and can't be changed on the board. The board shows what the service said about it.
 - **One table per code:** the first table that uses a code keeps it; any other is refused (*in use*) and waits with
   its pairing code. *Release* frees a code for a new table, for example after reinstalling the PC, and disconnects
