@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 220" width="360" height="220">
+  <rect width="360" height="220" rx="16" fill="#0c2a21"/>
+  <rect x="120" y="12" width="120" height="196" rx="16" fill="#132f27" stroke="#3a6b5b" stroke-width="2"/>
+  <line x1="120" y1="40" x2="240" y2="40" stroke="#d6a94a" stroke-width="2" stroke-dasharray="5 4"/>
+  <rect x="156" y="20" width="48" height="70" rx="6" fill="#e5484d" stroke="#fff" stroke-width="3"/>
+  <text x="180" y="66" text-anchor="middle" font-size="30" font-weight="800" font-family="system-ui,sans-serif" fill="#fff">7</text>
+  <path d="M180 150 V104" stroke="#d6a94a" stroke-width="4" stroke-linecap="round"/>
+  <path d="M170 114 L180 102 L190 114" fill="none" stroke="#d6a94a" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="132" y="150" width="36" height="52" rx="5" fill="#3b82e0" stroke="#fff" stroke-width="2"/>
+  <rect x="192" y="150" width="36" height="52" rx="5" fill="#3fb05f" stroke="#fff" stroke-width="2"/>
+  <text x="62" y="110" text-anchor="middle" font-size="14" fill="#cfe3dc" font-family="system-ui,sans-serif">Push up</text>
+  <text x="300" y="110" text-anchor="middle" font-size="14" fill="#cfe3dc" font-family="system-ui,sans-serif">Half out:</text>
+  <text x="300" y="128" text-anchor="middle" font-size="14" fill="#cfe3dc" font-family="system-ui,sans-serif">played</text>
+</svg>

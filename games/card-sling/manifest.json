@@ -1,0 +1,58 @@
+{
+  "id": "card-sling",
+  "name": "Card Sling (experiment)",
+  "version": "2026.10.23.1",
+  "sdk": "^0.1",
+  "description": "An experiment for card animations: sling a card off the top of your phone onto the pile, or draw one. No winner.",
+  "players": {
+    "min": 1,
+    "max": 8
+  },
+  "turnModel": "simultaneous",
+  "seatLayouts": [
+    2,
+    4,
+    6,
+    8
+  ],
+  "edges": [
+    "north",
+    "south",
+    "east",
+    "west"
+  ],
+  "seatConstraints": null,
+  "dynamicPlayers": true,
+  "saveGame": false,
+  "settings": [
+    {
+      "key": "aiSeconds",
+      "type": "int",
+      "min": 1,
+      "max": 20,
+      "default": 3,
+      "label": "Seconds between AI moves"
+    },
+    {
+      "key": "plays",
+      "type": "int",
+      "min": 10,
+      "max": 500,
+      "step": 10,
+      "default": 100,
+      "label": "Cards played until the game ends"
+    }
+  ],
+  "ai": {
+    "supported": true,
+    "options": [],
+    "hostConfig": []
+  },
+  "simulation": {
+    "supported": true,
+    "headless": true
+  },
+  "remoteBoardControl": true,
+  "lobbyButton": "bottom-right",
+  "permissions": []
+}

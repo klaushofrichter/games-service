@@ -2084,6 +2084,9 @@ function connect() {
       // switched off (that page listens).
       else if (IN_PLAY) tellPage({ type: "gt-board-deck", on: !!state.developer?.boardDeck });
       else if (state.developer?.boardDeck && window.parent === window) location.replace("/board/play.html");
+    } else if (m.ch === "game" && m.type === "gesture") {
+      // EXPERIMENT (card sling): a phone's live gesture, for the game's board to show at once.
+      game?.inst?.gesture?.(m.payload.seat, m.payload.data);
     } else if (m.ch === "game" && m.type === "board") {
       gameMsg = { ...m.payload, receivedAt: Date.now() };
       if (game?.inst && state) game.inst.update(gameMsg.view, gameMsg.events ?? [], gameInfo());

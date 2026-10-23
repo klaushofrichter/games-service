@@ -1,0 +1,13 @@
+/* Card Sling phone (experiment). The game's area clips the card at its top edge: that is where it leaves the phone. */
+.csd { position: relative; height: calc(100dvh - 96px); min-height: 480px; overflow: hidden; display: flex; flex-direction: column; touch-action: none; user-select: none; -webkit-user-select: none; }
+.csd-top { flex: 1; display: grid; place-items: center; align-content: center; gap: 8px; color: rgba(255,255,255,.55); text-align: center; padding: 16px; }
+.csd-hint { font-size: 15px; }
+.csd-arrow { font-size: 44px; line-height: 1; animation: csd-up 1.6s ease-in-out infinite; }
+@keyframes csd-up { 0%, 100% { transform: translateY(8px); opacity: .4; } 50% { transform: translateY(-8px); opacity: 1; } }
+.csd-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0 12px 8px; }
+.csd-count { color: rgba(255,255,255,.7); font-size: 14px; }
+.csd-draw { min-height: 44px; }
+.csd-hand { position: relative; height: 160px; margin-bottom: 12px; }
+.csd-card { position: absolute; bottom: 8px; width: 88px; height: 132px; filter: drop-shadow(0 4px 8px rgba(0,0,0,.4)); touch-action: none; cursor: grab; }
+.csd-card.drag { z-index: 50 !important; cursor: grabbing; filter: drop-shadow(0 14px 20px rgba(0,0,0,.5)); }
+.csd-card svg { display: block; pointer-events: none; }

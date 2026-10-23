@@ -597,6 +597,10 @@ async function showGame() {
           if (!r.ok) toast(r.reason);
           return r;
         }),
+      // EXPERIMENT (card sling): a live gesture for the board, fire and forget (no answer, not logged).
+      gesture: (data) => {
+        if (ws?.readyState === 1) ws.send(JSON.stringify({ v: 1, ch: "game", type: "gesture", payload: data }));
+      },
       toast,
       vibrate: (ms = 40) => navigator.vibrate?.(ms),
       assetUrl: (p) => `/games/${state.game.id}/assets/${p}`,
