@@ -1148,3 +1148,20 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   own agent: set up a table and write a game in one sentence, then fine-tune by playing. The footer links to it.
   Checks: `tests/website.test.ts` (the section; besides the GitHub repositories, the page may link to
   `https://skylar.technology`, still with no resources from elsewhere), `scripts/e2e/website.py` (a screenshot of it).
+
+## A local table from any branch: scripts/local-table.sh (23 Oct 2026)
+
+- **D-188 · 2026-10-23 · Klaus** — `scripts/mac-table.sh` is now `scripts/local-table.sh`, for macOS and Linux, and
+  it first brings the checkout up to date: the latest `main` by default, or the branch named with `--branch`
+  (`production`, `experiment/card-sling`). No containers are built: Node runs the code. *Why:* Klaus: "Can you update
+  that script so that it also does a "git pull" of main per default, or that it accepts a branch, such as
+  "production" or "experiment/card-sling" and launches that?" and "This is probably not mac specific. We can rename
+  the script "local-table"?" *Implementation (Claude):* the script fetches the branch, switches to it and
+  fast-forwards it; it stops instead when the checkout has changes of its own or the local branch has commits GitHub
+  doesn't, and `--no-pull` starts the checkout as it is. It runs from a temporary copy of itself, because switching
+  branches rewrites the file bash is reading. `npm ci` runs again when `package-lock.json` differs from the one the
+  dependencies were installed for. On Linux the QR code's address comes from `ip route`, the table's name from the
+  host name, and the board opens with `xdg-open`. An existing `~/.gametable-mac` is still used, so a Mac stays the same
+  table; new installs use `~/.gametable-local`. `scripts/mac-table.sh` remains as a two-line wrapper. Tried in a fresh
+  clone on Linux: `--branch experiment/card-sling` (installs, serves Card Sling), then the default (back on `main`, no
+  reinstall), and a refusal with a local change.

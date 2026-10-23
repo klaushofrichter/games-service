@@ -8,6 +8,9 @@ history.
 
 ## [Unreleased]
 
+- `scripts/local-table.sh` (was `mac-table.sh`, which still works) runs a table on macOS or Linux from the latest
+  `main`, or from any branch with `--branch production` or `--branch experiment/card-sling`; `--no-pull` runs the
+  checkout as it is (D-188).
 - The public website: the developer section says the platform is made for agentic coding (*You prompt your AI
   agent*), and a new About section at the end tells where the project and its code come from (D-187).
 - The public website: the Mexican Train picture changes to a second look (Lava lamp, numbers) as one scrolls,
