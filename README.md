@@ -98,7 +98,7 @@ board moves there; the table's own window says "The board moved to another scree
 | `CLOUD_URL` | unset | Cloud service; unset = development mode without cloud |
 | `TABLE_CODE` (or `--code`) | unset | An access code from the console (D-113): the table is approved without a pairing code. Wins over a code typed on the board |
 | `REQUIRE_CLOUD` | 0 | `1` blocks new games while the cloud is unreachable (production) |
-| `GRACE_MS` | 60000 | How long a disconnected deck keeps its seat |
+| `GRACE_MS` | 300000 | How long a disconnected phone keeps its seat in the lobby (`DECK_GRACE_MS` in `apps/table-host/src/host.ts`; a running game holds seats without a limit) |
 | `AI_DELAY_MS` | 800 | Pause before an AI player acts |
 | `MAX_REMOTE_PLAYERS` | 4 | Remote players and watchers together (D-168) |
 | `ALLOW_REMOTE_BOARD` | 0 | Serve the board to non-loopback clients (development only) |
