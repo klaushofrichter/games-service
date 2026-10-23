@@ -58,7 +58,7 @@ try:
                 # The games: filters and the close-up.
                 page.locator("#games").scroll_into_view_if_needed()
                 page.click(".filters [data-f=extra]")
-                assert page.locator(".game:not(.hide)").count() == 3, "extra-games has three games"
+                assert page.locator(".game:not(.hide)").count() == 4, "extra-games has four games"
                 page.click(".filters [data-f=built-in]")
                 assert page.locator(".game:not(.hide)").count() == 4, "four built-in games"
                 page.click(".filters [data-f=all]")
@@ -82,6 +82,11 @@ try:
                 page.click(".step[data-i='6']")
                 page.wait_for_selector("#mini-deck.on")
                 page.locator("#demo").screenshot(path=os.path.join(OUT, "website-lobby.png"))
+                # The demo game (D-185): Mexican Train, its board and what it customises.
+                page.locator("#showcase").scroll_into_view_if_needed()
+                page.wait_for_function("document.querySelector('#showcase img').complete && document.querySelector('#showcase img').naturalWidth > 0")
+                assert page.locator("#showcase .show-list li").count() == 6
+                page.locator("#showcase").screenshot(path=os.path.join(OUT, "website-showcase.png"))
                 for sid in ["build", "install", "table"]:
                     page.locator(f"#{sid}").scroll_into_view_if_needed()
                     page.wait_for_timeout(600)

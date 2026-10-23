@@ -1095,3 +1095,17 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   Fullscreen (and its *Leave fullscreen* label) works on the page around it (`fsDoc`; the page is served by the table
   itself, so it is the same origin). A board on its own is unchanged. `scripts/e2e/board_deck.py`: Fullscreen from the
   board's settings makes the page fullscreen with the deck on screen, and leaves it again; on the old code it fails.
+
+## Mexican Train on the public website (23 Oct 2026)
+
+- **D-185 · 2026-10-23 · Klaus** — The public website shows Mexican Train, the fourth game from extra-games (E-020),
+  as a game like the others and as a demo for developers of how far a game can make the table its own. *Why:* Klaus:
+  "integrate the new game "Mexican Train" to the website. You can mention that this is a demo game with many
+  customizations as developer example." *Implementation (Claude):* a card in the games grid (eight games now; Coin Flip
+  is no longer a wide card, so the grid stays three rows) with a board and a phone screenshot from
+  `scripts/site-screenshots.py`, where the phone plays its own turns until the trains have grown. The counts and the
+  lists of extra-games say eight and four games. A new *Demo game* block (`#showcase`) in the developer section,
+  before *Test and debug*, shows the board and six things the game customises: the self-sizing board, the animated
+  backgrounds, the restyled seat plates, its sound and music, rule options and table preferences, and its own phone
+  screen, all while the platform keeps the lobby, seats and players. Checks: `tests/website.test.ts` (the section and
+  the images), `scripts/e2e/website.py` (four extra-games, the block with its image).

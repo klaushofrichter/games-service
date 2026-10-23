@@ -23,7 +23,7 @@ OUT = tempfile.mkdtemp(prefix="site-shots-")
 GAMES = tempfile.mkdtemp(prefix="site-games-")
 for g in ["coin-flip", "holdem", "pachisi", "roulette"]:
     os.symlink(os.path.join(REPO, "games", g), os.path.join(GAMES, g))
-for g in ["chess", "liars-dice", "backgammon"]:
+for g in ["chess", "liars-dice", "backgammon", "mexican-train"]:
     os.symlink(os.path.join(EXTRA, "games", g), os.path.join(GAMES, g))
 PORT = 8177
 BASE = f"http://127.0.0.1:{PORT}"
@@ -58,6 +58,7 @@ PLAN = [
     ("chess", {}, 2, [], 2, 9),
     ("liars-dice", {}, 4, ["Klaus"], 3, 6),
     ("backgammon", {}, 2, [], 2, 11),
+    ("mexican-train", {"rounds": 1}, 6, ["Klaus"], 5, 45),
 ]
 
 try:
@@ -110,7 +111,27 @@ try:
             if phones:
                 phones[0].screenshot(path=os.path.join(OUT, f"{game}-phone-lobby.png"))
             a("POST", "/game/start", {})
-            time.sleep(secs)
+            if game == "mexican-train":
+                # Klaus plays from the phone (a tile that fits, then a highlighted train, else Draw or Done) until the
+                # trains have grown, and stops on a turn of theirs with a tile picked.
+                ph, end = phones[0], time.time() + secs
+                while time.time() < end:
+                    if ph.locator(".mtd-status.go").count():
+                        ok = ph.locator(".mtd-tile.ok")
+                        if ok.count():
+                            ok.first.click()
+                            if time.time() > end - 8:
+                                break
+                            hit = ph.locator(".mtd-train.hit")
+                            (hit.first.click(force=True) if hit.count() else ok.first.click())
+                        elif ph.locator(".mtd-done:not([hidden])").count():
+                            ph.locator(".mtd-done").click()
+                        elif ph.locator(".mtd-draw:not([hidden]):not([disabled])").count():
+                            ph.locator(".mtd-draw").click()
+                    time.sleep(0.4)
+                time.sleep(1.5)
+            else:
+                time.sleep(secs)
             if game == "holdem":
                 for _ in range(2):
                     try:
