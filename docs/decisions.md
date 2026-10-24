@@ -1315,3 +1315,25 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
     changes and contact. The players' terms at a table (`shared/terms.md`, D-163) stay as they are and are named as
     applying too. Checks: `tests/cloud.test.ts` (the page, the link beside the version, the address, no glossary on
     the website) and `scripts/e2e/website.py` (the link on the version's line, the page opens).
+- **D-198 · 2026-10-24 · Klaus** — A cookbook for people working with an AI agent, and an architecture overview, in
+  the repository. *Why:* Klaus: "a 'cookbook for humans, assisted by AI' with some sections - we always assume that a
+  LLM does the actual work, the cookbook would tell how to ask a LLM to do the right thing", with recipes for a local
+  table with the extra games, a simple game ("the Yahzee prompt, which actually works, i tested it"), private games,
+  a game service of one's own with DNS, HTTPS and real remote players (and what the console does), and a game
+  checklist; "We could also provide a Architecture overview"; and "the standard github pipeline: branch conventions
+  (names, protections), tests, deployment (which needs to be customized, as 3rd parties can't install in our
+  cluster)". *Implementation (Claude):* `docs/cookbook.md`: habits with an agent, then six recipes, each with what
+  you need, the prompt to give and how to tell it worked: 1 play fast (the runbook's Parts A and B1, or
+  `local-table.sh --extra`; an iPad as the board), 2 build a game (the website's Yahtzee prompts), 3 private games (a
+  private repository, at home by cloning, on a service with `GAME_REPO_TOKEN` and ticks), 4 one's own game service
+  (the console's sections; Part C to try it; for real remote players a domain, DNS, HTTPS, a Google OAuth client and
+  optionally TURN), 5 the game checklist (idea, what is on the phone and on the board, rules, awards, placement,
+  settings and preferences, the developer settings under *Advanced*, customization, each with a prompt and the
+  guide's section), 6 the GitHub pipeline (branches and their protection as GitHub has them: `production` requires
+  test, codeql and e2e and an up-to-date branch, `main` is unprotected; kebab-case feature branches,
+  `experiment/<name>`; squash to main, a merge commit to production; versions and decision records; extra-games tested
+  against games-service `main`; the deploy workflow runs only in this project's cluster, so a fork replaces it, with a
+  prompt for Docker Compose and Caddy). `docs/architecture.md`: the parts and their connections (diagram), a game's
+  folder, how a game runs from an intent to the views (diagram, setup, timers, AI pacing, the end and replay), what
+  the platform and the game each own, how the screens load a game's modules, and where to look in the code. The
+  README and `AGENTS.md` link to both.

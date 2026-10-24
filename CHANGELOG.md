@@ -10,6 +10,7 @@ history.
 
 - Terms of service for the website at `/terms`, linked beside the version at the foot of the page (D-197).
 - `docs/glossary.md`: the words for the platform's parts, their names in the code, and how seats are named (D-197).
+- `docs/cookbook.md`: what to ask an AI agent to play, build a game, keep games private, run a game service, complete a game and ship a change; `docs/architecture.md`: how a game works with the platform (D-198).
 - The public website shows Last Card (nine games), and a new block shows the sling: an animated schematic of a card
   pushed off a phone, coming onto the board at that seat and flying onto the pile, the real screenshots of that
   moment, and the few lines a game writes for it. *Play at home* mentions an iPad as a small game board (D-196).
