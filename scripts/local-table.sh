@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Run a Table Host on this computer (macOS or Linux) against the live Game Table service, without containers, for
-# development and testing. scripts/mac-table.sh is its old name and still works.
+# development and testing.
 #   scripts/local-table.sh              update to the latest main, start it, and open the board in the browser
 #   scripts/local-table.sh --branch production            the same with another branch, e.g. production or
 #   scripts/local-table.sh --branch experiment/card-sling   an experiment (also -b NAME)

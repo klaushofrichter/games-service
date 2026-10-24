@@ -1478,3 +1478,6 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   a local service can't read the private repositories in `deploy/game-repos.json`. `scripts/local-table.sh` names the
   console's address for the live service and says nothing about pairing without one. *Why:* found by following the
   getting-started steps on a fresh machine.
+- **D-207 · 2026-10-24 · Klaus** — `scripts/mac-table.sh`, the old name of `scripts/local-table.sh` (D-188), is gone.
+  `local-table.sh` still reads `~/.gametable-mac`, so a table first set up under the old name keeps its identity and
+  API key. *Why:* the alias only ran the other script; one name is clearer.
