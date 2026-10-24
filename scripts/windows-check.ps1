@@ -44,7 +44,7 @@ foreach ($shell in $shells) {
     Check (-not $e.ContainsKey("COMPOSE_PROFILES")) "${shell}: no cloud profile without -Cloud"
     $key = $e.TABLE_KEY
     $again = Run-Setup $shell @()
-    Check ($again.code -eq 0 -and (Read-Env).TABLE_KEY -eq $key -and $again.out -match "keeping it" -and $again.out -notmatch "TABLE_KEY") "${shell}: a second run keeps .env and doesn't print the key"
+    Check ($again.code -eq 0 -and (Read-Env).TABLE_KEY -eq $key -and $again.out -match "keeping it" -and -not $again.out.Contains($key)) "${shell}: a second run keeps .env and doesn't print the key"
     if ($hasCompose) {
       $cfg = docker compose -f $compose config 2>&1 | Out-String
       Check ($LASTEXITCODE -eq 0 -and $cfg.Contains($e.PUBLIC_URL) -and $cfg.Contains($key)) "${shell}: Docker Compose reads the .env"
