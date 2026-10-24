@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Puts the values from this repo's local .env where the deployment needs them, without printing any value:
-#   GitHub secret  KUBE_SETUP_DEPLOY_TOKEN      <- GITHUB_KUBE_SETUP_PAT    (the deploy pushes the kube-setup manifest)
+#   GitHub secret  KUBE_SETUP_DEPLOY_TOKEN      <- GITHUB_KUBE_SETUP_PAT    (the deploy pushes the cluster repository's manifest)
 #   k8s Secret     games-runner/runner-pat      <- GITHUB_GAMES_SERVICE_PAT (key `token`: the runner registers itself)
 #   k8s Secret     games/games-oauth            <- GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI,
 #                                                  ALLOWED_EMAILS, COOKIE_SECRET, and ADMIN_TOKEN, GAME_REPO_TOKEN
@@ -9,7 +9,7 @@
 #   scripts/sync-secrets.sh --check     validate .env and list what would be set (default)
 #   scripts/sync-secrets.sh --github    set the GitHub secret (needs `gh` signed in with admin on the repo)
 #   scripts/sync-secrets.sh --cluster   create or update both Kubernetes Secrets (needs kubectl for the cluster
-#                                       and the namespaces games and games-runner, created by kube-setup)
+#                                       and the namespaces games and games-runner, created by the cluster repository)
 #   scripts/sync-secrets.sh --all       both
 # After changing games-oauth, restart the pod: kubectl -n games rollout restart deployment/games-cloud
 set -euo pipefail

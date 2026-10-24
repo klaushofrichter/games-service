@@ -1,6 +1,6 @@
 # Push to main: re-run the tests, then build and push both images as `:main` — and nothing else.
 # `main` is continuously built but never deployed. This workflow is the only writer of `:main`; the deploy workflow
-# alone writes `:<sha>`, `:v<version>` and `:latest` (one writer per tag, kube-setup vault "Building a New Service").
+# alone writes `:<sha>`, `:v<version>` and `:latest` (one writer per tag, the cluster's convention for a new service).
 name: Build main
 on:
   push:

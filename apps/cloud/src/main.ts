@@ -42,7 +42,7 @@ if (present.length) {
 }
 
 // One process owns the state database and the tables' sockets (D-071, D-114): a second replica would neither see the
-// first one's sockets nor safely share its SQLite file. The replica count is in kube-setup's manifest, far from this
+// first one's sockets nor safely share its SQLite file. The replica count is in the cluster repository's manifest, far from this
 // code, so the manifest passes it in and we warn loudly when it is wrong.
 if (env.MAX_REPLICAS !== "1") {
   console.warn(`[cloud] WARNING: MAX_REPLICAS is ${env.MAX_REPLICAS ?? "unset"}; this service must run as exactly one replica`);

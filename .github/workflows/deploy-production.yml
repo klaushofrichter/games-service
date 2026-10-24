@@ -1,6 +1,6 @@
 # Push to production (a merged main -> production PR): version, build, deploy, verify, release.
 # Runs on this repo's own in-cluster runner (namespace games-runner), which may patch only deployment/games-cloud.
-# Pattern and reasons: kube-setup docs/cluster-deployment-requirements.md and docs/self-hosted-runner-cicd-pattern.md.
+# Pattern and reasons: the cluster repository's deployment requirements and its self-hosted runner pattern.
 name: Deploy production
 on:
   push:
@@ -81,7 +81,7 @@ jobs:
             docker push "$REGISTRY/games-$img:$GITHUB_SHA"
           done
 
-      - name: Update the kube-setup manifest and apply it
+      - name: Update the cluster repository's manifest and apply it
         env:
           KUBE_SETUP_DEPLOY_TOKEN: ${{ secrets.KUBE_SETUP_DEPLOY_TOKEN }}
         run: |

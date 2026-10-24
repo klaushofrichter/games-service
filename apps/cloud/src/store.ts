@@ -74,7 +74,7 @@ export class Store {
       // Keep the snapshot this start found, before writing a new one. After a Velero restore that is the consistent
       // copy from the backup; if the service started once before anyone set RESTORE_FROM_SNAPSHOT, the new startup
       // snapshot is a copy of the restored (possibly torn) state.db, and "previous" in the marker still reaches the
-      // good one (kube-setup review of D-115).
+      // good one (the cluster review of D-115).
       const snapDir = join(this.dataDir!, "snapshots");
       if (existsSync(join(snapDir, "state.db"))) copyFileSync(join(snapDir, "state.db"), join(snapDir, "state.prev.db"));
       this.snapshot(); // a fresh, consistent copy right away, so a backup taken in the next hour has one
