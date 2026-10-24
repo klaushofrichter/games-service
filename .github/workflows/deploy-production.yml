@@ -143,8 +143,19 @@ jobs:
           grep -qF ">$VERSION<" /tmp/landing.html || { echo "::error::GET / does not show the version label $VERSION"; exit 1; }
           # Auth-enforcement check, do not "fix" it to 200: anonymous /admin must redirect to the public sign-in page.
           # A 200 here would mean the admin portal had gone world-readable.
-          admin=$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' "$BASE/admin" || true)
-          [ "$admin" = "302 $BASE/" ] || { echo "::error::GET /admin returned '$admin', expected '302 $BASE/'"; exit 1; }
+          # With the console on its own host (CONSOLE_URL, D-204) /admin first sends people there; the check is the same there.
+          admin_url=$BASE/admin
+          admin=$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' "$admin_url" || true)
+          if [[ "$admin" =~ ^302\ (https://[a-z0-9.-]+)/admin$ ]] && [ "${BASH_REMATCH[1]}" != "$BASE" ]; then
+            console=${BASH_REMATCH[1]}
+            admin_url=$console/admin
+            admin=$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' "$admin_url" || true)
+            [ "$admin" = "302 $console/" ] || { echo "::error::GET $console/admin returned '$admin', expected '302 $console/'"; exit 1; }
+            capi=$(curl -s -o /dev/null -w '%{http_code}' "$console/admin/api/tables" || true)
+            [ "$capi" = "401" ] || { echo "::error::GET $console/admin/api/tables returned $capi without a session"; exit 1; }
+          else
+            [ "$admin" = "302 $BASE/" ] || { echo "::error::GET /admin returned '$admin', expected '302 $BASE/'"; exit 1; }
+          fi
           api=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/admin/api/tables" || true)
           [ "$api" = "401" ] || { echo "::error::GET /admin/api/tables returned $api without a session"; exit 1; }
           # The developer guide for game authors and language models (D-160) is public.
@@ -156,6 +167,7 @@ jobs:
             echo "served_version=$served"
             echo "page_code=$page"
             echo "admin=$admin"
+            echo "admin_url=$admin_url"
             echo "checked_at=$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
           } >> "$GITHUB_OUTPUT"
 
@@ -179,5 +191,6 @@ jobs:
           SERVED: ${{ steps.smoke.outputs.served_version }}
           PAGE_CODE: ${{ steps.smoke.outputs.page_code }}
           ADMIN: ${{ steps.smoke.outputs.admin }}
+          ADMIN_URL: ${{ steps.smoke.outputs.admin_url }}
           CHECKED_AT: ${{ steps.smoke.outputs.checked_at }}
         run: scripts/release-notes.sh > /tmp/notes.md && scripts/release.sh /tmp/notes.md

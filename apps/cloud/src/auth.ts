@@ -24,6 +24,8 @@ export interface AdminAuth {
   handle(req: IncomingMessage, res: ServerResponse, path: string): Promise<boolean>;
   /** The signed-in admin's email, or null. */
   session(req: IncomingMessage): string | null;
+  /** A Set-Cookie value that removes the session cookie (on the public host, after the console moved: D-204). */
+  readonly clearSession: string;
   readonly enabled: boolean;
 }
 
@@ -89,11 +91,11 @@ export function verifySession(secret: string, value: string | undefined): string
 }
 
 /**
- * @param publicUrl the service's own URL; https decides the Secure attribute and the __Host- cookie prefix
- *   (plain http is only for local development and tests).
+ * @param consoleUrl the console's URL (CONSOLE_URL, else PUBLIC_URL); https decides the Secure attribute and the __Host-
+ *   cookie prefix (plain http is only for local development and tests).
  */
-export function createAdminAuth(o: GoogleAuthOptions | null, publicUrl: string): AdminAuth {
-  const secure = publicUrl.startsWith("https://");
+export function createAdminAuth(o: GoogleAuthOptions | null, consoleUrl: string): AdminAuth {
+  const secure = consoleUrl.startsWith("https://");
   // __Host- keeps the cookie on this exact host: a sibling *.skylar.technology service can neither read nor overwrite it.
   const SESSION_COOKIE = secure ? "__Host-games_admin" : "games_admin";
   const base = ["HttpOnly", "SameSite=Lax", ...(secure ? ["Secure"] : [])];
@@ -115,6 +117,7 @@ export function createAdminAuth(o: GoogleAuthOptions | null, publicUrl: string):
 
   return {
     enabled: !!o,
+    clearSession: clear(SESSION_COOKIE, "/"),
     session(req) {
       if (!o) return null;
       const email = verifySession(o.cookieSecret, cookies(req).get(SESSION_COOKIE));

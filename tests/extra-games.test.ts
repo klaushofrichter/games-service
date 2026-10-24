@@ -751,4 +751,19 @@ describe("the deploy-time repository list", () => {
       await rm(dir, { recursive: true, force: true });
     }
   }, 30000);
+
+  it("CONSOLE_URL must be an origin of its own, and the Google redirect URI follows it (D-204)", async () => {
+    for (const [v, msg] of [["games-console.example", /must be an origin/], ["http://127.0.0.1:1/admin", /must be an origin/], ["ftp://console.example", /must be an origin/]] as const) {
+      const r = await runMain({ CONSOLE_URL: v });
+      expect(r.code, v).toBe(1);
+      expect(r.out, v).toMatch(msg);
+    }
+    const https = await runMain({ PUBLIC_URL: "https://games.example", CONSOLE_URL: "http://console.example", GOOGLE_CLIENT_ID: "x", GOOGLE_CLIENT_SECRET: "x", GOOGLE_REDIRECT_URI: "http://console.example/auth/google/callback", ALLOWED_EMAILS: "a@example.com", COOKIE_SECRET: "c".repeat(32) });
+    expect(https.out).toMatch(/must be https when PUBLIC_URL is/);
+    const redirect = await runMain({ PUBLIC_URL: "https://games.example", CONSOLE_URL: "https://console.example", GOOGLE_CLIENT_ID: "x", GOOGLE_CLIENT_SECRET: "x", GOOGLE_REDIRECT_URI: "https://games.example/auth/google/callback", ALLOWED_EMAILS: "a@example.com", COOKIE_SECRET: "c".repeat(32) });
+    expect(redirect.out).toMatch(/GOOGLE_REDIRECT_URI must be https:\/\/console\.example\/auth\/google\/callback/);
+    const ok = await runMain({ CONSOLE_URL: "http://localhost:1/" });
+    expect(ok.code).toBeNull();
+    expect(ok.out).toMatch(/console at http:\/\/localhost:1;/);
+  }, 40000);
 });
