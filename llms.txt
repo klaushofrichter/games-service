@@ -4,14 +4,14 @@
 
 **Installing it locally** (a table on one machine, phones on the same network): follow the runbook https://games.skylar.technology/docs/local-docker.md step by step. Docker is all it needs: no cloud service or console, no DNS entry, no HTTPS, nothing from games.skylar.technology. Games from other repositories, private ones included, are added by cloning them (runbook Part B); no token or console is involved.
 
-Read the developer guide before writing or changing a game. It is the contract between games and the platform, written for language models as much as for people. The platform's code is the final word: `packages/sdk/src/index.ts` (the rules API) and `packages/protocol/src/index.ts` (the manifest schema and lobby types) in the public repository https://github.com/klaushofrichter/games-service. For a complete game repository of its own to copy (three games, tests against the platform, CI), see the public example https://github.com/klaushofrichter/extra-games.
+Read the developer guide before writing or changing a game. It is the contract between games and the platform, written for language models as much as for people. The platform's code is the final word: `packages/sdk/src/index.ts` (the rules API) and `packages/protocol/src/index.ts` (the manifest schema and lobby types) in the public repository https://github.com/klaushofrichter/games-service. For a complete game repository of its own to copy (five games, tests against the platform, CI), see the public example https://github.com/klaushofrichter/extra-games.
 
 Key rules for every game: rules are pure and deterministic (randomness only from `ctx.random()`, time only from `ctx.now()`, never mutate the given state); a seat's view never contains another seat's secrets; a running game always keeps all its players, and the platform owns joining, leaving, away phones and exchanging players (a game only reacts in `onSeatChanged`); AI players read only their seat's view; a game's version changes with every change in its folder.
 
 ## Developer guide
 
 - [Writing a game for Game Table](https://games.skylar.technology/docs/game-development.md): the full contract, with a checklist (the same file in the repository: https://raw.githubusercontent.com/klaushofrichter/games-service/main/docs/developers/game-development.md)
-- [Everything in one file](https://games.skylar.technology/llms-full.txt): this index followed by the whole guide
+- [Everything in one file](https://games.skylar.technology/llms-full.txt): this index followed by the whole guide and the Docker runbook
 
 ## API reference (source)
 
@@ -28,7 +28,7 @@ Key rules for every game: rules are pure and deterministic (randomness only from
 - [Pachisi](https://github.com/klaushofrichter/games-service/tree/main/games/pachisi): turns, dice, captures, moves made by touching the board, `describe` for the Game Viewer
 - [Hold'em](https://github.com/klaushofrichter/games-service/tree/main/games/holdem): private cards, AI styles, awards, a skippable wait, sounds
 - [Roulette](https://github.com/klaushofrichter/games-service/tree/main/games/roulette): simultaneous betting, AI styles
-- [Example game repository](https://github.com/klaushofrichter/extra-games): Chess, Liar's Dice and Backgammon in a repository of their own (public), tested against games-service with CI; the layout to copy for a new game repository
+- [Example game repository](https://github.com/klaushofrichter/extra-games): Chess, Liar's Dice, Backgammon, Mexican Train and Last Card (a full example of the sling) in a repository of their own (public), tested against games-service with CI; the layout to copy for a new game repository
 
 ## Running it
 

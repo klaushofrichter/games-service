@@ -4,6 +4,30 @@ Decisions that shape the Game Table platform, newest last. Each entry records wh
 
 Format: **D-nnn · date · decided by** — decision. *Why:* reason.
 
+Records are history: an older record is not edited when a newer one changes it. Where that happened:
+
+| Earlier | Changed by | What changed |
+| --- | --- | --- |
+| D-004, D-005 | D-118, D-175 | Developer settings: games without a player at the table, playing from the board |
+| D-013 | D-080 | Corner buttons replace the 90° and 180° buttons |
+| D-029 | D-096 | The repository is public |
+| D-031 | D-068 | Node 26 instead of Node 22 |
+| D-036, D-071, D-097, D-098 | D-114 | The service's state is SQLite on a volume, not in memory or PostgreSQL |
+| D-044 | D-084 | Roulette's seats |
+| D-046 | D-079 | Hold'em for up to 8 players |
+| D-057, D-106 | D-159 | Remote boards with control change colours, AI options and settings |
+| D-088 | D-106, D-127 | Player colours; the gear stays put during a game |
+| D-091, D-102, D-107 | D-127b | Calendar versions for games |
+| D-102 | D-109 | Pachisi's pieces default to icons |
+| D-112 | D-135 | A language-model AI player is postponed |
+| D-118, D-120 | D-128 | Simulation, game logs and the developer setting move to *Advanced* |
+| D-118, D-119, D-144 | D-159, D-171 | Nobody leaves a running game by timeout; `onSeatLeft` is no longer called; `replace-with-ai` is gone |
+| D-125 | D-171 | `seatColors` is always empty |
+| D-134 | D-141 | No two-minute limit on *Show result* |
+| D-159 | D-166 | Tappable names replace the *Exchange…* buttons in the settings |
+| D-167 | D-168 | Watching is a mode of its own |
+| D-171 | D-172 | Rejoining by name |
+
 ## Product (concept phase, 12 Oct 2026)
 
 - **D-001 · 2026-10-12 · Klaus** — The board is the shared control surface. Every local player may operate it; there is no privileged player and no login. *Why:* the table is about people playing together in one room.
@@ -72,9 +96,9 @@ Format: **D-nnn · date · decided by** — decision. *Why:* reason.
 
 - **D-053 · 2026-10-12 · Claude** — An invite is created on the board (*Invite…* in the lobby and the in-game lobby overlay). The table asks the service for it; the board shows the link, the 8-character code and a QR code. An invite is single-use: the first browser that connects through it claims it at that moment, from then on only that browser's session can reconnect, and the table seats one player per session. Invites expire after their time-to-live.
 - **D-054 · 2026-10-12 · Claude** — Signaling runs over two WebSockets on the service: `/api/tables/ws` (the table, authenticated with its table token) and `/api/remote/ws` (the remote browser, authenticated by invite or session). The service only relays one offer and one answer per connection (non-trickle ICE); it never sees game traffic. ICE servers come from the service's `ICE_SERVERS` setting (default: Google STUN; add TURN for players behind strict NATs).
-- **D-055 · 2026-10-12 · Claude** — The table answers with werift, a pure-JavaScript WebRTC stack, so the host image stays native-dependency free. One reliable data channel carries everything: HTTP-style requests for the board and deck files and the board API, and virtual WebSockets for the live board and deck connections. On the table these enter the normal request and socket handlers, so remote players get exactly the board and deck local players get. *Why:* D-018 and D-020 (table is the only game server, P2P).
-- **D-056 · 2026-10-12 · Claude** — In the remote browser, the invite page (`/i/CODE`) holds the WebRTC connection and a service worker routes the board's and deck's requests to it. The board fills the window and the remote player's private deck sits beside it (below it on phones) and can be hidden. *Why:* D-017, the deck is a full page, not a special embed; games need no changes for remote play.
-- **D-057 · 2026-10-12 · Claude** — What remote players may do on the board is an allowlist: change the seat layout, and select, start, end and close games. Turning the table's board, seating, removing players, AI seats and options, saves, resuming, simulations, logs, invites, the remote settings and the local join code stay with the people at the table (remote players never see the join code). *Why:* an independent review found that a deny list let a remote guest remove every local player. The table can switch off board control for remote players (*Remote players can use the board controls* in the invite dialog); they then see the board read-only. A game can also forbid it in its manifest. At most `MAX_REMOTE_PLAYERS` (default 4) remote players (D-021).
+- **D-055 · 2026-10-12 · Claude** — The table answers with werift, a pure-JavaScript WebRTC stack, so the host image stays native-dependency free. One reliable data channel carries everything: HTTP-style requests for the board and deck files and the board API, and virtual WebSockets for the live board and deck connections. On the table these enter the normal request and socket handlers, so remote players get exactly the board and deck local players get. *Why:* D-020 (table is the only game server, P2P).
+- **D-056 · 2026-10-12 · Claude** — In the remote browser, the invite page (`/i/CODE`) holds the WebRTC connection and a service worker routes the board's and deck's requests to it. The board fills the window and the remote player's private deck sits beside it (below it on phones) and can be hidden. *Why:* D-021, the deck is a full page, not a special embed; games need no changes for remote play.
+- **D-057 · 2026-10-12 · Claude** — What remote players may do on the board is an allowlist: change the seat layout, and select, start, end and close games. Turning the table's board, seating, removing players, AI seats and options, saves, resuming, simulations, logs, invites, the remote settings and the local join code stay with the people at the table (remote players never see the join code). *Why:* an independent review found that a deny list let a remote guest remove every local player. The table can switch off board control for remote players (*Remote players can use the board controls* in the invite dialog); they then see the board read-only. A game can also forbid it in its manifest. At most `MAX_REMOTE_PLAYERS` (default 4) remote players (D-006).
 - **D-058 · 2026-10-12 · Claude** — werift waits up to 5 s for its STUN probe, which adds that much to connection setup when STUN is unreachable. Behind the ingress the service takes client addresses from `X-Forwarded-For` (`TRUST_PROXY=1`) so rate limits are per client.
 - **D-059 · 2026-10-12 · Claude** — A remote player's board turns so their own seat is at the bottom of their screen (a quarter turn for east and west seats), and games get that seat's edge as `frontEdge` and `rotation`, so their text faces the remote player. This changes only the remote copy; the table's own orientation and rotate buttons belong to the people at the table, so remote boards don't show them. Until the remote player has a seat, their board follows the table.
 
@@ -134,6 +158,8 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
 - **D-091 · 2026-10-13 · Klaus** — Coin Flip shows "Round 2 of 3" on the board, everyone's pick while the coin is in the air (✓/✗ once it lands), a countdown with a draining bar on the board and the phones when there is a time limit, and per-player statistics at the end (correct guesses, heads %). Version 0.2.0. For every game: when a game ends by itself, the board keeps its last screen with a **Show result** button in the Lobby button's corner; a game ended from the lobby goes straight to the result. A game's summary may carry a `table` (columns and rows), which the result screen and the phones show.
 - **D-092 · 2026-10-13 · Klaus** — Sound effects, switched on and off in the board's settings (on by default). It is a table-wide display choice (`POST /display {sound}`, in the state as `display.sound`) that every board follows, including remote players' boards, which have no settings of their own and cannot change it. Sounds are synthesised with Web Audio (no files): the board kit has `playSound(info, name, make)` and `ping()` for struck-metal tones; the board wakes audio on the first touch, the table PC's kiosk browser allows it from the start, and the remote page's board frame now allows autoplay. Coin Flip plays a ringing whirr while the coin is in the air and a clink with two bounces when it lands. *Found on the way:* the step that ended a game never delivered its events, so every game lost its final animation (the last coin flip, the winning move). The runtime now passes them on with the game-over.
 - **D-093 · 2026-10-13 · Klaus** — The phone shows the seat once: a compass badge ("SW") right-aligned on the line with the player's name, and the "At the table" list says where everyone sits. The separate seat card is gone; a player without a seat sees "No seat yet". Sound effects are confirmed as a board setting: games read `info.sound` and cannot change it (their `setPrefs` writes only their own per-game values). New tests: Coin Flip never shows a pick before the flip (checked to fail if it did), missed picks, statistics adding up, old 0.1 settings, sound vs. game prefs, a remote board following the sound setting, and a browser scenario for the phone header, a full table, a game with sound off, and a game ended from the lobby (no held screen).
+## Copy buttons and the remote deck window (14 Oct 2026)
+
 - **D-094 · 2026-10-14 · Klaus** — The board's join link (under the QR code) and the remote-player invite link each have a copy button that shows a check mark once copied. The board kit's `copyText()` uses the clipboard API, with the older copy command as a fallback outside a secure context (the board itself is only served on localhost, so it always has the API). Browser checks confirm the clipboard holds exactly the shown link in both places.
 - **D-095 · 2026-10-14 · Klaus** — On the remote player's page the deck window sits top right (16 px margin) and takes the height of its content, up to the window, so it shows a scrollbar only when the content really doesn't fit; it re-measures as the deck changes. Phones keep the bottom sheet. Scrollbars on the board, decks and the remote page are felt green (dark colour scheme), not white. The remote-play browser check measures both cases: room to spare (no scrollbar) and a short window (fills it and scrolls).
 
@@ -167,6 +193,8 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   - **Checks.** `tests/board-intents.test.ts` (who may move from which board, only listed intents, game rules still apply, a paused game, a game without board intents, the manifest field); `play.py pachisi` switches to icons and checks them on the board and both phones, makes every other move by tapping the board, checks that only that player's movable tokens answer and that board and phone offer the same tokens, and that the roll, move, six and capture sounds play; `remote.py` has Rita tap on her board and Ana on the table's, and checks neither board offers the other's tokens.
 - **D-103 · 2026-10-14 · Klaus** — An AI player can be removed from its own window (*Configure*): a **Remove** button, after a confirmation. *Implementation (Claude):* the AI window also opens before a game is chosen (it then has no options to set, only Remove and Done). `play.py dialogs` cancels once and then removes, with and without a game chosen. The toolbar's Remove for the selected player stays.
 - **D-104 · 2026-10-14 · Klaus** — The phones' *At the table* list shows a dot in each player's colour before their name. *Implementation (Claude):* the colour is `playerColor` (the game's choice, e.g. Pachisi's, else the seat's), so it matches the player's plate on the board and their seat badge (D-101); a player without a seat gets a hollow ring. `play.py dialogs` compares the dots with the seat colours.
+## Scrollbars on the service's pages (15 Oct 2026)
+
 - **D-105 · 2026-10-15 · Klaus** — Scrollbars everywhere fit the green felt; the console's *Game logs* box had a white one. *Implementation (Claude):* the table's pages (board, phones, terms) already had felt scrollbars from `theme.css`; the cloud's pages did not. The console (`admin.html`) now sets `color-scheme: dark` and `scrollbar-color` with a green thumb (#2f6457) on a track the colour of what it scrolls over, the page or a panel, plus `::-webkit-scrollbar` rules for browsers without `scrollbar-color`. The invite page got the same `::-webkit-` rules, and the sign-in and landing pages `color-scheme: dark` and `scrollbar-color`. `scripts/e2e/admin.py` fills the Game logs box until it scrolls and checks its colours.
 
 ## Player colours, Pachisi seating and the terms (15 Oct 2026)
@@ -200,7 +228,7 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
 ## Access codes and the persistent store (15 Oct 2026)
 
 - **D-113 · 2026-10-15 · Klaus** — Tables can be pre-approved: the console creates access codes, and a board that uses one is approved at once, with no pairing code. Klaus accepts the weaker security. A code has a validity (one week, one month, one year, forever) and a scope of extra-game repositories (none, i.e. the built-in games; all, including repositories added later; or chosen ones by name). Codes can be listed, edited and revoked; an expired code stays listed until deleted or more than a year old; the list shows when a code was last used. A code serves one board at a time and can't be used by a second one. Validity is checked only when a board first uses the code; a board still connected past it is highlighted in the console for an admin to remove by hand. "All" means all repositories at the time; a board may need to reconnect for one added later. An admin can edit an existing code's scope. A board takes its code from an environment variable, a command-line option, or its settings screen. *Implementation (Claude):*
-  - **Codes.** 8 characters from the 32-letter alphabet of D-026 (about 40 bits), shown as `ABCD-EFGH`, typed with or without the dash, any case. The console shows a code once, when it is created; the service keeps only a SHA-256 hash and the first two characters (the hint shown in lists and on the board). Month and year are calendar months and years (UTC). At most 1,000 codes.
+  - **Codes.** 8 characters from the 32-letter alphabet of D-033 (about 40 bits), shown as `ABCD-EFGH`, typed with or without the dash, any case. The console shows a code once, when it is created; the service keeps only a SHA-256 hash and the first two characters (the hint shown in lists and on the board). Month and year are calendar months and years (UTC). At most 1,000 codes.
   - **One board.** A code is bound to the first table that uses it, by the table's persistent identity (`tableId` in its `table.json`), so the same board reconnects as often as it likes and any other is refused (*in use*). **Release** in the console frees a code for a new board (say, a reinstalled PC with a new identity) and disconnects the table it was bound to, so a code never serves two boards.
   - **Hello.** A new or waiting table that presents a valid code is approved in the same request and gets its token. One that presents a bad code hears why (*unknown*, *expired*, *revoked*, *in use*) and waits with its pairing code as before, so manual approval still works. A disconnected table is never brought back by a code: only Reconnect does that. An approved table may present a code later (typed on its board); it is then linked to that code, and a code it had before is freed. Thirty wrong codes a minute from one address block hellos with a code for the rest of that minute.
   - **Scope.** While a table has a code, the code's scope decides its repositories (`all` is live, so a new repository arrives within one heartbeat, without a reconnect); its row in the console shows them read-only, and editing the code's scope reaches the table within 15 s, between games. Without a code, the per-table ticks of D-097 apply as before.
@@ -229,6 +257,8 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   - **Service.** It reads `run.json` from each upload (bounded; old-format logs keep the query's game and kind) and keeps the listing fields with the log record. `GET /admin/api/logs` filters by `gameId`, `tableId`, `from`, `to` (the day the game started) and `simulation`; download tokens take the same `tableId`, `from` and `to` as well as `gameId`, so one link can give a Claude session "all Loopy logs from yesterday". The console lists logs with start time, game and version, table, players, how they ended, duration, *does not replay* and error flags, with filters.
   - **Board.** The simulation dialog says how the games ended ("3 finished", or which did not) and whether every game replayed, instead of only "Done".
   - **Checks.** `tests/game-logs.test.ts` (uploads of simulations, played games and games ended from the lobby with their metadata; the queue across a service outage, uploaded once; the console's and download tokens' filters; old-format uploads; the running file during a game; recovery of a game the table stopped in, with its state rebuilt; the zip's files and README; a rule that throws; verify on request, a changed log and a non-deterministic game; snapshots; retention and the queue) and `scripts/e2e/logs.py` (a simulation from the board's dialog, a game with a phone, a table killed mid-game and restarted, all three in the console with filters, and a downloaded zip).
+
+## Player colours in the lobby (16 Oct 2026)
 
 - **D-117 · 2026-10-16 · Klaus** — A player's colour belongs to the player, not to the seat: it moves with them when they change seats. *Implementation (Claude):* refines D-106. A colour picked in the settings already followed the player; the default one (the seat's) was recomputed from the seat at every state, so a move changed it. Now the colour a seated player ends up with is kept for them (`keptColor`), and it comes right after an explicit choice when colours are given out, so moves and swaps keep everyone's colour; a new player takes their seat's colour only if nobody has it, else a free one. A player who leaves frees theirs. Check: `tests/player-color.test.ts` (a move to an empty seat, a swap, a newcomer on the old seat).
 
@@ -290,7 +320,7 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
 
 ## Game versions (17 Oct 2026)
 
-- **D-127 · 2026-10-17 · Klaus** — Games use calendar versions like the services, `YYYY.MM.DD.N` (America/Chicago),
+- **D-127b · 2026-10-17 · Klaus** — Games use calendar versions like the services, `YYYY.MM.DD.N` (America/Chicago),
   and a game's version changes when, and only when, the game changes. *The rule:*
   1. **A game is its folder** (`games/<id>/`): rules and every module they import from the folder, the board and phone
      UI, styles, assets, the rules for players (`how-to-play.md`) and the manifest.
@@ -355,7 +385,7 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
 
 ## A single player at the table (17 Oct 2026)
 
-- **D-128 · 2026-10-17 · Klaus** — A game can ask that the one player at the table sits on a given edge: with exactly
+- **D-128b · 2026-10-17 · Klaus** — A game can ask that the one player at the table sits on a given edge: with exactly
   one human playing at the table and the others remote or AI, the table moves them there when the game starts. Chess
   asks for south. *Why:* a remote player's board already turns so their own seat is at the bottom (D-059), but the
   table's board doesn't move: a local player seated north while sitting at the south side of the screen saw their
@@ -406,13 +436,16 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   most, so a board that never settles still gets its button). Boards without it behave as before. Coin Flip resolves
   it when the coin has landed; Loopy when its replay queue is empty (loopy-game L-029). README, *Writing a game*,
   describes it. `scripts/e2e/play.py endings` fails when *Show result* appears while the coin still spins.
-- **D-129 · 2026-10-17 · Klaus** — In the board's settings window, a choice with more than three options is a pulldown
+- **D-129b · 2026-10-17 · Klaus** — In the board's settings window, a choice with more than three options is a pulldown
   instead of a row of buttons. *Why:* Chess's eight time controls ran out of the window: the last was clipped and the
   rest could not be reached. *Implementation (Claude):* for a game's manifest settings (`enum`) and for the choices a
   game adds itself (`choice`); two or three options stay buttons. The pulldown is a native `select`, which the
   kiosk's Chromium opens as a touch list. Check: `scripts/e2e/settings_choice.py` with the test game Duel (a five-choice
   setting is a pulldown with all five, inside the window; a two-choice one stays buttons; both change the table's
   settings); it fails without the change.
+- *Renumbered:* D-127, D-128 and D-129 were each used twice on 2026-10-17. The first keeps the number (the gear
+  during a game, *Advanced*, a full table); the second is D-127b (calendar versions), D-128b (`localSeat`) and D-129b
+  (pulldowns for long choices). Code and docs follow.
 - **D-135 · 2026-10-17 · Klaus** — LLM-powered AI players are postponed. *Why:* their main gains over the coded AI
   (table talk, explaining moves, teamwork in words) need a conversational interface the table does not have, and would
   crowd the experience for now; on raw strength a model is not expected to beat a planner like Loopy's *strong*. The
@@ -582,7 +615,7 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
 ## Player names (18 Oct 2026)
 
 - **D-148 · 2026-10-18 · Klaus** — Player names are at most 12 characters (longer ones are cut) and unique at a table: a second player who picks a name already there is refused. Players can change their name on the phone. *Why:* long names overlapped seat plates and result tables with eight players, and two players with the same name can't be told apart. *Implementation (Claude):*
-  - **Rule.** `trimName()` in `table.ts`: spaces tidied, control and invisible characters dropped, cut to `MAX_NAME` = 12 characters (code points, so an emoji stays whole). Two names are the same when they match ignoring case and spacing (NFKC). Empty: the next free "Player N". A name ending in "(AI)" is refused: it is how AI players are marked (D-081). AI names and AI takeovers (D-139) keep their own rules.
+  - **Rule.** `trimName()` in `table.ts`: spaces tidied, control and invisible characters dropped, cut to `MAX_NAME` = 12 characters (code points, so an emoji stays whole). Two names are the same when they match ignoring case and spacing (NFKC). Empty: the next free "Player N". A name ending in "(AI)" is refused: it is how AI players are marked (D-081). AI names and AI takeovers (D-144) keep their own rules.
   - **Joining.** A taken name is refused with `{status: 409, code: "name-taken"}` (`name-invalid` for "(AI)"); the phone's join form shows the reason under the name and keeps what was typed; its field takes 12 characters. A remote player types the name on the service's invite page and can't retype it there, so a taken name gets a number instead ("Ann 2", cut to fit 12); the invite page's field takes 12 too.
   - **Change name.** On the phone, beside Rules in the header, outside a game: a sheet with the name, *Save*, and the reason if it is refused (`lobby.rename {name}` on the socket). Not during a game, since games and their logs use the names they started with; not for AI players. The board has no keyboard, so renaming is the player's own business on their phone.
   - **Checks.** `tests/names.test.ts` (cutting and tidying, taken names ignoring case and after the cut, "(AI)", empty names, remote numbering, rename rules) and `scripts/e2e/names.py` (a taken name on the join form, the 12-character field, Change name refused and accepted, the board following).
@@ -709,7 +742,7 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
     running game (`DELETE /players/{id}` answers 409, code `in-game`); away players' waiting time only runs outside a
     game. Games' `onSeatLeft` is therefore no longer called during a game (logs that have `seatLeft` still replay).
   - **Exchange.** *Settings › Players › Exchange…* beside every seated player of the running game (and *Exchange …*
-    on the away card, D-144, D-158), on the table's board, and on a remote board with board control (D-059: remote
+    on the away card, D-144, D-158), on the table's board, and on a remote board with board control (D-057: remote
     boards with control now also operate colours, AI options and game settings). The window offers *Someone at the
     table* (a QR code and link for this seat only, `POST /exchange {seat, kind: "local"}`), *A remote player* (a new
     invite, `kind: "remote"`, needs the service; the next remote player to arrive takes the seat), *An AI player*
@@ -862,6 +895,8 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
     seat; a watcher through the end of a game; who may manage watchers; no session in the state; players and watchers
     filling the places, an earlier invite refused). `scripts/e2e/watch_lobby.py` (leave → watching → Let play →
     reload; a watcher closing the window; leaving a game and coming back by exchange).
+## A review of players and watchers; changelog and runbook (20 Oct 2026)
+
 - **D-171 · 2026-10-20 · Claude** — An overnight review of players, seats, watchers and exchanges (D-159 … D-170),
   with tests for "all seats are taken, can another one come in?" in every way someone can arrive. *Why:* Klaus: "Do
   another /simplify run … Apply any fixes, invent new testcases then needed, specifically for cornercases like "all
@@ -1219,8 +1254,8 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
 - **D-191 · 2026-10-23 · Klaus** — A short message on a phone (a refused move, `ctx.toast`) floats over the top of the
   screen for its three seconds instead of being inserted above the tabs. *Why:* Klaus, playing Last Card: "The warning
   on the deck "not a valid card" or similar moves the game status box. Make this warning on top of the status, it
-  disappears after a few seconds anyway." *Implementation (Claude):* one `.deck-toast` element fixed at the top (not the shared theme's `.toast`, the board's, which sits at the bottom) (below the
-  safe area), fading in and out, `role="status"`; it covers the tabs for a moment and moves nothing. Pause messages
+  disappears after a few seconds anyway." *Implementation (Claude):* one `.deck-toast` element fixed at the top (below the safe area), not the shared theme's `.toast`, which is the
+  board's and sits at the bottom; fading in and out, `role="status"`; it covers the tabs for a moment and moves nothing. Pause messages
   ("Waiting for …") stay in the page as before: they last as long as the pause. Every game gets this.
 
 ## A phone keeps its seat for five minutes (23 Oct 2026)
@@ -1257,6 +1292,8 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   dropping half a card in the first frame; it eases off gently now (`ease`, about a third of a second at normal
   speed). Checks in `scripts/e2e/card_sling.py`: the card at the seat is where the phone says (within 12 px), and a
   drawn card's first frame in the slot is where its flight ended (same x, within 30 px down).
+## Sound after the first tap (23 Oct 2026)
+
 - **D-195 · 2026-10-23 · Klaus** — A board in a browser that holds sound back until the page is touched plays sound
   after the first tap, and says so until then. *Why:* Klaus: "Backgammon sounds: I could not hear them on the main
   board on a different URL, not localhost." Browsers allow sound only after the user has touched the page; the
@@ -1274,6 +1311,8 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   pointerdown alone does not turn the sound on, a tap does and the note goes; sound taken away again brings the note
   back and a tap the sound; and a browser that allows sound never
   shows it. With the old wake-up on pointerdown, the check fails.
+## Last Card and the sling on the public website (23 Oct 2026)
+
 - **D-196 · 2026-10-23 · Klaus** — The public website shows Last Card and the sling. Klaus: "update the landing page
   with the new game. Come up with an idea to showcase the sling feature, at minimum mention it as part of the platform
   features that games can use." *Implementation (Claude):* Last Card joins the games (nine in all, five from
@@ -1292,3 +1331,77 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   fits, holds one at the top edge and takes both screens (the board cropped around the seat). Check:
   `scripts/e2e/website.py` counts five extra games, checks that the schematic moves and has its three steps, that
   the real phone sits beside the board with both pictures loaded, and the iPad note.
+## Glossary, website terms, cookbook and architecture (24 Oct 2026)
+
+- **D-197 · 2026-10-24 · Klaus** — A glossary in the repository, and terms of service for the website. *Why:* Klaus:
+  "Do we have a glossary somewhere? If not, we could do a glossary.md and link it from the README … Ideally we are
+  using these terms also in the code"; "seat-plate is fine. Use the terms that you are using in the software"; "Also
+  explain the seating names North, South, etc."; and "We need to add 'Terms of Service' to the landing page … at the
+  bottom to the right of the version string in the same line … basically denying any warrantees or responsibility,
+  pledging compliance with copyrights and trademarks - and concerns should go to klaus@skylar.technology."
+  *Implementation (Claude):*
+  - **`docs/glossary.md`** (repository only, not served by the website): the table, the seats and their names, people,
+    joining and running a table, games, the sling, tools and the game service. Each term is the one the software
+    uses, with its names in the code and the words to avoid (for example *seat plate*, not *player box*; *AI player*,
+    not *bot*; *watcher*, not *spectator*). *Seats and their names* explains the edges (south at the bottom of the
+    screen's picture, west on the left of a south player), the compass names for one, two or three seats on an edge,
+    the layouts in seat-number order (from `seatName()`), and a diagram. *Where the words still differ* lists the
+    remaining mismatches (*admin portal* for the console in a few places; *cloud service* and *game service*; *deck* in
+    code, *your phone* for players). The README and `AGENTS.md` link to it.
+  - **Terms of service** at `/terms` (`apps/cloud/public/terms.html`), linked as *Terms of service* right of the
+    version label at the foot of the website, on its line. They cover the website, the service and the software: what
+    Game Table is (entertainment, no real money), no warranty ("as is"), no liability as far as the law allows, fair
+    use, what is recorded, copyrights and trademarks (a pledge to respect them; no affiliation with trademark owners;
+    other repositories' games under their authors' terms) with concerns to klaus@skylar.technology, the MIT licence,
+    changes and contact. The players' terms at a table (`shared/terms.md`, D-163) stay as they are and are named as
+    applying too. Checks: `tests/cloud.test.ts` (the page, the link beside the version, the address, no glossary on
+    the website) and `scripts/e2e/website.py` (the link on the version's line, the page opens).
+- **D-198 · 2026-10-24 · Klaus** — A cookbook for people working with an AI agent, and an architecture overview, in
+  the repository. *Why:* Klaus: "a 'cookbook for humans, assisted by AI' with some sections - we always assume that a
+  LLM does the actual work, the cookbook would tell how to ask a LLM to do the right thing", with recipes for a local
+  table with the extra games, a simple game ("the Yahzee prompt, which actually works, i tested it"), private games,
+  a game service of one's own with DNS, HTTPS and real remote players (and what the console does), and a game
+  checklist; "We could also provide a Architecture overview"; and "the standard github pipeline: branch conventions
+  (names, protections), tests, deployment (which needs to be customized, as 3rd parties can't install in our
+  cluster)". *Implementation (Claude):* `docs/cookbook.md`: habits with an agent, then six recipes, each with what
+  you need, the prompt to give and how to tell it worked: 1 play fast (the runbook's Parts A and B1, or
+  `local-table.sh --extra`; an iPad as the board), 2 build a game (the website's Yahtzee prompts), 3 private games (a
+  private repository, at home by cloning, on a service with `GAME_REPO_TOKEN` and ticks), 4 one's own game service
+  (the console's sections; Part C to try it; for real remote players a domain, DNS, HTTPS, a Google OAuth client and
+  optionally TURN), 5 the game checklist (idea, what is on the phone and on the board, rules, awards, placement,
+  settings and preferences, the developer settings under *Advanced*, customization, each with a prompt and the
+  guide's section), 6 the GitHub pipeline (branches and their protection as GitHub has them: `production` requires
+  test, codeql and e2e and an up-to-date branch, `main` is unprotected; kebab-case feature branches,
+  `experiment/<name>`; squash to main, a merge commit to production; versions and decision records; extra-games tested
+  against games-service `main`; the deploy workflow runs only in this project's cluster, so a fork replaces it, with a
+  prompt for Docker Compose and Caddy). `docs/architecture.md`: the parts and their connections (diagram), a game's
+  folder, how a game runs from an intent to the views (diagram, setup, timers, AI pacing, the end and replay), what
+  the platform and the game each own, how the screens load a game's modules, and where to look in the code. The
+  README and `AGENTS.md` link to both.
+- **D-199 · 2026-10-24 · Klaus** — A review of the documentation, the links and the decision records. *Why:* Klaus:
+  "do a complete review for documentation accuracy, ensuring that the README and other documents actually describe
+  the software as it is today", "make sure that all links in the documentation and the landing page actually
+  resolve", and "Review the ADRs for historical correctness, and flag any content that refers to the private
+  repositories." *Implementation (Claude):* every document was checked against the code.
+  - **README, `llms.txt`, the table-PC kit:** five games in extra-games; the test game Card Sling; the board served to
+    another screen (D-190); the phones' `lobby.rename`, `lobby.leave` and `game.gesture`; `GET /version`; the new
+    docs, the sling and the terms in the layout; *console*, not *admin portal* (also the website's link once signed
+    in); `ALLOW_REMOTE_BOARD`; the browser checks list. The table PC's `env.example` no longer sets `GRACE_MS=60000`,
+    so tables keep D-192's five minutes.
+  - **Developer guide:** awards' `null` rules, the AI's timing, errors and worker, `whenIdle` pacing (the table's
+    board only, 20 s at most), the phone's repeated events, the sling's full options, `onSeatChanged`'s argument,
+    `canContinueWithout`, Leave and rejoining, `turnModel`, the test harness of a game repository, Coin Flip's real
+    manifest.
+  - **Runbooks:** extra-games from `production` with its five games, waiting for `/health`, what deleting `.env`
+    removes, `GAME_REPOS` replacing the default, the restore marker (an empty marker after a clean restart brings back
+    the same state, so going back is `previous`), and an empty start without a snapshot. `kube-setup-request.md` is
+    marked as deployed and no longer says the state is in memory.
+  - **Rules for players** of the built-in games: leaving a game is an exchange now (Coin Flip, Hold'em, Pachisi,
+    Roulette); Hold'em's short all-in; Pachisi's result screen. Their versions are set anew.
+  - **The glossary, cookbook and architecture** (D-197, D-198): their code names, a game without a person at the
+    table, the pipeline per repository, the code map.
+  - **Links:** every relative link and anchor resolves; every web link answers, except ones the review could not
+    reach from its network (skylar.technology, img.shields.io) and `/terms`, which is new with this release.
+  - **Decision records:** D-127, D-128 and D-129 were each used twice; the second ones are D-127b, D-128b and D-129b,
+    and code and docs follow. Six cross-references are corrected (D-055, D-056, D-057, D-113, D-148, D-159), section
+    headings match their dates, and a table at the top lists the records later ones changed.

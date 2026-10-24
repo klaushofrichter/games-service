@@ -26,6 +26,7 @@ const REMOTE_SW = fileURLToPath(new URL("../public/remote-sw.js", import.meta.ur
 const FAVICON = fileURLToPath(new URL("../public/favicon.svg", import.meta.url));
 // The public website (D-176): one page and its images.
 const HOME_PAGE = fileURLToPath(new URL("../public/home.html", import.meta.url));
+const TERMS_PAGE = fileURLToPath(new URL("../public/terms.html", import.meta.url));
 const SITE_DIR = fileURLToPath(new URL("../public/site/", import.meta.url));
 const SITE_TYPES: Record<string, string> = { webp: "image/webp", png: "image/png", svg: "image/svg+xml", jpg: "image/jpeg" };
 export const REPO_URL = "https://github.com/klaushofrichter/games-service";
@@ -523,6 +524,11 @@ export function startCloud(o: CloudOptions) {
         res.writeHead(200, { "content-type": `${p.endsWith(".md") ? "text/markdown" : "text/plain"}; charset=utf-8`, "cache-control": "public, max-age=300", "access-control-allow-origin": "*" });
         return res.end(text);
       }
+      if (m === "GET" && p === "/terms") {
+        // The website's terms of service (D-197), linked beside the version label at the foot of the website.
+        res.writeHead(200, { ...HTML_HEADERS, "cache-control": "no-cache" });
+        return res.end((await readFile(TERMS_PAGE, "utf8")).replace("{{version}}", versionLabel()));
+      }
       if (await auth.handle(req, res, p)) return;
       if (m === "GET" && p === "/") {
         // The public website (D-176); also where logout lands (200, never a bounce to Google). The admin sign-in is a
@@ -530,7 +536,7 @@ export function startCloud(o: CloudOptions) {
         const signedIn = auth.session(req);
         const note = url.searchParams.has("signed-out") ? `<p class="note-toast" role="status">You are signed out.</p>` : "";
         const admin = signedIn
-          ? `<a id="admin-link" href="/admin" title="Signed in as ${esc(signedIn)}">Admin portal</a>`
+          ? `<a id="admin-link" href="/admin" title="Signed in as ${esc(signedIn)}">Console</a>`
           : auth.enabled
             ? `<a id="admin-link" href="/auth/google/login">Admin</a>`
             : `<a id="admin-link" href="/admin">Admin</a>`;

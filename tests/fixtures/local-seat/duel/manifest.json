@@ -3,7 +3,7 @@
   "name": "Duel",
   "version": "1.0.0",
   "sdk": "^0.1",
-  "description": "Test game for localSeat (D-128) and the board's settings window (D-129): two players, the one at the table sits south; a setting with five choices and one with two.",
+  "description": "Test game for localSeat (D-128b) and the board's settings window (D-129b): two players, the one at the table sits south; a setting with five choices and one with two.",
   "players": [
     2
   ],

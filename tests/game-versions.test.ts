@@ -1,4 +1,4 @@
-// D-127: scripts/check-game-versions.ts, run against throwaway git repositories: a game's version changes exactly when
+// D-127b: scripts/check-game-versions.ts, run against throwaway git repositories: a game's version changes exactly when
 // something in its folder does.
 import { execFileSync, spawnSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -37,7 +37,7 @@ afterEach(() => {
   if (dir) rmSync(dir, { recursive: true, force: true });
 });
 
-describe("game versions (D-127)", () => {
+describe("game versions (D-127b)", () => {
   it("passes when nothing changed, and when only things outside the game folders changed", () => {
     const git = repo({ chess: { version: "2026.01.02.1" } });
     expect(check().code).toBe(0);

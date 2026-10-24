@@ -41,7 +41,8 @@ console, uploading logs and table metrics (Part C).
 ## Prerequisites
 
 - **Docker** with the Compose plugin (`docker compose version` prints v2 or later): Docker Engine on Linux, Docker
-  Desktop on macOS or Windows (on Windows, run the commands in WSL or Git Bash).
+  Desktop on macOS or Windows (on Windows, run the commands in WSL or Git Bash, and run `setup.sh` with
+  `LAN_IP=<the WiFi adapter's IPv4 address from ipconfig>`: WSL's own 172.x address is not reachable from phones).
 - **git**, and about 1 GB of disk for the image.
 - The machine and the phones on **the same network**, not a guest WiFi that isolates devices. Port **8080** free and
   reachable from the LAN (a firewall may ask, or need a rule; see *Troubleshooting*).
@@ -82,10 +83,10 @@ docker compose -f deploy/local/docker-compose.yml up -d --build
 This builds the Table Host image from the checkout (a few minutes the first time) and starts it in the background;
 Docker restarts it after a reboot. Logs and saves live in the Docker volume `local_table-data`.
 
-**Check:**
+**Check** (the first start takes a moment; wait until it answers):
 
 ```sh
-curl -s http://localhost:8080/health          # {"status":"ok","version":"dev","protocol":1}
+until curl -fs http://localhost:8080/health; do sleep 2; done   # {"status":"ok","version":"dev","protocol":1}
 docker compose -f deploy/local/docker-compose.yml logs table-host | head
 ```
 
@@ -125,7 +126,8 @@ from its log to the same result. Every built-in game id works the same way.
 
 No phone at hand (a developer trying a game alone): on the board, open *Advanced* (hammer and wrench) › *Developer* ›
 *Play from the board*. The board then shows one player's deck beside it, like a remote player's page; enter a name
-there instead of scanning the QR code. It lasts until the Table Host restarts, or set `BOARD_DECK=1` in `.env`.
+there instead of scanning the QR code. It lasts until the Table Host restarts, or set `BOARD_DECK=1` in `.env`, then
+`docker compose -f deploy/local/docker-compose.yml up -d`.
 
 **The board on an iPad or a TV:** the board's settings › *Board on another screen…* show a QR code and link that move
 the board to another screen on the same network, and remember it there (D-190). With this compose file every device on
@@ -140,11 +142,14 @@ game.
 | --- | --- |
 | Logs | `docker compose -f deploy/local/docker-compose.yml logs -f table-host` |
 | Stop / start | `docker compose -f deploy/local/docker-compose.yml stop` / `… start` |
-| Update to the newest code | `git pull && docker compose -f deploy/local/docker-compose.yml up -d --build` |
+| Update to the newest code | `git pull && docker compose -f deploy/local/docker-compose.yml up -d --build`; with `GAMES` set (Part B), copy `games/*` into `../table-games` again too (the image's own built-in games are not used then) |
 | Another network (new LAN address) | `rm deploy/local/.env && deploy/local/setup.sh`, then `up -d` as in A3 |
 | Remove everything, data included | `docker compose -f deploy/local/docker-compose.yml down -v` |
 | The published image instead of building | `TABLE_HOST_IMAGE=ghcr.io/klaushofrichter/games-table-host:latest docker compose -f deploy/local/docker-compose.yml up -d --no-build` (linux/amd64 only; on Apple Silicon, build) |
 | Board control API | everything the board can do, over HTTP with `X-Table-Key`: README, *Board control API* |
+
+Deleting `.env` also removes lines you added (`GAMES` from Part B, `BOARD_DECK`, `PORT`): add them again, and pass
+`LAN_IP=` to `setup.sh` again if A2 needed it.
 
 More Table Host settings (time limits, the AI's pause, remote seats) are environment variables, listed in the
 README under *Table Host configuration*.
@@ -159,22 +164,23 @@ folders next to the built-in ones, and point the table at that folder. A **priva
 ### B1. Games from a public repository
 
 The example is the public [`klaushofrichter/extra-games`](https://github.com/klaushofrichter/extra-games) (Chess,
-Liar's Dice, Backgammon). Put all game folders, the built-in ones included, into one folder and point the table at it:
+Liar's Dice, Backgammon, Mexican Train, Last Card). Use its `production` branch, the one tables run. Put all game folders, the built-in ones included, into one folder and point the table at it:
 
 ```sh
-git clone https://github.com/klaushofrichter/extra-games ../extra-games
+git clone -b production https://github.com/klaushofrichter/extra-games ../extra-games
 mkdir -p ../table-games
 cp -r games/* ../extra-games/games/* ../table-games/
-echo "GAMES=\"$(cd ../table-games && pwd)\"" >> deploy/local/.env
+grep -q '^GAMES=' deploy/local/.env || echo "GAMES=\"$(cd ../table-games && pwd)\"" >> deploy/local/.env
 docker compose -f deploy/local/docker-compose.yml up -d
 ```
 
-**Check:** `curl -s -H "X-Table-Key: $TABLE_KEY" "$PUBLIC_URL/api/v1/games" | grep -o '"id":"[a-z-]*"'` also lists
-`backgammon`, `chess` and `liars-dice` (and the games of every repository you copied).
+**Check** (in a new shell, load `.env` first as in A4; wait for `/health` as in A3): `curl -s -H "X-Table-Key: $TABLE_KEY" "$PUBLIC_URL/api/v1/games" | grep -o '"id":"[a-z-]*"'` also lists
+`backgammon`, `chess`, `last-card`, `liars-dice` and `mexican-train` (and the games of every repository you copied).
 
 - `GAMES` must be an absolute path; the folder is mounted read-only at `/app/games` (there, the games find the SDK).
 - Game folder names must differ between repositories: a folder copied later replaces one with the same name.
-- To update: `git pull` in each clone, copy the game folders again, then
+- To update: `git pull` in each clone, copy the game folders again (to drop files removed upstream, empty
+  `../table-games` first and copy the built-in games too), then
   `docker compose -f deploy/local/docker-compose.yml restart table-host`.
 - A game repository is tested against a version of this one (often named in its `games-service.ref`); if a game
   does not load, the table's log says why (`docker compose -f deploy/local/docker-compose.yml logs table-host`), and
@@ -215,7 +221,8 @@ service, no console. Only the clone needs access.
    ```
 
 4. **Check:** the games list (as in B1) now has the repository's game ids (its `games/` folder names); the
-   table's log names them at start (`docker compose -f deploy/local/docker-compose.yml logs table-host | grep games:`).
+   table's log names them at start (`docker compose -f deploy/local/docker-compose.yml logs table-host | grep -E 'games:|skipping'`; a game that fails to load is
+   logged as `[games] skipping <id>: <reason>`).
 5. **Update** later: `git -C ../<repo> pull`, copy again (step 3), restart.
 
 The games stay on this machine: the table serves them to the phones on the LAN and to nobody else. Several private
@@ -236,7 +243,8 @@ docker compose -f deploy/local/docker-compose.yml up -d --build
    `ADMIN_TOKEN` from `deploy/local/.env`, and approve the code. The notice on the board disappears.
 2. The console's game repositories list `klaushofrichter/extra-games`; tick it for the table, and the table installs
    those games within a minute (the cloud service needs to reach `api.github.com`). More repositories: list them in
-   `GAME_REPOS` in `deploy/local/.env` (`owner/name@branch`, comma-separated). A private one also needs
+   `GAME_REPOS` in `deploy/local/.env` (`owner/name@branch`, comma-separated; it replaces the default, so include
+   `klaushofrichter/extra-games@production` to keep it). A private one also needs
    `GAME_REPO_TOKEN` there: a GitHub token that can read it (fine-grained, *Contents: read*). This is only the console
    route; Part B2 needs neither.
 3. *Invite* on the board creates a link for a remote player.
@@ -260,9 +268,9 @@ then `up -d` as in A3 (the cloud profile goes with the old `.env`).
 | Phone: the page does not load | The phone is on another network, a guest WiFi with client isolation or a VPN, or the machine's firewall blocks port 8080. Test `curl "$PUBLIC_URL/health"` from another computer. Firewall: macOS *System Settings › Network › Firewall* (allow Docker); Linux `sudo ufw allow 8080/tcp`; Windows: allow Docker Desktop for private networks |
 | The phone opens a wrong address | `PUBLIC_URL` is wrong (A2 check): rewrite `.env` with `LAN_IP`, then `up -d` |
 | Board: `the board is only served on the table PC` | Not this compose file, which sets `ALLOW_REMOTE_BOARD=1`. Use it, and open `http://localhost:8080/board/` |
-| `port is already allocated` | Something else uses 8080: set `PORT=8090` and `PUBLIC_URL=http://<address>:8090` in `.env` |
+| `port is already allocated` | Something else uses 8080: set `PORT=8090` and `PUBLIC_URL=http://<address>:8090` in `.env`, then `up -d` |
 | The build cannot pull `node:26-bookworm-slim` | No access to Docker Hub (a proxy, offline): use the published image (*Everyday*) or a registry mirror |
-| Games do not start; the board says the table is offline | `CLOUD_URL` is set but no cloud service runs: remove `CLOUD_URL` and `COMPOSE_PROFILES` from `.env` (Part A) |
+| The board says the table is offline, or shows a pairing code, without Part C | `CLOUD_URL` is set but no cloud service runs: remove `CLOUD_URL` and `COMPOSE_PROFILES` from `.env` (Part A) |
 | A remote invite link fails on another device | Expected over plain http (Part C, *Limit*) |
 
 ## Security notes

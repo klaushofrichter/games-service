@@ -110,6 +110,17 @@ try:
                     page.locator(f"#{sid}").scroll_into_view_if_needed()
                     page.wait_for_timeout(600)
                     page.screenshot(path=os.path.join(OUT, f"website-{sid}.png"))
+                # The terms of service (D-197): beside the version at the foot of the page, on a page of their own.
+                foot = page.locator("footer a.terms")
+                v, t = page.locator("footer .version").bounding_box(), foot.bounding_box()
+                assert abs(v["y"] - t["y"]) < 4 and t["x"] > v["x"], "the terms link right of the version, on its line"
+                foot.click()
+                page.wait_for_url("**/terms")
+                assert page.inner_text("h1") == "Terms of service"
+                assert page.locator("a[href='mailto:klaus@skylar.technology']").count() >= 1
+                page.screenshot(path=os.path.join(OUT, "website-terms.png"), full_page=True)
+                page.go_back()
+                page.wait_for_selector("#games-grid .game")
             else:
                 page.evaluate("window.scrollTo(0, 0)")
                 page.wait_for_timeout(300)

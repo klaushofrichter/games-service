@@ -1,4 +1,4 @@
-"""Browser check of the board's settings window for a game's choices (D-129), with the test game Duel
+"""Browser check of the board's settings window for a game's choices (D-129b), with the test game Duel
 (tests/fixtures/local-seat). A choice with up to three options shows as buttons; more become a pulldown, so a long
 list (Chess's eight time controls) never runs out of the window.
   python3 scripts/e2e/settings_choice.py out/

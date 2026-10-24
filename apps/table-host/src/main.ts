@@ -40,7 +40,7 @@ console.log(`[table-host] ${host.table.config.tableName} on port ${host.port}`);
 console.log(`[table-host] board:  http://localhost:${host.port}/board/`);
 console.log(`[table-host] join:   ${host.table.currentJoin().url}`);
 {
-  // Test games (manifest "test": true, today only quartet) exist for the automated tests; the board shows them only
+  // Test games (manifest "test": true: quartet and card-sling) exist for the automated tests; the board shows them only
   // with SHOW_TEST_GAMES=1.
   const all = [...host.table.games.values()].map((g) => g.manifest);
   const shown = all.filter((m) => !m.test || env.SHOW_TEST_GAMES === "1").map((m) => m.id);

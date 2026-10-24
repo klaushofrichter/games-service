@@ -84,7 +84,8 @@ export async function startHost(o: HostOptions = {}) {
   if (o.cloudUrl) {
     cloud = new CloudLink(table, logs, { cloudUrl: o.cloudUrl.replace(/\/$/, ""), dataDir, pollMs: o.cloudPollMs, heartbeatMs: o.cloudHeartbeatMs, accessCode: o.accessCode || undefined });
     cloud.gateway = gateway;
-    // Extra games come only through the service (D-016, D-097): without CLOUD_URL a table has its built-in games.
+    // Extra-game bundles come through the service (D-016, D-097); without CLOUD_URL a table runs the game folders it is
+    // given (GAMES_DIR, the built-in games by default).
     const link = cloud;
     cloud.extras = new ExtraGames(table, dataDir, (hash) => link.downloadBundle(hash));
     await cloud.extras.restore();

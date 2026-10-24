@@ -73,7 +73,7 @@ AI players can join with a play style: *conservative* (small bets, mostly on red
 ## Players joining and leaving
 
 - New players can sit down during the game. They start with the starting points.
-- If you leave, your bets for the current spin are removed and you are out of the final ranking.
+- If someone has to go, the board can exchange them for another person or an AI player, who keeps their points and bets.
 - If you run out of points, you sit out. The game does not wait for you.
 
 ## End of the game

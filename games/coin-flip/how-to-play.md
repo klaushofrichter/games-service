@@ -38,7 +38,7 @@ AI players pick heads or tails at random.
 ## Players joining and leaving
 
 - New players can sit down during the game. They start with 0 points.
-- If you leave, the coin no longer waits for you.
+- If your phone goes away or you leave, your seat waits for you: when there is a time limit, the coin flips without your pick. The board can exchange you for another person or an AI player.
 
 ## End of the game
 
