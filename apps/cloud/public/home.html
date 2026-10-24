@@ -1422,6 +1422,7 @@ docker compose -f deploy/local/docker-compose.yml up -d --build">Copy</button></
   const demo = $("#demo"), plates = $$(".plate", demo), stepsEl = $("#steps");
   stepsEl.innerHTML = STEPS.map((s, i) => `<button class="step" data-i="${i}"><h3>${s.h}</h3><p>${s.p}</p><i class="bar"></i></button>`).join("");
   const stepBtns = $$(".step", stepsEl);
+  const STEP_MS = 5200; // how long each scene of the lobby demo stays
   let cur = -1, timer = null, visible = false;
   function show(i) {
     cur = i;
@@ -1445,11 +1446,12 @@ docker compose -f deploy/local/docker-compose.yml up -d --build">Copy</button></
     $("#mini-deck").classList.toggle("on", !!s.deck);
     $(".stage", demo).classList.toggle("deck-on", !!s.deck);
     clearTimeout(timer);
-    if (!still && visible) timer = setTimeout(() => show((cur + 1) % STEPS.length), 5200);
+    if (!still && visible) timer = setTimeout(() => show((cur + 1) % STEPS.length), STEP_MS);
   }
   stepBtns.forEach((b) => b.addEventListener("click", () => show(Number(b.dataset.i))));
-  new IntersectionObserver(([e]) => { visible = e.isIntersecting; if (visible) show(cur < 0 ? 0 : cur); else clearTimeout(timer); }, { threshold: 0.3 }).observe(demo);
-  demo.style.setProperty("--dur", "5.2s");
+  // Out of view the demo stops, its progress bar too (.demo.paused).
+  new IntersectionObserver(([e]) => { visible = e.isIntersecting; demo.classList.toggle("paused", !visible); if (visible) show(cur < 0 ? 0 : cur); else clearTimeout(timer); }, { threshold: 0.3 }).observe(demo);
+  demo.style.setProperty("--dur", `${STEP_MS / 1000}s`);
   show(0);
 
   // The prompt types itself once it scrolls into view.

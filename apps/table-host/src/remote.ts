@@ -14,6 +14,8 @@ import { RTCPeerConnection, type RTCDataChannel } from "werift";
 import type { RemoteContext } from "./server.ts";
 
 const CHUNK = 16 * 1024; // base64 characters per frame, well under SCTP message limits
+/** The largest WebSocket message a remote session may send, as for the table's own sockets. */
+const MAX_MESSAGE = 64 * 1024;
 const MAX_SESSIONS = 16;
 const OPEN_TIMEOUT_MS = 30_000;
 
@@ -151,7 +153,11 @@ class Session {
         this.sockets.set(f.sid, s);
         this.gw.attach(s, fakeRequest("GET", "/ws", undefined, ctx));
         this.send({ k: "ws", sid: f.sid, op: "open" });
-      } else if (f.op === "msg") this.sockets.get(f.sid)?.receive(String(f.data ?? ""));
+      } else if (f.op === "msg") {
+        // The same limit as the table's own WebSockets (maxPayload, 64 KiB, D-202): a larger message is dropped.
+        const data = String(f.data ?? "");
+        if (data.length <= MAX_MESSAGE) this.sockets.get(f.sid)?.receive(data);
+      }
       else if (f.op === "close") this.sockets.get(f.sid)?.closed(f.code ?? 1000);
     }
   }

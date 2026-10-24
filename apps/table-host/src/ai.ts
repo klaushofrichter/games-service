@@ -26,10 +26,6 @@ export class AiWorker {
     this.rulesFile = rulesFile;
   }
 
-  get busy() {
-    return this.pending !== null;
-  }
-
   private start() {
     const w = new Worker(new URL("./ai-worker.ts", import.meta.url), { workerData: { rulesFile: this.rulesFile } });
     this.worker = w;
@@ -80,8 +76,7 @@ export class AiWorker {
 
   /** Stop a move in progress: the thread is terminated and the caller's promise rejects with AiCancelled. */
   cancel() {
-    if (!this.pending && this.worker) return; // idle: keep the thread (and its loaded rules) for the next move
-    this.terminate();
+    if (this.pending) this.terminate(); // idle: keep the thread (and its loaded rules) for the next move
   }
 
   terminate() {

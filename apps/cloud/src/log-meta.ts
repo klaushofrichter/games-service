@@ -33,6 +33,35 @@ const str = (v: unknown, max = 200) => (typeof v === "string" ? v.slice(0, max) 
 const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : undefined);
 const iso = (v: unknown) => (typeof v === "string" && !Number.isNaN(Date.parse(v)) ? new Date(v).toISOString() : undefined);
 
+/**
+ * A zip entry's text, or null when it is larger than `max` bytes: checked against its declared size first, then while it
+ * is inflated, so a small upload that inflates to gigabytes (a zip bomb) is never held in memory (D-202).
+ */
+function readLimited(f: JSZip.JSZipObject, max: number): Promise<string | null> {
+  const declared = (f as unknown as { _data?: { uncompressedSize?: number } })._data?.uncompressedSize;
+  if (typeof declared === "number" && declared > max) return Promise.resolve(null);
+  return new Promise((resolve) => {
+    const parts: Buffer[] = [];
+    let size = 0;
+    let done = false;
+    const finish = (v: string | null) => {
+      if (!done) ((done = true), resolve(v));
+    };
+    const stream = f.nodeStream("nodebuffer");
+    stream.on("data", (chunk: Buffer) => {
+      if (done) return;
+      size += chunk.length;
+      if (size > max) {
+        stream.pause();
+        return finish(null);
+      }
+      parts.push(chunk);
+    });
+    stream.on("error", () => finish(null));
+    stream.on("end", () => finish(Buffer.concat(parts).toString("utf8")));
+  });
+}
+
 /** The listing fields from run.json, checked and bounded. Nothing usable: {} (the upload is kept all the same). */
 export async function readRunMeta(zipData: Buffer): Promise<Partial<LogRecordMeta>> {
   let run: Record<string, any>;
@@ -40,8 +69,8 @@ export async function readRunMeta(zipData: Buffer): Promise<Partial<LogRecordMet
     const zip = await JSZip.loadAsync(zipData);
     const f = zip.file("run.json");
     if (!f) return {};
-    const text = await f.async("string");
-    if (text.length > 1_000_000) return {};
+    const text = await readLimited(f, 1_000_000);
+    if (text === null) return {};
     run = JSON.parse(text);
     if (!run || typeof run !== "object") return {};
   } catch {

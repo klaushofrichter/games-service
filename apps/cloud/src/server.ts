@@ -150,6 +150,8 @@ export function startCloud(o: CloudOptions) {
   const tokenIndex = new Map<string, string>(); // sha256(table token) hex -> tableId
   /** Uploaded logs; the bytes are in memory only without DATA_DIR, else in DATA_DIR/logs. */
   const logs = new Map<string, { meta: LogRecordMeta; data: Buffer | null }>();
+  /** Live, unused invites one table may hold at once (D-202). */
+  const MAX_INVITES = 50;
   const invites = new Map<string, { tableId: string; expiresAt: number; used: boolean }>(); // by sha256(code)
   /** Download tokens by sha256(token); `id` names one in the console without revealing it (D-115). */
   const downloadTokens = new Map<string, DownloadToken>();
@@ -257,6 +259,15 @@ export function startCloud(o: CloudOptions) {
   };
   /** Whether a hello or heartbeat body presents an access code at all. */
   const presentsCode = (v: unknown) => v !== undefined && v !== null && v !== "";
+  /**
+   * A per-address map grows by one entry per address between the 10-minute prunes; past a size many addresses could
+   * reach (an IPv6 range), entries whose minute is over go at once (D-202).
+   */
+  const sweep = (m: Map<string, { reset: number }>) => {
+    if (m.size < 50_000) return;
+    const now = Date.now();
+    for (const [k, v] of m) if (v.reset < now) m.delete(k);
+  };
   /** Wrong codes per client address; a hello with a code is refused once a client has too many in a minute. */
   const codeFailures = new Map<string, { n: number; reset: number }>();
   const codeBlocked = (ip: string) => {
@@ -264,6 +275,7 @@ export function startCloud(o: CloudOptions) {
     return !!f && f.reset > Date.now() && f.n >= MAX_CODE_FAILURES;
   };
   const codeFailed = (ip: string) => {
+    sweep(codeFailures);
     const f = codeFailures.get(ip);
     if (!f || f.reset <= Date.now()) codeFailures.set(ip, { n: 1, reset: Date.now() + 60_000 });
     else f.n++;
@@ -388,6 +400,7 @@ export function startCloud(o: CloudOptions) {
     return xff || req.socket.remoteAddress || "?";
   };
   const limited = (ip: string, max = 20) => {
+    sweep(lookups);
     const l = lookups.get(ip) ?? { n: 0, reset: Date.now() + 60_000 };
     if (Date.now() > l.reset) Object.assign(l, { n: 0, reset: Date.now() + 60_000 });
     l.n++;
@@ -708,6 +721,11 @@ export function startCloud(o: CloudOptions) {
         const t = tableFor(req);
         if (!t) return json(res, 401, { error: "unknown or revoked table" });
         const b = await jsonBody(req);
+        // Live invites per table are capped (D-202): each lasts up to a day, in memory and in the store.
+        const now = Date.now();
+        if ([...invites.values()].filter((i) => i.tableId === t.tableId && !i.used && i.expiresAt > now).length >= MAX_INVITES) {
+          return json(res, 429, { error: "too many open invites for this table; wait until some expire" });
+        }
         const exp = expiry(lifetime(b.ttlMinutes, 120, 24 * 60) * 60_000);
         let token = code(8);
         while (invites.has(tokenKey(token))) token = code(8);
