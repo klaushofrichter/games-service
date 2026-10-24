@@ -605,7 +605,7 @@ async function showGame() {
           if (!r.ok) toast(r.reason);
           return r;
         }),
-      // EXPERIMENT (card sling): a live gesture for the board, fire and forget (no answer, not logged).
+      // A live gesture for the boards (the sling, D-189): fire and forget, no answer, not logged.
       gesture: (data) => {
         if (ws?.readyState === 1) ws.send(JSON.stringify({ v: 1, ch: "game", type: "gesture", payload: data }));
       },
@@ -614,7 +614,12 @@ async function showGame() {
       assetUrl: (p) => `/games/${state.game.id}/assets/${p}`,
     });
   }
-  game.inst?.update(gameMsg.view, gameMsg.events ?? [], info());
+  // A message's events go to the game once; a redraw for anything else (the lobby, the tabs) passes none, as on the
+  // board, so nothing animates twice.
+  if (!game.inst) return;
+  const events = gameMsg.delivered ? [] : (gameMsg.events ?? []);
+  gameMsg.delivered = true;
+  game.inst.update(gameMsg.view, events, info());
 }
 
 // A remote player switching their board between turned and full width (D-101) changes how they see it: tell the game.
