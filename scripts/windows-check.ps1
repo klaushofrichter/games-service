@@ -10,8 +10,13 @@ $setup = Join-Path $root "deploy\local\setup.ps1"
 $envFile = Join-Path $root "deploy\local\.env"
 $compose = Join-Path $root "deploy\local\docker-compose.yml"
 $failures = @()
+# On GitHub, a failure is also an annotation: the job's log is not always at hand.
+$gh = [bool]$env:GITHUB_ACTIONS
 function Check([bool]$ok, [string]$what) {
-  if ($ok) { Write-Host "ok   $what" } else { Write-Host "FAIL $what"; $script:failures += $what }
+  if ($ok) { Write-Host "ok   $what"; return }
+  Write-Host "FAIL $what"
+  if ($gh) { Write-Host ("::error file=scripts/windows-check.ps1::" + ($what -replace "[\r\n]+", " ")) }
+  $script:failures += $what
 }
 function Read-Env { $m = @{}; Get-Content $envFile | Where-Object { $_ -match "^[A-Z_]+=" } | ForEach-Object { $k, $v = $_ -split "=", 2; $m[$k] = $v }; $m }
 function Run-Setup([string]$shell, [string[]]$more) {
@@ -90,7 +95,11 @@ try {
   }
 } finally {
   Stop-Process -Id $host_.Id -Force -ErrorAction SilentlyContinue
-  if ($failures.Count) { Write-Host "--- host log"; Get-Content $log, "$log.err" -ErrorAction SilentlyContinue | Select-Object -Last 40 }
+  if ($failures.Count) {
+    $tail = @(Get-Content $log, "$log.err" -ErrorAction SilentlyContinue | Select-Object -Last 40)
+    Write-Host "--- host log"; $tail | ForEach-Object { Write-Host $_ }
+    if ($gh -and $tail.Count) { Write-Host ("::warning file=scripts/windows-check.ps1::host log: " + (($tail | Select-Object -Last 8) -join " | ")) }
+  }
 }
 
 if ($failures.Count) { Write-Host "$($failures.Count) check(s) failed"; exit 1 }
