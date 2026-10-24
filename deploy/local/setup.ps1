@@ -18,14 +18,19 @@ $envFile = Join-Path $here ".env"
 
 # The PC's address on the WiFi or wired network: the up adapter with a default gateway, not a virtual one (WSL,
 # Hyper-V, Docker, VPN), Wi-Fi first. Phones scan this address in the board's QR code.
+# Not "Hyper-V" alone: a PC that is itself a virtual machine (a cloud VM) has a real "Hyper-V Network Adapter".
 function Find-LanIp {
-  $virtual = "vEthernet|WSL|Hyper-V|Docker|VirtualBox|VMware|Loopback|Tailscale|VPN|TAP"
+  $virtualAlias = "vEthernet|WSL|Docker|Loopback|Tailscale|VPN"
+  $virtualDescription = "Virtual Ethernet|Virtual Adapter|VirtualBox|VMware|TAP-|Tailscale|WireGuard|VPN|Loopback"
   $configs = @(Get-NetIPConfiguration -ErrorAction SilentlyContinue | Where-Object {
       $_.IPv4DefaultGateway -and $_.IPv4Address -and $_.NetAdapter.Status -eq "Up" -and
-      $_.InterfaceAlias -notmatch $virtual -and $_.InterfaceDescription -notmatch $virtual
+      $_.InterfaceAlias -notmatch $virtualAlias -and $_.InterfaceDescription -notmatch $virtualDescription
     })
   $pick = @($configs | Sort-Object { if ($_.InterfaceAlias -match "Wi-?Fi|WLAN|Wireless") { 0 } else { 1 } }) | Select-Object -First 1
   if ($pick) { return @($pick.IPv4Address)[0].IPAddress }
+  # Else the source address of the route to the internet, as setup.sh does on Linux.
+  $route = Find-NetRoute -RemoteIPAddress 1.1.1.1 -ErrorAction SilentlyContinue | Where-Object { $_.IPAddress } | Select-Object -First 1
+  if ($route) { return $route.IPAddress }
   return $null
 }
 
