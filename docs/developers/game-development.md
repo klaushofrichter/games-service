@@ -419,7 +419,9 @@ the move means. The test game `games/card-sling` is the smallest example; Last C
 
 - **Live gestures:** `ctx.gesture(data)` on the phone sends a small JSON object (at most 512 characters as JSON) to every board,
   local and remote, where the game's `gesture(seat, data)` hook gets it. No rules run, nothing is logged or replayed,
-  nothing reaches other phones; the host drops gestures while no game is active (also while paused), from players without a seat, and more
+  nothing reaches other phones; only the sling's own fields reach the boards (`id`, `f`, `x`, `a`, `end`, and `item` as a flat object of
+  short strings, numbers and booleans; D-202), so draw an `item` only through code that accepts known values; the
+  host drops gestures while no game is active (also while paused), from players without a seat, and more
   than one per 8 ms from a phone. The move itself is still an intent.
 - **On the phone,** `slingDeck(area, ctx, opts)` from `/shared/sling.js` makes every element with `data-sling="<id>"`
   in `area` draggable. `area` clips its content; its top edge is where things leave the phone. Letting go with half

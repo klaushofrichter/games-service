@@ -8,6 +8,7 @@ history.
 
 ## [Unreleased]
 
+- Security: a phone can pass only the sling's own fields to the boards and card faces draw only real cards; board access, served files, idle connections, move rates, remote messages, token comparison, uploaded logs and invites are hardened (D-202). Clean-ups without a change in behaviour (D-203).
 - A phone no longer repeats a game's last events when the lobby changes; each move animates once (D-201).
 - The cluster's deployment request leaves this repository, and private games are named without their details (D-200).
 - The documentation checked against the code: README, developer guide, runbooks, rules for players and decision records; the console is called *Console* on the website too; table PCs keep a lobby seat for five minutes as intended (D-199).

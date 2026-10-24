@@ -17,17 +17,19 @@ import {
   type SeatLayout,
   type CloudStatus,
 } from "../../../packages/protocol/src/index.ts";
-import { createRng, type GameEvent, type Intent, type SeatInfo } from "../../../packages/sdk/src/index.ts";
+import { createRng, list, type GameEvent, type Intent, type SeatInfo } from "../../../packages/sdk/src/index.ts";
 import { HOW_TO_PLAY, settingsWithDefaults, type InstalledGame } from "./games.ts";
 import { withStatistics } from "./stats.ts";
-
-/** The URL a deck fetches a game's rules from (D-099), or null. */
-const howToPlayUrl = (g: InstalledGame) => (g.howToPlay ? `/games/${g.manifest.id}/${HOW_TO_PLAY}` : null);
 import { GameRuntime, realClock, type AiMoveMeta, type LogRecord } from "./runtime.ts";
 import { movesFor } from "./moves.ts";
 import { baseMeta, countRecords, rebuild, verifyGame, verifySummary } from "./game-log.ts";
 import { AiCancelled, AiWorker, aiMove, isPromise, usesWorker } from "./ai.ts";
 import type { LogStore, PlayerMeta, RunningLog } from "./logs.ts";
+
+/** The URL a deck fetches a game's rules from (D-099), or null. */
+const howToPlayUrl = (g: InstalledGame) => (g.howToPlay ? `/games/${g.manifest.id}/${HOW_TO_PLAY}` : null);
+/** A session token: 24 random bytes, base64url. */
+const newSessionToken = () => randomBytes(24).toString("base64url");
 
 /** The longest player name (D-148): longer ones are cut. Room for "Alexandra 12" on every seat plate and result table. */
 export const MAX_NAME = 12;
@@ -302,7 +304,7 @@ export class Table extends EventEmitter {
   resumeGame() {
     if (this.phase !== "paused" || !this.runtime) throw new TableError(409, "the game is not paused");
     if (this.pause?.reason === "ai") throw new TableError(409, `waiting for ${this.pause.ai?.name ?? "an AI player"}; tap Play now to move for it`);
-    if (this.pause?.reason === "player") throw new TableError(409, `waiting for ${this.pause.players?.map((p) => p.name).join(" and ") || "a player"} to come back`);
+    if (this.pause?.reason === "player") throw new TableError(409, `waiting for ${list(this.pause.players?.map((p) => p.name) ?? []) || "a player"} to come back`);
     if (!this.cloudOnline) throw new TableError(409, "still offline; the game resumes by itself when the connection returns");
     if (this.waitingFor.size) {
       // Back online, but someone the game needs is still away (D-119): wait for them instead.
@@ -349,9 +351,7 @@ export class Table extends EventEmitter {
    * (`joinTokenTtlMs` > 0 adds an expiry; off by default.)
    */
   rotateJoinToken() {
-    let next = shortToken();
-    while (next === this.joinToken) next = shortToken();
-    this.joinToken = next;
+    this.joinToken = this.freshToken();
     this.joinTokenExpires = this.config.joinTokenTtlMs > 0 ? Date.now() + this.config.joinTokenTtlMs : Infinity;
   }
 
@@ -422,7 +422,7 @@ export class Table extends EventEmitter {
     const same = others.find((p) => nameKey(p.name) === k);
     if (same) {
       if (same.sessionToken) this.endedSessions.set(same.sessionToken, "you play from the board now; this phone left the table");
-      same.sessionToken = randomBytes(24).toString("base64url");
+      same.sessionToken = newSessionToken();
       this.emit("removed", same.id, "board"); // the old phone, if open, says why
       this.resume(same.sessionToken);
       return { playerId: same.id, sessionToken: same.sessionToken };
@@ -638,7 +638,7 @@ export class Table extends EventEmitter {
     const back = !exchange && location === "local" ? this.leftPlayerNamed(rawName) : undefined;
     if (back) {
       back.leftGame = false;
-      back.sessionToken = randomBytes(24).toString("base64url");
+      back.sessionToken = newSessionToken();
       this.resume(back.sessionToken);
       return { playerId: back.id, sessionToken: back.sessionToken };
     }
@@ -648,7 +648,7 @@ export class Table extends EventEmitter {
     // Names are unique at the table (D-148); a remote player can't retype on the invite page, so theirs gets a number.
     const name = location === "remote" ? this.freeName(rawName, old?.id) : this.cleanName(rawName, old?.id);
     const id = newId("p");
-    const sessionToken = randomBytes(24).toString("base64url");
+    const sessionToken = newSessionToken();
     const p: Player = { id, name, kind: "human", location, seat: null, connected: true, ready: !!exchange, sessionToken, remoteSession };
     this.players.set(id, p);
     if (exchange) this.takeSeat(p, exchange.seat);
@@ -1015,6 +1015,7 @@ export class Table extends EventEmitter {
   setReady(playerId: string, ready: boolean) {
     const p = this.mustPlayer(playerId);
     if (this.phase !== "ready") throw new TableError(409, "no game is waiting to start");
+    if (p.ready === !!ready) return; // nothing changed: no broadcast to every phone and board
     p.ready = !!ready;
     this.changed();
   }
@@ -1475,10 +1476,7 @@ export class Table extends EventEmitter {
 
   close() {
     this.assertNotPlaying("return to the lobby");
-    this.selected = null;
-    this.summary = null;
-    this.phase = "idle";
-    for (const p of this.players.values()) p.ready = p.kind === "ai";
+    this.unselect();
     this.changed();
   }
 
@@ -1831,8 +1829,7 @@ export class Table extends EventEmitter {
   /** Stop one AI move: its timers, its signal, and its worker thread if it was busy with it. */
   private cancelAiMove(playerId: string, mv: AiMoveState) {
     mv.controller?.abort();
-    const w = this.aiWorkers.get(playerId);
-    if (w?.busy) w.cancel();
+    this.aiWorkers.get(playerId)?.cancel();
     this.dropAiMove(playerId, mv);
     if (mv.shown) this.stateDirty = true;
   }
@@ -1990,7 +1987,7 @@ export const AI_NAMES = [
   "Ben", "Bob", "Finn", "Jack", "Leo", "Max", "Noah", "Otto", "Paul", "Sam", "Tom", "Theo",
 ];
 
-/** AI options with manifest defaults. The AI configuration screen (later phase) will override these per seat. */
+/** AI options with manifest defaults; a seat's own choices (setAiOptions, the board's AI window) win where valid. */
 export function aiDefaults(m: InstalledGame["manifest"], given: Record<string, unknown> = {}): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const o of m.ai.options) {

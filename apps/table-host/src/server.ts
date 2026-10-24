@@ -1,7 +1,7 @@
 // HTTP + WebSocket server of the Table Host: board and deck pages, board control API, live updates.
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { readFile } from "node:fs/promises";
-import { extname, join, normalize } from "node:path";
+import { extname, join, normalize, sep } from "node:path";
 import { createHash, timingSafeEqual } from "node:crypto";
 import { WebSocketServer, type WebSocket } from "ws";
 import QRCode from "qrcode";
@@ -33,10 +33,50 @@ export interface RemoteContext {
 }
 export const remoteOf = (req: IncomingMessage): RemoteContext | undefined => (req as IncomingMessage & { gtRemote?: RemoteContext }).gtRemote;
 
-type Client = ({ ws: WebSocket; role: "board" } | { ws: WebSocket; role: "deck"; playerId: string } | { ws: WebSocket; role: "pending" }) & { remote?: boolean; tab?: string; session?: string };
+type Client = ({ ws: WebSocket; role: "board" } | { ws: WebSocket; role: "deck"; playerId: string } | { ws: WebSocket; role: "pending" }) & {
+  remote?: boolean;
+  tab?: string;
+  session?: string;
+  alive?: boolean;
+  /** A remote board counted against the remote places (D-133). */
+  counted?: boolean;
+  lastGesture?: number;
+  /** Intents this connection may still send now (a token bucket, D-202). */
+  tokens?: number;
+  tokensAt?: number;
+};
 
 /** Connections one table serves at most (D-133): one local board, a deck per player (eight seats at most), and a board per remote player. */
 const MAX_DECKS = 8;
+/** Connections that have not said hello yet: at most this many, each for at most HELLO_MS (D-202). */
+const MAX_PENDING = 16;
+const HELLO_MS = 10_000;
+/** Intents per connection: a burst of INTENT_BURST, then INTENT_RATE a second (D-202). People and boards stay far below. */
+const INTENT_BURST = 40;
+const INTENT_RATE = 20;
+
+/**
+ * A sling gesture as the boards may see it (D-189, D-202): only the fields the sling uses, each of its kind, so a phone
+ * can pass nothing else to the boards (no markup, no large objects). `item`, the face a game may show while dragging, is
+ * a flat object of short strings, numbers and booleans.
+ */
+export function cleanGesture(p: unknown): Record<string, unknown> | null {
+  if (!p || typeof p !== "object" || Array.isArray(p)) return null;
+  const g = p as Record<string, unknown>;
+  const out: Record<string, unknown> = {};
+  if ((typeof g.id === "string" && g.id.length <= 64) || (typeof g.id === "number" && Number.isFinite(g.id))) out.id = g.id;
+  for (const k of ["f", "x", "a"]) if (typeof g[k] === "number" && Number.isFinite(g[k])) out[k] = g[k];
+  if (g.end === true) out.end = true;
+  if (g.item && typeof g.item === "object" && !Array.isArray(g.item)) {
+    const item: Record<string, string | number | boolean> = {};
+    for (const [k, v] of Object.entries(g.item).slice(0, 12)) {
+      if (!/^[A-Za-z_][\w-]{0,19}$/.test(k)) continue;
+      if ((typeof v === "string" && v.length <= 40) || typeof v === "boolean" || (typeof v === "number" && Number.isFinite(v))) item[k] = v;
+    }
+    out.item = item;
+  }
+  return out;
+}
 
 /** Reads a remote client may make: lobby and game state, never logs, saves, simulations or local join codes. */
 const REMOTE_DENIED = /^\/(join|simulation|logs|saves|invites|remote|qr|cloud|developer)(\/|$)/;
@@ -65,7 +105,7 @@ const MIME: Record<string, string> = {
 const ASSET_HEADERS = { "x-content-type-options": "nosniff", "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; img-src data:; sandbox" };
 
 export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
-  const clients = new Set<Client & { alive?: boolean }>();
+  const clients = new Set<Client>();
   const history = new History(logs, () => table.games);
 
   const keyOk = (k: unknown) => {
@@ -85,7 +125,8 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
   const SCREEN_COOKIE = "gt_screen";
   const screenToken = createHash("sha256").update(`board-screen:${opts.tableKey}`).digest("hex").slice(0, 40);
   const screenCookieOk = (req: IncomingMessage) => (req.headers.cookie ?? "").split(/;\s*/).includes(`${SCREEN_COOKIE}=${screenToken}`);
-  const boardAllowed = (req: IncomingMessage) => opts.allowRemoteBoard || isLoopback(req) || (isPrivate(req) && screenCookieOk(req));
+  // Never over remote play (D-202): a remote browser gets its own board, without the key, from the board route itself.
+  const boardAllowed = (req: IncomingMessage) => !remoteOf(req) && (opts.allowRemoteBoard || isLoopback(req) || (isPrivate(req) && screenCookieOk(req)));
 
   // ---------- broadcasting ----------
 
@@ -227,7 +268,8 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
 
   const serveFile = async (res: ServerResponse, rel: string, transform?: (s: string) => string, root = opts.publicDir) => {
     const file = normalize(join(root, rel));
-    if (!file.startsWith(root)) return json(res, 404, { error: "not found" });
+    // Inside root, not merely starting like it (a sibling folder "chess2" starts like "chess", D-202).
+    if (!file.startsWith(root.endsWith(sep) ? root : root + sep)) return json(res, 404, { error: "not found" });
     try {
       let data: Buffer | string = await readFile(file);
       if (transform) data = transform(data.toString("utf8"));
@@ -444,15 +486,14 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
       }
       // The board's link for another screen (D-190): opened there, it remembers that browser and shows the board.
       if (path === "/board/screen") {
-        if (remoteOf(req)) return json(res, 403, { error: "the board's link works only on the table's own network" });
-        if (!isPrivate(req)) return json(res, 403, { error: "the board's link works only on the table's own network" });
+        if (remoteOf(req) || !isPrivate(req)) return json(res, 403, { error: "the board's link works only on the table's own network" });
         if (!keyOk(url.searchParams.get("key"))) return json(res, 403, { error: "this board link is not valid for this table" });
         res.writeHead(302, { location: "/board/#screen", "set-cookie": `${SCREEN_COOKIE}=${screenToken}; HttpOnly; SameSite=Strict; Path=/; Max-Age=31536000` });
         return res.end();
       }
       if (path === "/qr.svg") {
         if (url.searchParams.get("screen") !== null) {
-          if (remoteOf(req) || !boardAllowed(req)) return json(res, 403, { error: "board only" });
+          if (!boardAllowed(req)) return json(res, 403, { error: "board only" });
           return await qrSvg(res, `${table.config.publicUrl}/board/screen?key=${encodeURIComponent(opts.tableKey)}`);
         }
         // ?exchange: the open exchange's code instead of the table's join code (D-159). A remote player's invite also
@@ -463,13 +504,13 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
           if (r ? !table.remoteControlAllowed(r.session) : !boardAllowed(req)) return json(res, 403, { error: "board only" });
           return await qrSvg(res, ex.url);
         }
-        if (!boardAllowed(req) || remoteOf(req)) return json(res, 403, { error: "board only" });
+        if (!boardAllowed(req)) return json(res, 403, { error: "board only" });
         if (url.searchParams.get("exchange") !== null) return ex?.kind === "local" ? await qrSvg(res, ex.url) : json(res, 404, { error: "no exchange is open" });
         return await qrSvg(res, table.currentJoin().url);
       }
       // Play from the board (D-175): the board and one player's deck side by side, only on the table PC itself.
       if (path === "/board/play.html") {
-        if (remoteOf(req) || !boardAllowed(req)) return json(res, 403, { error: "the board is only served on the table PC" });
+        if (!boardAllowed(req)) return json(res, 403, { error: "the board is only served on the table PC" });
         return await serveFile(res, "board/play.html", (s) => s.replace("__TABLE_KEY__", opts.tableKey));
       }
       if (path === "/board" || path === "/board/" || path === "/board/index.html") {
@@ -500,7 +541,6 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
 
   const wss = new WebSocketServer({ server, path: "/ws", maxPayload: 64 * 1024 });
 
-  /** Moves a client out because a newer window took its place (D-132, D-133): it is told so and closed. */
   // A removed watcher's windows close (D-168); the host also ends their browser's connection.
   table.on("remote-evict", (session: string) => {
     for (const o of [...clients]) {
@@ -509,11 +549,12 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
       o.ws.close(4010, "removed");
     }
   });
+  /** Moves a client out because a newer window took its place (D-132, D-133): it is told so and closed. */
   const replaceClient = (o: Client, by?: IncomingMessage) => {
     // Where the board went (D-190): the table's own computer, or another screen on the network.
     send(o.ws, envelope("system", "replaced", by ? { from: address(by), local: isLoopback(by) } : {}));
     o.ws.close(4009, "opened in another window");
-    clients.delete(o as Client & { alive?: boolean });
+    clients.delete(o);
   };
   /** What the table serves right now (D-133). */
   const connections = () => {
@@ -529,8 +570,20 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
   const onConnection = (ws: WebSocket, req: IncomingMessage) => {
     const remoteCtx = remoteOf(req);
     const remote = !!remoteCtx;
-    const client: Client & { alive?: boolean } = { ws, role: "pending", alive: true, remote };
+    const client: Client = { ws, role: "pending", alive: true, remote };
+    // A socket must say hello soon, and only a few may be waiting to (D-202): idle sockets cost memory and pings.
+    if ([...clients].filter((o) => o.role === "pending").length >= MAX_PENDING) return void ws.close(1013, "too many connections");
     clients.add(client);
+    const helloTimer = setTimeout(() => client.role === "pending" && ws.close(4008, "no hello"), HELLO_MS);
+    // An intent costs a token; tokens come back at INTENT_RATE a second up to INTENT_BURST.
+    const intentAllowed = () => {
+      const now = Date.now();
+      client.tokens = Math.min(INTENT_BURST, (client.tokens ?? INTENT_BURST) + ((now - (client.tokensAt ?? now)) / 1000) * INTENT_RATE);
+      client.tokensAt = now;
+      if (client.tokens < 1) return false;
+      client.tokens -= 1;
+      return true;
+    };
     ws.on("pong", () => (client.alive = true));
 
     const reply = (type: string, payload: unknown, seq?: number) => send(ws, envelope("system", type, payload, seq === undefined ? {} : { seq }));
@@ -542,7 +595,7 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
       } catch {
         return reply("error", { message: "invalid JSON" });
       }
-      const c = client as any;
+      const c = client as any; // the hello turns it into a board or a deck
       try {
         if (msg.ch === "system" && msg.type === "hello") {
           const p = msg.payload ?? {};
@@ -642,26 +695,31 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
           return;
         }
         if (c.role === "board" && msg.ch === "game" && msg.type === "intent") {
+          if (!intentAllowed()) return reply("reject", { reason: "Too many moves at once" }, msg.seq);
           // A move made by touching the board (D-102): payload { playerId, name, payload }.
           const b = msg.payload ?? {};
           const r = table.boardIntent(b.playerId, { name: b.name, payload: b.payload }, remoteCtx ? remoteCtx.session : null);
           return r.ok ? reply("ack", {}, msg.seq) : reply("reject", { reason: r.reason }, msg.seq);
         }
         if (c.role === "deck" && msg.ch === "game" && msg.type === "gesture") {
-          // EXPERIMENT (card sling): a live, unlogged gesture from a phone (a card being dragged), passed to every
-          // board with the player's seat. Not state: no answer, dropped when too fast or too big, or outside a game.
+          // A sling gesture (D-189): live and unlogged, from a phone (a card being dragged), passed to every board with
+          // the player's seat. Not state: no answer, dropped when too fast or too big, or outside a game; only the
+          // fields the sling uses reach the boards (cleanGesture, D-202).
           const now = Date.now();
           if (now - (c.lastGesture ?? 0) < 8) return;
           c.lastGesture = now;
           const seat = table.player(c.playerId)?.seat;
           if (seat === null || seat === undefined || table.phase !== "active") return;
-          const data = JSON.stringify(msg.payload ?? null);
+          const gesture = cleanGesture(msg.payload);
+          if (!gesture) return;
+          const data = JSON.stringify(gesture);
           if (data.length > 512) return;
           const text = `{"v":1,"ch":"game","type":"gesture","payload":{"seat":${seat},"data":${data}}}`;
           for (const o of clients) if (o.role === "board") sendText(o.ws, text);
           return;
         }
         if (c.role === "deck" && msg.ch === "game" && msg.type === "intent") {
+          if (!intentAllowed()) return reply("reject", { reason: "Too many moves at once" }, msg.seq);
           const r = table.intent(c.playerId, msg.payload);
           return r.ok ? reply("ack", {}, msg.seq) : reply("reject", { reason: r.reason }, msg.seq);
         }
@@ -675,11 +733,12 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
     });
 
     ws.on("close", () => {
+      clearTimeout(helloTimer);
       const listed = clients.delete(client); // a replaced board was taken off the list already, its successor stays
       const c = client as Client;
       held.delete(c);
       if (listed && c.role === "board" && !c.remote && ![...clients].some((o) => o.role === "board" && !o.remote)) table.setLocalBoard(false);
-      if ((c as Client & { counted?: boolean }).counted && c.session) table.remoteBoardClosed(c.session);
+      if (c.counted && c.session) table.remoteBoardClosed(c.session);
       if (c.role === "deck") {
         const id = c.playerId;
         const stillOpen = [...clients].some((o) => o.role === "deck" && o.playerId === id);

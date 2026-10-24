@@ -80,8 +80,13 @@ export function slingDeck(area, ctx, opts = {}) {
     }
     if (d.f > 0 || d.sent) {
       d.sent = true;
-      send({ id: d.id, f: d.f, x, a: d.a, ...(o.reveal === "drag" && o.item ? { item: o.item(d.id) } : {}) });
+      send(gesture(d, d.f, x));
     }
+  }
+
+  /** What the boards get of a drag: how far out, where along the edge, the lean; the face only with `reveal: "drag"`. */
+  function gesture(d, f, x) {
+    return { id: d.id, f, x, a: d.a, ...(o.reveal === "drag" && o.item ? { item: o.item(d.id) } : {}) };
   }
 
   function glide(d, dx, dy, ms, done) {
@@ -140,7 +145,7 @@ export function slingDeck(area, ctx, opts = {}) {
     const box = area.getBoundingClientRect(), r = d.el.getBoundingClientRect();
     // From above the line it goes straight up and off; pushed out, it keeps its sideways drift.
     glide(d, pushed ? d.dx + vx * 40 : d.dx * 0.5, d.dy - (r.bottom - box.top) - 6, pushed ? Math.max(70, 160 * (1 - d.f)) : 220, async () => {
-      send({ id: d.id, f: 1, x: measure(d).x, a: d.a, ...(o.reveal === "drag" && o.item ? { item: o.item(d.id) } : {}) }, true);
+      send(gesture(d, 1, measure(d).x), true);
       d.el.style.visibility = "hidden";
       ctx.vibrate?.(20);
       let ok = false;
@@ -156,10 +161,8 @@ export function slingDeck(area, ctx, opts = {}) {
       }
     });
   };
-  area.addEventListener("pointerdown", down);
-  area.addEventListener("pointermove", move);
-  area.addEventListener("pointerup", up);
-  area.addEventListener("pointercancel", up);
+  const listening = new AbortController();
+  for (const [type, fn] of [["pointerdown", down], ["pointermove", move], ["pointerup", up], ["pointercancel", up]]) area.addEventListener(type, fn, { signal: listening.signal });
 
   return {
     /** True while something is being dragged or slung: re-render the hand after it (`whenFree`). */
@@ -180,10 +183,7 @@ export function slingDeck(area, ctx, opts = {}) {
     destroy() {
       gone = true;
       cancelAnimationFrame(raf);
-      area.removeEventListener("pointerdown", down);
-      area.removeEventListener("pointermove", move);
-      area.removeEventListener("pointerup", up);
-      area.removeEventListener("pointercancel", up);
+      listening.abort();
     },
   };
 }

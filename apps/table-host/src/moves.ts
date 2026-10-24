@@ -3,7 +3,7 @@
 // own `describe` can say what each step meant and the state before and after any step can be shown.
 import type { GameDefinition, GameEvent, Intent, StepDescription, StepInfo } from "../../../packages/sdk/src/index.ts";
 import type { Manifest } from "../../../packages/protocol/src/index.ts";
-import { feedInput, GameRuntime, VirtualClock, type AiMoveMeta, type LogRecord } from "./runtime.ts";
+import { feedInput, GameRuntime, isInput, VirtualClock, type AiMoveMeta, type InputRecord, type LogRecord } from "./runtime.ts";
 
 export type RowKind = "start" | "move" | "timer" | "seatJoined" | "seatLeft" | "disconnected" | "reconnected" | "aiTakeover" | "seatChanged" | "aiOptions" | "pause" | "resume" | "error" | "snapshot" | "gap" | "end";
 
@@ -49,8 +49,6 @@ export interface MoveList {
 export const GAP_MS = 2 * 60_000;
 
 type Game = { manifest: Manifest; def: GameDefinition<any> };
-type InputRecord = Extract<LogRecord, { t: "intent" | "timer" | "seatJoined" | "seatLeft" | "seatChanged" }>;
-const isInput = (r: LogRecord): r is InputRecord => r.t === "intent" || r.t === "timer" || r.t === "seatJoined" || r.t === "seatLeft" || r.t === "seatChanged";
 
 const clone = <T>(v: T): T => (v === undefined ? v : structuredClone(v));
 

@@ -1421,3 +1421,33 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   them; later redraws pass `[]`. The developer guide says so. Check: `scripts/e2e/card_sling.py` wraps the phone's
   game module, counts the events each `update` gets, and toggles the sound twice after a draw: those redraws get none
   (with the old code they got the draw's event again).
+- **D-202 · 2026-10-24 · Klaus** — Security hardening from a whole-repository review. *Why:* Klaus asked for a
+  simplify pass over both repositories and to "take special care about security concerns"; the reviewers found these.
+  *Implementation (Claude):*
+  - **A phone could inject script into the table's board.** A sling gesture's `item` went to every board as the phone
+    sent it, and the card kits (Card Sling here, Last Card in extra-games, E-029) put its values into SVG unescaped;
+    the board page holds the table key. The host now passes only the sling's fields, each of its kind (`cleanGesture`),
+    and both card kits draw only known colours and values.
+  - **Board access in one place:** `boardAllowed` refuses requests over remote play itself, instead of every route
+    remembering to; the routes' own checks go. Served files must be inside their folder (`root` plus a separator),
+    not merely start like it.
+  - **Connections and moves:** a socket that has not said hello is closed after 10 s, and at most 16 may wait; each
+    connection may send 40 intents at once, then 20 a second ("Too many moves at once"), never logged. Remote play's
+    virtual sockets get the same 64 KiB message limit as real ones.
+  - **The service:** `same()` compares secrets as bytes and can no longer throw (a non-ASCII header of the right length
+    made it fail, which told the admin token's length); an uploaded log's `run.json` is read with a 1 MB limit while it
+    inflates, so a zip bomb is never held in memory; a table may hold 50 open invites; the per-address rate-limit maps
+    drop expired entries once they grow large.
+  - **Not changed here, for a decision:** remote play runs the table's board and game code on the service's own origin,
+    beside the console (a separate host for the console, or for play, would isolate them); remote access is split over
+    several lists with reads allowed by default (one route table with access per route would be one gate); the lobby
+    state is filtered for remote clients by removing fields, not by listing what they may see; ticking an extra-game
+    repository trusts its code fully on that table.
+  - Checks: `tests/security.test.ts` (the compare, a zip bomb, the gesture fields); the browser checks for the sling,
+    remote play, watchers, the board on another screen and a full table pass.
+- **D-203 · 2026-10-24 · Claude** — Clean-ups from the same review, no change in behaviour: `GameRuntime.aiTakeover`
+  (unused since D-159) and the AI worker's `busy` go; one `isInput` for replay and the move list; `close()` uses
+  `unselect()`; one session-token helper and one join-token loop; *Ready* tapped twice no longer broadcasts the lobby;
+  the sling's gesture payload is built in one place and its listeners come off with one `AbortController`;
+  `playerColor` no longer reads `seatColors` (always empty since D-159); stale "EXPERIMENT" comments on the sling are
+  gone; the website's lobby demo pauses its progress bar off screen, with one step length.
