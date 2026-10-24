@@ -9,7 +9,7 @@ request.
   the SDK, the cloud service at `https://games.skylar.technology`.
 - **Short index for language models:** [`/llms.txt`](../../llms.txt), also served at
   `https://games.skylar.technology/llms.txt`; this whole page at `https://games.skylar.technology/llms-full.txt`.
-- **Example game repository:** [`klaushofrichter/extra-games`](https://github.com/klaushofrichter/extra-games) (public): Chess, Liar's Dice and Backgammon in a repository of their own, with
+- **Example game repository:** [`klaushofrichter/extra-games`](https://github.com/klaushofrichter/extra-games) (public): Chess, Liar's Dice, Backgammon, Mexican Train and Last Card in a repository of their own, with
   the test setup and CI against this repository (section 15).
 - **Reference games in this repository:** `games/coin-flip` (the smallest complete game: simultaneous turns, timers,
   statistics, players joining mid-game), `games/pachisi` (turns, dice, moves made by touching the board),
@@ -84,7 +84,7 @@ A game is one folder; the folder name is the game's id (`a-z`, `0-9`, `-`).
 | `how-to-play.md` | yes, in practice | Rules for players, opened from **Rules** on every phone (section 11). |
 | `assets/` | no | Images, SVG, sounds, extra CSS or JS the UIs load, at `/games/<id>/assets/…` (`ctx.assetUrl(path)`). |
 
-The host serves exactly the UI files and `assets/` to browsers, never `rules.ts` or the manifest. Built-in games import
+The host serves exactly `board.js`, `deck.js`, their CSS, `how-to-play.md` and `assets/` to browsers, never `rules.ts` or the manifest. Built-in games import
 the SDK by path (`../../packages/sdk/src/index.ts`); games in other repositories import it by name
 (`@game-table/sdk`, `@game-table/sdk/cards`), which the host maps to its own SDK.
 
@@ -94,19 +94,25 @@ the SDK by path (`../../packages/sdk/src/index.ts`); games in other repositories
 {
   "id": "coin-flip",
   "name": "Coin Flip",
-  "version": "2026.10.19.1",
+  "version": "2026.10.23.1",
   "sdk": "^0.1",
-  "description": "Guess heads or tails; the most correct guesses win.",
+  "description": "Everyone guesses heads or tails, then the coin flips. Most correct guesses wins.",
   "players": { "min": 1, "max": 8 },
   "turnModel": "simultaneous",
   "seatLayouts": [2, 4, 6, 8],
-  "edges": ["north", "east", "south", "west"],
+  "edges": ["north", "south", "east", "west"],
   "dynamicPlayers": true,
-  "settings": [{ "key": "rounds", "type": "int", "min": 1, "max": 50, "default": 10, "label": "Rounds" }],
+  "settings": [
+    { "key": "rounds", "type": "int", "min": 1, "max": 20, "default": 3, "label": "Rounds" },
+    { "key": "roundSeconds", "type": "int", "min": 0, "max": 120, "step": 5, "default": 15, "label": "Seconds to guess (0 = no limit)" }
+  ],
   "ai": { "supported": true, "options": [] },
-  "simulation": { "supported": true, "headless": true }
+  "simulation": { "supported": true, "headless": true },
+  "viewer": { "columns": [{ "key": "round", "label": "Round" }, { "key": "guess", "label": "Guess" }, { "key": "coin", "label": "Coin" }, { "key": "score", "label": "Score" }] }
 }
 ```
+
+(Coin Flip's manifest, shortened: fields at their defaults are left out.)
 
 | Field | Meaning |
 | --- | --- |
@@ -114,13 +120,13 @@ the SDK by path (`../../packages/sdk/src/index.ts`); games in other repositories
 | `version` | Calendar version `YYYY.MM.DD.N` (section 13). |
 | `sdk` | The SDK version range the game is written for (`"^0.1"` today). |
 | `players` | `{ "min", "max" }` or a list of allowed counts, 1–8. |
-| `turnModel` | `"sequential"` or `"simultaneous"`: informational; the rules decide who may act. |
+| `turnModel` | `"sequential"` or `"simultaneous"`. The rules decide who may act; the platform uses it to schedule AI players (in a simultaneous game an AI waiting out its pause keeps its place when someone else moves). |
 | `seatLayouts` | Table layouts (2, 4, 6, 8 seats) the game can be played in. |
 | `edges` | Edges seats may be on; must include `north` and `south`. |
 | `localSeat` | Optional edge for a single person at the table when everyone else is remote or AI (they are moved there at the start). For games whose board has a front, like chess. |
 | `dynamicPlayers` | `true`: people who join during a game get a free seat and `onSeatJoined` is called. Default `false`: newcomers wait for the next game. |
 | `settings` | Game options set on the board before the start: `{ key, type: "int" \| "number" \| "string" \| "bool" \| "enum", min?, max?, step?, values?, default?, label? }`. The rules get them in `setup`. |
-| `ai` | `{ supported, options, timeoutSeconds = 20, worker = false }`. `options` uses the settings format (e.g. a play style); each AI player has its own values. Section 7. |
+| `ai` | `{ supported, options, timeoutSeconds = 20 (1–600), worker = false, hostConfig = [] }`. `options` uses the settings format (e.g. a play style); each AI player has its own values. Section 7. |
 | `simulation` | `{ supported, headless }`: AI-only games for testing, without a board. |
 | `boardIntents` | Intent names players may also send by touching the board (section 9). |
 | `skipTimers` | Timer ids the board may fire early, e.g. a pause after a hand (section 9). |
@@ -200,15 +206,17 @@ position. Put `myTurn: true` in it while the game waits for this player: the pho
 **`onTimer(state, id, ctx)`** → like `onIntent`, for a timer the game set. Turn timers, a pause on a hand's result,
 an automatic move when a player runs out of time.
 
-**`onSeatChanged(state, seat, ctx)`** → another player plays this seat from now on (section 6). Update what the state
+**`onSeatChanged(state, seatInfo, ctx)`** → `{ state, events? }`; `seatInfo` is `{ seat, playerId, name, kind, edge }`, the
+new player. Another player plays this seat from now on (section 6). Update what the state
 keeps about the seat's player (the name; whether it is a person, if the rules care). The seat's cards, score and
 position stay. Logged and replayed like an intent.
 
-**`onSeatJoined(state, seat, ctx)`** → only with `"dynamicPlayers": true`: someone took a free seat during the game.
+**`onSeatJoined(state, seatInfo, ctx)`** → `{ state, events? }`, with `seatInfo` as above; only with `"dynamicPlayers": true`: someone took a free seat during the game.
 Add them to the state.
 
-**`canContinueWithout(state, seat)`** → `true` (the default) or `{ wait: "text for the board" }`. Asked when a
-player's phone goes away. With `{ wait }` the game pauses until the phone is back or the board exchanges the player;
+**`canContinueWithout(state, seat)`** → `true` (the default) or `{ wait: "text for the board" }`. Asked often
+(whenever the table's state is sent, and when a phone goes away), so keep it cheap; the text is cut to 300
+characters, and an error counts as `true`. With `{ wait }` the game pauses until the phone is back or the board exchanges the player;
 the board shows the text (e.g. "Partners can't go on without a full team."). A question about the state: it must not
 change anything.
 
@@ -234,8 +242,8 @@ The platform owns everything about players. A game must not reimplement any of t
 | Players join, take seats, pick colours, change names, move seats | In the lobby, before the game. Seats are fixed when the game starts. | `ctx.seats` in `setup`. |
 | Someone joins during a game | Seated only if the manifest says `"dynamicPlayers": true` and a seat is free; else they wait for the next game. | `onSeatJoined`. |
 | A player's phone goes away (locked, out of range, closed) | Their seat **waits, with no time limit**; the game goes on and simply waits when it is their move. After 15 s the board shows "… is away" at their seat with **Exchange …**. The phone rejoins by itself when it is back. | Nothing (the state does not change). If the game answers `{ wait }` in `canContinueWithout`, the game pauses meanwhile. |
-| A player taps **Leave the game** on their phone | Their phone is done with this game. The seat is handled like an away player's at once: "… left the game" with **Exchange …**. | Nothing until the seat is exchanged. |
-| The board exchanges a player (Settings › Players › tap the name, **Exchange …** on the away card, the in-game Lobby) | For anyone, away or connected: a person at the table (a QR code for this seat), a remote player (an invite; only with a remote place free), a watcher or an AI player takes the seat, with its colour. Whoever had it goes; their phone is told, and a remote player's browser keeps watching. One exchange is open at a time; a new one replaces it, and it ends with the game. | `onSeatChanged(state, { seat, playerId, name, kind })`. |
+| A player taps **Leave the game** on their phone | Their phone is done with this game. The seat is handled like an away player's at once: "… left the game" with **Exchange …**. Scanning the join code again with the same name brings a player at the table back to their seat; a remote player's browser keeps watching. | Nothing until the seat is exchanged. |
+| The board exchanges a player (Settings › Players › tap the name, **Exchange …** on the away card, the in-game Lobby) | For anyone, away or connected: a person at the table (a QR code for this seat), a remote player (an invite; only with a remote place free), a watcher or an AI player (in games with AI players; for a seat an AI already plays, its options change instead) takes the seat, with its colour. Whoever had it goes; their phone is told, and a remote player's browser keeps watching. One exchange is open at a time; a new one replaces it, and it ends with the game. | `onSeatChanged(state, { seat, playerId, name, kind })`. |
 | Every seat is taken | Nobody else joins: phones with the join code, + AI player and player invites are refused with the reason. During a game the way in is an exchange; someone remote can still come as a watcher. | — |
 | Someone remote watches | They see the board only, take no seat and have no phone page; remote players and watchers together use at most the table's remote places (4 by default). | Nothing. |
 | An AI player's options change during the game | From its next move. | Nothing (options reach `ai()` as its `options`). |
@@ -264,18 +272,23 @@ What this means for a game:
   more to plan (what it has seen so far), put it in that seat's view (e.g. an `observer` field only AI seats get), never
   other seats' secrets.
 - **It is asked after every change**, for every AI player: answer `null` quickly when it is not this seat's turn. A
-  newer change cancels an older question (`ctx.signal` is aborted and the answer is dropped).
+  newer change cancels an older question (`ctx.signal` is aborted and the answer is dropped; in a worker the thread
+  is stopped instead, and `ctx.signal` never fires there).
 - **Randomness:** `ctx.random()` / `ctx.randomInt()` (the AI's own stream, not the game's). The move itself is logged,
   so replay never runs the AI again.
 - **Time:** answer synchronously for quick choices. For a search or a language-model call return a promise; the table
   keeps running. `ctx.deadline` (ms since the epoch) is when the table expects the move (`ai.timeoutSeconds`, default
-  20). Past it, the game pauses and the board offers **Play now**, which plays `aiFallback()`: a quick synchronous
-  move (without one, the AI is asked again). `"ai": { "worker": true }` runs `ai()` in a worker thread per AI player,
+  20). Past it, an AI that answers with a promise (or runs in a worker) pauses the game and the board offers
+  **Play now**, which plays `aiFallback()`: a quick synchronous move (without one, the AI is asked again). A
+  synchronous `ai()` in the host thread is not timed and holds the table while it runs: keep it quick. `"ai": { "worker": true }` runs `ai()` in a worker thread per AI player,
   with the view and options as plain data, so a long synchronous search never blocks the table.
+- **Errors:** if `ai()` throws or its worker fails, the platform plays `aiFallback()` at once (nothing without one); a
+  rejected AI intent is asked for once more after a pause.
 - **Options** come from `ai.options` in the manifest, per AI player, e.g. `{ "key": "style", "type": "enum", "values":
   ["cautious", "bold"], "default": "cautious", "label": "Play style" }`.
-- **Pace:** the platform lets an AI move only once the table's board has shown everything so far (section 9), and
-  phones get an AI's move once the board has shown it. Do not add artificial delays in `ai()`; let the board stage moves.
+- **Pace:** the platform pauses about 0.8 s before an AI acts (`AI_DELAY_MS`), lets it move only once the table's
+  board has shown everything so far (section 9), and phones get an AI's move once the board has shown it. Do not add
+  artificial delays in `ai()`; let the board stage moves.
 - **Simulations** (`"simulation": { "supported": true }`): AI-only games without a board, for testing and AI tuning;
   `scripts/soak.ts` runs many of them. They must finish: make sure AI players always find a move or `null` that lets a
   timer move the game on.
@@ -297,10 +310,11 @@ What this means for a game:
 - **`table`** (optional): per-player statistics, shown on the result screen and in the statistics window. Put the
   player's name in the first column, so the platform can mark a seat that changed hands.
 - **`awards`** (optional): the statistics window's trophies. `mostAward(base, scores, value?)` and
-  `leastAward(base, scores, value?)` build one from `[{ seat, score }]` and return `null` when nobody stands out (one
-  player, everyone tied, or the best score is 0). The platform drops awards that nobody or every player holds.
+  `leastAward(base, scores, value?)` build one from `[{ seat, score }]` and return `null` when nobody stands out: one
+  player or everyone tied, and for `mostAward` also a best score of 0 or less. The platform drops awards that nobody or every player holds.
 - **The platform adds** each seat's final player (`players`), a moves-and-thinking-time table (`play`) read from the
-  log, and two pace awards for people. A seat another player took over during the game shows the last player's name
+  log, and two pace awards for people (*Quick Draw* and *Deep Thinker*; a game award with the id `quick-draw` or
+  `deep-thinker` replaces the platform's). A seat another player took over during the game shows the last player's name
   with *; a note explains it.
 
 The board keeps the game's final screen until someone taps **Show result**, so the end can be seen. If the board UI
@@ -333,21 +347,24 @@ export function settings({ info, setPrefs }) { return []; } // optional: items f
 - **Facing:** a game on the table's board faces `north` or `south` (the turn button switches); remote boards turn to
   their player. Draw for `info.frontEdge` / `info.rotation` (degrees: south 0, west 90, north 180, east −90). Text
   should face the reader it is for.
-- **Platform buttons:** the gear and the turn button sit at the bottom-left (bottom-right when `lobbyButton` is
-  bottom-left), the *Lobby* button in the manifest's `lobbyButton` corner. Keep those corners clear.
+- **Platform buttons:** the gear, the turn button, the *Advanced* button and (while anyone watches) the watchers'
+  eye sit along the bottom edge from the bottom-left corner, up to about 300 px (from the bottom-right when
+  `lobbyButton` is bottom-left); the *Lobby* button is in the manifest's `lobbyButton` corner. Keep those clear.
 - **`update(view, events, info)`** is called with every change (and when `info` changes, with `events` empty). Make
   it cheap and idempotent: redraw from `view`, animate only `events` you have not shown yet.
 - **`whenIdle()`** (strongly recommended if you animate): resolve when every event sent so far has been shown. The
-  platform waits for it before an AI player moves, before phones see an AI's move, and before **Show result**. Without
+  platform waits for it before an AI player moves, before phones see an AI's move, and before **Show result**; the
+  table's own board paces the game (remote boards don't), and after 20 s without an answer the platform goes on. Without
   it the platform assumes the board shows everything at once. Never let it wait forever (resolve when nothing is
   queued).
 - **Moves on the board:** list intent names in `boardIntents`; `ctx.act(seat, name, payload)` sends one for a seat in
   `info.controlSeats` (people at the table on the table's board; a remote board only for its own player) and resolves
-  with `{ ok, reason }`. The rules decide as for any intent.
+  with `{ ok, reason }`; a rejection is shown as a toast by the platform. The rules decide as for any intent.
 - **Skipping a wait:** list timer ids in `skipTimers`; `ctx.skipTimer(id)` fires it now when `info.boardControl` is
-  true. Use it for a pause on a result ("Next hand").
+  true (not while the game is paused) and resolves with `{ ok, reason }`. Use it for a pause on a result ("Next hand").
 - **Settings:** `settings({ info, setPrefs })` returns items `{ type: "toggle" | "choice" | "swatches" | "button",
-  label, value, options, onChange }`. `setPrefs(patch)` stores display choices for this game (`info.prefs`), never
+  label, value, options, onChange }`: a `choice` takes `options: [{ value, label }]` (a pulldown above three),
+  `swatches` takes `options: ["#rrggbb", …]`, and a `button` shows `action` (or `label`) and calls `onChange()`. `setPrefs(patch)` stores display choices for this game (`info.prefs`), never
   rules.
 - **Sound:** `playSound(info, name, make)` from the board kit plays only when the table's sound is on (`info.sound`).
   A browser other than the table's kiosk plays it only after the board has been touched; the platform wakes it on the
@@ -384,7 +401,11 @@ export function mount(root, ctx) {
   the game's module gets the rest of the screen. Design for 360 px wide and for short screens (an iPhone with its
   toolbars shows about 400 × 680). Large touch targets.
 - **`ctx.send(name, payload)`** submits an intent and resolves with `{ ok, reason }`; a rejection is shown to the
-  player as a toast by the platform.
+  player as a toast by the platform. `ctx.toast(text)` floats a message over the top of the screen for 3 s;
+  `ctx.vibrate(ms = 40)` buzzes (the phone also vibrates by itself when `myTurn` comes).
+- **`update(view, events, info)`** is called again when `info` or the lobby changes, and on the phone the last
+  `events` may come again with it: animate an event only once (keep track of what you have shown, e.g. by a sequence
+  number in the view).
 - **`myTurn: true`** in the seat's view brings the game's tab forward when it becomes true.
 - **Staging:** phones get an AI player's move once the board has shown it; then `info.shownOnBoard` is true. Apply such
   updates at once rather than animating the move again.
@@ -397,27 +418,29 @@ A player can push a card (a die, a token…) up and off the top of their phone a
 seat (D-189). The platform does the gesture and the animation; the game draws the thing, says where it lands and what
 the move means. The test game `games/card-sling` is the smallest example; Last Card in extra-games a full one.
 
-- **Live gestures:** `ctx.gesture(data)` on the phone sends a small JSON object (512 bytes at most) to every board,
+- **Live gestures:** `ctx.gesture(data)` on the phone sends a small JSON object (at most 512 characters as JSON) to every board,
   local and remote, where the game's `gesture(seat, data)` hook gets it. No rules run, nothing is logged or replayed,
-  nothing reaches other phones; the host drops gestures outside a running game, from players without a seat, and more
+  nothing reaches other phones; the host drops gestures while no game is active (also while paused), from players without a seat, and more
   than one per 8 ms from a phone. The move itself is still an intent.
 - **On the phone,** `slingDeck(area, ctx, opts)` from `/shared/sling.js` makes every element with `data-sling="<id>"`
   in `area` draggable. `area` clips its content; its top edge is where things leave the phone. Letting go with half
-  of it out (`threshold`), or a flick, calls `onSling(id, { direction })`, where the game sends its intent and returns
+  of it out (`threshold`), or a flick (`flick`, an upward speed, 0.8 px/ms by default), calls `onSling(id, { direction })`, where the game sends its intent and returns
   whether it was accepted; `direction` (`"left"`, `"middle"`, `"right"`) says where the flick went. `canSling(id)`
-  returning false or a reason lets the thing peek out and bounce back. `line()` (a page height, e.g. the bottom of
+  returning false or a reason lets the thing peek out and bounce back (a reason shows as a toast). `line()` (a page height, e.g. the bottom of
   a status box) lets players play a thing by letting go above it, toward the middle, without pushing it all the way
   off; above the line, the thing and `area` have the class `sling-armed`. The thing leans with sideways movement
   (`tilt`), and the board shows the same angle. `reveal: "move"` (default) shows the board only the back while
-  dragging; `"drag"` sends `item(id)`, so the board shows the face at once. `receive(el)` lets a drawn thing come in
-  at the top, after the board has thrown it; `busy()` is true while something is under a finger (re-render after).
-- **On the board,** `slingBoard(root, { render, size, speed })` draws what comes in at each seat's edge of the board,
+  dragging; `"drag"` sends `item(id)`, so the board shows the face at once. `receive(el, { delay? })` lets a drawn
+  thing come in at the top, after the board has thrown it (timed by `speed()`); `busy()` is true while something is
+  dragged or on its way out (re-render after); call `sling.destroy()` in your own `destroy()`.
+- **On the board,** `slingBoard(root, { render, size, speed, spread })` draws what comes in at each seat's edge of the board,
   above the seat plates, and the flights. Pass gestures on with `sling.gesture(seat, data)` and keep `sling.info(info)`
   current in `update`. When the move's event arrives, `sling.fly(seat, { id, item, to })` flies the thing face up from
-  where the drag left it (or from the seat, for AI players) to `to = { x, y, angle }`, and resolves when it lands;
-  `sling.toSeat(seat, { item, from })` throws one to a seat (a drawn card), where it slips off the edge.
-  `render(item, { back })` returns the thing's markup; `speed()` slows everything down (1 = normal, offer it as a
-  board setting); `sling.flight(markup, from, to)` flies anything between two poses.
+  where the drag left it (or from the seat, for AI players) to `to = { x, y, angle, scale? }`, and resolves when it lands;
+  `sling.toSeat(seat, { item?, from })` throws one to a seat (a drawn card; no item: its back), where it slips off the
+  edge. `render(item, { back })` returns the thing's markup at `size` (default 120 × 180, a card); `spread` (160 px)
+  is how far the phone's sideways position moves it along the edge; `sling.edgeAt(seat)` gives `{ x, y, rot }`; `speed()` slows everything down (1 = normal, offer it as a
+  board setting); `sling.flight(markup, from, to)` flies anything between two poses; `sling.destroy()` in `destroy()`.
 
 ### `info` on the phone
 
@@ -446,7 +469,7 @@ table's settings (by their manifest labels) on top.
 - The host logs the seed and every input (intents, accepted or refused, timer firings, seats joining or changing
   hands) with its game time. `replay()` rebuilds the game from that, and the host checks every finished game this way.
   A game that does not replay exactly has a bug: usually randomness or time outside `ctx`, or a mutated input state.
-- Each log is a zip with `game-001.jsonl` (records), `game-001.moves.jsonl` (readable rows) and a README
+- Each log is a zip with `game-001.jsonl` (records), `game-001.moves.jsonl` (readable rows) `run.json`, the final state and a `README.md`
   (`apps/table-host/src/log-format.md`). `node scripts/game-log.ts <zip>` reads one from the command line (`info`,
   `moves 40-45`, `move 43` with the state before and after); `--games DIR` adds game folders from other repositories.
 - **`describe(step)`** (optional) says what a step meant, for the Game Viewer on the board, the move list and readers
@@ -461,14 +484,15 @@ table's settings (by their manifest labels) on top.
 A game's `version` is `YYYY.MM.DD.N` (America/Chicago date; `N` counts that day's versions from 1). It changes when,
 and only when, something in the game's folder changes (rules, UI, styles, assets, rules for players, the manifest), in
 the same pull request. Platform changes never change it. `node scripts/check-game-versions.ts --base origin/main
---fix` sets it for you; the pull request checks enforce it.
+--fix` sets it for you (in a game repository of your own: `node .games-service/scripts/check-game-versions.ts --base
+origin/main --fix`); the pull request checks enforce it.
 
 ## 14. Testing
 
 Tests use Vitest and run against the real host code.
 
 - **Rules:** `tests/harness.ts` in this repository loads a game folder and runs it on the real runtime with virtual
-  time: `const { rt, clock } = start(game, players, settings, seed)`; drive it with `rt.submit(seat, intent, "human")`,
+  time: `const { rt, clock } = start(await loadGame("my-game"), 3, settings, seed)` (three seats: Ann, Ben, Cleo); drive it with `rt.submit(seat, intent, "human")`,
   `clock.advance()` (fires due timers) and `rt.seatChanged(seatInfo)`, read `rt.view(seat)`, `rt.boardView()`,
   `rt.state` and `rt.over`, and check `expect(expectReplay(game, rt)).toBe(true)` once the game has ended.
 - **Host:** `tests/helpers.ts` starts a real Table Host (`testHost()`) with fake phones (`joinDeck(name)`,
@@ -512,7 +536,8 @@ my-games/
   games-service.ref         the games-service branch, tag or commit the games are tested against (e.g. "main")
   scripts/games-service.sh  clones games-service at that ref into .games-service/ (git-ignored) and installs it
   tsconfig.json, vitest.config.ts   map "@game-table/sdk" to .games-service/packages/sdk/src/index.ts
-  tests/                    import the harness and helpers from .games-service/tests/
+  tests/                    helpers from .games-service/tests/helpers.ts, and a small harness.ts of your own that
+                            loads your games/ on .games-service's runtime (copy extra-games' tests/harness.ts)
 ```
 
 - Rules import `@game-table/sdk` by name. The host maps it to its own SDK, so the same code runs on every table.
@@ -535,6 +560,6 @@ my-games/
       implemented by the game.
 - [ ] AI players answer `null` quickly when it is not their turn and only read their view.
 - [ ] The board UI animates events, keeps the corners clear, and implements `whenIdle()` if it replays moves.
-- [ ] The phone UI fits 360 × 600, sends intents with `ctx.send`, and uses `myTurn`.
+- [ ] The phone UI fits 360 px wide and about 400 × 680, sends intents with `ctx.send`, and uses `myTurn`.
 - [ ] `how-to-play.md` starts with the goal and `## In short`, and names settings by their labels.
 - [ ] Tests: a whole game, exact replay, private views, rejections, an exchange mid-game.

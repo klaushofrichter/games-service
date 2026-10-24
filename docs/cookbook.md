@@ -3,7 +3,7 @@
 Recipes for people who want to play, build or host Game Table, and let an AI coding agent (Claude, or any agent that
 can read web pages and run commands) do the work. Each recipe says what you need, what to ask, and how to tell that it
 worked. The agent reads the details itself: [`llms.txt`](https://games.skylar.technology/llms.txt) points it to the
-developer guide and the runbooks, and those are written for agents as much as for people.
+developer guide and the Docker runbook, and those are written for agents as much as for people.
 
 How the parts fit together: [`architecture.md`](architecture.md). The words used here (board, deck, seat plate,
 watcher, sling, console…): [`glossary.md`](glossary.md).
@@ -33,8 +33,9 @@ The agent follows the [local runbook](runbooks/local-docker.md): Part A (the tab
 extra games). No cloud service, no DNS entry, no HTTPS. With Node 26 instead of Docker, it can also run
 `CLOUD_URL= scripts/local-table.sh --extra ../extra-games` (README, *A table on your computer*).
 
-**It worked when** the board shows *Pick a game* with nine games, and a phone that scans the QR code gets a seat.
-Without a phone at hand, add AI players on the board and press Start, or ask the agent to run a simulation.
+**It worked when** the board shows *Pick a game* with nine games (three to a page), and a phone that scans the QR code gets a seat.
+Without a phone at hand, turn on *Advanced* (hammer and wrench) › *Developer* › *Games without a player at the table*,
+add AI players and press *Start game*; or turn on *Play from the board*; or ask the agent to run a simulation.
 
 **Tip, an iPad as the board:** open the board's settings (the gear) › *Board on another screen…* and scan the QR
 code with the iPad. The board moves there; the table keeps running on the computer. Good enough to try a game or
@@ -57,7 +58,7 @@ Or in one go, with the setup:
 
 The agent writes `games/yahtzee/` (manifest, rules, board, phone, rules for players, tests), runs the tests on a real
 Table Host and the browser checks, and shows you screenshots. Then play it: restart the table with your games
-(recipe 1, or `scripts/local-table.sh --extra ../your-games`) and pick it on the board.
+(recipe 1, or `CLOUD_URL= scripts/local-table.sh --extra ../extra-games` with your copy) and pick it on the board.
 
 **Then improve it, one request at a time**, for example:
 
@@ -86,8 +87,8 @@ The agent clones it with your own git access (it asks you if that fails) and poi
 goes into the table's settings.
 
 **To bring them to tables connected to a game service** (yours, recipe 4): the service fetches the repository with a
-read-only token (`GAME_REPO_TOKEN`, a fine-grained GitHub token with *Contents: read*), and an admin ticks it in the
-console for the tables that may have it, or gives those tables an access code that includes it. Ticking a repository
+read-only token (`GAME_REPO_TOKEN`, a fine-grained GitHub token with *Contents: read*), and an admin adds it under *Game repositories* in the
+console (or in `deploy/game-repos.json`) and ticks it for the tables that may have it, or gives those tables an access code that includes it. Ticking a repository
 trusts its code on that table's PC: only tick repositories you trust.
 
 ## 4. Your own game service, with real remote players
@@ -254,7 +255,7 @@ Both repositories (games-service and extra-games) work the same way; a game repo
 
 | Branch | What it is | Protection |
 | --- | --- | --- |
-| `main` | Where every change lands first, by pull request. Built and tested on every push; never deployed. | None on GitHub: changes arrive by pull request with green checks, by habit. A fork should protect it too. |
+| `main` | Where every change lands first, by pull request; tested by the pull request's checks (games-service also builds it on every push, `build-push.yml`); never deployed. | None on GitHub: changes arrive by pull request with green checks, by habit. A fork may want to protect it (required checks). |
 | `production` | What is live: games-service deploys it, and game services give tables the games of an extra-game repository's `production` branch. Changes only through a release pull request from `main`. | Required checks `test`, `codeql` and `e2e`, branch up to date before merging, no force pushes, no deletion. |
 | feature branches | One change each, named in kebab-case after what it does: `last-card-polish`, `board-sound-unlock`, `glossary-tos`. `experiment/<name>` for a trial that may never merge (`experiment/card-sling`). Dependabot opens `dependabot/…`. | Deleted on GitHub when merged. |
 
@@ -266,20 +267,24 @@ feature branch ──PR (squash)──▶ main ──release PR (merge commit)�
 
 - Every pull request runs three checks: **`test`** (game versions, unit tests, typecheck, `npm audit`, and in
   games-service both images built and run), **`e2e`** (every browser check on a real Table Host) and **`codeql`**
-  (code scanning). A pull request merges only when all three are green.
+  (code scanning); in extra-games `test` also runs a soak of AI-only games. A pull request to `production` can merge
+  only when all three are green; on `main` we wait for green by habit.
 - A change in a game's folder needs a new calendar version (`YYYY.MM.DD.N`); the `test` check fails otherwise, and
-  `node scripts/check-game-versions.ts --base origin/main --fix` sets it.
+  `node scripts/check-game-versions.ts --base origin/main --fix` sets it (in extra-games and other game repositories:
+  `node .games-service/scripts/check-game-versions.ts --base origin/main --fix`).
 - Every decision goes into `docs/decisions.md` (D-nnn in games-service, E-nnn in extra-games) in the same pull
   request; release notes for games-service under `## [Unreleased]` in `CHANGELOG.md`.
-- **extra-games is tested against games-service `main`** (its `games-service.ref`), and once a week against the
-  latest `main`. A game change that needs a platform change waits until the platform's pull request is merged.
+- **extra-games is tested on every pull request against the games-service ref in its `games-service.ref` (now
+  `main`), and every Monday against games-service `main`**, so a platform change that breaks a game shows up within a
+  week. A game change that needs a platform change waits until the platform's pull request is merged.
 - A release: a pull request from `main` to `production`, merged when green. games-service then deploys by itself,
   with the release's version, and publishes a GitHub release; extra-games' `production` is picked up by the game
   services that list it.
 
 **Ask:**
 
-> Read AGENTS.md and the README's *Branches, CI and deployment*. Make this change on a new branch, open a pull
+> Read AGENTS.md (CLAUDE.md in extra-games) and the README's *Branches, CI and deployment* (*Branches and checks* in
+> extra-games). Make this change on a new branch, open a pull
 > request to main with a decision record, wait for test, e2e and codeql, and merge it when green. Then release main to
 > production the same way.
 
@@ -292,7 +297,8 @@ Ways to run your own service instead:
 
 - **A server with Docker:** the cloud image behind a reverse proxy with HTTPS (Caddy or Traefik), its data on disk;
   recipe 4 says what you need (a domain, DNS, a certificate, a Google OAuth client).
-- **Your own Kubernetes:** the same image as a Deployment with one replica (`MAX_REPLICAS=1`), a persistent volume
+- **Your own Kubernetes:** the same image as a Deployment with exactly one replica (and `MAX_REPLICAS=1` in its
+  environment, which the service checks), a persistent volume
   for `DATA_DIR`, and an ingress with TLS.
 
 > This is a fork of games-service. Replace the deploy workflow with one that deploys the cloud service to my server

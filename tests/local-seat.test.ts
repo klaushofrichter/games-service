@@ -1,4 +1,4 @@
-// D-128: a game's localSeat puts the one player at the table on that edge when the game starts.
+// D-128b: a game's localSeat puts the one player at the table on that edge when the game starts.
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { testHost } from "./helpers.ts";
@@ -23,7 +23,7 @@ async function start(...decks: { request: (ch: string, type: string, payload: un
   return (t.host.table.runtime!.state as { seats: Record<number, string> }).seats;
 }
 
-describe("localSeat (D-128)", () => {
+describe("localSeat (D-128b)", () => {
   it("moves the one player at the table south, swapping with a remote player who sat there", async () => {
     await host();
     const rita = t.host.table.joinRemote("Rita", "sess-rita"); // takes the first seat, south

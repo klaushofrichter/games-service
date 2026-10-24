@@ -26,8 +26,8 @@ their right. Going around the table clockwise, seen from above: south, west, nor
 A seat's name says where it is (D-087). Players never see seat numbers; the API and the rules use them.
 
 - One seat on an edge is named after the edge: *north*.
-- Two seats on an edge are its two ends: *southwest* and *southeast*, *northwest* and *northeast* (on east and west:
-  *northeast* and *southeast*, *northwest* and *southwest*).
+- Two seats on an edge are its two ends: *southwest* and *southeast*, *northwest* and *northeast*. East and west
+  always have one seat.
 - Three seats add the plain edge in the middle: *southwest*, *south*, *southeast*.
 - The ends are named from the board's map, not from the player's own view: the *northwest* seat is at the top left of
   the screen, which is the north player's right hand.
@@ -66,11 +66,11 @@ buttons turn them to north, east, south or west (D-080). In code: `seatEdges(lay
 | --- | --- | --- | --- |
 | **Player** | Anyone with a seat in the lobby or a game: a person at the table, a remote player or an AI player. | `players`, `PlayerInfo` | user |
 | **Seat** | A place at the table, on an edge (2, 4, 6 or 8 per layout). A player takes a seat; a game's rules know players by seat number. | `seat`, `seats` | position, slot |
-| **Seat plate** | The box on the board with a player's name, colour and status, at their seat; games may restyle it. | `seatPlates()`, `.plate` | player box, name tag, badge |
+| **Seat plate** | The box on the board with a player's name, colour and status, at their seat; games may restyle it. | `seatPlates()`, `.kit-plate` (in a game), `.seat` (in the lobby) | player box, name tag, badge |
 | **AI player** | A seat played by the game's AI, shown as "(AI)". | `kind: "ai"` | bot, CPU, computer |
 | **Remote player** | A person who plays from elsewhere, through an invite: the remote board in their browser and their deck beside it. | `location: "remote"` | online player, guest |
 | **Watcher** | Someone remote who sees the board only: no seat, no deck, not one of the players. | `watchers` | spectator, viewer (the Game Viewer is something else) |
-| **Remote place** | What a remote player or watcher uses up; a table has four by default. | `remotePlaces`, "remote places" | — |
+| **Remote place** | What a remote player or watcher uses up; a table has four by default. | `maxRemotePlayers` (`MAX_REMOTE_PLAYERS`), `remotePlaces()` | — |
 | **Away** | A player whose phone has gone (locked, out of range, closed). The seat waits; after 15 s the board says so at the seat. | `away` | disconnected, offline, dropped |
 | **Leave** | A player taps *Leave the game* on their phone: handled like away, at once. | `leftGame`, `away[].left` | quit |
 | **Exchange** | Hand a seat to someone else during a game (a person at the table, a remote player, a watcher or an AI player); the game carries on with its score. | `exchange`, `onSeatChanged` | replace, swap, kick |
@@ -81,7 +81,7 @@ buttons turn them to north, east, south or west (D-080). In code: `seatEdges(lay
 | Term | What it is | In the code | Avoid |
 | --- | --- | --- | --- |
 | **Lobby** | The board's screen before and between games: seats, the chosen game, its settings, the QR code. | `lobby` | menu, home |
-| **Join code** | The code (and QR code) on the board that gives a phone a seat. | `joinCode` | room code, PIN |
+| **Join code** | The code (and QR code) on the board that gives a phone a seat. | `joinUrl`, `joinToken`, `/j/…` | room code, PIN |
 | **Invite** | A link from the game service that brings a remote player or watcher to the table. | `invite` | — |
 | **Table key** | The secret that lets a browser control the table (the board, its settings, the board control API). | `TABLE_KEY` | password |
 | **Board control** | What a board may do for players: moves by touching the board (`boardIntents`) for the seats in `info.controlSeats`, and skipping a wait. A remote board controls only its own player's seat. | `boardControl`, `controlSeats`, `remoteControl` | — |
@@ -119,18 +119,18 @@ buttons turn them to north, east, south or west (D-080). In code: `seatEdges(lay
 
 | Term | What it is | In the code | Avoid |
 | --- | --- | --- | --- |
-| **Log** | The record of a game: settings, players and every intent, kept to replay it. | `logs` | history (the board's list of games), transcript |
+| **Log** | The record of a game: settings, players and every intent, kept to replay it. | `logs` | history (in the code, the Game Viewer's API, `/api/v1/history`), transcript |
 | **Replay** | Running a finished game's log through the rules again, to check it reaches the same state. | `replay` | — |
 | **Game Viewer** | The board's window that walks through a game's moves. | `viewer.js` | replay viewer, debugger |
 | **Simulation** | Games played by AI players only, as fast as possible, to test a game. | `simulation` | bot run |
-| **Statistics** | The window with the awards and each player's numbers after a game. | `stats.js` | scoreboard |
+| **Statistics** | The window with the awards and each player's numbers after a game. | `stats.js`, `stats.ts` | scoreboard |
 
 ## The game service
 
 | Term | What it is | In the code | Avoid |
 | --- | --- | --- | --- |
 | **Game service** | The cloud service at `games.skylar.technology`: enrolls tables, brokers remote players, collects logs and metrics, serves the website. In technical docs also *cloud service*. | `apps/cloud` | backend, server |
-| **Console** | The game service's admin pages: tables, access codes, games, game logs, download tokens. | `admin.html`, `/admin` | admin portal, dashboard |
+| **Console** | The game service's admin pages: overview, tables, access codes, game repositories, game logs, download tokens, log retention. | `admin.html`, `/admin` | admin portal, dashboard |
 | **Admin** | Someone signed in to the console. | `admin` | — |
 | **Pairing code** | The code a new table shows until an admin approves it in the console. | `pairingCode` | — |
 | **Access code** | A code from the console that approves a table at once and decides its games (D-113). | `accessCode`, `TABLE_CODE` | licence key |
@@ -141,8 +141,7 @@ buttons turn them to north, east, south or west (D-080). In code: `seatEdges(lay
 
 Some older names stay in the code because games or tables already depend on them; new code uses the terms above.
 
-- **Console** is still called *admin portal* in a few places (the README's introduction, the website's link once
-  signed in).
+- **Console** was called *admin portal* in early decisions; older records keep that name.
 - **Game service** and **cloud service** name the same thing: the website says *game service*, technical docs often
   *cloud service* (`apps/cloud`).
 - **Deck** is the code's word; text for players says *your phone*.

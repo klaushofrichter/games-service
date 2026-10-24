@@ -59,7 +59,7 @@ import the SDK by name (`@game-table/sdk`), and the host provides it.
  phone (deck.js)        Table Host                                   board (board.js) and all decks
  ───────────────        ─────────────────────────────────────        ───────────────────────────────
  ctx.send("play",  ──▶  intent ──▶ rules.onIntent(state, seat, …)
-   { id: 12 })                      ├─ reject: { reason } ──▶ back to that phone ("That card doesn't match")
+   { id: 12 })                      ├─ reject: { reject: reason } ──▶ back to that phone ("That card doesn't match")
                                     └─ accept: new state + events
                                          │  log the intent (for replay)
                                          ├─ view(state, seat)  ──▶ each deck:   update(view, events, info)
@@ -67,7 +67,7 @@ import the SDK by name (`@game-table/sdk`), and the host provides it.
                                          └─ isOver(state)?     ──▶ the end: result, awards, statistics
 ```
 
-1. **Setup.** The lobby fixes the seats and the game's settings; the host calls `setup(ctx)` with them, and the
+1. **Setup.** The lobby fixes the seats and the game's settings; the host calls `setup(ctx, settings)`, and the
    state is born. `ctx.random()` gives the randomness, `ctx.now()` the time: nothing else, so the log can replay it.
 2. **Intents.** A player acts on their phone (`ctx.send(name, payload)`), by touching the board for a seat it may
    control (`ctx.act`), or an AI player chooses one (`ai()`). All of them reach `onIntent`, which checks everything
@@ -78,8 +78,9 @@ import the SDK by name (`@game-table/sdk`), and the host provides it.
    rules.
 4. **Timers.** The rules set timers (`ctx.setTimer`) for turn limits and pauses; when one fires, the host calls
    `onTimer`. The board may fire a listed timer early ("Next hand", `skipTimers`).
-5. **AI players** are asked for an intent when it is their move, at the board's pace: the host waits for the
-   board's `whenIdle()` (its animations) first, so they feel like people. They read only their seat's view; a slow
+5. **AI players** are asked for an intent when it is their move, at the board's pace: the host waits until the
+   table's own board has shown everything (the game's optional `whenIdle()`, with a time limit; remote boards never
+   hold it up), so they feel like people. They read only their seat's view; a slow
    AI can run in a worker thread (`ai.worker`).
 6. **The end.** `isOver(state)` returns the result text, a table, and awards; the platform adds each player's moves
    and thinking time, shows the result on the board and the statistics window, and stores the log. Every finished
@@ -90,7 +91,7 @@ import the SDK by name (`@game-table/sdk`), and the host provides it.
 | The platform | The game |
 | --- | --- |
 | Lobby, seats, seat layouts, names, colours, the QR code, joining | Which seat layouts and edges suit it (`manifest.json`) |
-| Phones going away and coming back, *Leave*, exchanging a player, watchers | `onSeatChanged`: update names kept in the state, nothing more |
+| Phones going away and coming back, *Leave*, exchanging a player, watchers | `onSeatChanged` (names and a person-or-AI flag kept in the state), `canContinueWithout` (only if the game truly cannot go on), `onSeatJoined` (with `dynamicPlayers`) |
 | Remote players and watchers (invites, WebRTC), the remote board's turning | Nothing: it draws for `info.frontEdge` like any board |
 | AI scheduling, its time limit, pausing when something is wrong | `ai()`: one intent for one seat, from that seat's view |
 | Timers' clock, pauses, the turn countdown in `info.timers` | Which timers exist and what happens when they fire |
@@ -119,9 +120,13 @@ needs nothing special for remote play.
 | The rules API games use | `packages/sdk/src/index.ts` |
 | The manifest schema and lobby types | `packages/protocol/src/index.ts` |
 | Lobby and seats | `apps/table-host/src/table.ts` |
-| Game runtime, replay | `apps/table-host/src/runtime.ts` |
+| Game runtime | `apps/table-host/src/runtime.ts` |
+| Replay check of every finished game | `apps/table-host/src/game-log.ts` |
+| Simulations | `apps/table-host/src/simulation.ts` |
+| The Game Viewer's API | `apps/table-host/src/history.ts`, `moves.ts` |
+| The table's link to the service, installed extra games | `apps/table-host/src/cloud.ts`, `extra-games.ts` |
 | AI players | `apps/table-host/src/ai.ts`, `ai-worker.ts` |
-| Logs, the Game Viewer's moves | `apps/table-host/src/logs.ts`, `moves.ts` |
+| Logs | `apps/table-host/src/logs.ts` |
 | The board and deck pages | `apps/table-host/public/board/`, `public/deck/`, `public/shared/` |
 | Remote play (table side) | `apps/table-host/src/remote.ts` |
 | The game service and its console | `apps/cloud/src/`, `apps/cloud/public/admin.html` |

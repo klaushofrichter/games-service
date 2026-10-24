@@ -606,7 +606,7 @@ toolsBtn.addEventListener("click", () => openAdvanced());
  */
 let settingsOverlay = null;
 /**
- * A choice with up to this many options shows as a row of buttons; more become a pulldown (D-129), since a row of
+ * A choice with up to this many options shows as a row of buttons; more become a pulldown (D-129b), since a row of
  * eight time controls ran out of the window.
  */
 const SEG_MAX = 3;
@@ -715,7 +715,7 @@ function openSettings() {
   // The code's "valid for …" counts down while the settings are open (down to minutes).
   const tick = setInterval(() => state?.cloud?.code?.expiresAt && draw(), 30_000);
   fsDoc.addEventListener("fullscreenchange", draw);
-  // Choices with more options than fit as buttons are pulldowns (D-129).
+  // Choices with more options than fit as buttons are pulldowns (D-129b).
   o.addEventListener("change", (e) => {
     const sel = e.target.closest("select");
     if (!sel) return;
@@ -1711,7 +1711,7 @@ function openAdvanced() {
   const unsub = onState(draw);
   api("GET", "/version").then((v) => ((platform = v), draw())).catch(() => {});
   const close = () => (unsub(), o.remove());
-  // Choices with more options than fit as buttons are pulldowns (D-129).
+  // Choices with more options than fit as buttons are pulldowns (D-129b).
   o.addEventListener("change", (e) => {
     const sel = e.target.closest("select");
     if (!sel) return;

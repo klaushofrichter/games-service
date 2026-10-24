@@ -18,7 +18,8 @@ backup from a time the service was scaled to 0 has no data.
 
 Usually nothing to do. At every start the service checks `state.db` (it must open and pass SQLite's `quick_check`). If
 it is missing or damaged, the service starts from `snapshots/state.db` by itself and keeps the damaged file beside it
-as `state.db.damaged-<time>`. A restart is enough:
+as `state.db.damaged-<time>`. With no snapshot it starts empty and keeps the damaged file aside (the log says
+`ERROR: … there is no snapshot`). A restart is enough:
 
 ```bash
 kubectl -n games rollout restart deploy/games-cloud
@@ -26,15 +27,18 @@ kubectl -n games rollout status deploy/games-cloud --timeout=180s
 kubectl -n games logs deploy/games-cloud | grep -E 'state (opened|snapshot)|ERROR'
 ```
 
-`state snapshot` in the log means it recovered; changes since that snapshot (at most an hour) are lost.
+`state snapshot` in the log means it recovered; changes since that snapshot (at most an hour) are lost. A clean
+shutdown also snapshots the database it is closing: if the log says `WARNING: snapshot failed`, or the recovered state
+looks wrong, use `previous` below.
 
-To use a snapshot even though `state.db` still opens, create the marker file and restart. The service removes the
-marker and keeps the replaced database as `state.db.replaced-<time>`. An empty marker means `snapshots/state.db`; the
-word `previous` in it means `snapshots/state.prev.db`, the one from before the last start:
+To go back to an earlier state even though `state.db` still opens, write `previous` into the marker file and
+restart: `snapshots/state.prev.db` is the state as it was when the running pod started. The service removes the
+marker and keeps the replaced database as `state.db.replaced-<time>`. An empty marker means `snapshots/state.db`, but
+a restart writes that snapshot from the current state first (at shutdown), so it only helps when the pod did not shut
+down cleanly (a crash, a lost node):
 
 ```bash
-kubectl -n games exec deploy/games-cloud -- sh -c 'ls -l /data/snapshots && touch /data/RESTORE_FROM_SNAPSHOT'
-# or: … sh -c 'echo previous > /data/RESTORE_FROM_SNAPSHOT'
+kubectl -n games exec deploy/games-cloud -- sh -c 'ls -l /data/snapshots && echo previous > /data/RESTORE_FROM_SNAPSHOT'
 kubectl -n games rollout restart deploy/games-cloud
 ```
 

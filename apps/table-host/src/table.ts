@@ -1395,7 +1395,7 @@ export class Table extends EventEmitter {
     this.selected = { game: g, settings: merged };
     // The table follows the game: a layout it supports, and nobody on an edge it does not use.
     this.applyLayout(layout);
-    this.placeLocalPlayer(g.manifest); // and the one player at the table on the game's edge (D-128)
+    this.placeLocalPlayer(g.manifest); // and the one player at the table on the game's edge (D-128b)
     this.summary = null;
     for (const p of this.players.values()) p.ready = p.kind === "ai";
     this.phase = "ready";
@@ -1446,7 +1446,7 @@ export class Table extends EventEmitter {
   }
 
   /**
-   * A game's `localSeat` (D-128): the one human playing at the table moves to that edge when the game starts, swapping
+   * A game's `localSeat` (D-128b): the one human playing at the table moves to that edge when the game starts, swapping
    * with the remote or AI player there (or taking a free seat). Nothing happens with two or more people at the table,
    * or when they already sit on that edge.
    */

@@ -22,7 +22,7 @@ The image (`ghcr.io/klaushofrichter/games-table-host`) is public, so no registry
 
 ## First start
 
-The board shows a 6-character **pairing code**. Approve it in the admin portal at `https://games.skylar.technology/admin` (or with `POST /admin/api/tables/pair/<code>`). The notice disappears and games can start. Players scan the QR code on the board, or type the address shown under it.
+The board shows a 6-character **pairing code**. Approve it in the console at `https://games.skylar.technology/admin` (or with `POST /admin/api/tables/pair/<code>`). The notice disappears and games can start. Players scan the QR code on the board, or type the address shown under it.
 
 ## Everyday
 
@@ -39,6 +39,6 @@ The board shows a 6-character **pairing code**. Approve it in the admin portal a
 
 ## Notes
 
-- The board page is only served to the PC itself (loopback), which is where it gets `TABLE_KEY`; the control API needs that key from anyone else. Phones only get the deck pages. Keep `TABLE_KEY` on this machine.
+- The board page is served to the PC itself (loopback), which is where it gets `TABLE_KEY`, and to another screen on the same network that was given the board's link (settings › *Board on another screen…*, D-190; the link carries the key, so show it only on your own screens). The control API needs the key from anyone else. Phones only get the deck pages. Keep `TABLE_KEY` on this machine.
 - The PC's address can change (no fixed IP range at venues); the QR code always uses the current LAN address unless `PUBLIC_URL` is set.
 - No offline play: without the service the board shows a notice, new games cannot start, and running games pause until the connection returns.

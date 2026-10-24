@@ -536,7 +536,7 @@ export function startCloud(o: CloudOptions) {
         const signedIn = auth.session(req);
         const note = url.searchParams.has("signed-out") ? `<p class="note-toast" role="status">You are signed out.</p>` : "";
         const admin = signedIn
-          ? `<a id="admin-link" href="/admin" title="Signed in as ${esc(signedIn)}">Admin portal</a>`
+          ? `<a id="admin-link" href="/admin" title="Signed in as ${esc(signedIn)}">Console</a>`
           : auth.enabled
             ? `<a id="admin-link" href="/auth/google/login">Admin</a>`
             : `<a id="admin-link" href="/admin">Admin</a>`;
