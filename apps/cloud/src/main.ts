@@ -94,6 +94,10 @@ if (repoFile !== "none") {
   }
 }
 
+const cfKeys = ["CF_TURN_KEY_ID", "CF_TURN_API_TOKEN"] as const;
+if (cfKeys.some((k) => env[k]) && !cfKeys.every((k) => env[k])) fail(`Cloudflare TURN is half configured: set both ${cfKeys.join(" and ")}, or neither`);
+const cfTurn = env.CF_TURN_KEY_ID && env.CF_TURN_API_TOKEN ? { keyId: env.CF_TURN_KEY_ID, apiToken: env.CF_TURN_API_TOKEN } : null;
+
 for (const k of ["LOG_STORAGE_MB", "DATA_LIMIT_MB"] as const) if (env[k] && !(Number(env[k]) >= 1)) fail(`${k} must be a number of megabytes, at least 1 (it is ${env[k]})`);
 
 const cloud = await startCloud({
@@ -105,6 +109,8 @@ const cloud = await startCloud({
   logRetentionDays: Number(env.LOG_RETENTION_DAYS ?? 90),
   // e.g. [{"urls":"stun:stun.l.google.com:19302"},{"urls":"turn:turn.example:3478","username":"u","credential":"p"}]
   iceServers: env.ICE_SERVERS ? JSON.parse(env.ICE_SERVERS) : undefined,
+  // A Cloudflare TURN key (D-209): relays for remote players behind a phone's or a strict network's NAT.
+  cloudflareTurn: cfTurn,
   // "1": trust X-Forwarded-For from loopback and the k3s pod/service networks; or a comma-separated CIDR list.
   trustProxy: parseTrustProxy(env.TRUST_PROXY),
   gameRepos: [...deployRepos, ...(env.GAME_REPOS ?? "").split(",").map((x) => x.trim()).filter(Boolean)],
@@ -120,5 +126,5 @@ const cloud = await startCloud({
   // The PREVIEW / DRAFT sash on the public website (D-177): on until the launch sets PREVIEW_BANNER=0.
   previewBanner: env.PREVIEW_BANNER !== "0",
 });
-console.log(`[cloud] ${env.APP_VERSION || "dev"} listening on ${cloud.port}; console at ${consoleUrl ?? `${publicUrl}/admin`}; admin sign-in: ${google ? `Google (${google.allowedEmails.length} allowed)` : "ADMIN_TOKEN only (development)"}`);
+console.log(`[cloud] ${env.APP_VERSION || "dev"} listening on ${cloud.port}; console at ${consoleUrl ?? `${publicUrl}/admin`}; relays: ${cfTurn ? "Cloudflare TURN" : env.ICE_SERVERS ? "ICE_SERVERS" : "STUN only"}; admin sign-in: ${google ? `Google (${google.allowedEmails.length} allowed)` : "ADMIN_TOKEN only (development)"}`);
 for (const sig of ["SIGINT", "SIGTERM"] as const) process.on(sig, async () => (await cloud.close(), process.exit(0)));

@@ -206,7 +206,7 @@ A remote player gets an invite link (`https://games.skylar.technology/i/CODE`) f
         ◀═════════(4) WebRTC data channel "gt": board/deck files, API, live sockets═════════▶
 ```
 
-- The service's `ICE_SERVERS` (JSON) sets STUN/TURN for both sides; without it, Google's public STUN is used. Add a TURN server for players behind strict NATs.
+- **Relays:** a direct connection fails behind some networks, typically a phone's hotspot or cellular data (the carrier's NAT), and some hotel, office or school networks. With a Cloudflare TURN key (`CF_TURN_KEY_ID`, `CF_TURN_API_TOKEN`) the service fetches short-lived relay credentials (a day, renewed after half) and hands them to both ends with each connection; WebRTC uses the relay only when the direct way fails (D-209). Otherwise `ICE_SERVERS` (JSON) sets STUN/TURN for both sides, and without either, Google's public STUN is used.
 - The table needs outbound UDP; the table PC kit uses host networking. In bridged Docker (the dev `docker-compose.yml`) remote play only works with a TURN server.
 - The remote board turns so the remote player's own seat is at the bottom of their screen. On an east or west seat, *Use the full width* shows the board upright instead (their seat at the side), and *Put my seat at the bottom* turns it back; the choice stays in that browser (D-101).
 - `POST /api/v1/remote {"boardControl": false}` (or the checkbox in the invite dialog) makes the board read-only for remote players. It is one switch for all of them, and a remote board has control only while its browser has a player at the table (D-167).
@@ -266,6 +266,7 @@ In the cluster these come from the `games-oauth` Secret (created by `scripts/syn
 | `PORT` | HTTP port (default 8081) |
 | `MAX_REPLICAS` | Must be `1` (set by the cluster manifest); the service warns at start otherwise, since one process owns the database and the tables' sockets |
 | `LOG_RETENTION_DAYS`, `ICE_SERVERS` | Log retention (default 90); STUN/TURN for remote play |
+| `CF_TURN_KEY_ID`, `CF_TURN_API_TOKEN` | Optional, both or neither: a Cloudflare TURN key (Cloudflare dashboard, *Realtime › TURN Server*). Remote players behind a phone's hotspot or a strict network get a relay; the service asks Cloudflare for credentials that expire after a day, and the key stays with the service (D-209). `scripts/sync-secrets.sh` carries them into `games-oauth` |
 | `DATA_LIMIT_MB`, `LOG_STORAGE_MB` | The service's storage budget in `DATA_DIR` (default 1024, the PVC's size) and the cap on game logs within it (default 256). The budget is counted from the service's own files, since a `local-path` volume has no quota; the oldest logs make way before free space in it drops below 15 % (at least 100 MB), and a log that can't fit is refused (the table keeps its copy). The console's Overview shows the use |
 | `GAME_REPO_TOKEN` | Read token for private extra-game repositories (D-097) |
 | `GAME_REPOS_FILE`, `GAME_REPOS` | The deploy-time repository list (default `deploy/game-repos.json`; `none` turns it off), and more repositories (`owner/name@ref`, comma-separated) for local development (D-098) |

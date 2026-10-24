@@ -307,6 +307,28 @@ describe("remote play", { timeout: 60_000 }, () => {
     expect(t.host.gateway.count).toBe(0);
   });
 
+  it("hands both ends the same Cloudflare TURN relays, with credentials the key never leaves the service for (D-209)", async () => {
+    await cloud.close();
+    const cfFetch = (async () =>
+      new Response(JSON.stringify({ iceServers: [{ urls: ["turn:turn.cloudflare.com:3478?transport=udp", "turn:turn.cloudflare.com:53?transport=udp"], username: "u9", credential: "c9" }] }), { status: 201 })) as unknown as typeof fetch;
+    cloud = await startCloud({ port: 0, host: "127.0.0.1", adminToken: ADMIN, publicUrl: "https://games.skylar.technology", iceServers: [], cloudflareTurn: { keyId: "k", apiToken: "secret-key-token", fetch: cfFetch } });
+    base = `http://127.0.0.1:${cloud.port}`;
+    const t = await pairedHost();
+    const seen: unknown[] = [];
+    const answer = t.host.gateway!.answer.bind(t.host.gateway);
+    t.host.gateway!.answer = (session, sdp, ice, invite) => (seen.push(ice), answer(session, sdp, ice, invite));
+    const { token } = await t.ok("POST", "/invites");
+    const ws = new WebSocket(`${base.replace("http", "ws")}/api/remote/ws?invite=${token}`);
+    cleanup.push(() => ws.close());
+    const hello = await new Promise<any>((r) => ws.once("message", (m) => r(JSON.parse(String(m)))));
+    const relay = [{ urls: ["turn:turn.cloudflare.com:3478?transport=udp"], username: "u9", credential: "c9" }];
+    expect(hello.iceServers).toEqual(relay);
+    expect(JSON.stringify(hello)).not.toContain("secret-key-token");
+    ws.send(JSON.stringify({ type: "offer", sdp: "v=0 not really" }));
+    await until(() => seen.length === 1);
+    expect(seen[0]).toEqual(relay);
+  });
+
   it("claims an invite on the first connection, before the table answers", async () => {
     const t = await pairedHost();
     const { token } = await t.ok("POST", "/invites");

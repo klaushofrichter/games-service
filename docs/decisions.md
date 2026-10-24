@@ -1501,3 +1501,18 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
     has a section *On a Windows PC*; its other commands run in Git Bash.
 
   *Why:* Klaus asked for a Windows 11 PC, with Docker Desktop as the focus.
+- **D-209 · 2026-10-24 · Klaus** — Relays for remote players from Cloudflare's TURN service:
+  - **What happens:** with a Cloudflare TURN key (`CF_TURN_KEY_ID`, `CF_TURN_API_TOKEN`, created in the Cloudflare
+    dashboard), the service asks `rtc.live.cloudflare.com` for credentials that expire after a day. It keeps them,
+    renews them when less than half their life is left, and asks once for connections that arrive together. Each
+    connection's hello and offer carry them to the remote browser and to the table.
+  - **What it leaves out:** URLs on port 53, which browsers refuse, so each one only adds a timeout. The key itself
+    never leaves the service.
+  - **When Cloudflare fails:** the current credentials are kept while they're valid; after that, the old STUN list
+    is used (`ICE_SERVERS`, or Google's STUN), with a minute between attempts.
+  - **Configuration:** `scripts/sync-secrets.sh` carries the key into `games-oauth`.
+  - *Why:* an iPad on an iPhone hotspot could not connect to the table, while a remote player on another home ISP
+    earlier the same day could, with the same connection code. The phone carrier's NAT blocks a direct WebRTC
+    connection, and the service handed out only STUN. Cloudflare instead of coturn on the cluster: no ports to open
+    at home and no new exposure there, credentials made by Cloudflare per request, a free allowance. WebRTC uses a
+    relay only when the direct way fails.
