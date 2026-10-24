@@ -8,6 +8,8 @@ history.
 
 ## [Unreleased]
 
+- A local cloud service in Docker starts on a fresh volume again (the image creates `/data` for its user), and
+  offers only the public extra games (D-206).
 - The console is at https://games-console.skylar.technology; the documentation, the table PC kit and
   `scripts/sync-secrets.sh` say so (D-205).
 - The console can have a host of its own (`CONSOLE_URL`, games-console.skylar.technology): its sign-in and session

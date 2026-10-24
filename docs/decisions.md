@@ -1471,3 +1471,10 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   callback as `GOOGLE_REDIRECT_URI`, and the documentation names the console's address where people approve a table.
   A local service still has its console at `/admin`, without `CONSOLE_URL`. *Why:* the switch is done; a `.env`
   without it would quietly put the console back on the public host.
+- **D-206 · 2026-10-24 · Claude** — The cloud image creates `/data` owned by uid 1000, like the table host's image:
+  a new Docker volume there was root's, and the service, which runs as uid 1000, stopped at start with `EACCES` on
+  `/data/snapshots` (`deploy/docker-compose.yml`, and runbook Part C). The cluster's PVC hid it. The development
+  compose file offers only the public extra games (`GAME_REPOS_FILE: none`, `GAME_REPOS`), like `deploy/local`, since
+  a local service can't read the private repositories in `deploy/game-repos.json`. `scripts/local-table.sh` names the
+  console's address for the live service and says nothing about pairing without one. *Why:* found by following the
+  getting-started steps on a fresh machine.

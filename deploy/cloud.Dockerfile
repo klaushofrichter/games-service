@@ -18,6 +18,9 @@ ARG APP_VERSION=dev
 ENV APP_VERSION=$APP_VERSION
 ENV PORT=8081
 EXPOSE 8081
+# DATA_DIR in Docker: /data owned by uid 1000, so a new named volume there inherits that owner (in the cluster the
+# PVC is mounted over it). Without it a fresh volume is root's and the service can't start (EACCES on /data/snapshots).
+RUN mkdir -p /data && chown 1000:1000 /data
 # Numeric, so the image is verifiably non-root on its own (uid 1000 is the image's 'node' user).
 USER 1000:1000
 CMD ["node", "apps/cloud/src/main.ts"]
