@@ -3,8 +3,8 @@
 #   GitHub secret  KUBE_SETUP_DEPLOY_TOKEN      <- GITHUB_KUBE_SETUP_PAT    (the deploy pushes the cluster repository's manifest)
 #   k8s Secret     games-runner/runner-pat      <- GITHUB_GAMES_SERVICE_PAT (key `token`: the runner registers itself)
 #   k8s Secret     games/games-oauth            <- GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI,
-#                                                  ALLOWED_EMAILS, COOKIE_SECRET, and ADMIN_TOKEN, GAME_REPO_TOKEN
-#                                                  if set
+#                                                  ALLOWED_EMAILS, COOKIE_SECRET, and CONSOLE_URL, ADMIN_TOKEN,
+#                                                  GAME_REPO_TOKEN if set
 #
 #   scripts/sync-secrets.sh --check     validate .env and list what would be set (default)
 #   scripts/sync-secrets.sh --github    set the GitHub secret (needs `gh` signed in with admin on the repo)
@@ -44,7 +44,10 @@ done < "$ENV_FILE"
 
 need() { for k in "$@"; do [ -n "${V[$k]:-}" ] || problems+=("$k is missing"); done; }
 need GITHUB_KUBE_SETUP_PAT GITHUB_GAMES_SERVICE_PAT GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET GOOGLE_REDIRECT_URI ALLOWED_EMAILS COOKIE_SECRET
-[ "${V[GOOGLE_REDIRECT_URI]:-}" = "$PUBLIC_URL/auth/google/callback" ] || problems+=("GOOGLE_REDIRECT_URI must be $PUBLIC_URL/auth/google/callback")
+# The console's own host (D-204), e.g. https://games-console.skylar.technology; sign-in returns there when it is set.
+[ -z "${V[CONSOLE_URL]:-}" ] || [[ "${V[CONSOLE_URL]}" =~ ^https://[a-z0-9.-]+$ ]] || problems+=("CONSOLE_URL must look like https://games-console.skylar.technology (no path, no trailing slash)")
+SIGN_IN_URL=${V[CONSOLE_URL]:-$PUBLIC_URL}
+[ "${V[GOOGLE_REDIRECT_URI]:-}" = "$SIGN_IN_URL/auth/google/callback" ] || problems+=("GOOGLE_REDIRECT_URI must be $SIGN_IN_URL/auth/google/callback")
 [[ "${V[GOOGLE_CLIENT_ID]:-}" == 40017202035-*.apps.googleusercontent.com ]] || problems+=("GOOGLE_CLIENT_ID should be a skylar-technology client (40017202035-....apps.googleusercontent.com)")
 [ "${#V[COOKIE_SECRET]}" -ge 32 ] 2>/dev/null || problems+=("COOKIE_SECRET must be at least 32 characters (openssl rand -hex 32)")
 [ -z "${V[ADMIN_TOKEN]:-}" ] || [ "${#V[ADMIN_TOKEN]}" -ge 16 ] || problems+=("ADMIN_TOKEN must be at least 16 characters, or left out")
@@ -56,6 +59,7 @@ done
 
 if ((${#problems[@]})); then printf 'problem: %s\n' "${problems[@]}" >&2; exit 1; fi
 OAUTH_KEYS=(GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET GOOGLE_REDIRECT_URI ALLOWED_EMAILS COOKIE_SECRET)
+[ -n "${V[CONSOLE_URL]:-}" ] && OAUTH_KEYS+=(CONSOLE_URL)
 [ -n "${V[ADMIN_TOKEN]:-}" ] && OAUTH_KEYS+=(ADMIN_TOKEN)
 # Extra-game repositories (D-097): the read token for private ones. Optional. The list itself is not a secret: it is
 # deploy/game-repos.json, baked into the image (D-098).

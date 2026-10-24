@@ -1451,3 +1451,17 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   the sling's gesture payload is built in one place and its listeners come off with one `AbortController`;
   `playerColor` no longer reads `seatColors` (always empty since D-159); stale "EXPERIMENT" comments on the sling are
   gone; the website's lobby demo pauses its progress bar off screen, with one step length.
+- **D-204 · 2026-10-24 · Klaus** — The console gets a host of its own, games-console.skylar.technology (`CONSOLE_URL`).
+  With it set, the console, `/admin/api`, Google sign-in and the session cookie (`__Host-`, host-only) live only on
+  that host; there `/` is a page with a Sign in link (where logout lands) and everything else answers 404. On the
+  public host `/admin` and `/auth/*` redirect to the console's host and remove a session cookie left from before, a
+  session is never accepted, and the website's *Admin* link points to the console's host. A cookie-authenticated
+  change must come from the console's origin. `ADMIN_TOKEN` works on both hosts. `GOOGLE_REDIRECT_URI` must be the
+  console's callback; `scripts/sync-secrets.sh` puts `CONSOLE_URL` into the `games-oauth` Secret, and the deploy's
+  smoke test follows the redirect and checks the console's host the same way. Unset, nothing changes. The cookie
+  stays `SameSite=Lax`: both hosts are the same site, so `Strict` would not separate them, and it would drop the
+  cookie on the redirect back from Google. *Why:* an invite page runs the board and phone pages that the inviting
+  table sends, game code from its extra-game repositories included, on the public host; with the console on the same
+  origin that code could call the console's API with a signed-in admin's cookie. A separate host puts the session out
+  of its reach; moving remote play instead would break every invite link, and hardening within one origin leaves
+  ways around it.

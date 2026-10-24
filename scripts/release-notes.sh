@@ -38,5 +38,5 @@ printf '\n### Verified at release\n\n'
 printf -- '- Rollout: deployment/games-cloud reached its new generation with every replica available\n'
 printf -- '- `GET %s/health` -> 200, reported version `%s`, matching the build this run stamped\n' "$BASE" "$SERVED"
 printf -- '- `GET %s/` -> %s, version label `%s` present\n' "$BASE" "$PAGE_CODE" "$SERVED"
-printf -- '- `GET %s/admin` without a session -> `%s` (sign-in enforced)\n' "$BASE" "$ADMIN"
+printf -- '- `GET %s` without a session -> `%s` (sign-in enforced)\n' "${ADMIN_URL:-$BASE/admin}" "$ADMIN"
 printf -- '- Checked at %s by [run %s](%s/%s/actions/runs/%s)\n' "$CHECKED_AT" "$GITHUB_RUN_ID" "$SERVER" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID"

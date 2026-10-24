@@ -254,12 +254,13 @@ In the cluster these come from the `games-oauth` Secret (created by `scripts/syn
 | Variable | Meaning |
 | --- | --- |
 | `PUBLIC_URL` | `https://games.skylar.technology`; an https URL requires Google sign-in |
+| `CONSOLE_URL` | Optional: the console's own host, e.g. `https://games-console.skylar.technology` (D-204). The console, sign-in and the session cookie then live only there, and `PUBLIC_URL/admin` sends people there; pages a table serves on `PUBLIC_URL` (remote play) can't use an admin's session. Its DNS record, ingress host and certificate, and the redirect URI in the Google client, must exist first. Unset: one host serves both |
 | `DATA_DIR` | Where the state is kept (D-114): `state.db` (SQLite), `snapshots/state.db` (hourly and at shutdown) and `logs/`. In the cluster the PVC `games-cloud-data` at `/data`. Unset = memory only, lost at restart. A `RESTORE_FROM_SNAPSHOT` file there makes the next start use the snapshot |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | The service's own OAuth client, in Google Cloud project `skylar-technology` |
-| `GOOGLE_REDIRECT_URI` | Exactly `PUBLIC_URL/auth/google/callback`; the service refuses to start otherwise |
+| `GOOGLE_REDIRECT_URI` | Exactly `CONSOLE_URL/auth/google/callback`, or `PUBLIC_URL/auth/google/callback` without `CONSOLE_URL`; the service refuses to start otherwise |
 | `ALLOWED_EMAILS` | Comma-separated admin allow-list, checked at sign-in and on every request |
 | `COOKIE_SECRET` | Signs the session cookie (`openssl rand -hex 32`, at least 32 characters). Replace it and restart to end every session |
-| `ADMIN_TOKEN` | Optional bearer token for scripts (`Authorization: Bearer …`, at least 16 characters); in local development it is the portal sign-in |
+| `ADMIN_TOKEN` | Optional bearer token for scripts (`Authorization: Bearer …`, at least 16 characters), on either host; in local development it is the portal sign-in |
 | `TRUST_PROXY` | `1` = trust `X-Forwarded-For` from loopback and the k3s pod/service networks, or a CIDR list |
 | `PORT` | HTTP port (default 8081) |
 | `MAX_REPLICAS` | Must be `1` (set by the cluster manifest); the service warns at start otherwise, since one process owns the database and the tables' sockets |

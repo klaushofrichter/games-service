@@ -71,6 +71,12 @@ export interface CloudOptions {
   /** Google sign-in for the admin portal; null only for local development (the portal then asks for ADMIN_TOKEN). */
   google?: GoogleAuthOptions | null;
   publicUrl: string; // https://games.skylar.technology
+  /**
+   * The console's own address (CONSOLE_URL, D-204), e.g. https://games-console.skylar.technology. When set, the console,
+   * sign-in and the session cookie live only on that host, so code a table serves on the public host (remote play)
+   * can't use an admin's session. Unset: one host serves both.
+   */
+  consoleUrl?: string;
   logRetentionDays?: number;
   /** STUN/TURN servers handed to both ends of a remote connection. */
   iceServers?: IceServer[];
@@ -393,8 +399,12 @@ export function startCloud(o: CloudOptions) {
     const a = addr.replace(/^::ffff:/, "");
     return isIPv4(a) ? proxies.check(a, "ipv4") : isIPv6(a) && proxies.check(a, "ipv6");
   };
-  const auth = createAdminAuth(o.google ?? null, o.publicUrl);
-  const ownOrigin = new URL(o.publicUrl).origin;
+  const consoleHost = o.consoleUrl ? new URL(o.consoleUrl) : null;
+  const auth = createAdminAuth(o.google ?? null, consoleHost?.origin ?? o.publicUrl);
+  /** Where the console is; a cookie-authenticated change must come from there. */
+  const consoleOrigin = consoleHost?.origin ?? new URL(o.publicUrl).origin;
+  /** A request for the console's host (D-204); without CONSOLE_URL the one host is both. */
+  const onConsole = (req: IncomingMessage) => !consoleHost || String(req.headers.host ?? "").toLowerCase() === consoleHost.host;
   const clientIp = (req: IncomingMessage) => {
     const xff = fromProxy(req.socket.remoteAddress) ? String(req.headers["x-forwarded-for"] ?? "").split(",").map((x) => x.trim()).filter(Boolean).pop() : "";
     return xff || req.socket.remoteAddress || "?";
@@ -416,14 +426,16 @@ export function startCloud(o: CloudOptions) {
   const tokenAdmin = (req: IncomingMessage) => !!o.adminToken && same(bearer(req), o.adminToken);
   /**
    * The signed-in admin (Google session) or a script holding ADMIN_TOKEN. A cookie-authenticated change must also come
-   * from our own origin: SameSite=Lax already keeps cross-site POSTs cookieless, this is the second layer.
+   * from the console's origin: SameSite=Lax already keeps cross-site POSTs cookieless, this is the second layer (and
+   * the one that stops a page on the public host, which is the same site as the console's host). A session counts only
+   * on the console's host (D-204).
    */
   const admin = (req: IncomingMessage): { via: "google"; email: string } | { via: "token" } | null => {
     if (tokenAdmin(req)) return { via: "token" };
-    const email = auth.session(req);
+    const email = onConsole(req) ? auth.session(req) : null;
     if (!email) return null;
     const m = req.method ?? "GET";
-    if (m !== "GET" && m !== "HEAD" && req.headers.origin !== ownOrigin) return null;
+    if (m !== "GET" && m !== "HEAD" && req.headers.origin !== consoleOrigin) return null;
     return { via: "google", email };
   };
   /** A lifetime from a request: positive and finite, else the default; never above the cap. */
@@ -542,17 +554,38 @@ export function startCloud(o: CloudOptions) {
         res.writeHead(200, { ...HTML_HEADERS, "cache-control": "no-cache" });
         return res.end((await readFile(TERMS_PAGE, "utf8")).replace("{{version}}", versionLabel()));
       }
+      if (consoleHost && onConsole(req)) {
+        // The console's host (D-204) serves the console and sign-in, nothing of the public website. "/" is where
+        // logout lands and where anonymous visitors to /admin go: a page with a Sign in link, never a bounce to Google.
+        if (m === "GET" && p === "/") {
+          if (auth.session(req)) {
+            res.writeHead(302, { location: "/admin", "cache-control": "no-store" });
+            return res.end();
+          }
+          const note = url.searchParams.has("signed-out") ? `<p class="muted">You are signed out.</p>` : "";
+          const signIn = auth.enabled ? `<a class="btn" href="/auth/google/login">Sign in with Google</a>` : `<a class="btn" href="/admin">Open the console</a>`;
+          return sendPage(res, 200, "Game Table Console", `${note}<p>${signIn}</p><p class="faint"><a href="${esc(o.publicUrl)}/">Game Table website</a></p>`);
+        }
+        if (p !== "/admin" && p !== "/admin/" && !p.startsWith("/admin/api/") && !p.startsWith("/auth/")) return json(res, 404, { error: "not found" });
+      } else if (consoleHost && (p === "/admin" || p === "/admin/" || p.startsWith("/auth/"))) {
+        // The console moved: send people there, and remove a session cookie left on this host from before.
+        res.writeHead(302, { location: `${consoleHost.origin}${p}${url.search}`, "cache-control": "no-store", "set-cookie": auth.clearSession });
+        return res.end();
+      }
       if (await auth.handle(req, res, p)) return;
       if (m === "GET" && p === "/") {
-        // The public website (D-176); also where logout lands (200, never a bounce to Google). The admin sign-in is a
-        // small link in the top right corner.
-        const signedIn = auth.session(req);
+        // The public website (D-176); also where logout lands (200, never a bounce to Google) when the console has no
+        // host of its own. The admin sign-in is a small link in the top right corner; with CONSOLE_URL this host can't
+        // see the session, so it is a plain link to the console's host.
+        const signedIn = consoleHost ? null : auth.session(req);
         const note = url.searchParams.has("signed-out") ? `<p class="note-toast" role="status">You are signed out.</p>` : "";
-        const admin = signedIn
-          ? `<a id="admin-link" href="/admin" title="Signed in as ${esc(signedIn)}">Console</a>`
-          : auth.enabled
-            ? `<a id="admin-link" href="/auth/google/login">Admin</a>`
-            : `<a id="admin-link" href="/admin">Admin</a>`;
+        const admin = consoleHost
+          ? `<a id="admin-link" href="${esc(consoleHost.origin)}/">Admin</a>`
+          : signedIn
+            ? `<a id="admin-link" href="/admin" title="Signed in as ${esc(signedIn)}">Console</a>`
+            : auth.enabled
+              ? `<a id="admin-link" href="/auth/google/login">Admin</a>`
+              : `<a id="admin-link" href="/admin">Admin</a>`;
         // The version label is part of the public page (and checked by the deploy's smoke test).
         const preview = o.previewBanner === false ? "" : `<div class="preview-sash" role="note" aria-label="Preview: Game Table is not live yet"><span>PREVIEW / DRAFT<small>NOT LIVE YET</small></span></div>`;
         const html = (await readFile(HOME_PAGE, "utf8")).replace("{{admin}}", admin).replace("{{note}}", note).replace("{{preview}}", preview).replace("{{version}}", versionLabel());

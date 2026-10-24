@@ -35,6 +35,8 @@ together. The details are in the [developer guide](developers/game-development.m
 - **The game service** is optional for play at the table. It enrolls tables (pairing codes, access codes), offers
   extra-game repositories to them, collects logs and metrics, has the console, and relays the first handshake of
   remote play. Game moves never pass through it: a remote browser talks to the table directly over WebRTC.
+  The console can have a host of its own (`CONSOLE_URL`): a remote browser runs pages the table sends, on the
+  service's public host, and the admins' sign-in stays out of their reach.
 
 ## A game is a folder
 
