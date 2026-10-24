@@ -4,6 +4,7 @@
 #   deploy/local/setup.sh --cloud    # also a local cloud service (docker compose --profile cloud)
 #   LAN_IP=192.168.1.50 deploy/local/setup.sh   # when the address found is not the one phones reach
 # An existing .env is kept (its key too); delete it to start over. Runbook: docs/runbooks/local-docker.md
+# On Windows, setup.ps1 next to it does the same in PowerShell (D-208).
 set -euo pipefail
 cd "$(dirname "$0")"
 cloud=0; [ "${1:-}" = "--cloud" ] && cloud=1

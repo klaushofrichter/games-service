@@ -1481,3 +1481,22 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
 - **D-207 · 2026-10-24 · Klaus** — `scripts/mac-table.sh`, the old name of `scripts/local-table.sh` (D-188), is gone.
   `local-table.sh` still reads `~/.gametable-mac`, so a table first set up under the old name keeps its identity and
   API key. *Why:* the alias only ran the other script; one name is clearer.
+- **D-208 · 2026-10-24 · Klaus** — A Windows PC with Docker Desktop runs a table without WSL or Git Bash:
+  - **`deploy/local/setup.ps1`** is the PowerShell twin of `setup.sh`. It writes the same `.env`: the address of the
+    up adapter with a default gateway, Wi-Fi first and no virtual adapters (WSL, Hyper-V, Docker, VPN); a random
+    table key; and `-Cloud`, `-LanIp`. The file is UTF-8 without a byte order mark, with LF line ends, and readable
+    only by the user.
+  - **`-Start`** also checks that Docker is running, runs `docker compose up -d --build`, waits for `/health` and
+    opens the board.
+  - **The scripts** are ASCII only, since Windows PowerShell 5.1 reads a file without a byte order mark in the
+    system's code page.
+  - **Windows CI:** a `windows` job in the PR checks runs `scripts/windows-check.ps1` on GitHub's Windows runner. It
+    runs `setup.ps1` in Windows PowerShell 5.1 and PowerShell 7 (address, key, no byte order mark, LF, kept on a
+    second run, `-Cloud -LanIp`, a wrong address refused), and has Docker Compose read the `.env` where the runner
+    has Compose. It also starts the Table Host natively on Node and checks `/health`, the board, the shared files,
+    the games, a simulation that replays exactly, and that backslashes in a request reach no file outside the served
+    folders.
+  - **Limit:** that runner has no Linux containers, so the images are built and run by the Linux jobs. The runbook
+    has a section *On a Windows PC*; its other commands run in Git Bash.
+
+  *Why:* Klaus asked for a Windows 11 PC, with Docker Desktop as the focus.
