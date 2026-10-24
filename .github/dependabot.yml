@@ -1,7 +1,7 @@
 version: 2
 
 # Version updates only. The security half (alerts + security updates) is a repository setting, not config:
-# kube-setup docs/repository-baseline.md, requirements 1 and 2.
+# The cluster's repository baseline, requirements 1 and 2.
 updates:
   # Application dependencies.
   - package-ecosystem: npm

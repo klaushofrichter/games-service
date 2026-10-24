@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Prints a release's notes, in the order kube-setup's requirements set: the curated CHANGELOG [Unreleased] notes
+# Prints a release's notes, in the order the cluster's requirements set: the curated CHANGELOG [Unreleased] notes
 # (dropped when empty), the commits since the previous release tag, and "Verified at release": what the deploy
 # itself observed. Run by deploy-production.yml after the smoke test passed; render it locally with stub values:
 #   TAG=v2026.10.12.1 SERVED=2026.10.12.1 PAGE_CODE=200 ADMIN="302 https://games.skylar.technology/" \

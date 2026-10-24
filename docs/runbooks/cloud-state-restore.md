@@ -4,9 +4,9 @@ Two situations, from mild to rare. games-cloud keeps its state in SQLite on the 
 (D-114): the live `state.db`; a consistent copy in `snapshots/state.db`, written at start, hourly and at shutdown;
 `snapshots/state.prev.db`, the snapshot as the service found it at its last start; and uploaded logs in `logs/`.
 
-Who runs it: someone with `kubectl` on the cluster (Klaus or kube-setup's on-node session). The commands use Velero's
-objects in namespace `velero` (no `velero` CLI needed). kube-setup owns Velero: if a step differs from how the cluster
-runs it, the cluster's way wins. Case B was tried by kube-setup on 15 Oct 2026 as a restore into a scratch namespace,
+Who runs it: someone with `kubectl` on the cluster (Klaus or the cluster's on-node session). The commands use Velero's
+objects in namespace `velero` (no `velero` CLI needed). The cluster repository owns Velero: if a step differs from how the cluster
+runs it, the cluster's way wins. Case B was tried on the cluster on 15 Oct 2026 as a restore into a scratch namespace,
 with the init hook below, against an empty volume: the mechanics work; a second run with real data is worthwhile once
 the release that writes `/data` has been backed up.
 
@@ -49,7 +49,7 @@ pair again, logs uploaded since then are gone).
 
 Stop at the first unexpected result.
 
-**0. Update kube-setup and pick the backup.** `git pull` in kube-setup first (step 4 applies its manifest). The backup
+**0. Update the cluster repository and pick the backup.** `git pull` in the cluster repository first (step 4 applies its manifest). The backup
 must include the volume:
 
 ```bash
@@ -133,11 +133,11 @@ If the restore ran without the hook, or the service started before the marker wa
 `snapshots/state.prev.db`. Set the marker to `previous` (case A) before anything else restarts the service, then
 continue with step 4.
 
-**4. Bring the Deployment back in line** with today's manifest from kube-setup (image and settings). This is the one
+**4. Bring the Deployment back in line** with today's manifest from the cluster repository (image and settings). This is the one
 rollout after the restore; the restored pod already used the snapshot in step 3.
 
 ```bash
-kubectl apply -f manifests/games/games-cloud-deployment.yaml     # in kube-setup, after git pull
+kubectl apply -f manifests/games/games-cloud-deployment.yaml     # in the cluster repository, after git pull
 kubectl -n games rollout status deploy/games-cloud --timeout=180s
 curl -s https://games.skylar.technology/health
 ```

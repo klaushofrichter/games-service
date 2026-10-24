@@ -34,7 +34,7 @@ export const REPO_URL = "https://github.com/klaushofrichter/games-service";
 /** The running version (APP_VERSION, stamped at build time; "dev" otherwise), as shown in the top bar and on "/". */
 const appVersion = () => process.env.APP_VERSION || "dev";
 /**
- * The version as a label: bare, never "v"-prefixed (kube-setup convention: tags carry the v, displayed values don't).
+ * The version as a label: bare, never "v"-prefixed (the cluster's convention: tags carry the v, displayed values don't).
  * A release version links to its GitHub release; "main" links to the main branch's history; anything else is plain.
  */
 export function versionLabel(v = appVersion()): string {

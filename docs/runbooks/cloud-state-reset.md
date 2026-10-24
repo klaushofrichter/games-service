@@ -9,8 +9,8 @@ table shows a pairing code (or uses an access code you create anew), and the con
 disconnected table, *Delete* on a log or *Delete all simulation logs*, *Revoke* on a download token, *Delete* on an
 access code.
 
-Who runs it: someone with `kubectl` on the cluster (Klaus or kube-setup's on-node session). It takes about five
-minutes; the service is down for one or two of them. Reviewed against the cluster by kube-setup on 15 Oct 2026 (the
+Who runs it: someone with `kubectl` on the cluster (Klaus or the cluster's on-node session). It takes about five
+minutes; the service is down for one or two of them. Reviewed against the cluster on 15 Oct 2026 (the
 reset pod passes admission in a server-side dry run).
 
 ## What is where
@@ -30,7 +30,7 @@ scaling down, never after.
 ## Steps
 
 Stop at the first unexpected result. The commands use `kubectl` with Velero's objects in namespace `velero`; there is
-no `velero` CLI on the kube-setup Mac.
+no `velero` CLI on the cluster's Mac.
 
 **0. Back up first, while the service runs**, so the reset can be undone (`cloud-state-restore.md`, case B):
 

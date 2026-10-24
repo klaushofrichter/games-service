@@ -1,4 +1,4 @@
-# PR checks. Required on `production`: test, codeql, e2e (kube-setup docs/cluster-deployment-requirements.md, 3 and 4).
+# PR checks. Required on `production`: test, codeql, e2e (the cluster's deployment requirements, 3 and 4).
 # Triggers on PRs to main too, so Dependabot's PRs are checked; the gate bites at the main -> production promotion.
 name: PR checks
 on:

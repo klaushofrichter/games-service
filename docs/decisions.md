@@ -211,7 +211,7 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
 
 ## Game-specific overrides (15 Oct 2026)
 
-- **D-111 · 2026-10-15 · Klaus** — A game may override platform features (seat plates, player positions, turn handling and the like) with its own, as long as the game stays manageable and other games are not affected. Each game lists its overrides, with what the platform could offer instead, so the platform can be improved to meet games' needs. *Implementation (Claude):* Loopy keeps its list in `loopy-game` `docs/platform-overrides.md` (L-017); candidates for the platform so far: seat plates with game slots, teams, acknowledgement barriers, a presentation barrier for board animations, AI takeover by the host, an asynchronous AI hook, and optional state versions on intents.
+- **D-111 · 2026-10-15 · Klaus** — A game may override platform features (seat plates, player positions, turn handling and the like) with its own, as long as the game stays manageable and other games are not affected. Each game lists its overrides, with what the platform could offer instead, so the platform can be improved to meet games' needs. *Implementation (Claude):* Loopy keeps its list in its own repository; candidates for the platform so far: seat plates with game slots, teams, acknowledgement barriers, a presentation barrier for board animations, AI takeover by the host, an asynchronous AI hook, and optional state versions on intents.
 
 ## AI players that take their time (15 Oct 2026)
 
@@ -223,7 +223,7 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   - **Board and phones.** The AI pause keeps the game visible: a card at the AI's seat, facing the players, with the AI's name, "is still thinking", *Play now* and *End game* (remote boards: *Play now* only with board control). The phones show "Waiting for … who is still thinking".
   - **Simulations** await answers and play the fallback when an AI is out of time (nobody can tap); AIs with `ai.worker` get one thread per seat for the run.
   - **Checks.** `tests/async-ai.test.ts` with the Think Race test games in `tests/fixtures/async-games` (answers that come later, the thinking marker, the pause and *Play now*, an answer during the pause, stale answers dropped, a failing AI, a connection pause taking over, worker threads keeping the table responsive and a hung worker stopped, simulations with and without fallback, exact replays); `tests/remote.test.ts` (*Play now* follows the remote board-control switch); `scripts/e2e/ai_wait.py` (the card on the board and the banner on the phone, *Play now*, a late answer removing the card).
-  - **Not yet:** the host-side configuration screens (API key, model, effort, cost limit) and a language-model agent; they come with the first game that uses one (Loopy's LLM agent).
+  - **Not yet:** the host-side configuration screens (API key, model, effort, cost limit) and a language-model agent; they come with the first game that uses one (a game's own language-model agent).
 
 ## Access codes and the persistent store (15 Oct 2026)
 
@@ -274,7 +274,7 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
 
 ## Players lost during a game (16 Oct 2026)
 
-- **D-119 · 2026-10-16 · Klaus** — Games decide whether they can go on without a player. A game may end when a player leaves (a team is broken, as in Loopy, or a minimum of players is needed), and says why. A temporary disconnect is survived: a game that needs the player pauses, the board says it can't go on until they are back and offers to end it, and it goes on by itself when they return. Games that don't say otherwise go on, as before; the disconnect of the last player at the table doesn't change that (D-118). Replacing a lost player with an AI comes later; the board's card leaves room for it. *Implementation (Claude):*
+- **D-119 · 2026-10-16 · Klaus** — Games decide whether they can go on without a player. A game may end when a player leaves (a team is broken, or a minimum of players is needed), and says why. A temporary disconnect is survived: a game that needs the player pauses, the board says it can't go on until they are back and offers to end it, and it goes on by itself when they return. Games that don't say otherwise go on, as before; the disconnect of the last player at the table doesn't change that (D-118). Replacing a lost player with an AI comes later; the board's card leaves room for it. *Implementation (Claude):*
   - **SDK.** `canContinueWithout(state, seat)`: `true` or `{ wait: text }`, a question about the state that never changes it (replay asks it again). `onSeatLeft` may return `{ end: { text, highlights? } }` to end the game with its own reason ("end" still ends it with the platform's text).
   - **Table.** When a seated player's phone goes away during a game, the table asks the game. `true`: as before (the waiting time, then onSeatLeft). `{ wait }`: no waiting time, the seat is held; the game pauses (`pause.reason: "player"`, `pause.players` with each name, seat and the game's text; timers stop, AI moves stop and start again afterwards; it takes over a pause for a slow AI and gives way to a pause for the cloud, which comes back to it). When every player the game waits for is back, it goes on. *Resume* is refused while waiting. *End game* ends it; afterwards a player still away leaves after the usual waiting time. Removing a player the game needs ends it with the game's text (asked inside the runtime before the seat goes, so replay ends it the same way). The lobby state's `needed` lists, during a game, the players it can't go on without. A hook that throws counts as `true` and is recorded as an `error` with `where: "canContinueWithout"`.
   - **Board and phones.** A card at the player's seat (the game stays visible): the name, "is away", the game's text, "goes on as soon as … is back", **End game** (remote boards with board control too). Several players away: all names on one card. Every Remove confirmation says "This ends the game: …" for a player the game needs. The phones' banner says whom the game waits for and why.
@@ -448,9 +448,9 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   (pulldowns for long choices). Code and docs follow.
 - **D-135 · 2026-10-17 · Klaus** — LLM-powered AI players are postponed. *Why:* their main gains over the coded AI
   (table talk, explaining moves, teamwork in words) need a conversational interface the table does not have, and would
-  crowd the experience for now; on raw strength a model is not expected to beat a planner like Loopy's *strong*. The
-  provisions stay as they are (D-028 configuration on the table, D-112 background AI with *Play now*, Loopy's `llm`
-  agent slot). *When it comes back:* a hybrid first (the game's planner scores the legal moves, the model chooses among
+  crowd the experience for now; on raw strength a model is not expected to beat a game's own planner. The
+  provisions stay as they are (D-028 configuration on the table, D-112 background AI with *Play now*, a game's own
+  language-model option). *When it comes back:* a hybrid first (the game's planner scores the legal moves, the model chooses among
   the best few and keeps per-game notes), the API called directly from the host, measured against the coded AI in
   AI-only simulations.
 - **D-136 · 2026-10-17 · Klaus** — In Hold'em the board gets a button to go on to the next hand while a hand's result
@@ -503,7 +503,7 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
 ## The statistics window (18 Oct 2026)
 
 - **D-140 · 2026-10-18 · Klaus** — A finished game's awards and statistics in a window on the board, for every game
-  that sends them. *Why:* the C# Loopy ended with trophies (*The Killer*, *The Piñata*, …) and per-player counts; this
+  that sends them. *Why:* an earlier version of Loopy ended with trophies and per-player counts; this
   is worth having for all games, drawn the same way.
   - **Data.** A game's summary may carry `awards: { id, icon, title, blurb?, seats, value? }[]`; the SDK's `mostAward`
     and `leastAward` build them, ties shared. The host keeps an award only when some, not all, players hold it (an
@@ -549,7 +549,7 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   pause first. With AI players paced on the board (D-141), an AI player's move reaches the decks once the table's board
   has shown it, so a phone says "Waiting for Rosa" while the board shows Rosa's move (it used to name the next AI
   while the board still showed the one before) and "your turn" when the board gets to you. When the game asks the
-  same AI again in the same turn (Loopy: a card, then the marble to move; TAC, then its copied card), the platform's
+  same AI again in the same turn (a card, then the piece to move), the platform's
   AI pause (`aiDelayMs`) is skipped while the board paces the game: it is one move, and the board shows each step
   anyway (without a board the pause is all that lets people follow). *Why:* Klaus: phones
   showed "Waiting for" names one AI ahead of the board, and around a TAC "the AI's get to think twice". *Implementation
@@ -557,7 +557,7 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   shown (`game idle`, D-141), until the board stays silent for the pacing timeout, or until the game no longer goes at
   the board's pace (no local board, pacing off, game over); any other message to a deck (a human's move, a timer, a
   pause) first sends what is held, in order. No local board or `BOARD_PACING=0`: nothing is held. A human can only act
-  out of turn in simultaneous phases (Loopy's exchange), where AI moves show at once on the board, so a deck is behind
+  out of turn in simultaneous phases (as in Loopy), where AI moves show at once on the board, so a deck is behind
   for milliseconds at most there. `tests/board-pacing.test.ts`: a phone gets an AI's move once the board has shown
   it, its own move at once.
 - **D-144 · 2026-10-18 · Klaus** — A player whose phone goes away during a game no longer leaves it after a minute by
@@ -566,8 +566,8 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   replaced with an AI manually." *Implementation (Claude):*
   - **Setting.** *Settings › Players › A player whose phone is away for a minute leaves the game*, off by default
     (`POST /api/v1/play {awayTimeout}`, the table's own board only; in memory, like the sound setting). On: as before,
-    the game's own rule for a player who leaves runs after the waiting time (`GRACE_MS`, Loopy puts its AI in the seat,
-    Hold'em folds the player out). Turned on or off during a game, it applies to players already away.
+    the game's own rule for a player who leaves runs after the waiting time (`GRACE_MS`; a game may put its AI in the
+    seat, Hold'em folds the player out). Turned on or off during a game, it applies to players already away.
   - **Away.** With it off, a player away during a game keeps the seat with no time limit; the game is not paused and
     waits by itself when it is their move. After 15 s (a phone locking for a moment shows nothing) the state lists them
     in `away` and the table's board shows a card at their seat: "Ben is away · The seat waits for them. Or hand it to an
@@ -674,9 +674,9 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
 
 ## How a phone sees the board (19 Oct 2026)
 
-- **D-151 · 2026-10-19 · Klaus** — A game's phone can show the board the way its player sees it, at the table and remotely, in every rotation. Klaus asked Starforge (a programming race on a factory map) to carry everything learnt about the deck and the board's rotations, remote players included: a robot's "north" on the phone must be the direction the player sees as up the table. *Implementation (Claude):*
+- **D-151 · 2026-10-19 · Klaus** — A game's phone can show the board the way its player sees it, at the table and remotely, in every rotation. Klaus asked Starforge to carry everything learnt about the deck and the board's rotations, remote players included: "north" on the phone must be the direction the player sees as up the table. *Implementation (Claude):*
   - **The table keeps the game's facing.** `gameFacing` (`"north" | "south"`) in the lobby state: the last north or south the table faced (D-101). Turning the lobby east or west leaves it; the board's `gameEdge()` reads it instead of tracking it itself, so a phone that joins later knows it too.
-  - **Deck `info`** gains `seatEdges` (as the board has them), `viewEdge` (the table edge the player looks from) and `boardEdge` (the edge the game faces on the board that player sees). At the table: `viewEdge` = the seat's edge, `boardEdge` = `gameFacing`. A remote player has their own board, turned to their seat (D-059), or upright when an east or west seat chose the full width (D-101): there both are that board's edge, so the phone reads it upright. A phone turns a map by `ROT[boardEdge]`-relative angles; Starforge's `viewAngle()` is the worked example.
+  - **Deck `info`** gains `seatEdges` (as the board has them), `viewEdge` (the table edge the player looks from) and `boardEdge` (the edge the game faces on the board that player sees). At the table: `viewEdge` = the seat's edge, `boardEdge` = `gameFacing`. A remote player has their own board, turned to their seat (D-059), or upright when an east or west seat chose the full width (D-101): there both are that board's edge, so the phone reads it upright. A phone turns a map by `ROT[boardEdge]`-relative angles.
   - A remote player toggling the full width re-renders the game on their phone (`storage` event), so the map follows at once.
   - **Checks.** `tests/lobby.test.ts` (the facing kept through east, west and rotations).
 - **D-152 · 2026-10-19 · Claude** — Two fixes found by Starforge's browser checks (D-151):
@@ -686,9 +686,8 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
     memory for 10 minutes (64 MB at most, oldest dropped first) and served `private, max-age=600`. Everything else
     stays `no-store`. A game updated between games shows its new assets within 10 minutes, or at once after a reload.
   - **A game's result table scrolls sideways inside its card on the phone**, with slightly tighter headers, instead
-    of running past the card (Starforge's eight columns at 390 px).
-- **D-153 · 2026-10-19 · Klaus** — `klaushofrichter/starforge-game` (Starforge Circuit, private, ported from
-  DigitalTableTop like Loopy) joins the deploy-time repositories on its `production` branch, beside extra-games and
+    of running past the card (eight columns at 390 px).
+- **D-153 · 2026-10-19 · Klaus** — `klaushofrichter/starforge-game` (Starforge, private) joins the deploy-time repositories on its `production` branch, beside extra-games and
   loopy-game (D-098, D-110). `GAME_REPO_TOKEN` must be able to read it (Contents: read).
 - **D-154 · 2026-10-19 · Klaus** — The lobby's QR panel reads *Scan to join locally* (was *Scan to join*): the code
   is for players at the table; remote players join through an invite. Checked facing south and east (the narrow panel).
@@ -1405,3 +1404,13 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   - **Decision records:** D-127, D-128 and D-129 were each used twice; the second ones are D-127b, D-128b and D-129b,
     and code and docs follow. Six cross-references are corrected (D-055, D-056, D-057, D-113, D-148, D-159), section
     headings match their dates, and a table at the top lists the records later ones changed.
+- **D-200 · 2026-10-24 · Klaus** — Private repositories in this public repository: their names may stay, details
+  about them go. *Why:* Klaus: "Using the names loopy and star forge is fine, as long as there are no game details or
+  screenshots. About Kube-setup, I follow you recommended path." *Implementation (Claude):*
+  - **The cluster repository:** `docs/kube-setup-request.md` (the deployment request, with cluster internals) is
+    removed from this repository; it was posted to the cluster's own channel for the cluster repository to keep.
+    Comments, the README and the state runbooks say *the cluster repository* instead of naming it. The deploy
+    workflow still clones it by name, which it needs to deploy. Earlier records keep their wording as history.
+  - **Loopy and Starforge:** named where it helps, without their game details: decision records that described
+    their rules, awards, AI levels, code or origin now say only what the platform decision needed. The test fixtures
+    and `deploy/game-repos.json` use the names only. The website has no screenshot of either.
