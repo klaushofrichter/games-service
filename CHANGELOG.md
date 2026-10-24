@@ -9,6 +9,8 @@ history.
 ## [Unreleased]
 
 - `scripts/mac-table.sh` is gone: use `scripts/local-table.sh`, which keeps a table set up under the old name (D-207).
+- A Windows PC with Docker Desktop: `deploy\local\setup.ps1 -Start` writes the settings, starts the table and opens
+  the board, in PowerShell; the PR checks run it and the Table Host on Windows (D-208).
 - `scripts/local-table.sh` starts on a Mac again: its start-up text no longer trips macOS's bash 3.2.
 - A local cloud service in Docker starts on a fresh volume again (the image creates `/data` for its user), and
   offers only the public extra games (D-206).

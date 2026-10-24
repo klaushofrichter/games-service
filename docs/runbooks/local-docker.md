@@ -41,12 +41,28 @@ console, uploading logs and table metrics (Part C).
 ## Prerequisites
 
 - **Docker** with the Compose plugin (`docker compose version` prints v2 or later): Docker Engine on Linux, Docker
-  Desktop on macOS or Windows (on Windows, run the commands in WSL or Git Bash, and run `setup.sh` with
-  `LAN_IP=<the WiFi adapter's IPv4 address from ipconfig>`: WSL's own 172.x address is not reachable from phones).
+  Desktop on macOS or Windows. On Windows, see *On a Windows PC* below.
 - **git**, and about 1 GB of disk for the image.
 - The machine and the phones on **the same network**, not a guest WiFi that isolates devices. Port **8080** free and
   reachable from the LAN (a firewall may ask, or need a rule; see *Troubleshooting*).
 - A browser on the machine for the board; a touchscreen is optional (a mouse works).
+
+### On a Windows PC
+
+Windows 10 or 11 with **Docker Desktop** (Linux containers, its default) and **Git for Windows**. Part A in PowerShell:
+
+```powershell
+git clone https://github.com/klaushofrichter/games-service
+cd games-service
+powershell -ExecutionPolicy Bypass -File deploy\local\setup.ps1 -Start
+```
+
+`setup.ps1` does what `setup.sh` does (A2): it writes `deploy\local\.env` with this PC's WiFi or wired address and a
+random table key, `-LanIp 192.168.1.50` when it picks the wrong address, `-Cloud` for Part C. With `-Start` it also
+builds and starts the table (A3) and opens the board. When Windows asks, allow Docker Desktop on **private**
+networks, or phones can't reach the table. The other commands of this runbook are for a shell: run them in **Git
+Bash**, which comes with Git for Windows. The PR checks run `setup.ps1` and the Table Host on Windows
+(`scripts/windows-check.ps1`, D-208).
 
 ## Part A: the table with the built-in games
 
@@ -72,7 +88,7 @@ random `TABLE_KEY` (the key of the board control API). It keeps an existing `.en
 `192.168.x.x` or `10.x.x.x`. If it picked the wrong one (a VPN, Docker's own `172.17.x.x`), run
 `rm deploy/local/.env && LAN_IP=<the right address> deploy/local/setup.sh`. To find the address:
 `ipconfig getifaddr en0` (macOS), `ip -4 route get 1.1.1.1` (Linux, the `src` value) or `ipconfig` (Windows, the WiFi
-adapter's IPv4 address).
+adapter's IPv4 address; on Windows `setup.ps1 -LanIp <address>`).
 
 ### A3. Build and start
 

@@ -28,7 +28,8 @@ Open `http://localhost:8080/board/` on the table PC (full screen, 1920 × 1080 o
 
 **On one machine with Docker, without the cloud service, DNS or HTTPS:** [`docs/runbooks/local-docker.md`](docs/runbooks/local-docker.md),
 written for people and for coding agents (`deploy/local/`). It needs no cloud service, also not for games from other
-repositories, private ones included (cloned, runbook Part B).
+repositories, private ones included (cloned, runbook Part B). On a Windows PC with Docker Desktop, in PowerShell:
+`powershell -ExecutionPolicy Bypass -File deploy\local\setup.ps1 -Start` (runbook, *On a Windows PC*).
 
 For development with a local cloud service: `docker compose -f deploy/docker-compose.yml up --build` starts a cloud service and a table host. The table shows a 6-character pairing code; approve it in the console at `http://localhost:8081/admin` (in local development it asks for `ADMIN_TOKEN`: `change-me-dev-admin-token` unless you set your own), or with
 
