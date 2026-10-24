@@ -8,6 +8,9 @@ history.
 
 ## [Unreleased]
 
+- The console can have a host of its own (`CONSOLE_URL`, games-console.skylar.technology): its sign-in and session
+  live only there, out of reach of the pages a table sends to remote players; `/admin` on the website's host sends
+  people there (D-204).
 - Security: a phone can pass only the sling's own fields to the boards and card faces draw only real cards; board access, served files, idle connections, move rates, remote messages, token comparison, uploaded logs and invites are hardened (D-202). Clean-ups without a change in behaviour (D-203).
 - A phone no longer repeats a game's last events when the lobby changes; each move animates once (D-201).
 - The cluster's deployment request leaves this repository, and private games are named without their details (D-200).

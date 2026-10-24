@@ -13,6 +13,15 @@ const fail = (msg: string) => {
   process.exit(1);
 };
 const publicUrl = env.PUBLIC_URL ?? "https://games.skylar.technology";
+// The console's own address (D-204): the console, sign-in and its cookie live there, away from remote play. Optional.
+const consoleUrl = env.CONSOLE_URL ? parseConsoleUrl(env.CONSOLE_URL) : undefined;
+function parseConsoleUrl(v: string): string {
+  const u = URL.parse(v);
+  if (!u || !/^https?:$/.test(u.protocol) || v.replace(/\/$/, "") !== u.origin) fail(`CONSOLE_URL must be an origin like https://games-console.skylar.technology (it is ${v})`);
+  if (u!.host === new URL(publicUrl).host) fail("CONSOLE_URL must be a host of its own, not PUBLIC_URL's");
+  if (publicUrl.startsWith("https://") && u!.protocol !== "https:") fail("CONSOLE_URL must be https when PUBLIC_URL is");
+  return u!.origin;
+}
 
 // ADMIN_TOKEN is optional: a bearer token for scripts and pipelines. People sign in with Google.
 const adminToken = env.ADMIN_TOKEN || undefined;
@@ -25,7 +34,7 @@ if (present.length) {
   const missing = googleKeys.filter((k) => !env[k]);
   if (missing.length) fail(`Google sign-in is half configured; missing ${missing.join(", ")}`);
   if (env.COOKIE_SECRET!.length < 32) fail("COOKIE_SECRET must be at least 32 characters (openssl rand -hex 32)");
-  const expected = `${publicUrl}/auth/google/callback`;
+  const expected = `${consoleUrl ?? publicUrl}/auth/google/callback`;
   if (env.GOOGLE_REDIRECT_URI !== expected) fail(`GOOGLE_REDIRECT_URI must be ${expected} (it is ${env.GOOGLE_REDIRECT_URI})`);
   google = {
     clientId: env.GOOGLE_CLIENT_ID!,
@@ -92,6 +101,7 @@ const cloud = await startCloud({
   adminToken,
   google,
   publicUrl,
+  consoleUrl,
   logRetentionDays: Number(env.LOG_RETENTION_DAYS ?? 90),
   // e.g. [{"urls":"stun:stun.l.google.com:19302"},{"urls":"turn:turn.example:3478","username":"u","credential":"p"}]
   iceServers: env.ICE_SERVERS ? JSON.parse(env.ICE_SERVERS) : undefined,
@@ -110,5 +120,5 @@ const cloud = await startCloud({
   // The PREVIEW / DRAFT sash on the public website (D-177): on until the launch sets PREVIEW_BANNER=0.
   previewBanner: env.PREVIEW_BANNER !== "0",
 });
-console.log(`[cloud] ${env.APP_VERSION || "dev"} listening on ${cloud.port}; admin sign-in: ${google ? `Google (${google.allowedEmails.length} allowed)` : "ADMIN_TOKEN only (development)"}`);
+console.log(`[cloud] ${env.APP_VERSION || "dev"} listening on ${cloud.port}; console at ${consoleUrl ?? `${publicUrl}/admin`}; admin sign-in: ${google ? `Google (${google.allowedEmails.length} allowed)` : "ADMIN_TOKEN only (development)"}`);
 for (const sig of ["SIGINT", "SIGTERM"] as const) process.on(sig, async () => (await cloud.close(), process.exit(0)));

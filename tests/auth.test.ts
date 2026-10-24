@@ -294,3 +294,91 @@ describe("console top bar, favicon and version label", () => {
     }
   });
 });
+
+describe("the console on a host of its own (CONSOLE_URL, D-204)", () => {
+  const CONSOLE = "https://games-console.skylar.technology";
+  const startSplit = () => start({ consoleUrl: CONSOLE, google: google({ redirectUri: `${CONSOLE}/auth/google/callback` }), adminToken: "script-token-0123456789" });
+  /** A request as the ingress forwards it: to our port, with the browser's Host. */
+  const at = (host: string, path: string, headers: Record<string, string> = {}, method = "GET", body?: string) =>
+    new Promise<{ status: number; headers: import("node:http").IncomingHttpHeaders; text: string }>((resolve, reject) => {
+      import("node:http").then(({ request }) => {
+        const r = request({ host: "127.0.0.1", port: cloud!.port, path, method, headers: { host, ...headers } }, (res) => {
+          let text = "";
+          res.on("data", (d) => (text += d));
+          res.on("end", () => resolve({ status: res.statusCode!, headers: res.headers, text }));
+        });
+        r.on("error", reject);
+        r.end(body);
+      });
+    });
+  const consoleHost = new URL(CONSOLE).host;
+  const publicHost = new URL(PUBLIC).host;
+  /** Signs in on the console's host and returns the session cookie value. */
+  async function signInThere(email: string) {
+    const login = await at(consoleHost, "/auth/google/login");
+    expect(new URL(String(login.headers.location)).searchParams.get("redirect_uri")).toBe(`${CONSOLE}/auth/google/callback`);
+    const stateCookie = (login.headers["set-cookie"] ?? []).find((c) => c.startsWith("games_oauth_state="))!.split(";")[0];
+    const state = decodeURIComponent(stateCookie.split("=")[1]);
+    const cb = await at(consoleHost, `/auth/google/callback?state=${encodeURIComponent(state)}&code=${encodeURIComponent(email)}`, { cookie: stateCookie });
+    expect(cb.headers.location).toBe("/admin");
+    const c = (cb.headers["set-cookie"] ?? []).find((x) => x.startsWith("__Host-games_admin="))!;
+    expect(c).toMatch(/Secure/);
+    expect(c).not.toMatch(/Domain=/i); // host-only: never sent to the public host
+    return c.split(";")[0].slice("__Host-games_admin=".length);
+  }
+
+  it("signs in and serves the console only on the console's host", async () => {
+    await startSplit();
+    const session = await signInThere("admin@example.com");
+    const cookie = `__Host-games_admin=${session}`;
+    expect((await at(consoleHost, "/admin", { cookie })).status).toBe(200);
+    expect(JSON.parse((await at(consoleHost, "/admin/api/me", { cookie })).text)).toEqual({ via: "google", email: "admin@example.com" });
+    // Signed in, the console's "/" opens the console; anonymous, it is a page with a Sign in link.
+    expect((await at(consoleHost, "/", { cookie })).headers.location).toBe("/admin");
+    const anon = await at(consoleHost, "/");
+    expect(anon.status).toBe(200);
+    expect(anon.text).toContain('href="/auth/google/login"');
+    expect((await at(consoleHost, "/admin")).headers.location).toBe("/");
+    // Nothing of the public website or remote play on the console's host.
+    for (const path of ["/i/ABCDEFGH", "/dl/x", "/site/x.png", "/api/tables/hello"]) expect((await at(consoleHost, path)).status, path).toBe(404);
+  });
+
+  it("the public host never accepts the session, even a cookie left there from before, and sends people to the console", async () => {
+    await startSplit();
+    const session = await signInThere("admin@example.com");
+    const cookie = `__Host-games_admin=${session}`;
+    expect((await at(publicHost, "/admin/api/me", { cookie })).status).toBe(401);
+    const put = await at(publicHost, "/admin/api/settings", { cookie, origin: PUBLIC, "content-type": "application/json" }, "PUT", JSON.stringify({ logRetentionDays: 30 }));
+    expect(put.status).toBe(401);
+    for (const path of ["/admin", "/auth/google/login", "/auth/logout"]) {
+      const r = await at(publicHost, path, { cookie });
+      expect(r.status, path).toBe(302);
+      expect(r.headers.location, path).toBe(`${CONSOLE}${path}`);
+      expect(String(r.headers["set-cookie"]), path).toMatch(/^__Host-games_admin=; Path=\/; Max-Age=0/);
+    }
+    // The website links the console's host and can't tell who is signed in there.
+    const home = await at(publicHost, "/", { cookie });
+    expect(home.status).toBe(200);
+    expect(home.text).toContain(`<a id="admin-link" href="${CONSOLE}/">Admin</a>`);
+    // Scripts with ADMIN_TOKEN work on either host.
+    for (const host of [publicHost, consoleHost]) expect((await at(host, "/admin/api/tables", { authorization: "Bearer script-token-0123456789" })).status, host).toBe(200);
+  });
+
+  it("a cookie-authenticated change must come from the console's origin, not the public one", async () => {
+    await startSplit();
+    const cookie = `__Host-games_admin=${await signInThere("admin@example.com")}`;
+    const put = (origin: string) => at(consoleHost, "/admin/api/settings", { cookie, origin, "content-type": "application/json" }, "PUT", JSON.stringify({ logRetentionDays: 30 }));
+    expect((await put(PUBLIC)).status).toBe(401); // a page on the public host is the same site, so only the origin tells
+    expect((await put(CONSOLE)).status).toBe(200);
+  });
+
+  it("logout on the console's host lands on its signed-out page", async () => {
+    await startSplit();
+    const cookie = `__Host-games_admin=${await signInThere("admin@example.com")}`;
+    const out = await at(consoleHost, "/auth/logout", { cookie });
+    expect(out.headers.location).toBe("/?signed-out=1");
+    const page = await at(consoleHost, "/?signed-out=1");
+    expect(page.text).toContain("You are signed out");
+    expect(page.text).not.toContain("accounts.google.com");
+  });
+});

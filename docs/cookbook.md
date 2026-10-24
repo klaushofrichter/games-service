@@ -124,14 +124,17 @@ play only there. You provide:
 - an **HTTPS certificate** (a reverse proxy such as Caddy or Traefik gets one from Let's Encrypt by itself);
 - a **Google OAuth client** for the admin sign-in (an https service requires it), and the e-mail addresses that may
   sign in (`ALLOWED_EMAILS`);
-- optionally a **TURN server** (`ICE_SERVERS`) for players behind strict networks.
+- optionally a **TURN server** (`ICE_SERVERS`) for players behind strict networks;
+- recommended, a **second domain name for the console** (for example `games-console.example.com`, `CONSOLE_URL`) with
+  its own DNS record and certificate: an invite page runs code that the inviting table sends, and on a host of its own
+  the console's sign-in is out of that code's reach.
 
 **Ask:**
 
 > Read https://games.skylar.technology/llms.txt and the README of https://github.com/klaushofrichter/games-service
 > (*Cloud service configuration*, *Remote play*). Run the Game Table cloud service on this server at
-> https://games.example.com behind Caddy, with its data kept on disk, Google sign-in for admins
-> (allowed: me@example.com), and connect my table at home to it. Tell me which values I have to create myself, and
+> https://games.example.com behind Caddy, with its data kept on disk, the console at https://games-console.example.com,
+> Google sign-in for admins (allowed: me@example.com), and connect my table at home to it. Tell me which values I have to create myself, and
 > where to put them; don't put secrets into the repository.
 
 **It worked when** `https://games.example.com/health` answers, you can sign in to the console, your table shows
