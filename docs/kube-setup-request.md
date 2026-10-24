@@ -6,8 +6,10 @@ Service*, *Services*, *Networking and DNS*, *Container Security*) and `docs/clus
 Where this request deviates from the usual shape, it says why. Draft YAML is a starting point: adjust names and
 labels to the cluster's conventions, and the manifests are yours to own.
 
-**Nothing here is urgent:** the cluster is not ready yet (Klaus, 2026-10-12). The repo side is ready; see
-*What games-service already did* at the end.
+**Status:** deployed (first production deploy after the volume landed on 15 Oct 2026); kept as the record of what
+was requested. The live manifests in the cluster repository win where they differ: they add the `data` volume (PVC
+`games-cloud-data` at `/data`), `DATA_DIR=/data`, `fsGroup: 1000` and the backup annotation, which the draft below
+lacks.
 
 ## The service in one paragraph
 
@@ -23,8 +25,9 @@ Node 26, listens on **8081**, image `ghcr.io/klaushofrichter/games-cloud`, numer
 
 - **Not a Knative Service.** Knative `DomainMapping` breaks WebSocket (vault, *Networking and DNS*), and tables hold
   their socket for hours. cams-admin solved the same problem with a Deployment and its own Ingress.
-- **One replica, `strategy: Recreate`.** State is in memory for now (pairings, invites, uploaded logs), and the
-  signaling sockets belong to one process. Do not scale it out: a second pod would not see the first one's tables.
+- **One replica, `strategy: Recreate`.** One process owns the SQLite state in `/data` and the
+  signaling sockets. Do not scale it out: a second pod would neither see the first one's tables nor safely share the
+  database.
 - **Volume (done 15 Oct 2026, kube-setup `afc7bbe`).** PVC `games-cloud-data` (1Gi, `local-path`, PV set to
   Retain) at `/data`, `DATA_DIR=/data`, pod `fsGroup: 1000`, backed up by Velero's daily file-system backup (30 days).
   The service keeps its state there as SQLite (D-114): tables, access codes, repository ticks, console repositories,
@@ -59,7 +62,7 @@ metadata:
   labels: { app: games-cloud }
 spec:
   replicas: 1
-  strategy: { type: Recreate } # one process owns the in-memory state and the table sockets
+  strategy: { type: Recreate } # one process owns the state database and the table sockets
   selector:
     matchLabels: { app: games-cloud }
   template:
@@ -83,7 +86,7 @@ spec:
           livenessProbe: { httpGet: { path: /health, port: http }, periodSeconds: 30 }
           resources:
             requests: { cpu: 50m, memory: 96Mi }
-            limits: { memory: 512Mi } # uploaded game logs are held in memory until the store lands
+            limits: { memory: 512Mi } # headroom for log uploads and repository bundles
           securityContext:
             allowPrivilegeEscalation: false
             capabilities: { drop: [ALL] }
@@ -91,7 +94,7 @@ spec:
             runAsNonRoot: true
             runAsUser: 1000
             seccompProfile: { type: RuntimeDefault }
-            readOnlyRootFilesystem: true # checked: the service writes nothing to disk (CI runs the image --read-only)
+            readOnlyRootFilesystem: true # it writes only to /data (the PVC); CI runs the image --read-only
 ```
 
 **Network policy** (default-deny both ways, the cams-admin pattern):
@@ -120,7 +123,7 @@ Copy `cams-admin-runner` (it deploys a plain Deployment the same way), with:
 
 `scripts/sync-secrets.sh` in games-service reads its local `.env` and, without printing values:
 
-- `--cluster`: applies `games/games-oauth` (the five sign-in keys, plus the optional `GAME_REPO_TOKEN` for private
+- `--cluster`: applies `games/games-oauth` (the five sign-in keys, plus the optional `ADMIN_TOKEN` and `GAME_REPO_TOKEN` for private
   extra-game repositories, D-097; the repository list itself is in the image, D-098) and `games-runner/runner-pat`
   (key `token`).
   It needs the two namespaces to exist first.

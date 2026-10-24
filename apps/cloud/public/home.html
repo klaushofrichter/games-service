@@ -482,6 +482,7 @@ footer h4 { font: 600 13px var(--text); letter-spacing: .14em; text-transform: u
 footer a { color: var(--faint); display: block; margin: 6px 0; }
 footer a:hover { color: var(--ink); }
 footer .version { display: inline; margin: 0; }
+footer a.terms { display: inline; margin: 0; }
 
 /* ---------- reveal on scroll ---------- */
 .js .rv { opacity: 0; transform: translateY(30px); transition: opacity .9s cubic-bezier(.2,.7,.2,1), transform .9s cubic-bezier(.2,.7,.2,1); transition-delay: var(--d, 0s); }
@@ -1216,7 +1217,7 @@ docker compose -f deploy/local/docker-compose.yml up -d --build">Copy</button></
     <div>
       <a class="logo" href="#" style="margin:0 0 14px"><img src="/favicon.svg" alt="">Game Table</a>
       <p>Board and card games around one touchscreen, with phones as private hands. Free and open source under the MIT licence, with no warranty.</p>
-      <p style="margin-top:14px">Version {{version}}</p>
+      <p style="margin-top:14px">Version {{version}} · <a class="terms" href="/terms">Terms of service</a></p>
     </div>
     <div><h4>Play</h4><a href="#games">Games</a><a href="#install">Play at home</a><a href="/docs/local-docker.md">Local runbook</a><a href="#table">The table</a><a href="#service">Game service</a></div>
     <div><h4>Build</h4><a href="/docs/game-development.md">Developer guide</a><a href="/llms.txt">llms.txt</a><a href="/llms-full.txt">llms-full.txt</a><a href="#repos">Game repositories</a><a href="https://github.com/klaushofrichter/games-service/blob/main/docs/decisions.md" target="_blank" rel="noopener noreferrer">Decision records</a></div>

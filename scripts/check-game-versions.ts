@@ -1,4 +1,4 @@
-// Game versions (D-127): a game's version is a calendar version, YYYY.MM.DD.N, in its manifest. It changes exactly
+// Game versions (D-127b): a game's version is a calendar version, YYYY.MM.DD.N, in its manifest. It changes exactly
 // when the game changes: any file in its folder (rules, board and phone UI, styles, assets, rules for players, the
 // manifest's other fields). Changes outside the folder (the lobby, the board kit, the SDK, the table host) never change
 // a game's version; logs record the platform version separately.
@@ -107,7 +107,7 @@ for (const id of readdirSync(dir, { withFileTypes: true }).filter((e) => e.isDir
 
 for (const f of fixed) console.log(`set ${f}`);
 if (problems.length) {
-  console.error(`Game versions (D-127) against ${base}:\n${problems.map((p) => `  - ${p}`).join("\n")}`);
+  console.error(`Game versions (D-127b) against ${base}:\n${problems.map((p) => `  - ${p}`).join("\n")}`);
   console.error(`\nRun node ${process.argv[1].replace(process.cwd() + "/", "")} --fix to set the versions of changed games.`);
   process.exit(1);
 }

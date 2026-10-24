@@ -83,7 +83,7 @@ export const manifestSchema = z.object({
   ),
   seatConstraints: z.unknown().nullable().optional(),
   /**
-   * Where a single player at the table sits (D-128): when exactly one human plays at the table (the others remote or
+   * Where a single player at the table sits (D-128b): when exactly one human plays at the table (the others remote or
    * AI) and they are on another edge, the table moves them to a seat on this edge when the game starts, swapping with
    * whoever sits there. With two or more people at the table everyone keeps their seat. For games whose board has a
    * front side, e.g. Chess, where the remote players' boards turn to them by themselves (D-059).

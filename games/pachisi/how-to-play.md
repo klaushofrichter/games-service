@@ -66,11 +66,11 @@ In the board's settings (the gear): **Pieces** shows icons on the tokens (the de
 
 ## Players leaving
 
-If a player leaves, their tokens are removed from the board. If only one player is left, that player wins.
+A game keeps its players. If someone has to go, the board can exchange them for another person or an AI player, who plays on with the same tokens.
 
 ## End of the game
 
-The game ends as soon as one player has every token at HOME. That player wins. There are no second places. The result screen shows how many tokens each player got home, and how many they sent back or lost.
+The game ends as soon as one player has every token at HOME. That player wins. There are no second places.
 
 ## Tips
 

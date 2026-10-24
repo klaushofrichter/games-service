@@ -3,7 +3,7 @@
 Empties games-cloud's persistent state (D-114): every paired table, access code, repository tick, console-added
 repository, uploaded game log, invite, download token and setting. Afterwards the service starts as if new: every
 table shows a pairing code (or uses an access code you create anew), and the console lists only the repositories from
-`deploy/game-repos.json`.
+`deploy/game-repos.json` (and `GAME_REPOS`, if the Deployment sets it).
 
 **Use this only to start over.** To remove single records, use the console instead (D-115): *Delete* on a
 disconnected table, *Delete* on a log or *Delete all simulation logs*, *Revoke* on a download token, *Delete* on an

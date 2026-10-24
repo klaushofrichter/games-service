@@ -25,7 +25,7 @@ Never show your phone to the others: your two cards are only there.
 3. **Flop:** three shared cards. Betting round.
 4. **Turn:** a fourth shared card. Betting round.
 5. **River:** a fifth shared card. Last betting round.
-6. **Showdown:** all remaining hands are shown on the board and the best hand wins the pot. The next hand starts after a few seconds, or at once when someone taps **Next hand** on the board.
+6. **Showdown:** all remaining hands are shown on the board and the best hand wins the pot. The next hand starts after a few seconds, or at once when someone taps **Next hand** on the board (**Finish** after the last hand).
 
 After the flop, betting starts with the first player after the dealer. The dealer button moves one player clockwise each hand.
 
@@ -43,13 +43,13 @@ The button shows the exact amount you will pay now. **Fold** is greyed out when 
 
 - Before the flop and on the flop, a bet is the **small bet**.
 - On the turn and river, a bet is **twice the small bet**.
-- At most four bets per round (the big blind counts as the first one before the flop). Then the raise button says **Capped**.
+- At most four bets per round (the big blind counts as the first one before the flop). Then, or when you can only call, the raise button says **Capped**.
 
 ### All-in and side pots
 
 If you do not have enough points to call, you can call with everything you have. You are then **all-in**: you stay in the hand but bet no more. You can only win as much from each player as you put in. The rest goes to side pots for the others.
 
-An all-in that adds less than half a bet does not let players who already acted raise again.
+An all-in that adds less than half a bet does not count as a raise: players who already acted have to match it, and may still raise.
 
 ## Winning a hand
 
@@ -79,7 +79,7 @@ AI players can be *tight* (plays only good hands) or *loose* (plays more hands a
 ## Players out and leaving
 
 - With no points left, you are out and sit out the remaining hands.
-- If you leave, your hand is folded and your points are out of the final ranking.
+- If someone has to go, the board can exchange them for another person or an AI player, who plays on with the same cards and points.
 
 ## End of the game
 

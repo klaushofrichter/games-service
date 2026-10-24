@@ -45,6 +45,20 @@ describe("cloud service", () => {
     expect(await (await fetch(`${base}/`)).text()).toContain('href="/llms.txt"');
   });
 
+  it("serves the terms of service, linked beside the version at the foot of the website (D-197)", async () => {
+    const home = await (await fetch(`${base}/`)).text();
+    expect(home).toMatch(/Version <(a|span) class="version"[^>]*>[^<]*<\/(a|span)> · <a class="terms" href="\/terms">Terms of service<\/a>/);
+    const r = await fetch(`${base}/terms`);
+    expect(r.status).toBe(200);
+    expect(r.headers.get("content-type")).toContain("text/html");
+    const terms = await r.text();
+    expect(terms).toContain("<h1>Terms of service</h1>");
+    expect(terms).toContain('href="mailto:klaus@skylar.technology"');
+    expect(terms).not.toContain("{{version}}");
+    // The glossary is for the repository, not the website.
+    expect((await fetch(`${base}/docs/glossary.md`)).status).toBe(404);
+  });
+
   it("rejects admin calls without the admin token", async () => {
     expect((await fetch(`${base}/admin/api/tables`)).status).toBe(401);
   });
