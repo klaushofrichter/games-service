@@ -1414,3 +1414,10 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   - **Loopy and Starforge:** named where it helps, without their game details: decision records that described
     their rules, awards, AI levels, code or origin now say only what the platform decision needed. The test fixtures
     and `deploy/game-repos.json` use the names only. The website has no screenshot of either.
+- **D-201 · 2026-10-24 · Klaus** — The phone gives a game each message's events once, as the board does. *Why:* the
+  review (D-199) found that the phone called the game's `update` again with the last events whenever the lobby
+  changed or the page redrew, so a game could animate the same move twice; Klaus: "fix the phone repeating events
+  like the board does". *Implementation (Claude):* `deck.js` marks a game message's events delivered once the game has
+  them; later redraws pass `[]`. The developer guide says so. Check: `scripts/e2e/card_sling.py` wraps the phone's
+  game module, counts the events each `update` gets, and toggles the sound twice after a draw: those redraws get none
+  (with the old code they got the draw's event again).
