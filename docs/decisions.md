@@ -1292,3 +1292,26 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   fits, holds one at the top edge and takes both screens (the board cropped around the seat). Check:
   `scripts/e2e/website.py` counts five extra games, checks that the schematic moves and has its three steps, that
   the real phone sits beside the board with both pictures loaded, and the iPad note.
+- **D-197 · 2026-10-24 · Klaus** — A glossary in the repository, and terms of service for the website. *Why:* Klaus:
+  "Do we have a glossary somewhere? If not, we could do a glossary.md and link it from the README … Ideally we are
+  using these terms also in the code"; "seat-plate is fine. Use the terms that you are using in the software"; "Also
+  explain the seating names North, South, etc."; and "We need to add 'Terms of Service' to the landing page … at the
+  bottom to the right of the version string in the same line … basically denying any warrantees or responsibility,
+  pledging compliance with copyrights and trademarks - and concerns should go to klaus@skylar.technology."
+  *Implementation (Claude):*
+  - **`docs/glossary.md`** (repository only, not served by the website): the table, the seats and their names, people,
+    joining and running a table, games, the sling, tools and the game service. Each term is the one the software
+    uses, with its names in the code and the words to avoid (for example *seat plate*, not *player box*; *AI player*,
+    not *bot*; *watcher*, not *spectator*). *Seats and their names* explains the edges (south at the bottom of the
+    screen's picture, west on the left of a south player), the compass names for one, two or three seats on an edge,
+    the layouts in seat-number order (from `seatName()`), and a diagram. *Where the words still differ* lists the
+    remaining mismatches (*admin portal* for the console in a few places; *cloud service* and *game service*; *deck* in
+    code, *your phone* for players). The README and `AGENTS.md` link to it.
+  - **Terms of service** at `/terms` (`apps/cloud/public/terms.html`), linked as *Terms of service* right of the
+    version label at the foot of the website, on its line. They cover the website, the service and the software: what
+    Game Table is (entertainment, no real money), no warranty ("as is"), no liability as far as the law allows, fair
+    use, what is recorded, copyrights and trademarks (a pledge to respect them; no affiliation with trademark owners;
+    other repositories' games under their authors' terms) with concerns to klaus@skylar.technology, the MIT licence,
+    changes and contact. The players' terms at a table (`shared/terms.md`, D-163) stay as they are and are named as
+    applying too. Checks: `tests/cloud.test.ts` (the page, the link beside the version, the address, no glossary on
+    the website) and `scripts/e2e/website.py` (the link on the version's line, the page opens).

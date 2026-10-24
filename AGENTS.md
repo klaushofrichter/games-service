@@ -9,6 +9,8 @@
   Without Docker: `scripts/local-table.sh` (Node 26) runs one from the latest `main`, `--branch NAME`, and
   `--extra ../other-repo` for games not released yet (developer guide, section 14). The board can move to an iPad
   or a TV on the same network: board settings › *Board on another screen…* (README, D-190).
+- **Words:** [`docs/glossary.md`](docs/glossary.md) names the platform's parts and their names in the code (board,
+  deck, seat plate, watcher, sling, console, the seat names). Use them in docs, UI text and new code.
 - **Changing the platform?** Decisions are recorded in [`docs/decisions.md`](docs/decisions.md) (D-nnn); add one for
   every product decision in the same pull request. Keep the developer guide, `llms.txt` and the SDK comments in step:
   `tests/developer-docs.test.ts` checks that every rules hook, manifest field and UI `info` field is documented.
