@@ -130,7 +130,7 @@ buttons turn them to north, east, south or west (D-080). In code: `seatEdges(lay
 | Term | What it is | In the code | Avoid |
 | --- | --- | --- | --- |
 | **Game service** | The cloud service at `games.skylar.technology`: enrolls tables, brokers remote players, collects logs and metrics, serves the website. In technical docs also *cloud service*. | `apps/cloud` | backend, server |
-| **Console** | The game service's admin pages: overview, tables, access codes, game repositories, game logs, download tokens, log retention. With `CONSOLE_URL` they have a host of their own (games-console.skylar.technology), away from remote play. | `admin.html`, `/admin` | admin portal, dashboard |
+| **Console** | The game service's admin pages: overview, tables, access codes, game repositories, game logs, download tokens, log retention. In production they have a host of their own, games-console.skylar.technology (`CONSOLE_URL`), away from remote play; a local service has them at `/admin`. | `admin.html`, `/admin` | admin portal, dashboard |
 | **Admin** | Someone signed in to the console. | `admin` | — |
 | **Pairing code** | The code a new table shows until an admin approves it in the console. | `pairingCode` | — |
 | **Access code** | A code from the console that approves a table at once and decides its games (D-113). | `accessCode`, `TABLE_CODE` | licence key |

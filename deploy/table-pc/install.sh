@@ -48,6 +48,6 @@ systemctl restart gametable-kiosk.service || true
 PORT=$(grep -E '^PORT=' "$DIR/.env" | cut -d= -f2)
 echo
 echo "Done. The board opens on the touchscreen. On first start it shows a pairing code:"
-echo "approve it in the admin portal (https://games.skylar.technology/admin)."
+echo "approve it in the console (https://games-console.skylar.technology)."
 echo "Settings: ${DIR}/.env    Update: sudo ${DIR}/update.sh    Logs: docker logs -f \$(docker ps -qf name=table-host)"
 echo "Health: curl http://127.0.0.1:${PORT:-8080}/health"

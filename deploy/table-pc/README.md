@@ -22,7 +22,7 @@ The image (`ghcr.io/klaushofrichter/games-table-host`) is public, so no registry
 
 ## First start
 
-The board shows a 6-character **pairing code**. Approve it in the console at `https://games.skylar.technology/admin` (or with `POST /admin/api/tables/pair/<code>`). The notice disappears and games can start. Players scan the QR code on the board, or type the address shown under it.
+The board shows a 6-character **pairing code**. Approve it in the console at `https://games-console.skylar.technology` (or with `POST /admin/api/tables/pair/<code>` and `ADMIN_TOKEN`). The notice disappears and games can start. Players scan the QR code on the board, or type the address shown under it.
 
 ## Everyday
 

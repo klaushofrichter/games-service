@@ -129,6 +129,12 @@ export SHOW_TEST_GAMES="${SHOW_TEST_GAMES:-0}"
 [ -n "${PUBLIC_URL:-}" ] && export PUBLIC_URL
 [ -n "${TABLE_CODE:-}" ] && export TABLE_CODE
 
+# Where to approve a pairing code: the live service has its console on a host of its own (D-204).
+case "$CLOUD_URL" in
+  "") approve="" ;;
+  https://games.skylar.technology) approve="https://games-console.skylar.technology" ;;
+  *) approve="$CLOUD_URL/admin" ;;
+esac
 cat <<EOF
 Game Table host on this computer
   board:     http://localhost:$PORT/board/   (only from this computer)
@@ -136,9 +142,9 @@ Game Table host on this computer
   service:   ${CLOUD_URL:-none (development mode)}
   data:      $DATA_DIR   (API key: X-Table-Key from $KEY_FILE)
 If the system asks whether "node" may accept incoming connections, allow it, or phones cannot join.
-If the board shows a pairing code, approve it at ${CLOUD_URL:-the service}/admin, or give the table an
+${approve:+If the board shows a pairing code, approve it in the console at $approve, or give the table an
 access code from the console: start with --code ABCD-EFGH, or type it in the board's settings.
-Stop with Ctrl-C.
+}Stop with Ctrl-C.
 
 EOF
 
