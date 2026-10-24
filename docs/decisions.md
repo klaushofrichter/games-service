@@ -1483,7 +1483,8 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   API key. *Why:* the alias only ran the other script; one name is clearer.
 - **D-208 · 2026-10-24 · Klaus** — A Windows PC with Docker Desktop runs a table without WSL or Git Bash:
   - **`deploy/local/setup.ps1`** is the PowerShell twin of `setup.sh`. It writes the same `.env`: the address of the
-    up adapter with a default gateway, Wi-Fi first and no virtual adapters (WSL, Hyper-V, Docker, VPN); a random
+    up adapter with a default gateway, Wi-Fi first, no virtual adapters (WSL, Hyper-V switches, Docker, VPN), else the
+    source address of the route to the internet; a random
     table key; and `-Cloud`, `-LanIp`. The file is UTF-8 without a byte order mark, with LF line ends, and readable
     only by the user.
   - **`-Start`** also checks that Docker is running, runs `docker compose up -d --build`, waits for `/health` and
