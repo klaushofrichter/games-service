@@ -8,6 +8,7 @@ history.
 
 ## [Unreleased]
 
+- `scripts/local-table.sh` starts on a Mac again: its start-up text no longer trips macOS's bash 3.2.
 - A local cloud service in Docker starts on a fresh volume again (the image creates `/data` for its user), and
   offers only the public extra games (D-206).
 - The console is at https://games-console.skylar.technology; the documentation, the table PC kit and
