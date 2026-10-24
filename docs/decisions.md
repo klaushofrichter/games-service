@@ -1465,3 +1465,9 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   origin that code could call the console's API with a signed-in admin's cookie. A separate host puts the session out
   of its reach; moving remote play instead would break every invite link, and hardening within one origin leaves
   ways around it.
+- **D-205 · 2026-10-24 · Klaus** — Production runs with the console on games-console.skylar.technology (D-204): its
+  DNS record, the Ingress host with its own certificate (kube-setup), the redirect URI in the Google client, and
+  `CONSOLE_URL` in the `games-oauth` Secret. `scripts/sync-secrets.sh` now requires `CONSOLE_URL` and the console's
+  callback as `GOOGLE_REDIRECT_URI`, and the documentation names the console's address where people approve a table.
+  A local service still has its console at `/admin`, without `CONSOLE_URL`. *Why:* the switch is done; a `.env`
+  without it would quietly put the console back on the public host.

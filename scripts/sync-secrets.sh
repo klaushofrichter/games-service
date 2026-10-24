@@ -3,7 +3,7 @@
 #   GitHub secret  KUBE_SETUP_DEPLOY_TOKEN      <- GITHUB_KUBE_SETUP_PAT    (the deploy pushes the cluster repository's manifest)
 #   k8s Secret     games-runner/runner-pat      <- GITHUB_GAMES_SERVICE_PAT (key `token`: the runner registers itself)
 #   k8s Secret     games/games-oauth            <- GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI,
-#                                                  ALLOWED_EMAILS, COOKIE_SECRET, and CONSOLE_URL, ADMIN_TOKEN,
+#                                                  ALLOWED_EMAILS, COOKIE_SECRET, CONSOLE_URL, and ADMIN_TOKEN,
 #                                                  GAME_REPO_TOKEN if set
 #
 #   scripts/sync-secrets.sh --check     validate .env and list what would be set (default)
@@ -18,6 +18,8 @@ REPO=klaushofrichter/games-service
 ENV_FILE=${ENV_FILE:-.env}
 MODE=${1:---check}
 PUBLIC_URL=https://games.skylar.technology
+# The console's own host (D-204, D-205): sign-in returns there.
+CONSOLE_URL=https://games-console.skylar.technology
 
 [ -f "$ENV_FILE" ] || { echo "no $ENV_FILE here" >&2; exit 1; }
 git check-ignore -q "$ENV_FILE" || { echo "$ENV_FILE is not git-ignored; refusing to continue" >&2; exit 1; }
@@ -43,11 +45,9 @@ while IFS= read -r line || [ -n "$line" ]; do
 done < "$ENV_FILE"
 
 need() { for k in "$@"; do [ -n "${V[$k]:-}" ] || problems+=("$k is missing"); done; }
-need GITHUB_KUBE_SETUP_PAT GITHUB_GAMES_SERVICE_PAT GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET GOOGLE_REDIRECT_URI ALLOWED_EMAILS COOKIE_SECRET
-# The console's own host (D-204), e.g. https://games-console.skylar.technology; sign-in returns there when it is set.
-[ -z "${V[CONSOLE_URL]:-}" ] || [[ "${V[CONSOLE_URL]}" =~ ^https://[a-z0-9.-]+$ ]] || problems+=("CONSOLE_URL must look like https://games-console.skylar.technology (no path, no trailing slash)")
-SIGN_IN_URL=${V[CONSOLE_URL]:-$PUBLIC_URL}
-[ "${V[GOOGLE_REDIRECT_URI]:-}" = "$SIGN_IN_URL/auth/google/callback" ] || problems+=("GOOGLE_REDIRECT_URI must be $SIGN_IN_URL/auth/google/callback")
+need GITHUB_KUBE_SETUP_PAT GITHUB_GAMES_SERVICE_PAT GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET GOOGLE_REDIRECT_URI ALLOWED_EMAILS COOKIE_SECRET CONSOLE_URL
+[ "${V[CONSOLE_URL]:-}" = "$CONSOLE_URL" ] || problems+=("CONSOLE_URL must be $CONSOLE_URL")
+[ "${V[GOOGLE_REDIRECT_URI]:-}" = "$CONSOLE_URL/auth/google/callback" ] || problems+=("GOOGLE_REDIRECT_URI must be $CONSOLE_URL/auth/google/callback")
 [[ "${V[GOOGLE_CLIENT_ID]:-}" == 40017202035-*.apps.googleusercontent.com ]] || problems+=("GOOGLE_CLIENT_ID should be a skylar-technology client (40017202035-....apps.googleusercontent.com)")
 [ "${#V[COOKIE_SECRET]}" -ge 32 ] 2>/dev/null || problems+=("COOKIE_SECRET must be at least 32 characters (openssl rand -hex 32)")
 [ -z "${V[ADMIN_TOKEN]:-}" ] || [ "${#V[ADMIN_TOKEN]}" -ge 16 ] || problems+=("ADMIN_TOKEN must be at least 16 characters, or left out")
@@ -58,8 +58,7 @@ done
 [ -z "${V[GAME_REPOS]:-}" ] || problems+=("GAME_REPOS is not synced to the cluster: the list is deploy/game-repos.json (D-098); remove it from .env")
 
 if ((${#problems[@]})); then printf 'problem: %s\n' "${problems[@]}" >&2; exit 1; fi
-OAUTH_KEYS=(GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET GOOGLE_REDIRECT_URI ALLOWED_EMAILS COOKIE_SECRET)
-[ -n "${V[CONSOLE_URL]:-}" ] && OAUTH_KEYS+=(CONSOLE_URL)
+OAUTH_KEYS=(GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET GOOGLE_REDIRECT_URI ALLOWED_EMAILS COOKIE_SECRET CONSOLE_URL)
 [ -n "${V[ADMIN_TOKEN]:-}" ] && OAUTH_KEYS+=(ADMIN_TOKEN)
 # Extra-game repositories (D-097): the read token for private ones. Optional. The list itself is not a secret: it is
 # deploy/game-repos.json, baked into the image (D-098).

@@ -8,6 +8,8 @@ history.
 
 ## [Unreleased]
 
+- The console is at https://games-console.skylar.technology; the documentation, the table PC kit and
+  `scripts/sync-secrets.sh` say so (D-205).
 - The console can have a host of its own (`CONSOLE_URL`, games-console.skylar.technology): its sign-in and session
   live only there, out of reach of the pages a table sends to remote players; `/admin` on the website's host sends
   people there (D-204).
