@@ -8,6 +8,7 @@ history.
 
 ## [Unreleased]
 
+- The cluster's deployment request leaves this repository, and private games are named without their details (D-200).
 - The documentation checked against the code: README, developer guide, runbooks, rules for players and decision records; the console is called *Console* on the website too; table PCs keep a lobby seat for five minutes as intended (D-199).
 - Terms of service for the website at `/terms`, linked beside the version at the foot of the page (D-197).
 - `docs/glossary.md`: the words for the platform's parts, their names in the code, and how seats are named (D-197).

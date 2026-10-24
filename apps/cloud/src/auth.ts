@@ -1,4 +1,4 @@
-// Admin sign-in with Google, following the cluster's pattern (kube-setup vault, "Building a New Service" → Google OAuth):
+// Admin sign-in with Google, following the cluster's pattern (its convention for Google OAuth):
 // openid+email scope, a random `state` echoed in a cookie (CSRF), verifyIdToken against our client ID, an allow-list of
 // emails (ALLOWED_EMAILS), and an HMAC-signed session cookie (COOKIE_SECRET). Logout clears the cookie and lands on a
 // public page with a Sign in link — never a bounce through Google, which would sign the user silently back in.

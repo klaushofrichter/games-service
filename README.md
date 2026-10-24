@@ -85,7 +85,7 @@ board moves there; the table's own window says "The board moved to another scree
 | `scripts/site-screenshots.py` | Takes the game screenshots for the public website (`apps/cloud/public/site/`) from a host running every public game |
 | `scripts/soak.ts` | AI-only soak run over every game and player count |
 | `scripts/local-table.sh` | A Table Host on this computer against the live service, from any branch (see above) |
-| `docs/` | Decision log; the glossary, the cookbook and the architecture overview; `developers/` (the game developer guide); the request to the kube-setup session for the cluster side; `runbooks/` for running a table locally with Docker and for resetting and restoring the service's state |
+| `docs/` | Decision log; the glossary, the cookbook and the architecture overview; `developers/` (the game developer guide); `runbooks/` for running a table locally with Docker and for resetting and restoring the service's state |
 | `tests/` | Vitest suites that drive a real host through the board control API and fake decks |
 | `deploy/` | Dockerfiles, docker-compose, the local Docker setup (`local/`), the table PC kit |
 | `.github/` | The three workflows, Dependabot, the CodeQL gate and its accepted-findings list |
@@ -290,7 +290,7 @@ Everything at once, and going back to a backup, are runbooks for someone with cl
 
 ## Branches, CI and deployment
 
-Same shape as every service on the cluster (kube-setup's vault, *Building a New Service*):
+Same shape as every service on the cluster:
 
 ```
 feature branch → PR → main → (PR) → production → deploy
@@ -300,7 +300,7 @@ feature branch → PR → main → (PR) → production → deploy
 | --- | --- | --- |
 | `production-checks.yml` | PR to `main` or `production` | `test` (game versions, tests, typecheck, `npm audit --audit-level=high`, both images built and run non-root), `e2e` (all browser checks and the local Docker runbook), `codeql` (fails on any finding not in `.github/codeql-accepted.tsv`) |
 | `build-push.yml` | push to `main` | tests and typecheck, then both images as `:main`, and nothing else |
-| `deploy-production.yml` | push to `production` | on the in-cluster runner: calendar version, images as `:<sha>`, `:v<version>`, `:latest`, kube-setup manifest updated (push, then apply), rollout, smoke test until `/health` serves the new version, then a GitHub release with what the deploy verified |
+| `deploy-production.yml` | push to `production` | on the in-cluster runner: calendar version, images as `:<sha>`, `:v<version>`, `:latest`, the cluster repository's manifest updated (push, then apply), rollout, smoke test until `/health` serves the new version, then a GitHub release with what the deploy verified |
 
 `main` is built but never deployed. Releases are versioned `YYYY.MM.DD.N` (America/Chicago) at deploy time; nothing in the sources carries a version. Curated release notes go under `## [Unreleased]` in `CHANGELOG.md`.
 
