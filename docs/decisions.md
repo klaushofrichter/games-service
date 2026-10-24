@@ -1478,3 +1478,41 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   a local service can't read the private repositories in `deploy/game-repos.json`. `scripts/local-table.sh` names the
   console's address for the live service and says nothing about pairing without one. *Why:* found by following the
   getting-started steps on a fresh machine.
+- **D-207 · 2026-10-24 · Klaus** — `scripts/mac-table.sh`, the old name of `scripts/local-table.sh` (D-188), is gone.
+  `local-table.sh` still reads `~/.gametable-mac`, so a table first set up under the old name keeps its identity and
+  API key. *Why:* the alias only ran the other script; one name is clearer.
+- **D-208 · 2026-10-24 · Klaus** — A Windows PC with Docker Desktop runs a table without WSL or Git Bash:
+  - **`deploy/local/setup.ps1`** is the PowerShell twin of `setup.sh`. It writes the same `.env`: the address of the
+    up adapter with a default gateway, Wi-Fi first, no virtual adapters (WSL, Hyper-V switches, Docker, VPN), else the
+    source address of the route to the internet; a random
+    table key; and `-Cloud`, `-LanIp`. The file is UTF-8 without a byte order mark, with LF line ends, and readable
+    only by the user.
+  - **`-Start`** also checks that Docker is running, runs `docker compose up -d --build`, waits for `/health` and
+    opens the board.
+  - **The scripts** are ASCII only, since Windows PowerShell 5.1 reads a file without a byte order mark in the
+    system's code page.
+  - **Windows CI:** a `windows` job in the PR checks runs `scripts/windows-check.ps1` on GitHub's Windows runner. It
+    runs `setup.ps1` in Windows PowerShell 5.1 and PowerShell 7 (address, key, no byte order mark, LF, kept on a
+    second run, `-Cloud -LanIp`, a wrong address refused), and has Docker Compose read the `.env` where the runner
+    has Compose. It also starts the Table Host natively on Node and checks `/health`, the board, the shared files,
+    the games, a simulation that replays exactly, and that backslashes in a request reach no file outside the served
+    folders.
+  - **Limit:** that runner has no Linux containers, so the images are built and run by the Linux jobs. The runbook
+    has a section *On a Windows PC*; its other commands run in Git Bash.
+
+  *Why:* Klaus asked for a Windows 11 PC, with Docker Desktop as the focus.
+- **D-209 · 2026-10-24 · Klaus** — Relays for remote players from Cloudflare's TURN service:
+  - **What happens:** with a Cloudflare TURN key (`CF_TURN_KEY_ID`, `CF_TURN_API_TOKEN`, created in the Cloudflare
+    dashboard), the service asks `rtc.live.cloudflare.com` for credentials that expire after a day. It keeps them,
+    renews them when less than half their life is left, and asks once for connections that arrive together. Each
+    connection's hello and offer carry them to the remote browser and to the table.
+  - **What it leaves out:** URLs on port 53, which browsers refuse, so each one only adds a timeout. The key itself
+    never leaves the service.
+  - **When Cloudflare fails:** the current credentials are kept while they're valid; after that, the old STUN list
+    is used (`ICE_SERVERS`, or Google's STUN), with a minute between attempts.
+  - **Configuration:** `scripts/sync-secrets.sh` carries the key into `games-oauth`.
+  - *Why:* an iPad on an iPhone hotspot could not connect to the table, while a remote player on another home ISP
+    earlier the same day could, with the same connection code. The phone carrier's NAT blocks a direct WebRTC
+    connection, and the service handed out only STUN. Cloudflare instead of coturn on the cluster: no ports to open
+    at home and no new exposure there, credentials made by Cloudflare per request, a free allowance. WebRTC uses a
+    relay only when the direct way fails.

@@ -28,7 +28,8 @@ Open `http://localhost:8080/board/` on the table PC (full screen, 1920 × 1080 o
 
 **On one machine with Docker, without the cloud service, DNS or HTTPS:** [`docs/runbooks/local-docker.md`](docs/runbooks/local-docker.md),
 written for people and for coding agents (`deploy/local/`). It needs no cloud service, also not for games from other
-repositories, private ones included (cloned, runbook Part B).
+repositories, private ones included (cloned, runbook Part B). On a Windows PC with Docker Desktop, in PowerShell:
+`powershell -ExecutionPolicy Bypass -File deploy\local\setup.ps1 -Start` (runbook, *On a Windows PC*).
 
 For development with a local cloud service: `docker compose -f deploy/docker-compose.yml up --build` starts a cloud service and a table host. The table shows a 6-character pairing code; approve it in the console at `http://localhost:8081/admin` (in local development it asks for `ADMIN_TOKEN`: `change-me-dev-admin-token` unless you set your own), or with
 
@@ -41,7 +42,7 @@ Or skip the pairing code: create an access code in the console (*Access codes*) 
 
 ## A table on your computer (development)
 
-`scripts/local-table.sh` runs a Table Host on a Mac or a Linux computer against the live service at `games.skylar.technology` (Node 26 needed), without containers (`scripts/mac-table.sh` is its old name). It first updates the checkout to the latest `main`; `--branch production` or `--branch experiment/card-sling` runs another branch, and `--no-pull` runs the checkout as it is. `CLOUD_URL= scripts/local-table.sh --extra ../extra-games` adds the games of another checkout as they are (e.g. a branch of extra-games not released yet). It opens the board in the browser, puts the computer's WiFi (default-route) address in the QR code, and keeps the table's identity and API key in `~/.gametable-local` (or `~/.gametable-mac`, where an older table lives), so a restart is the same table. The first time, the board shows a pairing code: approve it in the console at `https://games-console.skylar.technology`. Allow `node` to accept incoming connections when the system asks, or phones cannot join. `scripts/local-table.sh --code ABCD-EFGH` uses an access code from the console instead, so no approval is needed. `CLOUD_URL= scripts/local-table.sh` runs it without the service.
+`scripts/local-table.sh` runs a Table Host on a Mac or a Linux computer against the live service at `games.skylar.technology` (Node 26 needed), without containers. It first updates the checkout to the latest `main`; `--branch production` or `--branch experiment/card-sling` runs another branch, and `--no-pull` runs the checkout as it is. `CLOUD_URL= scripts/local-table.sh --extra ../extra-games` adds the games of another checkout as they are (e.g. a branch of extra-games not released yet). It opens the board in the browser, puts the computer's WiFi (default-route) address in the QR code, and keeps the table's identity and API key in `~/.gametable-local` (or `~/.gametable-mac`, where an older table lives), so a restart is the same table. The first time, the board shows a pairing code: approve it in the console at `https://games-console.skylar.technology`. Allow `node` to accept incoming connections when the system asks, or phones cannot join. `scripts/local-table.sh --code ABCD-EFGH` uses an access code from the console instead, so no approval is needed. `CLOUD_URL= scripts/local-table.sh` runs it without the service.
 
 ## The board on another screen
 
@@ -205,7 +206,7 @@ A remote player gets an invite link (`https://games.skylar.technology/i/CODE`) f
         ◀═════════(4) WebRTC data channel "gt": board/deck files, API, live sockets═════════▶
 ```
 
-- The service's `ICE_SERVERS` (JSON) sets STUN/TURN for both sides; without it, Google's public STUN is used. Add a TURN server for players behind strict NATs.
+- **Relays:** a direct connection fails behind some networks, typically a phone's hotspot or cellular data (the carrier's NAT), and some hotel, office or school networks. With a Cloudflare TURN key (`CF_TURN_KEY_ID`, `CF_TURN_API_TOKEN`) the service fetches short-lived relay credentials (a day, renewed after half) and hands them to both ends with each connection; WebRTC uses the relay only when the direct way fails (D-209). Otherwise `ICE_SERVERS` (JSON) sets STUN/TURN for both sides, and without either, Google's public STUN is used.
 - The table needs outbound UDP; the table PC kit uses host networking. In bridged Docker (the dev `docker-compose.yml`) remote play only works with a TURN server.
 - The remote board turns so the remote player's own seat is at the bottom of their screen. On an east or west seat, *Use the full width* shows the board upright instead (their seat at the side), and *Put my seat at the bottom* turns it back; the choice stays in that browser (D-101).
 - `POST /api/v1/remote {"boardControl": false}` (or the checkbox in the invite dialog) makes the board read-only for remote players. It is one switch for all of them, and a remote board has control only while its browser has a player at the table (D-167).
@@ -265,6 +266,7 @@ In the cluster these come from the `games-oauth` Secret (created by `scripts/syn
 | `PORT` | HTTP port (default 8081) |
 | `MAX_REPLICAS` | Must be `1` (set by the cluster manifest); the service warns at start otherwise, since one process owns the database and the tables' sockets |
 | `LOG_RETENTION_DAYS`, `ICE_SERVERS` | Log retention (default 90); STUN/TURN for remote play |
+| `CF_TURN_KEY_ID`, `CF_TURN_API_TOKEN` | Optional, both or neither: a Cloudflare TURN key (Cloudflare dashboard, *Realtime › TURN Server*). Remote players behind a phone's hotspot or a strict network get a relay; the service asks Cloudflare for credentials that expire after a day, and the key stays with the service (D-209). `scripts/sync-secrets.sh` carries them into `games-oauth` |
 | `DATA_LIMIT_MB`, `LOG_STORAGE_MB` | The service's storage budget in `DATA_DIR` (default 1024, the PVC's size) and the cap on game logs within it (default 256). The budget is counted from the service's own files, since a `local-path` volume has no quota; the oldest logs make way before free space in it drops below 15 % (at least 100 MB), and a log that can't fit is refused (the table keeps its copy). The console's Overview shows the use |
 | `GAME_REPO_TOKEN` | Read token for private extra-game repositories (D-097) |
 | `GAME_REPOS_FILE`, `GAME_REPOS` | The deploy-time repository list (default `deploy/game-repos.json`; `none` turns it off), and more repositories (`owner/name@ref`, comma-separated) for local development (D-098) |

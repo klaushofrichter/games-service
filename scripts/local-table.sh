@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Run a Table Host on this computer (macOS or Linux) against the live Game Table service, without containers, for
-# development and testing. scripts/mac-table.sh is its old name and still works.
+# development and testing.
 #   scripts/local-table.sh              update to the latest main, start it, and open the board in the browser
 #   scripts/local-table.sh --branch production            the same with another branch, e.g. production or
 #   scripts/local-table.sh --branch experiment/card-sling   an experiment (also -b NAME)
@@ -130,11 +130,18 @@ export SHOW_TEST_GAMES="${SHOW_TEST_GAMES:-0}"
 [ -n "${TABLE_CODE:-}" ] && export TABLE_CODE
 
 # Where to approve a pairing code: the live service has its console on a host of its own (D-204).
+# Plain variables, not a multi-line ${var:+...} in the text below: macOS's bash 3.2 can't parse that.
 case "$CLOUD_URL" in
   "") approve="" ;;
   https://games.skylar.technology) approve="https://games-console.skylar.technology" ;;
   *) approve="$CLOUD_URL/admin" ;;
 esac
+pairing=""
+if [ -n "$approve" ]; then
+  pairing="If the board shows a pairing code, approve it in the console at $approve, or give the table an
+access code from the console: start with --code ABCD-EFGH, or type it in the board's settings.
+"
+fi
 cat <<EOF
 Game Table host on this computer
   board:     http://localhost:$PORT/board/   (only from this computer)
@@ -142,9 +149,7 @@ Game Table host on this computer
   service:   ${CLOUD_URL:-none (development mode)}
   data:      $DATA_DIR   (API key: X-Table-Key from $KEY_FILE)
 If the system asks whether "node" may accept incoming connections, allow it, or phones cannot join.
-${approve:+If the board shows a pairing code, approve it in the console at $approve, or give the table an
-access code from the console: start with --code ABCD-EFGH, or type it in the board's settings.
-}Stop with Ctrl-C.
+${pairing}Stop with Ctrl-C.
 
 EOF
 

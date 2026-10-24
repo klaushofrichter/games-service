@@ -9,6 +9,7 @@ import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { BlockList, isIPv4, isIPv6 } from "node:net";
 import { WebSocketServer, type WebSocket } from "ws";
+import { iceProvider, type CloudflareTurn } from "./turn.ts";
 import { createAdminAuth, esc, HTML_HEADERS, randomToken, same, sendPage, type GoogleAuthOptions } from "./auth.ts";
 import { GameRepoStore, type GameRepo } from "./game-repos.ts";
 import { Store } from "./store.ts";
@@ -80,6 +81,8 @@ export interface CloudOptions {
   logRetentionDays?: number;
   /** STUN/TURN servers handed to both ends of a remote connection. */
   iceServers?: IceServer[];
+  /** A Cloudflare TURN key: short-lived relay credentials for each connection, ahead of iceServers (D-209). */
+  cloudflareTurn?: CloudflareTurn | null;
   /**
    * Behind a reverse proxy (the cluster's Traefik): take the client address from X-Forwarded-For, but only when the
    * direct peer is one of these networks. A CIDR list, never a hop count (default: loopback and the k3s pod and
@@ -380,7 +383,7 @@ export function startCloud(o: CloudOptions) {
     return { ...vol, reserve: reserveFor(vol.total), ...use, logCap: maxLogBytes, logBytes: logBytes(), low: vol.free < reserveFor(vol.total) * 1.5 };
   };
   const lookups = new Map<string, { n: number; reset: number }>(); // invite lookup rate limit per IP
-  const iceServers = o.iceServers ?? [{ urls: "stun:stun.l.google.com:19302" }];
+  const iceFor = iceProvider(o.iceServers ?? [{ urls: "stun:stun.l.google.com:19302" }], o.cloudflareTurn ?? null);
   // Remote play signaling (D-020): tables hold a socket here; remote browsers get a session per invite.
   const tableSockets = new Map<string, WebSocket>();
   // by sha256(session id); `invite`: sha256 of the invite it came through, so the table can tell which invite was used (D-164)
@@ -1120,7 +1123,12 @@ export function startCloud(o: CloudOptions) {
     s.ws?.close(4000, "replaced");
     s.ws = ws;
     const t = tables.get(s.tableId);
-    sendJson(ws, { type: "hello", session: id, iceServers, tableName: t?.name ?? "Game Table" });
+    // Both ends get the same servers: the browser's offer follows this hello.
+    let iceServers: IceServer[] = [];
+    void iceFor().then((servers) => {
+      iceServers = servers;
+      if (ws.readyState === ws.OPEN) sendJson(ws, { type: "hello", session: id, iceServers, tableName: t?.name ?? "Game Table" });
+    });
     ws.on("message", (raw) => {
       let msg: any;
       try {

@@ -21,7 +21,8 @@ watcher, sling, console…): [`glossary.md`](glossary.md).
 
 ## 1. Play something, fast: a table with the extra games
 
-**You need:** a computer on the same WiFi as the phones, with Docker (or Node 26), and git. A touchscreen is
+**You need:** a computer on the same WiFi as the phones (a Mac, a Linux PC, or a Windows PC with Docker Desktop), with
+Docker (or Node 26), and git. A touchscreen is
 optional: a mouse works, and an iPad can be the board (see the tip below).
 
 **Ask:**

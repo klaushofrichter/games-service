@@ -4,7 +4,7 @@
 #   k8s Secret     games-runner/runner-pat      <- GITHUB_GAMES_SERVICE_PAT (key `token`: the runner registers itself)
 #   k8s Secret     games/games-oauth            <- GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI,
 #                                                  ALLOWED_EMAILS, COOKIE_SECRET, CONSOLE_URL, and ADMIN_TOKEN,
-#                                                  GAME_REPO_TOKEN if set
+#                                                  GAME_REPO_TOKEN, CF_TURN_KEY_ID + CF_TURN_API_TOKEN if set
 #
 #   scripts/sync-secrets.sh --check     validate .env and list what would be set (default)
 #   scripts/sync-secrets.sh --github    set the GitHub secret (needs `gh` signed in with admin on the repo)
@@ -55,6 +55,10 @@ for k in GITHUB_KUBE_SETUP_PAT GITHUB_GAMES_SERVICE_PAT; do
   [[ "${V[$k]:-}" == github_pat_* || "${V[$k]:-}" == ghp_* ]] || problems+=("$k does not look like a GitHub token")
 done
 [ -z "${V[GAME_REPO_TOKEN]:-}" ] || [[ "${V[GAME_REPO_TOKEN]}" == github_pat_* || "${V[GAME_REPO_TOKEN]}" == ghp_* ]] || problems+=("GAME_REPO_TOKEN does not look like a GitHub token")
+# Cloudflare TURN (D-209): the key's id and its API token, both or neither.
+if [ -n "${V[CF_TURN_KEY_ID]:-}${V[CF_TURN_API_TOKEN]:-}" ] && { [ -z "${V[CF_TURN_KEY_ID]:-}" ] || [ -z "${V[CF_TURN_API_TOKEN]:-}" ]; }; then
+  problems+=("Cloudflare TURN needs both CF_TURN_KEY_ID and CF_TURN_API_TOKEN, or neither")
+fi
 [ -z "${V[GAME_REPOS]:-}" ] || problems+=("GAME_REPOS is not synced to the cluster: the list is deploy/game-repos.json (D-098); remove it from .env")
 
 if ((${#problems[@]})); then printf 'problem: %s\n' "${problems[@]}" >&2; exit 1; fi
@@ -63,6 +67,8 @@ OAUTH_KEYS=(GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET GOOGLE_REDIRECT_URI ALLOWED_EM
 # Extra-game repositories (D-097): the read token for private ones. Optional. The list itself is not a secret: it is
 # deploy/game-repos.json, baked into the image (D-098).
 [ -n "${V[GAME_REPO_TOKEN]:-}" ] && OAUTH_KEYS+=(GAME_REPO_TOKEN)
+# Relays for remote players behind a phone's or a strict network's NAT (D-209). Optional.
+[ -n "${V[CF_TURN_KEY_ID]:-}" ] && OAUTH_KEYS+=(CF_TURN_KEY_ID CF_TURN_API_TOKEN)
 echo ".env ok. Keys (values not shown):"
 echo "  GitHub secret KUBE_SETUP_DEPLOY_TOKEN  <- GITHUB_KUBE_SETUP_PAT"
 echo "  games-runner/runner-pat (token)        <- GITHUB_GAMES_SERVICE_PAT"
