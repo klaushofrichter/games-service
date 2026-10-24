@@ -394,7 +394,7 @@ export class GameRuntime {
     if (this.over) return;
     const gt = this.beginStep();
     this.seats = this.seats.map((s) => (s.seat === seat.seat ? { ...seat, edge: seat.edge ?? s.edge } : s));
-    if (aiOptions) (this.opts as { aiOptions?: Record<number, Record<string, unknown>> }).aiOptions = { ...(this.opts.aiOptions ?? {}), [seat.seat]: aiOptions };
+    if (aiOptions) this.setSeatAiOptions(seat.seat, aiOptions);
     const info = this.seats.find((s) => s.seat === seat.seat) ?? seat;
     const extra = aiOptions ? { aiOptions } : {};
     const events = this.guarded(
@@ -408,7 +408,7 @@ export class GameRuntime {
 
   /** An AI player's options changed during the game (D-159): not an input, only what it decides from now on. */
   setAiOptions(seat: number, aiOptions: Record<string, unknown>) {
-    (this.opts as { aiOptions?: Record<number, Record<string, unknown>> }).aiOptions = { ...(this.opts.aiOptions ?? {}), [seat]: aiOptions };
+    this.setSeatAiOptions(seat, aiOptions);
     this.record({ t: "aiOptions", at: this.clock.now(), seat, aiOptions });
   }
 
@@ -434,11 +434,8 @@ export class GameRuntime {
     this.record(connected ? { t: "reconnected", at: this.clock.now(), seat } : { t: "disconnected", at: this.clock.now(), seat, ...(waiting ? { waiting } : {}) });
   }
 
-  /** An AI player plays this seat from now on (D-144): its options, and a log record. */
-  aiTakeover(seat: number, name: string, aiOptions: Record<string, unknown>) {
-    if (this.over) return;
-    (this.opts as { aiOptions?: Record<number, Record<string, unknown>> }).aiOptions = { ...(this.opts.aiOptions ?? {}), [seat]: aiOptions };
-    this.record({ t: "aiTakeover", at: this.clock.now(), seat, name, aiOptions });
+  private setSeatAiOptions(seat: number, aiOptions: Record<string, unknown>) {
+    this.opts.aiOptions = { ...(this.opts.aiOptions ?? {}), [seat]: aiOptions };
   }
 
   /** Returns true if the game ended because of it. */
@@ -562,9 +559,13 @@ export function replayLog(manifest: Manifest, def: GameDefinition<any>, log: Log
  * Feed one logged record to a replaying runtime as the table did; records that are not inputs are skipped. An exception
  * the game threw when it was played, it throws again now (D-116): that is part of the game, so it is swallowed here.
  */
+/** The records replay feeds to the rules: everything else in a log is for reading only. */
+export type InputRecord = Extract<LogRecord, { t: "intent" | "timer" | "seatJoined" | "seatLeft" | "seatChanged" }>;
+export const isInput = (r: LogRecord): r is InputRecord => r.t === "intent" || r.t === "timer" || r.t === "seatJoined" || r.t === "seatLeft" || r.t === "seatChanged";
+
 export function feedInput(rt: GameRuntime, r: LogRecord) {
   try {
-    if (r.t === "intent" || r.t === "timer" || r.t === "seatJoined" || r.t === "seatLeft" || r.t === "seatChanged") rt.setReplayTime(r.gt);
+    if (isInput(r)) rt.setReplayTime(r.gt);
     if (r.t === "intent") rt.submit(r.seat, r.intent, r.by); // rejected ones too: a rule may draw randomness before rejecting
     else if (r.t === "timer") rt.fireTimer(r.id);
     else if (r.t === "seatJoined") rt.seatJoined(r.seat);

@@ -3,7 +3,11 @@ const FILL = { red: "#e5484d", yellow: "#f2c230", green: "#3fb05f", blue: "#3b82
 
 /** A card's face as an <svg>, w × h pixels. */
 export function cardFace(card, w, h) {
-  const c = FILL[card.color] ?? "#888";
+  // The face may come from a phone's gesture (D-202): only known colours and short plain values reach the markup.
+  const color = Object.hasOwn(FILL, card?.color) ? card.color : "";
+  const value = String(card?.value ?? "").replace(/[^\w+-]/g, "").slice(0, 3);
+  card = { color, value };
+  const c = FILL[color] ?? "#888";
   const big = h * 0.36, small = h * 0.13;
   return `<svg viewBox="0 0 100 150" width="${w}" height="${h}" aria-label="${card.color} ${card.value}">
     <rect x="1" y="1" width="98" height="148" rx="10" fill="#fff"/>

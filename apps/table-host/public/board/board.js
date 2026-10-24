@@ -498,7 +498,6 @@ function placeTools(playing, front, gearCorner) {
   toolsBtn.classList.toggle("dev", !!(state.developer?.allowNoLocalPlayer || state.developer?.boardDeck) && !REMOTE);
   const flipInside = playing && !REMOTE && gearCorner !== FRONT_CORNERS[front][0]; // the turn button at 172 px
   const along = REMOTE ? 102 : flipInside ? 242 : 172;
-  const alongX = front === "south" || front === "north";
   placeAlong(toolsBtn, along, front, gearCorner, true);
   placeAlong(watchBtn, along + 70, front, gearCorner, placeWatchers());
 }
@@ -2138,7 +2137,7 @@ function connect() {
       else if (IN_PLAY) tellPage({ type: "gt-board-deck", on: !!state.developer?.boardDeck });
       else if (state.developer?.boardDeck && window.parent === window) location.replace("/board/play.html");
     } else if (m.ch === "game" && m.type === "gesture") {
-      // EXPERIMENT (card sling): a phone's live gesture, for the game's board to show at once.
+      // A phone's live sling gesture (D-189), for the game's board to show at once.
       game?.inst?.gesture?.(m.payload.seat, m.payload.data);
     } else if (m.ch === "game" && m.type === "board") {
       gameMsg = { ...m.payload, receivedAt: Date.now() };

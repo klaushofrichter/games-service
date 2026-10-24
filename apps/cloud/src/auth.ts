@@ -31,8 +31,15 @@ const STATE_COOKIE = "games_oauth_state";
 /** Admin session lifetime. */
 const SESSION_SECONDS = 7 * 86400;
 
-/** Constant-time string comparison (length is not secret). */
-export const same = (a: string, b: string) => a.length === b.length && timingSafeEqual(Buffer.from(a), Buffer.from(b));
+/**
+ * Constant-time string comparison (length is not secret). Compared as bytes: two strings of the same length can differ in
+ * bytes (non-ASCII), and timingSafeEqual throws on unequal lengths (D-202).
+ */
+export const same = (a: unknown, b: string) => {
+  if (typeof a !== "string") return false;
+  const x = Buffer.from(a), y = Buffer.from(b);
+  return x.length === y.length && timingSafeEqual(x, y);
+};
 /** A random token: 24 bytes, base64url. */
 export const randomToken = () => randomBytes(24).toString("base64url");
 

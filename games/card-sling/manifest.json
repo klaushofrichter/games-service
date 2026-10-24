@@ -1,7 +1,7 @@
 {
   "id": "card-sling",
   "name": "Card Sling",
-  "version": "2026.10.23.1",
+  "version": "2026.10.23.2",
   "sdk": "^0.1",
   "description": "A test game for the sling (D-189): sling cards from your phone onto the pile, or draw one. No winner.",
   "players": {
