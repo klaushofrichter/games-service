@@ -1,6 +1,7 @@
 """Browser check of the sling (D-189) with the test game Card Sling: a phone drags a card a third off its top (the board
 shows the back of it at the player's edge, with the same tilt), flings it onto the pile, then draws one. Screenshots
-of the board and the phone at each stage.
+of the board and the phone at each stage. The phone's game gets each message's events once: redraws for the lobby
+pass none, as on the board.
   python3 scripts/e2e/card_sling.py out/
 """
 import os, sys, time
@@ -32,6 +33,13 @@ try:
         board.wait_for_selector("button.tile")
         phone = br.new_page(viewport={"width": 390, "height": 844}, device_scale_factor=2)
         watch(phone, "phone")
+        # The phone's game module, wrapped: every update records how many events it got.
+        WRAP = """import * as real from "/games/card-sling/deck.js?real=1";
+export function mount(root, ctx) {
+  const inst = real.mount(root, ctx);
+  return { ...inst, update(v, events, info) { (window.__events ??= []).push(events.length); return inst.update(v, events, info); } };
+}"""
+        phone.route(lambda u: "/games/card-sling/deck.js?v=" in u, lambda r: r.fulfill(status=200, content_type="text/javascript", body=WRAP))
         join_deck(phone, a("GET", "/join")["url"], "Klaus")
         a("POST", "/layout", {"seats": 4})
         a("POST", "/ai", {})
@@ -111,6 +119,14 @@ try:
         print("drawn card: flight ended at", landed, "slot shows it at", slot)
         assert landed and slot and abs(landed["x"] - slot["x"]) < 12 and abs(landed["y"] - slot["y"]) < 30, "the drawn card jumps at the seat"
         print("gestures received by the board:", board.evaluate("window.__g"))
+        # 3b. A change in the lobby redraws the phone: the game gets no events again (it got the draw's once).
+        seen = phone.evaluate("window.__events.length")
+        assert sum(phone.evaluate("window.__events")) > 0, "the phone's game never got events"
+        a("POST", "/display", {"sound": False})
+        a("POST", "/display", {"sound": True})
+        time.sleep(0.6)
+        redraws = phone.evaluate(f"window.__events.slice({seen})")
+        assert redraws and all(n == 0 for n in redraws[:2]), f"a lobby redraw repeated events on the phone: {redraws}"
         # 4. An AI player's card flies in from its seat.
         board.wait_for_selector(".sling-flight", timeout=20000)
         time.sleep(0.15)

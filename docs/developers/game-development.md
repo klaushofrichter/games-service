@@ -403,9 +403,8 @@ export function mount(root, ctx) {
 - **`ctx.send(name, payload)`** submits an intent and resolves with `{ ok, reason }`; a rejection is shown to the
   player as a toast by the platform. `ctx.toast(text)` floats a message over the top of the screen for 3 s;
   `ctx.vibrate(ms = 40)` buzzes (the phone also vibrates by itself when `myTurn` comes).
-- **`update(view, events, info)`** is called again when `info` or the lobby changes, and on the phone the last
-  `events` may come again with it: animate an event only once (keep track of what you have shown, e.g. by a sequence
-  number in the view).
+- **`update(view, events, info)`** is called with every change, and again when `info` or the lobby changes, then
+  with `events` empty (as on the board): each message's events come once.
 - **`myTurn: true`** in the seat's view brings the game's tab forward when it becomes true.
 - **Staging:** phones get an AI player's move once the board has shown it; then `info.shownOnBoard` is true. Apply such
   updates at once rather than animating the move again.
