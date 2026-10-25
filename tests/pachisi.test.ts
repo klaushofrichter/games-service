@@ -180,7 +180,7 @@ describe("through the table host", () => {
       expect(v.view.players).toHaveLength(2);
       expect((await b.request("game", "intent", { name: "roll" })).payload.reason).toMatch(/Ann's turn/);
       // Play until someone wins (tokens: 1 keeps it short). Every intent must be accepted, and only accepted ones count:
-      // a refused one used to cost a round, so a deck held back by the intent limit ran out of rounds (D-211).
+      // a refused one used to cost a round, so a deck held back by the intent limit ran out of rounds (D-213).
       let moves = 0;
       while ((await t.ok("GET", "/state")).phase !== "finished") {
         if (++moves > 1000) throw new Error("pachisi did not finish in 1000 moves");

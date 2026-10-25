@@ -9,7 +9,10 @@ history.
 ## [Unreleased]
 
 - Tests: the Pachisi game played through two decks no longer fails now and then on the intent limit, nor the AI
-  options test under load (D-211).
+  options test under load (D-213).
+- `docs/runbooks/remote-play-relays.md`: when remote players need a relay and how to set one up and check it; the
+  service checks its Cloudflare key at start (D-211).
+- The board, the phones and the website show their icon in Safari too (PNG, `favicon.ico` and an Apple touch icon besides the SVG, D-212).
 - A long deck, such as a remote player's, no longer shows a seam in its background (D-210).
 - Remote players on a phone's hotspot or cellular data can connect: with a Cloudflare TURN key the service hands out
   short-lived relay credentials, used only when a direct connection fails (D-209).

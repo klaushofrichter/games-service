@@ -1519,7 +1519,27 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
 - **D-210 · 2026-10-25 · Claude** — The deck's background gradient is painted once, then the felt colour it ends in.
   Repeated, it showed a seam, bright against dark, where a deck was taller than its window, e.g. the deck beside a
   remote player's board. *Why:* Klaus's screenshot of a remote deck in Backgammon.
-- **D-211 · 2026-10-25 · Claude** — Tests that play many moves from one deck play within the host's intent limit (D-202),
+- **D-211 · 2026-10-25 · Klaus** — Relays are documented as an option, and a key problem shows at start:
+  - **Documentation:** `docs/runbooks/remote-play-relays.md` says when a relay is needed (a phone's hotspot or
+    cellular data, some strict networks; not a table on one network, rarely home internet). It covers how
+    Cloudflare's works, setting it up (including this cluster's `KUBECONFIG` and restart), checking it from the log
+    and with a phone on cellular data, rotating or removing the key, another TURN server through `ICE_SERVERS`, and
+    troubleshooting. The README, the cookbook, the glossary (*Relay*) and `llms.txt` link it, so agents find it.
+  - **At start:** the service asks Cloudflare once, logging `Cloudflare TURN: relay credentials ready` or the
+    failure, so a wrong or revoked key shows before the first remote player.
+  - **Graceful degradation, unchanged:** without the key, or when Cloudflare fails, STUN only, as before D-209;
+    remote play works wherever a direct connection does.
+
+  *Why:* the hotspot test worked with the relay. Developers and other services without a Cloudflare account must
+  not depend on it.
+- **D-212 · 2026-10-25 · Claude** — Favicons for every browser:
+  - **Files:** the board, the deck and the website's pages link, besides the SVG favicon, a 32 px PNG and a 180 px
+    Apple touch icon, all rendered from the same SVGs.
+  - **Routes:** the Table Host and the service answer `/favicon.ico` (16 and 32 px inside) and
+    `/apple-touch-icon.png` at their root, where browsers ask without a link.
+  - *Why:* Safari, on a Mac and an iPad, shows no SVG favicon, so a table at `localhost:8080` and the website had
+    a blank icon there.
+- **D-213 · 2026-10-25 · Claude** — Tests that play many moves from one deck play within the host's intent limit (D-202),
   and a test does not take the log's last entry for one it is waiting for.
   - **The flake:** the Pachisi test that plays a whole game through two decks sent intents in a tight loop of 400
     rounds. A deck sending faster than 20 a second got "Too many moves at once", and each refused intent still used a

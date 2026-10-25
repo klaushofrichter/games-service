@@ -98,6 +98,7 @@ const MIME: Record<string, string> = {
   ".jpeg": "image/jpeg",
   ".webp": "image/webp",
   ".gif": "image/gif",
+  ".ico": "image/x-icon",
   ".md": "text/markdown; charset=utf-8",
   ".json": "application/json",
 };
@@ -522,6 +523,8 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
       }
       if (path === "/deck" || path === "/deck/") return await serveFile(res, "deck/index.html");
       if (path.startsWith("/board/") || path.startsWith("/deck/") || path.startsWith("/shared/")) return await serveFile(res, path.slice(1));
+      // Browsers ask for these at the root (Safari shows no SVG favicon, iOS looks for its home-screen icon): D-212.
+      if (path === "/favicon.ico" || path === "/apple-touch-icon.png") return await serveFile(res, `shared${path}`);
       if ((match = path.match(/^\/games\/([a-z0-9-]+)\/((?:board|deck)\.(?:js|css)|how-to-play\.md|assets\/[\w./-]+)$/))) {
         // A game's own board and deck UI and its assets; rules and manifest are not served.
         const g = table.games.get(match[1]);

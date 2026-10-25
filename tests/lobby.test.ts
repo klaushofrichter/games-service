@@ -559,7 +559,7 @@ describe("AI configuration", () => {
     // During the game the board may change how an AI in it plays (D-159): from its next move, noted in the log.
     expect((await t.ok("POST", `/players/${ai2}/ai-options`, { options: { style: "erratic" } })).players.find((p: any) => p.id === ai2).aiOptions).toEqual({ style: "erratic" });
     expect(t.host.table.runtime!.aiOptions(seatOf(ai2))).toEqual({ style: "erratic" });
-    // The AIs keep playing meanwhile, so the note need not be the log's last entry (D-211).
+    // The AIs keep playing meanwhile, so the note need not be the log's last entry (D-213).
     expect(t.host.table.runtime!.log.findLast((e: any) => e.t === "aiOptions")).toMatchObject({ t: "aiOptions", seat: seatOf(ai2), aiOptions: { style: "erratic" } });
   });
 });

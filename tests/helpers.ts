@@ -114,7 +114,7 @@ export class Deck {
 
   /**
    * Send a game intent and wait for its answer. A deck that plays faster than a person meets the host's intent limit
-   * (D-202, "Too many moves at once"); then wait for the next token to come back and send the same intent again (D-211).
+   * (D-202, "Too many moves at once"); then wait for the next token to come back and send the same intent again (D-213).
    */
   async intent(name: string, payload?: unknown) {
     for (;;) {
