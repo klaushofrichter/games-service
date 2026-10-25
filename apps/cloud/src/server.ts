@@ -384,6 +384,9 @@ export function startCloud(o: CloudOptions) {
   };
   const lookups = new Map<string, { n: number; reset: number }>(); // invite lookup rate limit per IP
   const iceFor = iceProvider(o.iceServers ?? [{ urls: "stun:stun.l.google.com:19302" }], o.cloudflareTurn ?? null);
+  // Ask once at start, so a wrong or revoked key shows in the log now, not at the first remote player (D-211). A
+  // failure is logged by the provider, and remote play goes on with STUN.
+  if (o.cloudflareTurn) void iceFor().then((servers) => servers.some((x) => x.credential) && console.log("[cloud] Cloudflare TURN: relay credentials ready"));
   // Remote play signaling (D-020): tables hold a socket here; remote browsers get a session per invite.
   const tableSockets = new Map<string, WebSocket>();
   // by sha256(session id); `invite`: sha256 of the invite it came through, so the table can tell which invite was used (D-164)
