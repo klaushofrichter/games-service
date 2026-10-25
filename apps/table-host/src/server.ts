@@ -53,7 +53,7 @@ const MAX_PENDING = 16;
 const HELLO_MS = 10_000;
 /** Intents per connection: a burst of INTENT_BURST, then INTENT_RATE a second (D-202). People and boards stay far below. */
 const INTENT_BURST = 40;
-const INTENT_RATE = 20;
+export const INTENT_RATE = 20;
 
 /**
  * A sling gesture as the boards may see it (D-189, D-202): only the fields the sling uses, each of its kind, so a phone

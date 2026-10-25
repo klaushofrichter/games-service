@@ -179,18 +179,16 @@ describe("through the table host", () => {
       const v = await a.waitView((x) => x.view.myTurn === true);
       expect(v.view.players).toHaveLength(2);
       expect((await b.request("game", "intent", { name: "roll" })).payload.reason).toMatch(/Ann's turn/);
-      // play until someone wins (tokens: 1 keeps it short)
-      for (let i = 0; i < 400; i++) {
-        const st = await t.ok("GET", "/state");
-        if (st.phase === "finished") break;
+      // Play until someone wins (tokens: 1 keeps it short). Every intent must be accepted, and only accepted ones count:
+      // a refused one used to cost a round, so a deck held back by the intent limit ran out of rounds (D-211).
+      let moves = 0;
+      while ((await t.ok("GET", "/state")).phase !== "finished") {
+        if (++moves > 1000) throw new Error("pachisi did not finish in 1000 moves");
         const board = (await t.ok("GET", "/game/board")).view;
         const deck = board.turn === 0 ? a : b;
-        if (board.phase === "roll") await deck.request("game", "intent", { name: "roll" });
-        else {
-          const me = board.players.find((p: any) => p.seat === board.turn);
-          const token = me.tokens.findIndex((x: number) => x !== 44);
-          await deck.request("game", "intent", { name: "move", payload: { token } });
-        }
+        const me = board.players.find((p: any) => p.seat === board.turn);
+        const r = board.phase === "roll" ? await deck.intent("roll") : await deck.intent("move", { token: me.tokens.findIndex((x: number) => x !== 44) });
+        expect(r.type, JSON.stringify(r.payload)).toBe("ack");
       }
       const done = await a.waitState((s) => s.phase === "finished");
       expect(done.summary?.text).toMatch(/wins/);

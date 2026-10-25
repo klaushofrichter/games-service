@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import WebSocket from "ws";
 import { startHost, type HostOptions } from "../apps/table-host/src/host.ts";
+import { INTENT_RATE } from "../apps/table-host/src/server.ts";
 import type { Envelope, LobbyState } from "../packages/protocol/src/index.ts";
 
 export async function testHost(o: HostOptions = {}) {
@@ -109,6 +110,18 @@ export class Deck {
     const p = this.next((m) => m.ch === "system" && m.seq === seq);
     this.send(ch, type, payload);
     return p;
+  }
+
+  /**
+   * Send a game intent and wait for its answer. A deck that plays faster than a person meets the host's intent limit
+   * (D-202, "Too many moves at once"); then wait for the next token to come back and send the same intent again (D-211).
+   */
+  async intent(name: string, payload?: unknown) {
+    for (;;) {
+      const r = await this.request("game", "intent", payload === undefined ? { name } : { name, payload });
+      if (r.type !== "reject" || r.payload?.reason !== "Too many moves at once") return r;
+      await sleep(1000 / INTENT_RATE + 5);
+    }
   }
 
   lastState(): LobbyState | undefined {
