@@ -541,6 +541,15 @@ export class Table extends EventEmitter {
     return [...this.visitors.entries()].filter(([s]) => this.isWatcher(s)).map(([, v]) => ({ id: v.id, name: v.name || "Guest" }));
   }
 
+  /**
+   * Who plays or watches from elsewhere, as counts for the service's console (D-214): remote players, how many of them
+   * are connected now (a dropped one keeps the seat while away), and watchers. No names.
+   */
+  presence(): { remote: number; remoteConnected: number; watchers: number } {
+    const remote = this.humans().filter((p) => p.location === "remote" && !p.leftGame);
+    return { remote: remote.length, remoteConnected: remote.filter((p) => p.connected).length, watchers: this.watchers().length };
+  }
+
   /** Remote players and watchers, without `except`'s session: together at most `maxRemotePlayers` (D-168). */
   remoteCount(except?: string) {
     const players = this.humans().filter((p) => p.location === "remote" && !p.leftGame && p.remoteSession !== except).length;
