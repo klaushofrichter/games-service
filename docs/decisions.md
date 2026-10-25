@@ -1532,3 +1532,10 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
 
   *Why:* the hotspot test worked with the relay. Developers and other services without a Cloudflare account must
   not depend on it.
+- **D-212 · 2026-10-25 · Claude** — Favicons for every browser:
+  - **Files:** the board, the deck and the website's pages link, besides the SVG favicon, a 32 px PNG and a 180 px
+    Apple touch icon, all rendered from the same SVGs.
+  - **Routes:** the Table Host and the service answer `/favicon.ico` (16 and 32 px inside) and
+    `/apple-touch-icon.png` at their root, where browsers ask without a link.
+  - *Why:* Safari, on a Mac and an iPad, shows no SVG favicon, so a table at `localhost:8080` and the website had
+    a blank icon there.
