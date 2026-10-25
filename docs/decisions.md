@@ -1539,3 +1539,15 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
     `/apple-touch-icon.png` at their root, where browsers ask without a link.
   - *Why:* Safari, on a Mac and an iPad, shows no SVG favicon, so a table at `localhost:8080` and the website had
     a blank icon there.
+- **D-213 · 2026-10-25 · Claude** — Tests that play many moves from one deck play within the host's intent limit (D-202),
+  and a test does not take the log's last entry for one it is waiting for.
+  - **The flake:** the Pachisi test that plays a whole game through two decks sent intents in a tight loop of 400
+    rounds. A deck sending faster than 20 a second got "Too many moves at once", and each refused intent still used a
+    round; some games ran out of rounds unfinished, and waiting for the finished lobby state timed out ("timed out
+    waiting for message", `tests/helpers.ts`). It failed on 2026-10-24 and 2026-10-25, and about one run in ten alone.
+  - **The fix:** `Deck.intent()` sends a game intent and, when the limit refuses it, waits for the next token
+    (`INTENT_RATE`, now exported) and sends it again. The Pachisi test counts only accepted moves and fails at once on
+    any other refusal. Under CPU load the AI-options test in the lobby tests found an AI's move after the
+    `aiOptions` note; it now looks for the last such note.
+  - *Why:* the limit is the platform's and stays as it is; a test that plays faster than a person waits for it,
+    rather than a longer timeout or more rounds.
