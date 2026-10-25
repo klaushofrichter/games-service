@@ -1516,3 +1516,6 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
     connection, and the service handed out only STUN. Cloudflare instead of coturn on the cluster: no ports to open
     at home and no new exposure there, credentials made by Cloudflare per request, a free allowance. WebRTC uses a
     relay only when the direct way fails.
+- **D-210 · 2026-10-25 · Claude** — The deck's background gradient is painted once, then the felt colour it ends in.
+  Repeated, it showed a seam, bright against dark, where a deck was taller than its window, e.g. the deck beside a
+  remote player's board. *Why:* Klaus's screenshot of a remote deck in Backgammon.
