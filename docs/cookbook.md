@@ -126,7 +126,9 @@ play only there. You provide:
 - an **HTTPS certificate** (a reverse proxy such as Caddy or Traefik gets one from Let's Encrypt by itself);
 - a **Google OAuth client** for the admin sign-in (an https service requires it), and the e-mail addresses that may
   sign in (`ALLOWED_EMAILS`);
-- optionally a **TURN server** (`ICE_SERVERS`) for players behind strict networks;
+- optionally a **relay** for remote players on a phone's hotspot or cellular data: a Cloudflare TURN key
+  (`CF_TURN_KEY_ID`, `CF_TURN_API_TOKEN`) or your own TURN server (`ICE_SERVERS`); see the
+  [relays runbook](runbooks/remote-play-relays.md);
 - recommended, a **second domain name for the console** (for example `games-console.example.com`, `CONSOLE_URL`) with
   its own DNS record and certificate: an invite page runs code that the inviting table sends, and on a host of its own
   the console's sign-in is out of that code's reach.

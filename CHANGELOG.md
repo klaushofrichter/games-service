@@ -8,6 +8,8 @@ history.
 
 ## [Unreleased]
 
+- `docs/runbooks/remote-play-relays.md`: when remote players need a relay and how to set one up and check it; the
+  service checks its Cloudflare key at start (D-211).
 - A long deck, such as a remote player's, no longer shows a seam in its background (D-210).
 - Remote players on a phone's hotspot or cellular data can connect: with a Cloudflare TURN key the service hands out
   short-lived relay credentials, used only when a direct connection fails (D-209).

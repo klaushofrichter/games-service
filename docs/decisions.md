@@ -1519,3 +1519,16 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
 - **D-210 · 2026-10-25 · Claude** — The deck's background gradient is painted once, then the felt colour it ends in.
   Repeated, it showed a seam, bright against dark, where a deck was taller than its window, e.g. the deck beside a
   remote player's board. *Why:* Klaus's screenshot of a remote deck in Backgammon.
+- **D-211 · 2026-10-25 · Klaus** — Relays are documented as an option, and a key problem shows at start:
+  - **Documentation:** `docs/runbooks/remote-play-relays.md` says when a relay is needed (a phone's hotspot or
+    cellular data, some strict networks; not a table on one network, rarely home internet). It covers how
+    Cloudflare's works, setting it up (including this cluster's `KUBECONFIG` and restart), checking it from the log
+    and with a phone on cellular data, rotating or removing the key, another TURN server through `ICE_SERVERS`, and
+    troubleshooting. The README, the cookbook, the glossary (*Relay*) and `llms.txt` link it, so agents find it.
+  - **At start:** the service asks Cloudflare once, logging `Cloudflare TURN: relay credentials ready` or the
+    failure, so a wrong or revoked key shows before the first remote player.
+  - **Graceful degradation, unchanged:** without the key, or when Cloudflare fails, STUN only, as before D-209;
+    remote play works wherever a direct connection does.
+
+  *Why:* the hotspot test worked with the relay. Developers and other services without a Cloudflare account must
+  not depend on it.
