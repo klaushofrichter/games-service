@@ -255,16 +255,23 @@ async function refresh() {
     const [m, tables, logs, repoData, codeList, tokenList] = await Promise.all([api("GET", "/admin/api/metrics"), api("GET", "/admin/api/tables"), api("GET", "/admin/api/logs"), api("GET", "/admin/api/repos"), api("GET", "/admin/api/codes"), api("GET", "/admin/api/download-tokens")]);
     drawRepos(repoData);
     drawCodes(codeList);
+    // Remote players and watchers at an online table, from its last heartbeat (D-214); a dropped player is "away".
+    const presenceLine = (p) => {
+      if (!p || !(p.remote || p.watchers)) return "";
+      const away = p.remote - p.remoteConnected;
+      const parts = [p.remote ? `${p.remoteConnected} remote player${p.remoteConnected === 1 ? "" : "s"}${away ? `, ${away} away` : ""}` : "", p.watchers ? `${p.watchers} watching` : ""].filter(Boolean);
+      return `<div class="faint" style="font-size:13px">${parts.join(" · ")}</div>`;
+    };
     const mins = Math.round(m.totalGameMs / 60000);
     $("#metrics").innerHTML = [
-      [m.tables, "tables"], [tables.filter((t) => t.online).length, "online now"], [m.gamesPlayed, "games played"],
+      [m.tables, "tables"], [tables.filter((t) => t.online).length, "online now"], [m.remoteNow ?? 0, "remote players now"], [m.watchersNow ?? 0, "watching now"], [m.gamesPlayed, "games played"],
       [m.gamesTerminated, "games ended early"], [mins >= 120 ? `${Math.round(mins / 60)} h` : `${mins} min`, "time played"], [m.simulations, "AI simulations"],
     ].map(([n, l]) => `<div class="tile"><div class="n">${esc(n)}</div><div class="l">${l}</div></div>`).join("")
       + storageTile(m.storage);
     $("#tables").innerHTML = tables.map((t) => `<tr class="${t.code?.pastValidity ? "flag" : ""}">
       <td><div>${esc(t.name)}</div><div class="mono faint">${esc(t.tableId)}</div></td>
       <td><span class="pill ${t.status}">${t.status}</span>${t.status === "pending" ? ` <span class="mono">${esc(t.pairingCode)}</span>` : ""}${t.code?.pastValidity ? ` <span class="pill past" title="Its access code has run out; disconnect it if it should stop">code past validity</span>` : ""}</td>
-      <td><span class="dot ${t.online ? "on" : ""}"></span>${t.online ? "online" : `last seen ${ago(t.lastSeen)}`}</td>
+      <td><span class="dot ${t.online ? "on" : ""}"></span>${t.online ? "online" : `last seen ${ago(t.lastSeen)}`}${presenceLine(t.presence)}</td>
       <td>${t.metrics.gamesPlayed ?? 0}</td>
       <td>${t.status === "pending" ? `<span class="faint">ticked when approving</span>`
         : t.reposFrom === "code" ? `<div class="faint" style="font-size:13px">from access code <span class="codehint">${esc(t.code.hint)}••</span>${t.code.label ? ` ${esc(t.code.label)}` : ""}</div>${repos.length ? `<span class="checks" title="Change the code's games under Access codes">${repoChecks(t.repos ?? [], "disabled")}</span>` : ""}`

@@ -101,9 +101,11 @@ table through an invite link, keeps the game logs, and has the console for admin
 **What the console does** (for admins only; `/admin` on the service, or its own host with `CONSOLE_URL`, like
 https://games-console.skylar.technology):
 
-- **Overview:** how many tables, how many online now, games played, the service's storage.
+- **Overview:** how many tables, how many online now, remote players and watchers connected now, games played, the
+  service's storage.
 - **Tables:** a new table shows a pairing code on its board; an admin approves it here. Each table's row shows
-  whether it is online, its games played and which game repositories it has; *Disconnect* and *Reconnect* it.
+  whether it is online (with its remote players, away ones and watchers, as counts), its games played and which game
+  repositories it has; *Disconnect* and *Reconnect* it.
 - **Access codes:** codes that approve a table at once (no pairing code), with a validity and the games it brings;
   give one to someone who sets up a table (`TABLE_CODE`, or the board's settings).
 - **Game repositories:** the extra-game repositories the service offers (public, or private with

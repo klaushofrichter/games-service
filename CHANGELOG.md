@@ -8,6 +8,9 @@ history.
 
 ## [Unreleased]
 
+- The console shows remote players and watchers connected right now, per table and in total (counts only, D-214).
+- Tests: the Pachisi game played through two decks no longer fails now and then on the intent limit, nor the AI
+  options test under load (D-213).
 - `docs/runbooks/remote-play-relays.md`: when remote players need a relay and how to set one up and check it; the
   service checks its Cloudflare key at start (D-211).
 - The board, the phones and the website show their icon in Safari too (PNG, `favicon.ico` and an Apple touch icon besides the SVG, D-212).
