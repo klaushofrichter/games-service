@@ -178,6 +178,20 @@ describe("HTTP hardening", () => {
     }
   });
 
+  it("serves the favicon in every form browsers ask for, at the root too (D-212)", async () => {
+    const t = await host();
+    for (const [path, type] of [["/shared/favicon.svg", "image/svg+xml"], ["/shared/favicon-32.png", "image/png"], ["/favicon.ico", "image/x-icon"], ["/apple-touch-icon.png", "image/png"]]) {
+      const r = await fetch(`${t.base}${path}`);
+      expect(r.status, path).toBe(200);
+      expect(r.headers.get("content-type"), path).toBe(type);
+    }
+    for (const page of ["/board/", "/deck/"]) {
+      const html = await (await fetch(`${t.base}${page}`)).text();
+      expect(html, page).toContain('href="/shared/favicon-32.png"');
+      expect(html, page).toContain('rel="apple-touch-icon"');
+    }
+  });
+
   it("answers unknown endpoints, bad JSON and oversized bodies with clear errors", async () => {
     const t = await host();
     expect((await t.api("GET", "/nope")).status).toBe(404);

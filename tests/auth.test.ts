@@ -251,9 +251,17 @@ describe("console top bar, favicon and version label", () => {
     expect(icon.status).toBe(200);
     expect(icon.headers.get("content-type")).toBe("image/svg+xml");
     expect(await icon.text()).toMatch(/^<svg /);
+    // For Safari (no SVG favicons) and iOS home screens (D-212); also on the console's host.
+    for (const [path, type, magic] of [["/favicon.ico", "image/x-icon", [0, 0, 1, 0]], ["/favicon-32.png", "image/png", [0x89, 0x50, 0x4e, 0x47]], ["/apple-touch-icon.png", "image/png", [0x89, 0x50, 0x4e, 0x47]]] as const) {
+      const r = await get(path);
+      expect(r.status, path).toBe(200);
+      expect(r.headers.get("content-type"), path).toBe(type);
+      expect([...new Uint8Array(await r.arrayBuffer()).slice(0, 4)], path).toEqual(magic);
+    }
     const { session } = await signIn("admin@example.com");
     for (const html of [await (await get("/")).text(), await (await get("/admin", { cookie: `__Host-games_admin=${session}` })).text()]) {
       expect(html).toContain('<link rel="icon" type="image/svg+xml" href="/favicon.svg">');
+      expect(html).toContain('<link rel="apple-touch-icon" href="/apple-touch-icon.png">');
     }
   });
 

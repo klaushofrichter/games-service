@@ -25,6 +25,9 @@ const GAME_GUIDE = fileURLToPath(new URL("../../../docs/developers/game-developm
 const LOCAL_RUNBOOK = fileURLToPath(new URL("../../../docs/runbooks/local-docker.md", import.meta.url));
 const REMOTE_SW = fileURLToPath(new URL("../public/remote-sw.js", import.meta.url));
 const FAVICON = fileURLToPath(new URL("../public/favicon.svg", import.meta.url));
+/** The icon for browsers without SVG favicons (Safari) and for iOS home screens (D-212). */
+const ICONS: Record<string, string> = { "/favicon.ico": "image/x-icon", "/favicon-32.png": "image/png", "/apple-touch-icon.png": "image/png" };
+const PUBLIC_DIR = fileURLToPath(new URL("../public/", import.meta.url));
 // The public website (D-176): one page and its images.
 const HOME_PAGE = fileURLToPath(new URL("../public/home.html", import.meta.url));
 const TERMS_PAGE = fileURLToPath(new URL("../public/terms.html", import.meta.url));
@@ -543,6 +546,10 @@ export function startCloud(o: CloudOptions) {
       if (m === "GET" && p === "/favicon.svg") {
         res.writeHead(200, { "content-type": "image/svg+xml", "cache-control": "public, max-age=86400" });
         return res.end(await readFile(FAVICON));
+      }
+      if (m === "GET" && ICONS[p]) {
+        res.writeHead(200, { "content-type": ICONS[p], "cache-control": "public, max-age=86400" });
+        return res.end(await readFile(PUBLIC_DIR + p.slice(1)));
       }
       if (m === "GET" && (p === "/llms.txt" || p === "/llms-full.txt" || p === "/docs/game-development.md" || p === "/docs/local-docker.md")) {
         // Public: what anyone (a person or a language model) needs to write a game for Game Table (D-160) or to install
