@@ -183,7 +183,7 @@ export const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", 
 
 /** The small public page style shared by the landing page and the sign-in messages. */
 export function publicPage(title: string, body: string): string {
-  return `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)} · Game Table</title><link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  return `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)} · Game Table</title><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <style>html{color-scheme:dark;scrollbar-color:#2f6457 #0a1d19}body{font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;background:#0a1d19;color:#f3eee2;display:grid;place-items:center;min-height:100vh;margin:0}
 main{max-width:440px;padding:28px;text-align:center}h1{font-family:"Iowan Old Style",Palatino,Georgia,serif;font-weight:600}a{color:#d6a94a}
 .btn{display:inline-block;margin-top:8px;padding:9px 20px;border-radius:999px;background:#d6a94a;color:#1b1407;font-weight:600;text-decoration:none}.muted{color:#b9b3a3}

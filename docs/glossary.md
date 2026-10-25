@@ -69,6 +69,7 @@ buttons turn them to north, east, south or west (D-080). In code: `seatEdges(lay
 | **Seat plate** | The box on the board with a player's name, colour and status, at their seat; games may restyle it. | `seatPlates()`, `.kit-plate` (in a game), `.seat` (in the lobby) | player box, name tag, badge |
 | **AI player** | A seat played by the game's AI, shown as "(AI)". | `kind: "ai"` | bot, CPU, computer |
 | **Remote player** | A person who plays from elsewhere, through an invite: the remote board in their browser and their deck beside it. | `location: "remote"` | online player, guest |
+| **Relay** | A TURN server that carries a remote player's connection when a direct one can't be made (a phone's hotspot, cellular data, some strict networks). Optional; Cloudflare's, through the game service (D-209). | `iceServers`, `apps/cloud/src/turn.ts` | TURN |
 | **Watcher** | Someone remote who sees the board only: no seat, no deck, not one of the players. | `watchers` | spectator, viewer (the Game Viewer is something else) |
 | **Remote place** | What a remote player or watcher uses up; a table has four by default. | `maxRemotePlayers` (`MAX_REMOTE_PLAYERS`), `remotePlaces()` | — |
 | **Away** | A player whose phone has gone (locked, out of range, closed). The seat waits; after 15 s the board says so at the seat. | `away` | disconnected, offline, dropped |

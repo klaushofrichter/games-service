@@ -45,4 +45,5 @@ Key rules for every game: rules are pure and deterministic (randomness only from
 ## Optional
 
 - [Platform README](https://raw.githubusercontent.com/klaushofrichter/games-service/main/README.md): running a table, the board control API, extra-game repositories, remote play, logs
+- [Relays for remote play](https://raw.githubusercontent.com/klaushofrichter/games-service/main/docs/runbooks/remote-play-relays.md): when a remote player on a phone's hotspot or cellular data can't connect, a TURN relay (Cloudflare's, optional) for a game service: set up, check, troubleshoot
 - [Decision log](https://raw.githubusercontent.com/klaushofrichter/games-service/main/docs/decisions.md): why the platform behaves as it does
