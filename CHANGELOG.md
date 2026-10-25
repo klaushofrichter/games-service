@@ -8,6 +8,7 @@ history.
 
 ## [Unreleased]
 
+- A long deck, such as a remote player's, no longer shows a seam in its background (D-210).
 - Remote players on a phone's hotspot or cellular data can connect: with a Cloudflare TURN key the service hands out
   short-lived relay credentials, used only when a direct connection fails (D-209).
 - `scripts/mac-table.sh` is gone: use `scripts/local-table.sh`, which keeps a table set up under the old name (D-207).
