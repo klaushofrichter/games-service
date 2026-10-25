@@ -386,6 +386,8 @@ export function startCloud(o: CloudOptions) {
     return { ...vol, reserve: reserveFor(vol.total), ...use, logCap: maxLogBytes, logBytes: logBytes(), low: vol.free < reserveFor(vol.total) * 1.5 };
   };
   const lookups = new Map<string, { n: number; reset: number }>(); // invite lookup rate limit per IP
+  /** Each table's remote players and watchers from its last heartbeat (D-214); not stored. */
+  const presence = new Map<string, { remote: number; remoteConnected: number; watchers: number }>();
   const iceFor = iceProvider(o.iceServers ?? [{ urls: "stun:stun.l.google.com:19302" }], o.cloudflareTurn ?? null);
   // Ask once at start, so a wrong or revoked key shows in the log now, not at the first remote player (D-211). A
   // failure is logged by the provider, and remote play goes on with STUN.
@@ -692,6 +694,9 @@ export function startCloud(o: CloudOptions) {
         const b = await jsonBody(req);
         t.lastSeen = Date.now();
         if (b.metrics && typeof b.metrics === "object") t.metrics = b.metrics;
+        // Who plays from elsewhere right now (D-214): counts only, kept in memory, shown while the table is online.
+        const count = (v: unknown) => (Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 1000 ? (v as number) : 0);
+        if (b.presence && typeof b.presence === "object") presence.set(t.tableId, { remote: count(b.presence.remote), remoteConnected: count(b.presence.remoteConnected), watchers: count(b.presence.watchers) });
         // An approved table may present an access code too (typed on its board later): it then belongs to that code,
         // which decides its repositories from now on (D-113). A code it had before is freed.
         let codeStatus: CodeStatus | undefined;
@@ -813,6 +818,7 @@ export function startCloud(o: CloudOptions) {
                 reposFrom: c ? "code" : "table",
                 code: c ? { id: c.id, hint: c.hint, label: c.label, state: codeState(c), pastValidity: t.status === "approved" && isExpired(c) } : null,
                 online: online(t),
+                presence: online(t) ? (presence.get(t.tableId) ?? null) : null,
               };
             }),
           );
@@ -901,7 +907,8 @@ export function startCloud(o: CloudOptions) {
         if (m === "GET" && p === "/admin/api/metrics") {
           const all = [...tables.values()];
           const sum = (k: string) => all.reduce((a, t) => a + (t.metrics[k] ?? 0), 0);
-          return json(res, 200, { tables: all.length, gamesPlayed: sum("gamesPlayed"), gamesTerminated: sum("gamesTerminated"), totalGameMs: sum("totalGameMs"), simulations: sum("simulations"), storage: storage() });
+          const now = all.filter(online).map((t) => presence.get(t.tableId));
+          return json(res, 200, { tables: all.length, remoteNow: now.reduce((a, p) => a + (p?.remoteConnected ?? 0), 0), watchersNow: now.reduce((a, p) => a + (p?.watchers ?? 0), 0), gamesPlayed: sum("gamesPlayed"), gamesTerminated: sum("gamesTerminated"), totalGameMs: sum("totalGameMs"), simulations: sum("simulations"), storage: storage() });
         }
         if (m === "GET" && p === "/admin/api/settings") return json(res, 200, settings);
         if (m === "PUT" && p === "/admin/api/settings") {

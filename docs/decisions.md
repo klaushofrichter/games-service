@@ -1551,3 +1551,12 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
     `aiOptions` note; it now looks for the last such note.
   - *Why:* the limit is the platform's and stays as it is; a test that plays faster than a person waits for it,
     rather than a longer timeout or more rounds.
+- **D-214 · 2026-10-25 · Klaus** — The console shows who plays from elsewhere right now:
+  - **What the table sends:** each table's heartbeat (every 15 s) carries counts: its remote players, how many of
+    them are connected (a dropped one keeps the seat, away), and its watchers. No names.
+  - **What the service does with them:** keeps them in memory, not in the database, and shows them only while the
+    table is online. On the table's row: "2 remote players, 1 away · 1 watching". On the Overview: tiles for remote
+    players and watchers connected now, over all online tables.
+  - **Delay:** a drop shows within one heartbeat.
+  - *Why:* the service saw only the handshake of a remote connection, not who stayed. Counts answer "how many play
+    from elsewhere now" without storing who.

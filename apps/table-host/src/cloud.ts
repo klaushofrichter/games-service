@@ -279,7 +279,7 @@ export class CloudLink {
       }
       // An approved table presents a code only until the service has accepted it (say, one typed on the board later).
       const present = code && this.codeStatus !== "accepted" ? { accessCode: code } : {};
-      const r = await this.req("POST", "/api/tables/heartbeat", { metrics: this.table.metrics, phase: this.table.phase, ...present });
+      const r = await this.req("POST", "/api/tables/heartbeat", { metrics: this.table.metrics, phase: this.table.phase, presence: this.table.presence(), ...present });
       if (r.status === 401) {
         // Revoked by an admin: forget the token and go back to pairing. Extra games go too: they were given to this
         // table while it was approved, and come back with the admin's ticks when it is approved again (D-097).

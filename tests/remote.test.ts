@@ -329,6 +329,33 @@ describe("remote play", { timeout: 60_000 }, () => {
     expect(seen[0]).toEqual(relay);
   });
 
+  it("tells the service how many remote players are connected and how many watch, without names (D-214)", async () => {
+    const t = await pairedHost();
+    const adminApi = async (path: string) => (await fetch(`${base}${path}`, { headers: { authorization: `Bearer ${ADMIN}` } })).json();
+    const row = async () => (await adminApi("/admin/api/tables")).find((x: any) => x.status === "approved");
+    await until(async () => (await row())?.presence);
+    expect((await row()).presence).toEqual({ remote: 0, remoteConnected: 0, watchers: 0 });
+    const { token } = await t.ok("POST", "/invites");
+    const peer = await RemotePeer.connect(token);
+    const deck = await peer.socket({ name: "Rita" });
+    await until(async () => (await row()).presence?.remoteConnected === 1);
+    expect((await row()).presence).toEqual({ remote: 1, remoteConnected: 1, watchers: 0 });
+    expect(JSON.stringify(await row())).not.toContain("Rita");
+    const m = await adminApi("/admin/api/metrics");
+    expect(m).toMatchObject({ remoteNow: 1, watchersNow: 0 });
+    // A watcher counts apart from the players.
+    const w = await t.ok("POST", "/invites", { watch: true });
+    const watcher = await RemotePeer.connect(w.token);
+    await (await watcher.socket({ role: "board", name: "Wanda" })).next((x) => x.type === "welcome");
+    await until(async () => (await row()).presence?.watchers === 1);
+    expect((await row()).presence).toEqual({ remote: 1, remoteConnected: 1, watchers: 1 });
+    expect(await adminApi("/admin/api/metrics")).toMatchObject({ remoteNow: 1, watchersNow: 1 });
+    // Rita's deck drops: she keeps her seat, away, and the console counts her so.
+    deck.close();
+    await until(async () => (await row()).presence?.remoteConnected === 0);
+    expect((await row()).presence).toEqual({ remote: 1, remoteConnected: 0, watchers: 1 });
+  });
+
   it("claims an invite on the first connection, before the table answers", async () => {
     const t = await pairedHost();
     const { token } = await t.ok("POST", "/invites");
