@@ -1607,3 +1607,10 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   it, joining as Ann found no seat or another one, under a name typed again. The AI player remembers whose seat it
   took (`standsInFor`). Beside the board (D-175), *Take your seat back* joins under the deck's last name without the
   name form; a phone is told to join with the same name. Someone with another name doesn't get the seat.
+- **D-223 · 2026-10-27 · Klaus** — Exchanging the last player at the table (`developer.protectedPlayer`) for an AI
+  player, a remote player or a watcher asks first, and says that without a player at the table the next game needs
+  the developer setting *Games without a player at the table* (D-118): on the table's board the confirmed exchange
+  switches it on (`allowNoLocalPlayer: true` with `POST /exchange`), so nobody has to find it under Advanced. A remote
+  board can't change the developer setting, so its question says the table's board has to. The lobby's reason a game
+  can't start names the setting too. *Why:* after the last player left, two ready AI players could not start, and it
+  was not clear why.
