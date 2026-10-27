@@ -683,7 +683,7 @@ function openSettings() {
         <div class="faint" style="font-size:.7em;margin-top:6px">Picking a colour someone else has swaps the two.</div></div>`;
     };
     const gameSettings = fields.length
-      ? `<div class="group game-rules"><div class="eyebrow">${esc(state.game.name)} · game settings</div>
+      ? `<div class="group game-rules ${editable ? "" : "locked"}"><div class="eyebrow">${esc(state.game.name)} · game settings${editable ? "" : ` <span class="lock" aria-label="locked">🔒 locked during the game</span>`}</div>
           ${fields.map((f) => `<div class="row"><span>${esc(f.label ?? f.key)}</span>${setting(f)}</div>`).join("")}
           ${editable ? "" : `<div class="faint" style="font-size:.7em;margin-top:6px">These can be changed before the game starts.</div>`}</div>`
       : "";
@@ -704,6 +704,7 @@ function openSettings() {
   };
   const close = () => {
     unsub();
+    unsubView();
     clearInterval(tick);
     fsDoc.removeEventListener("fullscreenchange", draw);
     o.remove();
@@ -711,6 +712,9 @@ function openSettings() {
   };
   draw();
   const unsub = onState(draw);
+  // A game's own items show the game's view (Backgammon's Undo for both players): a change made here comes back as a
+  // game update, not a lobby state, so redraw on those too (D-215).
+  const unsubView = onGameView(draw);
   // The code's "valid for …" counts down while the settings are open (down to minutes).
   const tick = setInterval(() => state?.cloud?.code?.expiresAt && draw(), 30_000);
   fsDoc.addEventListener("fullscreenchange", draw);
@@ -1989,6 +1993,12 @@ function onState(fn) {
   stateListeners.add(fn);
   return () => stateListeners.delete(fn);
 }
+/** Called after the game's board got a new view (the settings window, D-215). */
+const gameViewListeners = new Set();
+function onGameView(fn) {
+  gameViewListeners.add(fn);
+  return () => gameViewListeners.delete(fn);
+}
 
 async function refreshGames() {
   games = await api("GET", "/games").catch(() => games);
@@ -2143,6 +2153,7 @@ function connect() {
       gameMsg = { ...m.payload, receivedAt: Date.now() };
       if (game?.inst && state) game.inst.update(gameMsg.view, gameMsg.events ?? [], gameInfo());
       else if (state && (state.phase === "active" || state.phase === "paused")) showGame();
+      for (const fn of gameViewListeners) fn();
       reportIdle(gameMsg.seq);
     }
   };

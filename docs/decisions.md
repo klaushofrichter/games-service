@@ -1560,3 +1560,12 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   - **Delay:** a drop shows within one heartbeat.
   - *Why:* the service saw only the handshake of a remote connection, not who stayed. Counts answer "how many play
     from elsewhere now" without storing who.
+- **D-215 · 2026-10-27 · Klaus** — The board's settings window during a game:
+  - **Locked values look locked:** the game's own settings, fixed once a game runs (D-090), are dimmed and marked
+    "🔒 locked during the game".
+  - **A game's switches show their change at once:** the window redraws on game updates as well as on lobby
+    changes. Backgammon's *Undo (both players)* changed the game, but the open window kept showing the old choice
+    until it was closed and opened again, because a game's change arrives as a game update, not a lobby state.
+  - *Why:* Klaus switched Undo during a match, saw nothing change, and took the locked start value above it for the
+    switch. Extra-games' Backgammon browser check now checks the switch shows *Off* right after the tap; it fails
+    without this change.
