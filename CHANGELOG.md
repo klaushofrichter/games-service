@@ -8,6 +8,7 @@ history.
 
 ## [Unreleased]
 
+- Exchanging the last player at the table asks first and switches on games without a player at the table (D-223).
 - A player whose seat went to an AI player gets it back, with their name, by joining again as themselves; beside the
   board, *Take your seat back* does it in one tap (D-222).
 - *Awards and Results* sits in the game's corner of the board, where *Show result* was (D-217).

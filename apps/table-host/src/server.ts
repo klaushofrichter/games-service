@@ -385,6 +385,9 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
       if (kind !== "ai" && kind !== "local" && kind !== "remote" && kind !== "watcher") throw new TableError(400, "kind must be ai, local, remote or watcher");
       if (remote && kind === "local") throw new TableError(403, "a remote board can exchange for a remote player or an AI");
       table.assertExchange(seat, kind); // before asking the service for an invite that could not be used
+      // The last player at the table goes (D-223): the board asked, and games without one are allowed from now on. The
+      // developer setting is the table's own board's to change, not a remote one's.
+      if (body.allowNoLocalPlayer === true && !remote) table.setDeveloper({ allowNoLocalPlayer: true });
       const url = kind === "remote" ? (await newInvite()).url : undefined;
       return json(res, 200, { ...table.exchange(seat, kind, url, body.watcher), state: table.state() });
     }
