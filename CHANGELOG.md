@@ -10,7 +10,8 @@ history.
 
 - Cleanup pass: the service reads and writes stored logs without blocking other tables, the console doesn't refresh
   in a hidden tab, the Game Viewer opens a simulation's log without replaying every game again, and repeated code in
-  the table host, the cloud service, the board and the phone is folded into shared helpers.
+  the table host, the cloud service, the board and the phone is folded into shared helpers. Seat plates are rewritten
+  only when they change, so their animations no longer restart on every update.
 - The board's settings window shows a game's switch change at once (it waited for a reopen), and dims the game settings
   that are locked during a game (D-215).
 - At the end of a game, one button: *Awards and Results* opens the awards and statistics, and its *Done* leads to the results (D-216).

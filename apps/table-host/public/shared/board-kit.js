@@ -216,7 +216,7 @@ export function seatPlates(layer, info, extra = () => "", opts = {}) {
     layer.appendChild(box);
   }
   const pos = info.seatPositions;
-  box.innerHTML = info.players
+  const markup = info.players
     .filter((p) => p.seat !== null && pos[p.seat])
     .map((p) => {
       const at = pos[p.seat];
@@ -226,8 +226,14 @@ export function seatPlates(layer, info, extra = () => "", opts = {}) {
         <div class="kit-extra">${p.connected ? extra(p.seat, p) : "Reconnecting…"}</div></div>`;
     })
     .join("");
+  // Written only when it changed: boards call this on every update, and a rewrite restarts the plates' animations.
+  if (platesShown.get(box) !== markup) {
+    platesShown.set(box, markup);
+    box.innerHTML = markup;
+  }
   return box;
 }
+const platesShown = new WeakMap();
 
 /** Inject a stylesheet once (games call this for their own CSS file). */
 export function useStyles(href) {
