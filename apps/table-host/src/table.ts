@@ -1186,6 +1186,7 @@ export class Table extends EventEmitter {
         players: allowedPlayerCounts(m),
         settings: m.settings,
         aiOptions: m.ai.options,
+        ...(m.ai.notice ? { aiNotice: m.ai.notice } : {}),
         howToPlay: howToPlayUrl(g),
         ...(source ? { extra: true } : {}),
       };

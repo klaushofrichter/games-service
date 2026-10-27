@@ -126,7 +126,7 @@ the SDK by path (`../../packages/sdk/src/index.ts`); games in other repositories
 | `localSeat` | Optional edge for a single person at the table when everyone else is remote or AI (they are moved there at the start). For games whose board has a front, like chess. |
 | `dynamicPlayers` | `true`: people who join during a game get a free seat and `onSeatJoined` is called. Default `false`: newcomers wait for the next game. |
 | `settings` | Game options set on the board before the start: `{ key, type: "int" \| "number" \| "string" \| "bool" \| "enum", min?, max?, step?, values?, default?, label? }`. The rules get them in `setup`. |
-| `ai` | `{ supported, options, timeoutSeconds = 20 (1–600), worker = false, hostConfig = [] }`. `options` uses the settings format (e.g. a play style); each AI player has its own values. Section 7. |
+| `ai` | `{ supported, options, timeoutSeconds = 20 (1–600), worker = false, hostConfig = [], notice? }`. `options` uses the settings format (e.g. a play style); each AI player has its own values. `notice` (up to 600 characters, plain text, `https://` links become links) shows under the AI player's options on the board: credit and licence for an engine the AI uses (D-224). Section 7. |
 | `simulation` | `{ supported, headless }`: AI-only games for testing, without a board. |
 | `boardIntents` | Intent names players may also send by touching the board (section 9). |
 | `skipTimers` | Timer ids the board may fire early, e.g. a pause after a hand (section 9). |
