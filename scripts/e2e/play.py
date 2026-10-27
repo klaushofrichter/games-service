@@ -326,6 +326,11 @@ def coinflip(browser, board):
     board.wait_for_selector("#stats-button:not([hidden])")
     assert board.locator("#result-button").is_hidden(), "Show result besides Awards and Results"
     assert board.inner_text("#stats-button").startswith("Awards and Results")
+    # In the game's corner (bottom right for Coin Flip), where Show result is, not inset beside it (D-217).
+    gap = board.evaluate("""() => { const b = document.getElementById('stats-button').getBoundingClientRect();
+      const s = document.getElementById('surface').getBoundingClientRect(), k = s.width / 1920;
+      return { right: (s.right - b.right) / k, bottom: (s.bottom - b.bottom) / k }; }""")
+    assert abs(gap["right"] - 26) < 4 and abs(gap["bottom"] - 26) < 4, f"Awards and Results is not in the corner: {gap}"
     board.wait_for_selector(".cf-table >> text=Klaus")
     board.wait_for_selector("text=All 3 rounds played")
     shot(board, "held-final")

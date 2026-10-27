@@ -8,6 +8,7 @@ history.
 
 ## [Unreleased]
 
+- *Awards and Results* sits in the game's corner of the board, where *Show result* was (D-217).
 - Cleanup pass: the service reads and writes stored logs without blocking other tables, the console doesn't refresh
   in a hidden tab, the Game Viewer opens a simulation's log without replaying every game again, and repeated code in
   the table host, the cloud service, the board and the phone is folded into shared helpers. Seat plates are rewritten

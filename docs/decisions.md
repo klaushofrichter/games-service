@@ -1579,3 +1579,6 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
     *Done* only closes the window.
   - Each board moves on by itself, as before (D-091).
   - *Why:* the awards were easy to skip; this way every table sees them.
+- **D-217 · 2026-10-27 · Klaus** — *Awards and Results* sits in the game's corner of the board, where *Show result*
+  sits, not 214 px in from it. It stood beside *Show result* when both were shown (D-149); since D-216 it is the only
+  button there, and the gap looked like a misplaced button. Both buttons share one rule for the corner.
