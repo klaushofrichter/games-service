@@ -443,21 +443,16 @@ function settleFinal() {
     if (state) render();
   });
 }
-/** The statistics window (D-140): it faces the board's front edge; at the table it can be turned to any edge. */
-function showStatistics() {
+/**
+ * The statistics window (D-140): it faces the board's front edge; at the table it can be turned to any edge. Opened
+ * from a game's last screen it is the way on (D-216): its Done leads to the results in the lobby, as Show result did.
+ */
+function showStatistics(fromEnd = false) {
   if (!state?.summary || overlayRoot.querySelector(".overlay.statistics")) return;
-  openStatistics({ summary: state.summary, gameName: state.game?.name, overlayRoot, edge: overlayEdge(), turnable: !REMOTE });
+  const onClose = fromEnd ? () => ((holdFinal = false), render()) : undefined;
+  openStatistics({ summary: state.summary, gameName: state.game?.name, overlayRoot, edge: overlayEdge(), turnable: !REMOTE, onClose });
 }
-statsBtn.addEventListener("click", showStatistics);
-/** Statistics sits right beside Show result, 10 px apart, whatever Show result's width (D-149). */
-function placeStats() {
-  const st = statsBtn.style;
-  st.left = st.right = "";
-  if (statsBtn.hidden || resultBtn.hidden) return;
-  const corner = [...statsBtn.classList].find((c) => /^(top|bottom)-(left|right)$/.test(c));
-  if (!corner) return;
-  st[corner.endsWith("right") ? "right" : "left"] = `${26 + resultBtn.offsetWidth + 10}px`;
-}
+statsBtn.addEventListener("click", () => showStatistics(true));
 resultBtn.addEventListener("click", () => {
   holdFinal = false;
   render();
@@ -948,12 +943,14 @@ function render() {
   lobbyBtn.hidden = !playing;
   const gameCorner = cornerClass(state.game?.lobbyButton ?? "bottom-right");
   lobbyBtn.className = gameCorner;
-  resultBtn.hidden = !holdFinal || !finalSettled;
+  // The way on from a game's last screen (D-216): Awards and Results when the game has them (their window's Done leads
+  // to the results), else Show result straight to the results.
+  const atEnd = holdFinal && finalSettled;
+  const stats = hasStatistics(state.summary);
+  resultBtn.hidden = !atEnd || stats;
   resultBtn.className = `primary ${gameCorner}`;
-  // Beside Show result, when the game has statistics (D-140).
-  statsBtn.hidden = resultBtn.hidden || !hasStatistics(state.summary);
-  statsBtn.className = gameCorner;
-  placeStats();
+  statsBtn.hidden = !atEnd || !stats;
+  statsBtn.className = `primary ${gameCorner}`;
   if (state.phase !== "finished") overlayRoot.querySelector(".overlay.statistics")?.remove();
 
   renderPause();
@@ -1183,7 +1180,7 @@ function renderFinished() {
       <div class="summary"><div class="eyebrow">${esc(state.game?.name ?? "Game")} · finished</div>
       <div class="big">${esc(s?.text ?? "Game over")}</div>
       ${s?.table ? `<div class="summary-scroll">${summaryTable(s.table)}</div>` : ""}
-      <div class="toolbar"><button class="primary" data-again>Play again</button>${hasStatistics(s) ? `<button data-stats>Statistics</button>` : ""}<button data-close>Back to lobby</button></div></div>
+      <div class="toolbar"><button class="primary" data-again>Play again</button>${hasStatistics(s) ? `<button data-stats>Awards and Results</button>` : ""}<button data-close>Back to lobby</button></div></div>
     </section>${joinPanel()}`;
 }
 

@@ -106,7 +106,7 @@ export function openViewer({ api, overlayRoot, face, toast, openStats }) {
         <span class="seg seats"><button data-seat="" class="${f.seat === null ? "on" : ""}">Everyone</button>${players.map((x) => `<button data-seat="${x.seat}" class="${f.seat === x.seat ? "on" : ""}">${esc(x.name)}</button>`).join("")}</span>
         <button data-toggle="movesOnly" class="${f.movesOnly ? "on" : ""}">Moves only</button>
         <button data-toggle="problems" class="${f.problems ? "on" : ""}">Problems</button>
-        ${openStats && g?.endReason === "finished" ? `<button data-stats>Statistics</button>` : ""}
+        ${openStats && g?.endReason === "finished" ? `<button data-stats>Awards and Results</button>` : ""}
         <form class="goto"><label>Move #<input name="move" type="number" min="1" max="${g?.moves ?? 1}" inputmode="numeric"></label><button>Go</button></form>
       </div>
       ${!p ? `<div class="empty faint">Loading…</div>` : p.total === 0 ? `<div class="empty faint">Nothing matches these filters.</div>` : `<div class="scroll"><table class="vtable moves"><thead><tr><th class="num">#</th><th>Time</th><th>Player</th>${cols.map((c) => `<th class="col">${esc(c.label)}</th>`).join("")}<th>What happened</th></tr></thead>

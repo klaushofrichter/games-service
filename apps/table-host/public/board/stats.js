@@ -46,8 +46,8 @@ export function openStatistics({ summary, gameName, overlayRoot, edge = "south",
   const turn = turnable
     ? `<div class="stats-turn" role="group" aria-label="Turn the window"><span>Turn to</span>${EDGES.map(([e, l]) => `<button type="button" data-face="${e}" aria-label="Turn to the ${e} edge">${l}</button>`).join("")}</div>`
     : "";
-  o.innerHTML = `<div class="panel stats-panel" role="dialog" aria-modal="true" aria-label="Statistics">
-    <div class="stats-head"><h2>${esc(gameName ?? "Game")} · Statistics</h2>${turn}<button type="button" class="primary" data-close-stats>Done</button></div>
+  o.innerHTML = `<div class="panel stats-panel" role="dialog" aria-modal="true" aria-label="Awards and Results">
+    <div class="stats-head"><h2>${esc(gameName ?? "Game")} · Awards and Results</h2>${turn}<button type="button" class="primary" data-close-stats>Done</button></div>
     <p class="stats-result">${esc(summary.text ?? "")}</p>
     <h4>Awards</h4>${awardsHtml}
     ${summary.table ? `<h4>Statistics</h4>${table(summary.table, "game")}` : ""}
