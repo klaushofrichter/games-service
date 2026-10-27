@@ -1582,3 +1582,7 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
 - **D-217 · 2026-10-27 · Klaus** — *Awards and Results* sits in the game's corner of the board, where *Show result*
   sits, not 214 px in from it. It stood beside *Show result* when both were shown (D-149); since D-216 it is the only
   button there, and the gap looked like a misplaced button. Both buttons share one rule for the corner.
+- **D-218 · 2026-10-27 · Klaus** — Play from the board (D-175): the deck beside the board no longer greets with
+  "session expired; scan the QR code to join again". A session it saved in an earlier run (the table restarted, or the
+  setting was off in between) is dropped quietly and the name form shows: that deck takes its seat with the table
+  key, so there is no QR code to scan. A phone keeps the message.
