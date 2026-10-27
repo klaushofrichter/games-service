@@ -24,6 +24,16 @@ let gameMsg = null; // last game.view message { seat, view, events, timers, now,
 let banner = "";
 let removed = false;
 let removedReason = ""; // "left" (from this phone, D-158), "evicted", "replaced"
+let myName = ""; // this deck's name in the last state, to take the seat back with when removed (D-222)
+// Beside the board (D-175), "Take your seat back" reloads with the name to join under, without the name form (D-222).
+const AGAIN_KEY = "gametable.board-deck.again";
+let againName = "";
+if (BOARD) {
+  try {
+    againName = sessionStorage.getItem(AGAIN_KEY) ?? "";
+    sessionStorage.removeItem(AGAIN_KEY);
+  } catch {}
+}
 let leftGame = false; // removed during a game
 let replaced = false; // this player's deck opened in another window (D-133)
 let seq = 0;
@@ -137,6 +147,7 @@ function connect(hello) {
       }
     } else if (m.ch === "lobby" && m.type === "state") {
       state = m.payload;
+      if (!removed && self()) myName = self().name;
       if (state.phase !== "active" && state.phase !== "paused") gameMsg = null;
     } else if (m.ch === "game" && m.type === "view") {
       gameMsg = { ...m.payload, receivedAt: Date.now() };
@@ -412,13 +423,19 @@ function render() {
       removedReason === "board"
         ? ["You play from the board now", "Your place at the table continues on the board (a developer setting). Scan the QR code again once it is switched off."]
         : removedReason === "replaced"
-        ? ["Your seat went to someone else", REMOTE ? "Another player took over your seat. You keep watching the board; the table can give you a seat again." : "Another player took over your seat in this game. Scan the QR code on the board to join the next game."]
+        ? ["Your seat went to someone else", REMOTE ? "Another player took over your seat. You keep watching the board; the table can give you a seat again." : `Another player took over your seat in this game. Scan the QR code on the board to join again; if an AI player took it, join ${myName ? `as ${esc(myName)}` : "with the same name"} to get it back.`]
         : removedReason === "left" && leftGame
           ? ["You left the game", REMOTE ? "Ask the table for a new invite to play again." : "Scan the QR code on the board to join the next game."]
           : [removedReason === "evicted" ? "You were removed from the table" : "You left the table", REMOTE ? "Ask the table for a new invite to join again." : "Scan the QR code on the board to join again. During a game, the board shows it under Settings › Show join code."];
     // Beside the board (D-175) there is no QR code to scan: a button takes a seat again.
-    body.innerHTML = `<div class="card center"><h1>${title}</h1><p class="muted">${BOARD ? "You can take a seat again from here." : text}</p>${BOARD ? `<button class="primary big" type="button" data-board-again>Take a seat again</button>` : ""}</div>`;
-    body.querySelector("[data-board-again]")?.addEventListener("click", () => location.reload());
+    // With the name this deck had, the seat an AI player took over comes back with it (D-222).
+    body.innerHTML = `<div class="card center"><h1>${title}</h1><p class="muted">${BOARD ? (myName ? `You can take your seat back as ${esc(myName)} from here.` : "You can take a seat again from here.") : text}</p>${BOARD ? `<button class="primary big" type="button" data-board-again>${myName ? "Take your seat back" : "Take a seat again"}</button>` : ""}</div>`;
+    body.querySelector("[data-board-again]")?.addEventListener("click", () => {
+      try {
+        if (myName) sessionStorage.setItem(AGAIN_KEY, myName);
+      } catch {}
+      location.reload();
+    });
     return;
   }
   if (!me) return renderJoin();
@@ -439,6 +456,13 @@ function render() {
 function renderJoin() {
   put(top, banner ? `<div class="banner">${esc(banner)}</div>` : "");
   const saved = storage.get();
+  if (BOARD && againName && !ws) {
+    connect({ boardKey: boardKey(), name: againName });
+    joinError = "";
+    againName = "";
+    body.innerHTML = `<p class="muted center">Taking your seat back…</p>`;
+    return;
+  }
   if (saved && !ws) {
     connect({ sessionToken: saved });
     body.innerHTML = `<p class="muted center">Reconnecting…</p>`;

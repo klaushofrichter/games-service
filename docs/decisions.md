@@ -27,6 +27,7 @@ Records are history: an older record is not edited when a newer one changes it. 
 | D-159 | D-166 | Tappable names replace the *Exchange…* buttons in the settings |
 | D-167 | D-168 | Watching is a mode of its own |
 | D-171 | D-172 | Rejoining by name |
+| D-172 | D-222 | A seat handed to an AI player comes back to the person who joins with their name |
 
 ## Product (concept phase, 12 Oct 2026)
 
@@ -1600,3 +1601,9 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   them take a free seat before a game or exchange a player for them during one — instead of pointing to Settings,
   which they don't have; the invite page's note points to the eye. `POST /api/v1/watching/name {name}` is for a
   watcher's own board only; their state carries `remote.watcherId`, so their board finds itself in `watchers`.
+- **D-222 · 2026-10-27 · Klaus** — A player whose seat the board handed to an AI player (D-159, "Ann (AI)") gets it
+  back by joining again with their name: during the game as an exchange does (the AI goes, the game goes on with them),
+  after it straight away, with their colour. Before, D-172 gave the seat back only while it waited, and once an AI had
+  it, joining as Ann found no seat or another one, under a name typed again. The AI player remembers whose seat it
+  took (`standsInFor`). Beside the board (D-175), *Take your seat back* joins under the deck's last name without the
+  name form; a phone is told to join with the same name. Someone with another name doesn't get the seat.

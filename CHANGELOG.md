@@ -8,6 +8,8 @@ history.
 
 ## [Unreleased]
 
+- A player whose seat went to an AI player gets it back, with their name, by joining again as themselves; beside the
+  board, *Take your seat back* does it in one tap (D-222).
 - *Awards and Results* sits in the game's corner of the board, where *Show result* was (D-217).
 - Play from the board: the deck beside the board no longer warns "session expired" before its name form (D-218).
 - The access code moves from the board's settings to Advanced (the tools button) (D-219).
