@@ -64,6 +64,9 @@ html, body { overflow: hidden; }
 #center.sideways .join .url, #center.sideways .join .code, #center.sideways .join .faint { text-align: left !important; }
 
 .main { display: flex; flex-direction: column; min-height: 0; }
+/* The lobby's title line: the table's name, and on the right a warning when the access code runs out (D-220). */
+.main .title-row { display: flex; align-items: baseline; justify-content: space-between; gap: 24px; }
+.main .code-warning { color: var(--ruby); font-size: 1.2em; font-weight: 600; text-align: right; }
 .main h1 { font-family: var(--display); font-weight: 600; font-size: 2.6em; margin: 4px 0 2px; }
 .main .sub { color: var(--ink-soft); margin-bottom: 18px; }
 

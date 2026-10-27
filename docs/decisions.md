@@ -1589,3 +1589,8 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
 - **D-219 · 2026-10-27 · Klaus** — The *Game Table service* group with the table's access code (D-113) moves from
   the board's settings to the Advanced window (the tools button), after *Developer*. A code is set up once, and the
   settings keep what is changed while playing. The waiting notice says "or enter an access code in Advanced".
+- **D-220 · 2026-10-27 · Klaus** — When the table's access code has less than 3 hours of validity left, the lobby
+  says so on the line of the table's name, on the right, in red: "Access code expires in 90 minutes". It counts down
+  in minutes by the board's one 30-second tick (the same that counts the code down in Advanced). Past its end it says
+  "Access code expired": the table keeps working until an admin disconnects it (D-113). The table's own board only;
+  a remote player can do nothing about it.

@@ -102,10 +102,24 @@ try:
         wait(lambda: "expiresAt" in state(TABLE_A)["cloud"]["code"], 20, "the code's validity to reach the table")
         c = state(TABLE_A)["cloud"]["code"]
         assert {k: c[k] for k in ("hint", "source", "status")} == {"hint": code[:2], "source": "board", "status": "accepted"}, c
-        # The keypad closes; the settings behind it show the code as accepted.
+        # The keypad closes; Advanced behind it shows the code as accepted.
         board.wait_for_selector(".overlay.advanced .service .code-status.accepted:has-text('valid for 7 days')")
         board.screenshot(path=os.path.join(OUT, "codes-board-accepted.png"))
         board.click(".overlay.advanced button[data-close-overlay]")
+        # D-220: within 3 hours of the code's end, the lobby's title line warns, in minutes, and counts down by itself;
+        # past it, it says so (the board's 30 s tick). The board's clock is moved on instead of waiting a week.
+        assert board.inner_text(".main .code-warning") == "", "a warning with a week to go"
+        ends = c["expiresAt"]
+        SHIFT = """(to) => { window.__now ??= Date.now; const d = to - window.__now(); Date.now = () => window.__now() + d; }"""
+        board.evaluate(SHIFT, ends - 90 * 60_000)
+        board.wait_for_function("() => document.querySelector('.main .code-warning').textContent === 'Access code expires in 90 minutes'", timeout=40000)
+        board.screenshot(path=os.path.join(OUT, "codes-board-expiry-warning.png"))
+        board.evaluate(SHIFT, ends - 89 * 60_000 - 30_000)
+        board.wait_for_function("() => document.querySelector('.main .code-warning').textContent === 'Access code expires in 90 minutes' || document.querySelector('.main .code-warning').textContent === 'Access code expires in 89 minutes'", timeout=40000)
+        board.evaluate(SHIFT, ends + 60_000)
+        board.wait_for_function("() => document.querySelector('.main .code-warning').textContent === 'Access code expired'", timeout=40000)
+        board.evaluate("() => { if (window.__now) Date.now = window.__now; }")
+        board.wait_for_function("() => document.querySelector('.main .code-warning').textContent === ''", timeout=40000)
 
         # The console shows the table on the code's row, and the code on the table's row.
         console.reload()

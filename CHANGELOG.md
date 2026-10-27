@@ -11,6 +11,7 @@ history.
 - *Awards and Results* sits in the game's corner of the board, where *Show result* was (D-217).
 - Play from the board: the deck beside the board no longer warns "session expired" before its name form (D-218).
 - The access code moves from the board's settings to Advanced (the tools button) (D-219).
+- The lobby warns when the access code has less than 3 hours left, counting down in minutes (D-220).
 - Cleanup pass: the service reads and writes stored logs without blocking other tables, the console doesn't refresh
   in a hidden tab, the Game Viewer opens a simulation's log without replaying every game again, and repeated code in
   the table host, the cloud service, the board and the phone is folded into shared helpers. Seat plates are rewritten

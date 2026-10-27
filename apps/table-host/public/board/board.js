@@ -699,7 +699,6 @@ function openSettings() {
   const close = () => {
     unsub();
     unsubView();
-    clearInterval(tick);
     fsDoc.removeEventListener("fullscreenchange", draw);
     o.remove();
     settingsOverlay = null;
@@ -709,8 +708,6 @@ function openSettings() {
   // A game's own items show the game's view (Backgammon's Undo for both players): a change made here comes back as a
   // game update, not a lobby state, so redraw on those too (D-215).
   const unsubView = onGameView(draw);
-  // The code's "valid for …" counts down while the settings are open (down to minutes).
-  const tick = setInterval(() => state?.cloud?.code?.expiresAt && draw(), 30_000);
   fsDoc.addEventListener("fullscreenchange", draw);
   // Choices with more options than fit as buttons are pulldowns (D-129b).
   o.addEventListener("change", (e) => {
@@ -789,6 +786,34 @@ function validityText(expiresAt, now = Date.now()) {
   if (x >= 3600_000) return say(n(3600_000), "hour");
   return say(Math.max(1, Math.floor(ms / 60_000)), "minute");
 }
+/**
+ * The lobby's warning when the table's access code runs out within 3 hours (D-220), in minutes; refreshed by
+ * the board's tick. Past its validity the table keeps working until an admin disconnects it, so it says that too.
+ * The table's own board only: a remote player can do nothing about it.
+ */
+function codeWarning(now = Date.now()) {
+  const code = state?.cloud?.code;
+  if (REMOTE || code?.status !== "accepted" || code.expiresAt == null) return "";
+  const ms = code.expiresAt - now;
+  if (ms > CODE_WARN_MS) return "";
+  if (ms <= 0) return "Access code expired";
+  const min = Math.ceil(ms / 60_000);
+  return `Access code expires in ${min} minute${min === 1 ? "" : "s"}`;
+}
+const CODE_WARN_MS = 3 * 3600_000;
+
+/**
+ * The board's one tick for what counts down in minutes, every 30 s while the access code has an end: its validity in
+ * Advanced, and the lobby's warning (D-220).
+ */
+const ticks = new Set();
+const onTick = (fn) => (ticks.add(fn), () => ticks.delete(fn));
+setInterval(() => state?.cloud?.code?.expiresAt && ticks.forEach((fn) => fn()), 30_000);
+onTick(() => {
+  const el = center.querySelector(".code-warning");
+  if (el) el.textContent = codeWarning();
+});
+
 /** The badge after the masked code: the service's answer, or, once accepted, how long the code is valid. */
 function codeBadge(code) {
   if (code.status === "accepted" && code.expiresAt !== undefined) {
@@ -1083,7 +1108,7 @@ function toolbar() {
 function renderLobby() {
   const humans = state.players.filter((p) => p.kind === "human").length;
   center.innerHTML = `<section class="main">
-      <div class="eyebrow">${esc(state.tableName)}</div>
+      <div class="title-row"><div class="eyebrow">${esc(state.tableName)}</div><span class="code-warning">${codeWarning()}</span></div>
       ${cloudNotice()}<h1>Pick a game</h1>
       <div class="sub">${humans ? `${humans} at the table${REMOTE ? "" : " · tap a seat, then another to move a player"}` : REMOTE ? "Waiting for players" : "Scan the code to take a seat"}${remoteNote()}</div>
       ${gameTiles()}
@@ -1705,8 +1730,9 @@ function openAdvanced() {
   };
   draw();
   const unsub = onState(draw);
+  const unsubTick = onTick(draw); // the access code's "valid for …" counts down while Advanced is open
   api("GET", "/version").then((v) => ((platform = v), draw())).catch(() => {});
-  const close = () => (unsub(), o.remove());
+  const close = () => (unsub(), unsubTick(), o.remove());
   // Choices with more options than fit as buttons are pulldowns (D-129b).
   o.addEventListener("change", (e) => {
     const sel = e.target.closest("select");
