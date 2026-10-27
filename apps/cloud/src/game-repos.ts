@@ -41,7 +41,7 @@ export function parseRepoSpec(spec: string): { repo: string; ref: string } {
 }
 
 /** Fetch a repository's games/ folder and pack it. Throws with a message fit for the console. */
-export async function fetchRepoBundle(repo: string, ref: string, o: GameRepoOptions) {
+async function fetchRepoBundle(repo: string, ref: string, o: GameRepoOptions) {
   const api = (o.apiUrl ?? "https://api.github.com").replace(/\/$/, "");
   const r = await fetch(`${api}/repos/${repo}/tarball/${encodeURIComponent(ref)}`, {
     headers: {

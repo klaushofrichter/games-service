@@ -35,7 +35,7 @@ export interface HostOptions extends Partial<TableConfig> {
   accessCode?: string;
 }
 
-export function lanAddress(): string {
+function lanAddress(): string {
   for (const list of Object.values(networkInterfaces())) {
     for (const a of list ?? []) if (a.family === "IPv4" && !a.internal) return a.address;
   }

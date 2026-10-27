@@ -273,7 +273,6 @@ export function openViewer({ api, overlayRoot, face, toast, openStats }) {
   });
 
   o.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") return close();
     const tr = e.target.closest?.("tr[data-line]");
     if (tr && e.key === "Enter") openStep({ line: Number(tr.dataset.line) });
   });

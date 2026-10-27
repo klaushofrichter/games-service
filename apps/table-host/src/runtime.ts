@@ -12,6 +12,7 @@ import {
   type SeatLeftEnd,
   type StepResult,
 } from "../../../packages/sdk/src/index.ts";
+import { randomContext } from "./random-context.ts";
 import type { GameSummary, Manifest } from "../../../packages/protocol/src/index.ts";
 
 export type LogRecord =
@@ -54,7 +55,7 @@ export interface LoggedError {
   stack?: string;
 }
 
-export function loggedError(e: unknown): LoggedError {
+function loggedError(e: unknown): LoggedError {
   const err = e as { message?: unknown; stack?: unknown } | null;
   const message = typeof err?.message === "string" ? err.message : String(e);
   const stack = typeof err?.stack === "string" ? err.stack.split("\n").slice(0, 20).join("\n") : undefined;
@@ -188,9 +189,13 @@ export class GameRuntime {
     this.listeners.push(l);
   }
 
+  hasSeat(seat: number) {
+    return this.seats.some((s) => s.seat === seat);
+  }
+
   ctx(): GameContext {
     return {
-      ...rngCtx(this.rng),
+      ...randomContext(this.rng),
       setTimer: (id, ms) => this.setTimer(id, ms),
       clearTimer: (id) => this.clearTimer(id),
       now: () => this.stepGt ?? this.gameTime(),
@@ -445,14 +450,13 @@ export class GameRuntime {
     // A game that can't go on without this seat ends with its own reason (D-119). Asked before the seat goes, so a
     // replay asks the same question of the same state.
     const needed = this.canContinueWithout(seat);
+    this.seats = this.seats.filter((s) => s.seat !== seat);
     if (needed !== true) {
-      this.seats = this.seats.filter((s) => s.seat !== seat);
       this.record({ t: "seatLeft", at: this.clock.now(), gt, seat, ended: true });
       this.inputDone();
       this.finish("seatLeft", { text: needed.wait, highlights: { leftSeat: seat } });
       return true;
     }
-    this.seats = this.seats.filter((s) => s.seat !== seat);
     const r = this.guarded<StepResult<unknown> | "end" | SeatLeftEnd>(
       () => (this.def.onSeatLeft ? this.def.onSeatLeft(this.state, seat, this.ctx()) : "end"),
       (error) => ({ t: "seatLeft", at: this.clock.now(), gt, seat, ended: false, error }),
@@ -518,13 +522,13 @@ export class GameRuntime {
    */
   aiDecide(seat: number, aiRng: () => number, signal: AbortSignal = NEVER, deadline = Number.MAX_SAFE_INTEGER): Intent | null | Promise<Intent | null> {
     if (!this.def.ai || this.over) return null;
-    return this.def.ai(this.view(seat), seat, { ...rngCtx(aiRng), signal, deadline }, this.aiOptions(seat));
+    return this.def.ai(this.view(seat), seat, { ...randomContext(aiRng), signal, deadline }, this.aiOptions(seat));
   }
 
   /** The game's quick move for an AI out of time (D-112), or null if the game has none. */
   aiFallbackIntent(seat: number, aiRng: () => number): Intent | null {
     if (!this.def.aiFallback || this.over) return null;
-    return this.def.aiFallback(this.view(seat), seat, rngCtx(aiRng), this.aiOptions(seat));
+    return this.def.aiFallback(this.view(seat), seat, randomContext(aiRng), this.aiOptions(seat));
   }
 
   aiOptions(seat: number): Record<string, unknown> {
@@ -533,7 +537,6 @@ export class GameRuntime {
 }
 
 const NEVER = new AbortController().signal;
-const rngCtx = (rng: () => number) => ({ random: rng, randomInt: (min: number, max: number) => min + Math.floor(rng() * (max - min + 1)) });
 
 /** Rebuild a game from its log and return the final state hash. */
 export function replay(manifest: Manifest, def: GameDefinition<any>, log: LogRecord[]): string {
