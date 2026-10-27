@@ -789,10 +789,10 @@ awards: [
       <div class="txt">
         <span class="clock"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>One prompt · no supervision</span>
         <h3>“Create a backgammon game for the game platform.”</h3>
-        <p class="muted">That was the whole prompt. Claude read the developer guide and came back with a working Backgammon, without anyone looking over its shoulder. A few hours of polish later it plays matches to 100 points with the doubling cube and the Crawford rule. Everything else it simply gets from the platform:</p>
+        <p class="muted">That was the whole prompt. Claude read the developer guide and came back with a working Backgammon, without anyone looking over its shoulder. A few hours of polish later it plays matches to 100 points with the doubling cube and the Crawford rule, its checkers move by tap or by drag and drop, and its strongest AI players come from wildbg, Carsten Wenderdel's open-source neural-network engine, which Claude ported to TypeScript and tested against its own AI. Everything else it simply gets from the platform:</p>
         <ul>
-          <li>AI players, three strengths</li>
-          <li>A touch board: tap, then move</li>
+          <li>AI players, six strengths</li>
+          <li>A touch board: tap or drag</li>
           <li>Private phone decks</li>
           <li>Remote players and watchers</li>
           <li>Timers, pauses, exchanges</li>
@@ -1332,13 +1332,13 @@ docker compose -f deploy/local/docker-compose.yml up -d --build">Copy</button></
     { id: "holdem", name: "Hold'em", players: "2–8 players", src: "built-in", wide: true, phone: "holdem-phone",
       text: "Fixed-limit Texas Hold'em. Your two cards stay on your phone; the board shows the shared cards and the pot. AI players in two styles, side pots, awards." },
     { id: "backgammon", name: "Backgammon", players: "2 players", src: "extra",
-      text: "Roll and move your checkers on the board, hit blots and bear off first. Matches to 100 points with the doubling cube; AI at three strengths." },
+      text: "Roll, then tap or drag your checkers on the board, hit blots and bear off first. Matches to 100 points with the doubling cube; AI at six strengths, the strongest from wildbg, a neural-network engine." },
     { id: "roulette", name: "Roulette", players: "1–6 players", src: "built-in", phone: "roulette-phone",
       text: "European single-zero roulette. Everyone bets at once from their phone, then the wheel spins. Three AI styles." },
     { id: "liars-dice", name: "Liar's Dice", players: "2–6 players", src: "extra", phone: "liars-dice-phone",
       text: "Everyone rolls in secret under their phone. Bid how many dice show a face, or call the last bid a lie." },
     { id: "chess", name: "Chess", players: "2 players", src: "extra",
-      text: "Tap a piece on the board, then its square. Clocks from bullet to classical, or none; AI at a strength you choose." },
+      text: "Tap a piece on the board, then its square, or drag it there. Clocks from bullet to classical, or none; AI at a strength you choose." },
     { id: "pachisi", name: "Pachisi", players: "2–4 players", src: "built-in",
       text: "Race your tokens around the board and home. Roll a 6 to leave the start, touch a token to move it, land on someone to send them back." },
     { id: "mexican-train", name: "Mexican Train", players: "2–8 players", src: "extra", phone: "mexican-train-phone",

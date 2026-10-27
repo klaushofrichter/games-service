@@ -8,6 +8,7 @@ history.
 
 ## [Unreleased]
 
+- The website mentions drag and drop in Chess and Backgammon, and Backgammon's wildbg AI players.
 - A game can show a notice under its AI players' options, e.g. an engine's licence (`ai.notice`, D-224).
 - Exchanging the last player at the table asks first and switches on games without a player at the table (D-223).
 - A player whose seat went to an AI player gets it back, with their name, by joining again as themselves; beside the
