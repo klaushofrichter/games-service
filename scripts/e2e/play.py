@@ -320,13 +320,18 @@ def coinflip(browser, board):
     time.sleep(1.5)
     played = board.evaluate("() => window.gameTableSounds ?? []")
     assert played.count("coin-spin") == 3 and played.count("coin-land") >= 2, played
-    # D-091: the last screen stays, with statistics, until Show result
+    # D-091: the last screen stays until someone moves on; D-216: the one way on is Awards and Results, whose Done
+    # leads to the results.
     wait(lambda: api("GET", "/state")["phase"] == "finished", 10, "the game to finish")
-    board.wait_for_selector("#result-button:not([hidden])")
+    board.wait_for_selector("#stats-button:not([hidden])")
+    assert board.locator("#result-button").is_hidden(), "Show result besides Awards and Results"
+    assert board.inner_text("#stats-button").startswith("Awards and Results")
     board.wait_for_selector(".cf-table >> text=Klaus")
     board.wait_for_selector("text=All 3 rounds played")
     shot(board, "held-final")
-    board.click("#result-button")
+    board.click("#stats-button")
+    board.wait_for_selector(".overlay.statistics .stats-panel")
+    board.click(".overlay.statistics [data-close-stats]")
     board.wait_for_selector(".summary-table >> text=Heads %")
     decks[0].wait_for_selector(".summary-table >> text=Klaus")
     shot(board, "result")
@@ -364,14 +369,14 @@ def endings(browser, board):
     for d, g in zip(decks, ["heads", "tails"]):
         d.wait_for_selector(f"[data-guess={g}]:not([disabled])")
         d.click(f"[data-guess={g}]")
-    # The game is over at once, but Show result waits until the board has shown the end: the coin lands first (D-134).
+    # The game is over at once, but the way on waits until the board has shown the end: the coin lands first (D-134).
     wait(lambda: api("GET", "/state")["phase"] == "finished", 5, "the game to end")
-    assert board.locator("#result-button:not([hidden])").count() == 0, "Show result appeared while the coin was still spinning"
-    board.wait_for_selector("#result-button:not([hidden])")  # held, as a game that ended by itself
-    assert not board.evaluate("() => document.querySelector('.cf-coin')?.getAnimations().some((a) => a.playState === 'running')"), "Show result appeared before the coin landed"
+    assert board.locator("#stats-button:not([hidden])").count() == 0, "Awards and Results appeared while the coin was still spinning"
+    board.wait_for_selector("#stats-button:not([hidden])")  # held, as a game that ended by itself
+    assert not board.evaluate("() => document.querySelector('.cf-coin')?.getAnimations().some((a) => a.playState === 'running')"), "Awards and Results appeared before the coin landed"
     time.sleep(1.4)
     assert board.evaluate("() => window.gameTableSounds") == [], "no sounds with sound off"
-    # The statistics window (D-140): beside Show result, with the awards the host kept, turnable at the table.
+    # The statistics window (D-140, D-216): the way on from the end, with the awards the host kept, turnable at the table.
     summary = api("GET", "/state")["summary"]
     assert summary["players"] and summary["play"], summary
     board.wait_for_selector("#stats-button:not([hidden])")
@@ -392,7 +397,9 @@ def endings(browser, board):
     assert "rotate(180deg)" in board.evaluate("() => document.querySelector('.stats-panel').style.transform")
     board.click(".overlay.statistics [data-close-stats]")
     board.wait_for_selector(".overlay.statistics", state="detached")
-    board.click("#result-button")
+    # Done led on to the results (no Show result any more, D-216)
+    board.wait_for_selector("[data-stats]")
+    assert board.locator("#stats-button").is_hidden() and board.locator("#result-button").is_hidden()
     # and from the result screen; Escape closes it
     board.click("[data-stats]")
     board.wait_for_selector(".overlay.statistics .stats-panel")
