@@ -22,7 +22,7 @@ describe("games without a player at the table (D-118)", () => {
     await t.ok("POST", "/ai", {});
     await t.ok("POST", "/ai", {});
     await pick();
-    expect((await t.ok("GET", "/state")).game.needs).toEqual(["needs at least one player at the table"]);
+    expect((await t.ok("GET", "/state")).game.needs).toEqual(["needs at least one player at the table (or, under Advanced › Developer, games without one)"]);
     expect((await t.api("POST", "/game/start")).body.error).toMatch(/at least one player at the table/);
     const r = t.host.table.joinRemote("Rita", "sess-1");
     t.host.table.setReady(r.playerId, true);
@@ -147,7 +147,7 @@ describe("games without a player at the table (D-118)", () => {
     await until(async () => (await t.ok("GET", "/state")).phase === "finished");
     await t.ok("POST", "/game/close");
     await pick();
-    expect((await t.ok("GET", "/state")).game.needs).toEqual(["needs at least one player at the table"]);
+    expect((await t.ok("GET", "/state")).game.needs).toEqual(["needs at least one player at the table (or, under Advanced › Developer, games without one)"]);
   });
 
   it("is off again after a restart, unless the table starts with it on", async () => {
@@ -159,5 +159,21 @@ describe("games without a player at the table (D-118)", () => {
     await t.close();
     t = await testHost({ allowNoLocalPlayer: true }); // ALLOW_NO_LOCAL_PLAYER=1
     expect((await t.ok("GET", "/state")).developer.allowNoLocalPlayer).toBe(true);
+  });
+
+  it("exchanging the last player at the table for an AI may switch it on with the exchange (D-223)", async () => {
+    t = await testHost();
+    const ann = await t.joinDeck("Ann");
+    await t.ok("POST", "/ai", {});
+    await pick(3);
+    await ann.request("lobby", "ready", { ready: true });
+    await t.ok("POST", "/game/start");
+    const s = await t.ok("GET", "/state");
+    const seat = s.players.find((p: any) => p.name === "Ann").seat;
+    expect(s.developer.protectedPlayer).toBe(ann.playerId); // the board asks before exchanging her
+    await t.ok("POST", "/exchange", { seat, kind: "ai", allowNoLocalPlayer: true });
+    const after = await t.ok("GET", "/state");
+    expect(after.developer).toMatchObject({ allowNoLocalPlayer: true, protectedPlayer: null });
+    expect(after.players.find((p: any) => p.seat === seat).kind).toBe("ai");
   });
 });

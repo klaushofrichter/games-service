@@ -1388,9 +1388,18 @@ function openExchange(playerId) {
       if (opts) act("POST", `/players/${cur.id}/ai-options`, { options: opts });
       return close();
     }
-    if (kind === "ai" && !(await confirmDialog(`Exchange ${cur.name} for an AI player?`, `An AI player takes over ${cur.name}'s seat for the rest of this game.`, "Exchange"))) return;
+    // The last player at the table (D-223): without one, the next game starts only with the developer setting "Games
+    // without a player at the table", so the board says so, and switches it on with the exchange.
+    const last = kind !== "local" && state.developer?.protectedPlayer === cur.id;
+    if (last) {
+      const what = kind === "ai" ? "an AI player" : kind === "watcher" ? "a watcher" : "a remote player";
+      const then = REMOTE
+        ? "Without a player at the table, the next game can start only once the table's board allows games without one (Advanced › Developer)."
+        : "Without a player at the table, the next game needs the developer setting “Games without a player at the table”, so it is switched on now (Advanced › Developer).";
+      if (!(await confirmDialog(`Exchange ${cur.name}, the last player at the table, for ${what}?`, `${kind === "ai" ? `An AI player takes over ${cur.name}'s seat for the rest of this game. ` : ""}${then}`, "Exchange"))) return;
+    } else if (kind === "ai" && !(await confirmDialog(`Exchange ${cur.name} for an AI player?`, `An AI player takes over ${cur.name}'s seat for the rest of this game.`, "Exchange"))) return;
     error = "";
-    const r = await api("POST", "/exchange", { seat, kind, ...(kind === "watcher" ? { watcher: b.dataset.watcher } : {}) }).catch((err) => ((error = err?.message ?? "That did not work"), null));
+    const r = await api("POST", "/exchange", { seat, kind, ...(kind === "watcher" ? { watcher: b.dataset.watcher } : {}), ...(last && !REMOTE ? { allowNoLocalPlayer: true } : {}) }).catch((err) => ((error = err?.message ?? "That did not work"), null));
     if (r && kind === "ai") {
       toast(`An AI player took over ${cur.name}'s seat`);
       return close();

@@ -4,7 +4,8 @@
 A Table Host of its own (port 8137). Ann and Ben play Coin Flip. On the board, Settings › Players › Ben (the name, D-166):
 "Someone at the table" shows a QR code and its link, and the window waits; a new phone opens the link, joins as Cleo
 and takes Ben's seat (colour kept), and the window closes by itself. Then Cleo's name, "An AI player", confirmed:
-"Cleo (AI)" plays the seat. The board can't remove a player of the running game. Ben's phone is told why it lost the seat.
+"Cleo (AI)" plays the seat. Ann, now the last player at the table, for an AI: the board asks first and switches on
+games without a player at the table (D-223). The board can't remove a player of the running game. Ben's phone is told why it lost the seat.
 """
 import os, sys
 from playwright.sync_api import sync_playwright
@@ -83,6 +84,20 @@ try:
         board.click(".overlay.exchange [data-ex=ai]")
         board.locator("button", has_text="Exchange").last.click()
         wait(lambda: players().get("Cleo (AI)", {}).get("seat") == ben_seat, 10, "Cleo (AI) in the seat")
+        assert a("GET", "/state")["phase"] == "active"
+        # D-223: Ann is now the last player at the table. Exchanging her asks first, says the developer setting goes on,
+        # and switches it on with the exchange, so the next game can start without anyone at the table.
+        assert a("GET", "/state")["developer"]["allowNoLocalPlayer"] is False
+        if not board.locator(".overlay.settings").count():
+            board.click("#settings-button")
+        board.click(f".overlay.settings [data-exchange='{players()['Ann']['id']}']")
+        board.click(".overlay.exchange [data-ex=ai]")
+        board.wait_for_selector(".dialog >> text=the last player at the table", timeout=5000)
+        assert "“Games without a player at the table”, so it is switched on now" in board.inner_text(".dialog")
+        board.screenshot(path=os.path.join(OUT, "exchange-last-player.png"))
+        board.locator("button", has_text="Exchange").last.click()
+        wait(lambda: "Ann (AI)" in players(), 10, "Ann (AI) in the seat")
+        assert a("GET", "/state")["developer"]["allowNoLocalPlayer"] is True, "the developer setting stayed off"
         assert a("GET", "/state")["phase"] == "active"
         br.close()
 finally:
