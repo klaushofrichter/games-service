@@ -1586,3 +1586,6 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   "session expired; scan the QR code to join again". A session it saved in an earlier run (the table restarted, or the
   setting was off in between) is dropped quietly and the name form shows: that deck takes its seat with the table
   key, so there is no QR code to scan. A phone keeps the message.
+- **D-219 · 2026-10-27 · Klaus** — The *Game Table service* group with the table's access code (D-113) moves from
+  the board's settings to the Advanced window (the tools button), after *Developer*. A code is set up once, and the
+  settings keep what is changed while playing. The waiting notice says "or enter an access code in Advanced".

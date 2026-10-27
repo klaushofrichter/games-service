@@ -38,7 +38,7 @@ curl -X POST -H "Authorization: Bearer ${ADMIN_TOKEN:-change-me-dev-admin-token}
 ```
 
 Or skip the pairing code: create an access code in the console (*Access codes*) and start with
-`TABLE_CODE=ABCD-EFGH docker compose …`, or type it in the board's settings (*Access codes* below).
+`TABLE_CODE=ABCD-EFGH docker compose …`, or type it on the board under Advanced (*Access codes* below).
 
 ## A table on your computer (development)
 
@@ -184,7 +184,7 @@ codes*: a label, a validity (one week, one month, one year or forever) and the g
 repositories, or chosen ones). The console shows the code, like `ABCD-EFGH`, once; the service keeps only a hash.
 
 - **On the table:** `TABLE_CODE=ABCD-EFGH` in the environment (the table PC's `.env`), `--code ABCD-EFGH` on the
-  command line (also `scripts/local-table.sh --code …`), or *Access code* in the board's settings, which has a keypad.
+  command line (also `scripts/local-table.sh --code …`), or *Access code* in the board's Advanced window (the tools button), which has a keypad.
   A code given at start wins and can't be changed on the board. The board shows what the service said about it.
 - **One table per code:** the first table that uses a code keeps it; any other is refused (*in use*) and waits with
   its pairing code. *Release* frees a code for a new table, for example after reinstalling the PC, and disconnects

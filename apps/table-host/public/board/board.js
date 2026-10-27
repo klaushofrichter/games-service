@@ -694,7 +694,6 @@ function openSettings() {
       ${(state.watchers ?? []).length ? `<div class="group player-colors watchers-group"><div class="eyebrow">Watching</div>${watcherRows()}<div class="faint group-note">${WATCHER_NOTE}</div></div>` : ""}
       ${gameSettings}
       ${items.length ? `<div class="group game-settings"><div class="eyebrow">${esc(state.game.name)}</div>${items.map((it, k) => `<div class="row"><span>${esc(it.label)}</span>${control(it, k)}</div>`).join("")}</div>` : ""}
-      ${serviceSettings()}
       <div class="actions settings-actions"><button class="primary" data-close-overlay>Done</button></div></div>`);
   };
   const close = () => {
@@ -733,7 +732,6 @@ function openSettings() {
       (fsDoc.fullscreenElement ? fsDoc.exitFullscreen() : fsDoc.documentElement.requestFullscreen()).catch(() => toast("Fullscreen was refused by the browser"));
     }
     if (b.dataset.sound !== undefined) return void act("POST", "/display", { sound: state.display?.sound === false });
-    if (b.dataset.accessCode !== undefined) return openCodePad();
     if (b.dataset.joinCode !== undefined) return openJoinCode();
     if (b.dataset.screen !== undefined) return openScreenLink();
     if (b.dataset.colorPlayer) return void act("POST", `/players/${encodeURIComponent(b.dataset.colorPlayer)}/color`, { color: b.dataset.color });
@@ -801,7 +799,10 @@ function codeBadge(code) {
   return `<span class="code-status ${esc(code.status)}">${esc(CODE_STATUS[code.status] ?? code.status)}</span>`;
 }
 
-/** The settings group for the table's access code: on the table's own board only, and only with the service. */
+/**
+ * The group for the table's access code, in Advanced (D-219): on the table's own board only, and only with the
+ * service. Set up once, so it is out of the way of the settings people use while playing.
+ */
 function serviceSettings() {
   const c = state.cloud;
   if (REMOTE || !c || c.status === "disabled") return "";
@@ -971,7 +972,7 @@ function cloudNotice() {
   // With an access code that the service did not accept, the board says why, beside the pairing code (D-113).
   const codeNote = c.code && c.code.status !== "accepted" && c.code.status !== "waiting" ? ` · access code <span style="white-space:nowrap">${esc(codeMask(c.code.hint))}</span>: ${esc(CODE_STATUS[c.code.status] ?? c.code.status)}` : "";
   if (c.status === "pending")
-    return `<div class="cloud">Waiting for an admin to approve this table · pairing code <b>${esc(c.pairingCode ?? "…")}</b>${codeNote || (c.code ? "" : " · or enter an access code in the settings")}</div>`;
+    return `<div class="cloud">Waiting for an admin to approve this table · pairing code <b>${esc(c.pairingCode ?? "…")}</b>${codeNote || (c.code ? "" : " · or enter an access code in Advanced")}</div>`;
   if (c.status === "offline") return `<div class="cloud">The table is offline · new games start when the connection returns</div>`;
   if (c.status === "revoked")
     return c.code?.status === "revoked"
@@ -1698,6 +1699,7 @@ function openAdvanced() {
         <div class="row" style="margin-top:10px"><span>Play from the board: one player's deck beside the board, no phone</span><button data-adv="board-deck" class="${state.developer?.boardDeck ? "on" : ""}" role="switch" aria-checked="${!!state.developer?.boardDeck}">${state.developer?.boardDeck ? "On" : "Off"}</button></div>
         <div class="faint" style="font-size:.7em;margin-top:6px">For developing games without a phone: the board shows one player's deck, like a remote player's page, and nobody else joins at the table (the QR code goes); remote and AI players as usual. Off again when the table restarts; that player stays.</div>
         <div class="row" style="margin-top:10px"><span>What holds the game up right now: AI players, the board, the phones</span><button data-adv="live">Live status…</button></div></div>`}
+      ${serviceSettings()}
       ${versionsGroup(platform)}
       <div class="actions settings-actions"><button class="primary" data-close-overlay>Done</button></div></div>`);
   };
@@ -1724,6 +1726,7 @@ function openAdvanced() {
     if (a === "sim") return (close(), openSimulation());
     if (a === "logs") return (close(), openGameLogs());
     if (a === "live") return (close(), openLiveStatus());
+    if (b?.dataset.accessCode !== undefined) return openCodePad();
     if (a === "no-local") act("POST", "/developer", { allowNoLocalPlayer: !state.developer?.allowNoLocalPlayer });
     if (a === "board-deck") act("POST", "/developer", { boardDeck: !state.developer?.boardDeck });
   });

@@ -341,7 +341,7 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
     if (m === "DELETE" && (match = path.match(/^\/watchers\/([\w-]+)$/))) return (table.removeWatcher(match[1]), ok());
     if (m === "POST" && (match = path.match(/^\/watchers\/([\w-]+)\/play$/))) return (table.letWatcherPlay(match[1]), ok());
     if (m === "POST" && path === "/cloud/code") {
-      // The table's pre-approved access code (D-113), typed in the board's settings; "" removes it.
+      // The table's pre-approved access code (D-113), typed on the board (Advanced, D-219); "" removes it.
       if (!opts.setAccessCode) throw new TableError(409, "access codes need the Game Table service (CLOUD_URL)");
       await opts.setAccessCode(body.code ?? "");
       return ok();
