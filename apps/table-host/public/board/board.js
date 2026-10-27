@@ -172,7 +172,11 @@ function numberProblem(f, raw) {
  * A small form for manifest-described fields (game settings, AI options). Resolves with the values,
  * or null when cancelled. With `removeLabel`, a red button on the left resolves with "remove" (D-103).
  */
-function formDialog(title, intro, fields, values = {}, okLabel = "OK", removeLabel = null) {
+/** Plain text with its https:// links as links (opening a new tab), for a game's notes. */
+const linkified = (text) => esc(text).replace(/https:\/\/[^\s<]+[^\s<.,;:!?)]/g, (u) => `<a href="${u}" target="_blank" rel="noopener">${u}</a>`);
+
+/** A form for settings or options; `note`: a game's text under the fields (an AI engine's licence, D-224). */
+function formDialog(title, intro, fields, values = {}, okLabel = "OK", removeLabel = null, note = "") {
   return new Promise((resolve) => {
     const d = document.createElement("div");
     d.className = "dialog-backdrop";
@@ -185,6 +189,7 @@ function formDialog(title, intro, fields, values = {}, okLabel = "OK", removeLab
     };
     d.innerHTML = `<div class="dialog form"><h2>${esc(title)}</h2>${intro ? `<div class="muted">${esc(intro)}</div>` : ""}
       <div class="fields">${fields.map((f) => `<label><span>${esc(f.label ?? f.key)}</span>${input(f)}</label>`).join("") || `<div class="faint">${state?.game ? "Nothing to set for this game." : "Pick a game to choose how it plays."}</div>`}</div>
+      ${note ? `<div class="faint form-note">${linkified(note)}</div>` : ""}
       <div class="actions">${removeLabel ? `<button class="danger" data-x="remove" style="margin-right:auto">${esc(removeLabel)}</button>` : ""}<button data-x="no">Cancel</button><button class="primary" data-x="yes">${esc(okLabel)}</button></div></div>`;
     d.addEventListener("click", (e) => {
       const x = e.target.closest("button")?.dataset.x;
@@ -241,7 +246,7 @@ async function configureAi(playerId) {
   if (!p) return;
   const g = state.game ? games.find((x) => x.id === state.game.id) : null;
   const title = g ? `${p.name} · ${g.name}` : p.name;
-  const opts = await formDialog(title, g ? "How this AI player plays." : "", g?.aiOptions ?? [], p.aiOptions ?? {}, g ? "Save" : "Done", "Remove");
+  const opts = await formDialog(title, g ? "How this AI player plays." : "", g?.aiOptions ?? [], p.aiOptions ?? {}, g ? "Save" : "Done", "Remove", g?.aiNotice);
   if (opts === "remove") {
     if (await confirmDialog(`Remove ${p.name}?`, "The AI player leaves its seat.", "Remove")) {
       if (selectedPlayer === playerId) selectedPlayer = null;
@@ -1384,7 +1389,7 @@ function openExchange(playerId) {
     const cur = state.players.find((q) => q.seat === seat) ?? first;
     if (kind === "ai-options") {
       const g = games.find((q) => q.id === state.game?.id);
-      const opts = await formDialog(`${cur.name} · ${g?.name ?? ""}`, "How this AI player plays from its next move on.", g?.aiOptions ?? [], cur.aiOptions ?? {}, "Save");
+      const opts = await formDialog(`${cur.name} · ${g?.name ?? ""}`, "How this AI player plays from its next move on.", g?.aiOptions ?? [], cur.aiOptions ?? {}, "Save", null, g?.aiNotice);
       if (opts) act("POST", `/players/${cur.id}/ai-options`, { options: opts });
       return close();
     }

@@ -6,6 +6,7 @@ A Table Host of its own on port 8093 with the test games. A board and one phone;
   - the game is paused (the phone says whom it waits for) and the game stays visible around the card;
   - "Play now" plays the game's quick move (logged as a fallback) and the game goes on;
   - an AI that answers during the pause takes the card away by itself;
+  - the AI player's options window shows the game's notice, with its link (D-224);
   - no browser console error.
   python3 scripts/e2e/ai_wait.py out/
 """
@@ -59,6 +60,20 @@ def main():
             deck = ctx.new_page()
             watch(deck, "Ann")
             join_deck(deck, a("GET", "/join")["url"], "Ann")
+
+            # D-224: the AI player's window shows the game's notice under the options, its link a link.
+            a("POST", "/game/select", {"gameId": "think-race", "settings": {"target": 5}})
+            first = a("POST", "/ai", {})["playerId"]
+            seat = next(p["seat"] for p in a("GET", "/state")["players"] if p["id"] == first)
+            board.locator(".seat").nth(seat).click()
+            board.click(f"[data-config='{first}']")
+            note = board.locator(".dialog.form .form-note")
+            note.wait_for(timeout=5000)
+            assert "test fixture" in note.inner_text(), note.inner_text()
+            assert note.locator("a[href='https://example.org/think-race'][target=_blank]").count() == 1, note.inner_html()
+            shot(board, "ai-notice")
+            board.click(".dialog [data-x=no]")
+            a("DELETE", f"/players/{first}")
 
             # An AI far over its budget: the game pauses and the board offers Play now at its seat.
             ai = start_race(board, deck, 10_000, 5)

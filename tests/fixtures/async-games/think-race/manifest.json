@@ -15,7 +15,8 @@
     "options": [
       { "key": "thinkMs", "type": "int", "min": 0, "max": 60000, "default": 50, "label": "Thinking time (ms)" },
       { "key": "behaviour", "type": "enum", "values": ["ok", "fail", "hang", "sync"], "default": "ok", "label": "Behaviour" }
-    ]
+    ],
+    "notice": "Think Race's AI is a test fixture: https://example.org/think-race (public domain)."
   },
   "simulation": { "supported": true, "headless": true },
   "test": true

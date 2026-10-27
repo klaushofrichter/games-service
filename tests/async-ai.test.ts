@@ -44,6 +44,13 @@ const pauses = () => log().filter((r) => r.t === "pause" || r.t === "resume").ma
 const aiMoves = () => log().filter((r): r is Extract<LogRecord, { t: "intent" }> => r.t === "intent" && r.by === "ai");
 
 describe("AI players that take their time (D-112)", { timeout: 30_000 }, () => {
+  it("lists a game's notice for its AI players' options (D-224); a game without one has none", async () => {
+    t = await testHost({ gamesDir: GAMES, showTestGames: true });
+    const games = await t.ok("GET", "/games");
+    expect(games.find((g: any) => g.id === "think-race").aiNotice).toBe("Think Race's AI is a test fixture: https://example.org/think-race (public domain).");
+    expect(games.find((g: any) => g.id === "think-race-worker")).not.toHaveProperty("aiNotice");
+  });
+
   it("plays moves that come later, logs the thinking time, and the game replays exactly", async () => {
     await race("think-race", { thinkMs: 60 });
     await until(() => t.host.table.phase === "finished", 8000, "the AI to finish the race");

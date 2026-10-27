@@ -507,3 +507,6 @@ button.copy:hover, button.copy.done { color: var(--brass); border-color: var(--b
   border-radius: 999px; font-size: 20px; background: rgba(10, 29, 25, 0.9); border: 1px solid var(--brass-deep);
   color: var(--brass); }
 #sound-hint[hidden] { display: none; }
+/* A game's text under an AI player's options, such as an engine's licence (D-224). */
+.dialog.form .form-note { font-size: .7em; line-height: 1.45; margin-top: 12px; overflow-wrap: anywhere; }
+.dialog.form .form-note a { color: inherit; }
