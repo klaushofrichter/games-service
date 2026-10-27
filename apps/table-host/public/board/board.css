@@ -211,6 +211,9 @@ pre.raw { font-family: var(--mono); font-size: 0.7em; color: var(--ink-soft); ba
 }
 .overlay h2 { font-family: var(--display); margin: 0 0 14px; }
 .overlay .row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--felt-line); gap: 12px; }
+/* A game's settings during a game are fixed (D-090): dimmed, so they don't look like the switches that do change (D-215). */
+.overlay .game-rules.locked .row { opacity: .5; }
+.overlay .game-rules .lock { margin-left: 8px; font-size: .9em; letter-spacing: 0; text-transform: none; color: var(--ink-faint, #8a9a92); }
 .overlay .row:last-child { border-bottom: 0; }
 .overlay .group { margin: 18px 0; }
 .overlay label { display: flex; flex-direction: column; gap: 6px; font-size: 0.9em; }
