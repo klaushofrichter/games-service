@@ -124,7 +124,7 @@ buttons turn them to north, east, south or west (D-080). In code: `seatEdges(lay
 | **Replay** | Running a finished game's log through the rules again, to check it reaches the same state. | `replay` | — |
 | **Game Viewer** | The board's window that walks through a game's moves. | `viewer.js` | replay viewer, debugger |
 | **Simulation** | Games played by AI players only, as fast as possible, to test a game. | `simulation` | bot run |
-| **Statistics** | The window with the awards and each player's numbers after a game. | `stats.js`, `stats.ts` | scoreboard |
+| **Awards and Results** | The window with the result, the awards and each player's numbers after a game; at the end of a game the way to the results (D-216). | `stats.js`, `stats.ts` | statistics, scoreboard |
 
 ## The game service
 

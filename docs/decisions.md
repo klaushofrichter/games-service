@@ -1569,3 +1569,13 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   - *Why:* Klaus switched Undo during a match, saw nothing change, and took the locked start value above it for the
     switch. Extra-games' Backgammon browser check now checks the switch shows *Off* right after the tap; it fails
     without this change.
+- **D-216 · 2026-10-27 · Klaus** — Players go through the awards on the way to the results:
+  - **The end screen:** a game that ended by itself shows one button, *Awards and Results ›*, where it showed
+    *Show result* and *Statistics* side by side (D-140, D-149). It opens the statistics window, now titled
+    "Awards and Results". Its *Done*, a tap beside it or Escape lead to the results in the lobby, as *Show result*
+    did.
+  - **Games without awards or a table** keep *Show result ›*, since there is nothing to show first.
+  - **Elsewhere:** the button on the results page and in the Game Viewer is also *Awards and Results*; there,
+    *Done* only closes the window.
+  - Each board moves on by itself, as before (D-091).
+  - *Why:* the awards were easy to skip; this way every table sees them.

@@ -317,8 +317,10 @@ What this means for a game:
   `deep-thinker` replaces the platform's). A seat another player took over during the game shows the last player's name
   with *; a note explains it.
 
-The board keeps the game's final screen until someone taps **Show result**, so the end can be seen. If the board UI
-replays moves (section 9), **Show result** waits for it.
+The board keeps the game's final screen until someone taps **Awards and Results**, so the end can be seen. That
+opens the awards and statistics (`isOver`'s awards and table), whose *Done* leads to the results in the lobby; a game
+without awards or a table shows **Show result** instead, straight to the results (D-216). If the board UI replays
+moves (section 9), the button waits for it.
 
 ## 9. The board UI (`board.js`)
 
@@ -353,7 +355,7 @@ export function settings({ info, setPrefs }) { return []; } // optional: items f
 - **`update(view, events, info)`** is called with every change (and when `info` changes, with `events` empty). Make
   it cheap and idempotent: redraw from `view`, animate only `events` you have not shown yet.
 - **`whenIdle()`** (strongly recommended if you animate): resolve when every event sent so far has been shown. The
-  platform waits for it before an AI player moves, before phones see an AI's move, and before **Show result**; the
+  platform waits for it before an AI player moves, before phones see an AI's move, and before **Awards and Results**; the
   table's own board paces the game (remote boards don't), and after 20 s without an answer the platform goes on. Without
   it the platform assumes the board shows everything at once. Never let it wait forever (resolve when nothing is
   queued).

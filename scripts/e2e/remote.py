@@ -267,9 +267,10 @@ try:
         # Where each button lands on Rita's screen, and which way it turns.
         WHERE = """(id) => { const e = document.getElementById(id); const r = e.getBoundingClientRect();
           return { x: (r.left + r.right) / 2 / innerWidth, y: (r.top + r.bottom) / 2 / innerHeight, cls: e.className }; }"""
-        res, sts, tools = (bframe.evaluate(WHERE, i) for i in ("result-button", "stats-button", "tools-button"))
-        assert res["x"] > 0.6 and res["y"] > 0.6 and "turned" in res["cls"], f"Show result is not at Rita's bottom right: {res}"
-        assert sts["x"] > 0.5 and sts["y"] > 0.6 and sts["x"] < res["x"] and "turned" in sts["cls"], f"Statistics is not beside Show result: {sts}"
+        sts, tools = (bframe.evaluate(WHERE, i) for i in ("stats-button", "tools-button"))
+        # The one way on, Awards and Results, in the game's corner at Rita's bottom right (D-216).
+        assert sts["x"] > 0.6 and sts["y"] > 0.6 and "turned" in sts["cls"], f"Awards and Results is not at Rita's bottom right: {sts}"
+        assert rboard.locator("#result-button").is_hidden(), "Show result besides Awards and Results"
         assert tools["x"] < 0.3 and tools["y"] > 0.6, f"the tools are not at Rita's bottom left: {tools}"
         remote.screenshot(path=os.path.join(OUT, "remote-north-finished.png"))
         rboard.locator("#stats-button").click()
