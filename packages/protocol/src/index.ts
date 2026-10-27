@@ -270,8 +270,9 @@ export interface LobbyState {
   /**
    * `watching`: only in the state a remote board gets whose browser has no player at the table (D-167, D-168);
    * `mayJoin`: only for remote boards, whether their page shows the deck (a player, or one let in to play).
+   * `watcherId`: only in a watcher's own state, their id in `watchers` (D-221).
    */
-  remote: { boardControl: boolean; maxPlayers: number; players: number; joined: { invite: string; name: string }[]; watching?: boolean; mayJoin?: boolean };
+  remote: { boardControl: boolean; maxPlayers: number; players: number; joined: { invite: string; name: string }[]; watching?: boolean; mayJoin?: boolean; watcherId?: string };
   /** The table's display choices from the board's settings (D-092), followed by every board, remote ones too. */
   display: { sound: boolean };
   /**

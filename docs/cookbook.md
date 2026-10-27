@@ -107,7 +107,7 @@ https://games-console.skylar.technology):
   whether it is online (with its remote players, away ones and watchers, as counts), its games played and which game
   repositories it has; *Disconnect* and *Reconnect* it.
 - **Access codes:** codes that approve a table at once (no pairing code), with a validity and the games it brings;
-  give one to someone who sets up a table (`TABLE_CODE`, or the board's settings).
+  give one to someone who sets up a table (`TABLE_CODE`, or the board's Advanced window).
 - **Game repositories:** the extra-game repositories the service offers (public, or private with
   `GAME_REPO_TOKEN`), and which tables get them.
 - **Game logs** and **Download tokens:** finished games uploaded by the tables, to download, and tokens that let
