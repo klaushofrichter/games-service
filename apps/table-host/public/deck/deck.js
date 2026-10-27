@@ -119,7 +119,9 @@ function connect(hello) {
         if (m.payload.status === 403) {
           storage.clear();
           me = null;
-          banner = msg;
+          // The deck beside the board (D-175) takes a seat with the table key, not a QR code: a session saved from an
+          // earlier run that the table no longer knows just goes, and the name form shows without a warning (D-218).
+          banner = BOARD && hello.sessionToken ? "" : msg;
         } else if (!me && (m.payload.code === "name-taken" || m.payload.code === "name-invalid")) {
           joinError = msg; // the form stays, with the reason under the name (D-148)
           const el = body.querySelector("#join-error");

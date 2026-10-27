@@ -547,21 +547,46 @@ async function watcherAction(b) {
   } else act("POST", `/watchers/${w.id}/play`);
   return true;
 }
+/** The settings' Fullscreen row, also in a watcher's window (D-221): the whole page where it applies (D-184). */
+function fullscreenRow() {
+  return `<div class="row"><span>Fullscreen</span>${fsDoc.fullscreenEnabled ? `<button data-fs class="${fsDoc.fullscreenElement ? "on" : ""}">${fsDoc.fullscreenElement ? "Leave fullscreen" : "Fullscreen"}</button>` : `<span class="faint">not available in this browser</span>`}</div>`;
+}
+function toggleFullscreen() {
+  (fsDoc.fullscreenElement ? fsDoc.exitFullscreen() : fsDoc.documentElement.requestFullscreen()).catch(() => toast("Fullscreen was refused by the browser"));
+}
+/** The watcher this board belongs to (D-221): a remote board whose browser watches; null elsewhere. */
+const watcherSelf = () => (REMOTE && state.remote?.watching ? (state.watchers ?? []).find((w) => w.id === state.remote.watcherId) ?? null : null);
+/**
+ * The eye's window: who watches, and Remove / Let play where this board may. A watcher's own board, which has no
+ * settings, also gets their name to change and Fullscreen here (D-221), and is told how they could play: the table's
+ * board does that.
+ */
 function openWatchers() {
   const o = document.createElement("div");
   o.className = "overlay watchers";
   const draw = () => {
     if (!(state.watchers ?? []).length) return close();
+    const me = watcherSelf();
+    const note = me
+      ? "You see the board, never a player's private view. To play, ask the table: its board can let you take a free seat before a game, or exchange a player for you during one. To stop watching, close this window."
+      : `${WATCHER_NOTE}${lobbyPhase() ? "" : " During a game, a watcher can take a seat through Settings › Players: tap a player's name."}`;
     setPanel(o, `<div class="panel watchers-panel"><h2>Watching</h2>
+      ${me ? `<div class="group"><div class="row"><span>Your name: <b>${esc(me.name)}</b></span><button data-watcher-name>Change name</button></div>${fullscreenRow()}</div>` : ""}
       <div class="group player-colors">${watcherRows()}</div>
-      <p class="faint" style="font-size:.75em">${WATCHER_NOTE}${lobbyPhase() ? "" : " During a game, a watcher can take a seat through Settings › Players: tap a player's name."}</p>
+      <p class="faint" style="font-size:.75em">${note}</p>
       <div class="actions settings-actions"><button class="primary" data-close-overlay>Done</button></div></div>`);
   };
-  const close = () => (unsub(), o.remove());
+  const close = () => (unsub(), fsDoc.removeEventListener("fullscreenchange", draw), o.remove());
   const unsub = onState(draw);
+  fsDoc.addEventListener("fullscreenchange", draw);
   o.addEventListener("click", async (e) => {
     const b = e.target.closest("button");
     if (e.target === o || b?.dataset.closeOverlay !== undefined) return close();
+    if (b?.dataset.fs !== undefined) return toggleFullscreen();
+    if (b?.dataset.watcherName !== undefined) {
+      const me = watcherSelf();
+      return openNamePad(me?.name === "Guest" ? "" : (me?.name ?? ""), (n) => n && act("POST", "/watching/name", { name: n }), "Your name");
+    }
     if (b) await watcherAction(b);
   });
   draw();
@@ -641,7 +666,6 @@ function openSettings() {
       console.error("game settings failed", err);
       items = [];
     }
-    const fs = fsDoc.fullscreenEnabled;
     // The chosen game's own settings from its manifest (D-090): editable until it starts, then shown read-only.
     const fields = gameFields();
     const editable = state.phase === "ready";
@@ -686,7 +710,7 @@ function openSettings() {
       <div class="group"><div class="eyebrow">Display</div>
         <div class="row"><span>Sound effects</span><button data-sound class="${state.display?.sound !== false ? "on" : ""}" role="switch" aria-checked="${state.display?.sound !== false}">${state.display?.sound !== false ? "On" : "Off"}</button></div>
         ${REMOTE || IN_PLAY ? "" : `<div class="row"><span>Another screen on this WiFi, such as an iPad or a TV, shows the board instead</span><button data-screen>Board on another screen…</button></div>`}
-        <div class="row"><span>Fullscreen</span>${fs ? `<button data-fs class="${fsDoc.fullscreenElement ? "on" : ""}">${fsDoc.fullscreenElement ? "Leave fullscreen" : "Fullscreen"}</button>` : `<span class="faint">not available in this browser</span>`}</div></div>
+        ${fullscreenRow()}</div>
       <div class="group"><div class="eyebrow">Joining</div>
         ${state.developer?.boardDeck ? `<div class="row"><span class="faint">Played from the board (Advanced › Developer): no phone joins at the table</span></div>` : `<div class="row"><span>The QR code and address for phones, to join or rejoin, also during a game</span><button data-join-code>Show join code…</button></div>`}
         <div class="row"><span>${remoteJoinText()}</span>${inviteButton("Invite remote player…")}</div></div>
@@ -694,13 +718,11 @@ function openSettings() {
       ${(state.watchers ?? []).length ? `<div class="group player-colors watchers-group"><div class="eyebrow">Watching</div>${watcherRows()}<div class="faint group-note">${WATCHER_NOTE}</div></div>` : ""}
       ${gameSettings}
       ${items.length ? `<div class="group game-settings"><div class="eyebrow">${esc(state.game.name)}</div>${items.map((it, k) => `<div class="row"><span>${esc(it.label)}</span>${control(it, k)}</div>`).join("")}</div>` : ""}
-      ${serviceSettings()}
       <div class="actions settings-actions"><button class="primary" data-close-overlay>Done</button></div></div>`);
   };
   const close = () => {
     unsub();
     unsubView();
-    clearInterval(tick);
     fsDoc.removeEventListener("fullscreenchange", draw);
     o.remove();
     settingsOverlay = null;
@@ -710,8 +732,6 @@ function openSettings() {
   // A game's own items show the game's view (Backgammon's Undo for both players): a change made here comes back as a
   // game update, not a lobby state, so redraw on those too (D-215).
   const unsubView = onGameView(draw);
-  // The code's "valid for …" counts down while the settings are open (down to minutes).
-  const tick = setInterval(() => state?.cloud?.code?.expiresAt && draw(), 30_000);
   fsDoc.addEventListener("fullscreenchange", draw);
   // Choices with more options than fit as buttons are pulldowns (D-129b).
   o.addEventListener("change", (e) => {
@@ -729,11 +749,8 @@ function openSettings() {
     const b = e.target.closest("button");
     if (e.target === o || b?.dataset.closeOverlay !== undefined) return close();
     if (!b) return;
-    if (b.dataset.fs !== undefined) {
-      (fsDoc.fullscreenElement ? fsDoc.exitFullscreen() : fsDoc.documentElement.requestFullscreen()).catch(() => toast("Fullscreen was refused by the browser"));
-    }
+    if (b.dataset.fs !== undefined) toggleFullscreen();
     if (b.dataset.sound !== undefined) return void act("POST", "/display", { sound: state.display?.sound === false });
-    if (b.dataset.accessCode !== undefined) return openCodePad();
     if (b.dataset.joinCode !== undefined) return openJoinCode();
     if (b.dataset.screen !== undefined) return openScreenLink();
     if (b.dataset.colorPlayer) return void act("POST", `/players/${encodeURIComponent(b.dataset.colorPlayer)}/color`, { color: b.dataset.color });
@@ -791,6 +808,34 @@ function validityText(expiresAt, now = Date.now()) {
   if (x >= 3600_000) return say(n(3600_000), "hour");
   return say(Math.max(1, Math.floor(ms / 60_000)), "minute");
 }
+/**
+ * The lobby's warning when the table's access code runs out within 3 hours (D-220), in minutes; refreshed by
+ * the board's tick. Past its validity the table keeps working until an admin disconnects it, so it says that too.
+ * The table's own board only: a remote player can do nothing about it.
+ */
+function codeWarning(now = Date.now()) {
+  const code = state?.cloud?.code;
+  if (REMOTE || code?.status !== "accepted" || code.expiresAt == null) return "";
+  const ms = code.expiresAt - now;
+  if (ms > CODE_WARN_MS) return "";
+  if (ms <= 0) return "Access code expired";
+  const min = Math.ceil(ms / 60_000);
+  return `Access code expires in ${min} minute${min === 1 ? "" : "s"}`;
+}
+const CODE_WARN_MS = 3 * 3600_000;
+
+/**
+ * The board's one tick for what counts down in minutes, every 30 s while the access code has an end: its validity in
+ * Advanced, and the lobby's warning (D-220).
+ */
+const ticks = new Set();
+const onTick = (fn) => (ticks.add(fn), () => ticks.delete(fn));
+setInterval(() => state?.cloud?.code?.expiresAt && ticks.forEach((fn) => fn()), 30_000);
+onTick(() => {
+  const el = center.querySelector(".code-warning");
+  if (el) el.textContent = codeWarning();
+});
+
 /** The badge after the masked code: the service's answer, or, once accepted, how long the code is valid. */
 function codeBadge(code) {
   if (code.status === "accepted" && code.expiresAt !== undefined) {
@@ -801,7 +846,10 @@ function codeBadge(code) {
   return `<span class="code-status ${esc(code.status)}">${esc(CODE_STATUS[code.status] ?? code.status)}</span>`;
 }
 
-/** The settings group for the table's access code: on the table's own board only, and only with the service. */
+/**
+ * The group for the table's access code, in Advanced (D-219): on the table's own board only, and only with the
+ * service. Set up once, so it is out of the way of the settings people use while playing.
+ */
 function serviceSettings() {
   const c = state.cloud;
   if (REMOTE || !c || c.status === "disabled") return "";
@@ -971,7 +1019,7 @@ function cloudNotice() {
   // With an access code that the service did not accept, the board says why, beside the pairing code (D-113).
   const codeNote = c.code && c.code.status !== "accepted" && c.code.status !== "waiting" ? ` · access code <span style="white-space:nowrap">${esc(codeMask(c.code.hint))}</span>: ${esc(CODE_STATUS[c.code.status] ?? c.code.status)}` : "";
   if (c.status === "pending")
-    return `<div class="cloud">Waiting for an admin to approve this table · pairing code <b>${esc(c.pairingCode ?? "…")}</b>${codeNote || (c.code ? "" : " · or enter an access code in the settings")}</div>`;
+    return `<div class="cloud">Waiting for an admin to approve this table · pairing code <b>${esc(c.pairingCode ?? "…")}</b>${codeNote || (c.code ? "" : " · or enter an access code in Advanced")}</div>`;
   if (c.status === "offline") return `<div class="cloud">The table is offline · new games start when the connection returns</div>`;
   if (c.status === "revoked")
     return c.code?.status === "revoked"
@@ -1082,7 +1130,7 @@ function toolbar() {
 function renderLobby() {
   const humans = state.players.filter((p) => p.kind === "human").length;
   center.innerHTML = `<section class="main">
-      <div class="eyebrow">${esc(state.tableName)}</div>
+      <div class="title-row"><div class="eyebrow">${esc(state.tableName)}</div><span class="code-warning">${codeWarning()}</span></div>
       ${cloudNotice()}<h1>Pick a game</h1>
       <div class="sub">${humans ? `${humans} at the table${REMOTE ? "" : " · tap a seat, then another to move a player"}` : REMOTE ? "Waiting for players" : "Scan the code to take a seat"}${remoteNote()}</div>
       ${gameTiles()}
@@ -1698,13 +1746,15 @@ function openAdvanced() {
         <div class="row" style="margin-top:10px"><span>Play from the board: one player's deck beside the board, no phone</span><button data-adv="board-deck" class="${state.developer?.boardDeck ? "on" : ""}" role="switch" aria-checked="${!!state.developer?.boardDeck}">${state.developer?.boardDeck ? "On" : "Off"}</button></div>
         <div class="faint" style="font-size:.7em;margin-top:6px">For developing games without a phone: the board shows one player's deck, like a remote player's page, and nobody else joins at the table (the QR code goes); remote and AI players as usual. Off again when the table restarts; that player stays.</div>
         <div class="row" style="margin-top:10px"><span>What holds the game up right now: AI players, the board, the phones</span><button data-adv="live">Live status…</button></div></div>`}
+      ${serviceSettings()}
       ${versionsGroup(platform)}
       <div class="actions settings-actions"><button class="primary" data-close-overlay>Done</button></div></div>`);
   };
   draw();
   const unsub = onState(draw);
+  const unsubTick = onTick(draw); // the access code's "valid for …" counts down while Advanced is open
   api("GET", "/version").then((v) => ((platform = v), draw())).catch(() => {});
-  const close = () => (unsub(), o.remove());
+  const close = () => (unsub(), unsubTick(), o.remove());
   // Choices with more options than fit as buttons are pulldowns (D-129b).
   o.addEventListener("change", (e) => {
     const sel = e.target.closest("select");
@@ -1724,6 +1774,7 @@ function openAdvanced() {
     if (a === "sim") return (close(), openSimulation());
     if (a === "logs") return (close(), openGameLogs());
     if (a === "live") return (close(), openLiveStatus());
+    if (b?.dataset.accessCode !== undefined) return openCodePad();
     if (a === "no-local") act("POST", "/developer", { allowNoLocalPlayer: !state.developer?.allowNoLocalPlayer });
     if (a === "board-deck") act("POST", "/developer", { boardDeck: !state.developer?.boardDeck });
   });
@@ -1838,13 +1889,13 @@ const NAME_ROWS = [[..."QWERTYUIOP"], [..."ASDFGHJKL"], [..."ZXCVBNM"], [..."Ä�
  * method for any script, and pasting work in the field too. Calls done(name) with the cleaned name ("" for none).
  */
 let namePad = null;
-function openNamePad(initial, done) {
+function openNamePad(initial, done, title = "Player's name") {
   if (namePad) return;
   const o = (namePad = document.createElement("div"));
   o.className = "overlay name-pad";
   let shift = false;
   let digits = false;
-  o.innerHTML = `<div class="panel"><h2>Player's name</h2>
+  o.innerHTML = `<div class="panel"><h2>${esc(title)}</h2>
     <div class="name-field"><input maxlength="48" autocomplete="off" spellcheck="false" aria-label="Name"><span class="count"></span></div>
     <div class="keys"></div>
     <div class="actions"><button data-clear>Clear</button><span style="flex:1"></span><button data-cancel>Cancel</button><button class="primary" data-save>Use this name</button></div></div>`;

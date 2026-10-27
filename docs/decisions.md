@@ -1579,3 +1579,24 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
     *Done* only closes the window.
   - Each board moves on by itself, as before (D-091).
   - *Why:* the awards were easy to skip; this way every table sees them.
+- **D-217 · 2026-10-27 · Klaus** — *Awards and Results* sits in the game's corner of the board, where *Show result*
+  sits, not 214 px in from it. It stood beside *Show result* when both were shown (D-149); since D-216 it is the only
+  button there, and the gap looked like a misplaced button. Both buttons share one rule for the corner.
+- **D-218 · 2026-10-27 · Klaus** — Play from the board (D-175): the deck beside the board no longer greets with
+  "session expired; scan the QR code to join again". A session it saved in an earlier run (the table restarted, or the
+  setting was off in between) is dropped quietly and the name form shows: that deck takes its seat with the table
+  key, so there is no QR code to scan. A phone keeps the message.
+- **D-219 · 2026-10-27 · Klaus** — The *Game Table service* group with the table's access code (D-113) moves from
+  the board's settings to the Advanced window (the tools button), after *Developer*. A code is set up once, and the
+  settings keep what is changed while playing. The waiting notice says "or enter an access code in Advanced".
+- **D-220 · 2026-10-27 · Klaus** — When the table's access code has less than 3 hours of validity left, the lobby
+  says so on the line of the table's name, on the right, in red: "Access code expires in 90 minutes". It counts down
+  in minutes by the board's one 30-second tick (the same that counts the code down in Advanced). Past its end it says
+  "Access code expired": the table keeps working until an admin disconnects it (D-113). The table's own board only;
+  a remote player can do nothing about it.
+- **D-221 · 2026-10-27 · Klaus** — A watcher's own board, which has no settings, gets two of them in the eye's window:
+  *Your name* with *Change name* (the board's name pad; made unique as when they came in, also during a game, since a
+  watcher is not a player) and *Fullscreen*. That window tells them how they could play — the table's board can let
+  them take a free seat before a game or exchange a player for them during one — instead of pointing to Settings,
+  which they don't have; the invite page's note points to the eye. `POST /api/v1/watching/name {name}` is for a
+  watcher's own board only; their state carries `remote.watcherId`, so their board finds itself in `watchers`.

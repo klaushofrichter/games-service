@@ -12,7 +12,7 @@ const arg = (name: string) => {
   return a[i].includes("=") ? a[i].slice(a[i].indexOf("=") + 1) : a[i + 1];
 };
 // A pre-approved access code from the Game Table console (D-113): the table is approved at once, without a pairing
-// code. The environment wins over the command line, and both win over a code typed in the board's settings.
+// code. The environment wins over the command line, and both win over a code typed on the board (Advanced).
 const accessCode = env.TABLE_CODE || arg("code") || undefined;
 
 const host = await startHost({

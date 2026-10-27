@@ -1,6 +1,6 @@
 """Browser check of "Play from the board" (D-175), a developer setting: switched on under Advanced › Developer, the
 board moves into a page with one player's deck beside it, laid out like a remote player's page; the deck takes a seat
-without a phone or join code; the QR code goes and a phone with the code is turned away; the player plays a game of
+without a phone or join code, also with a stale session saved (no warning, D-218); the QR code goes and a phone with the code is turned away; the player plays a game of
 Coin Flip from the deck against an AI; Hide and Show fold the deck; Fullscreen takes the whole page, deck included
 (D-184); switched off, the board is alone again and the
 player stays at the table.
@@ -33,6 +33,9 @@ try:
         page.goto(BASE + "/board/")
         page.wait_for_selector("text=Pick a game")
         assert page.locator("aside.join img").count() == 1, "the QR code shows before"
+        # A session saved by an earlier run that the table no longer knows (it restarted): the deck shows its name form
+        # without "session expired; scan the QR code" (D-218).
+        page.evaluate("() => localStorage.setItem('gametable.board-deck.' + location.host, 'from-an-earlier-run')")
 
         # Advanced › Developer › Play from the board: the board moves into the page with the deck beside it.
         page.click("#tools-button")
@@ -45,6 +48,9 @@ try:
         board.locator("aside.join.board-deck").wait_for()
 
         # The deck takes a seat with a name, without a join code.
+        deck.locator("input[name=name]").wait_for(timeout=10000)
+        page.wait_for_timeout(300)
+        assert deck.locator("#top").inner_text().strip() == "", f"a warning over the name form: {deck.locator('#top').inner_text()}"
         deck.locator("input[name=name]").fill("Dev")
         deck.locator("button[type=submit]").click()
         wait(lambda: "Dev" in players(), 10, "Dev at the table")

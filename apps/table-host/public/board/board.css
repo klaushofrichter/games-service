@@ -64,6 +64,9 @@ html, body { overflow: hidden; }
 #center.sideways .join .url, #center.sideways .join .code, #center.sideways .join .faint { text-align: left !important; }
 
 .main { display: flex; flex-direction: column; min-height: 0; }
+/* The lobby's title line: the table's name, and on the right a warning when the access code runs out (D-220). */
+.main .title-row { display: flex; align-items: baseline; justify-content: space-between; gap: 24px; }
+.main .code-warning { color: var(--ruby); font-size: 1.2em; font-weight: 600; text-align: right; }
 .main h1 { font-family: var(--display); font-weight: 600; font-size: 2.6em; margin: 4px 0 2px; }
 .main .sub { color: var(--ink-soft); margin-bottom: 18px; }
 
@@ -180,11 +183,12 @@ pre.raw { font-family: var(--mono); font-size: 0.7em; color: var(--ink-soft); ba
 #lobby-button.bottom-left { left: 26px; bottom: 26px; }
 #lobby-button.top-right { right: 26px; top: 26px; }
 #lobby-button.top-left { left: 26px; top: 26px; }
-#result-button { position: absolute; z-index: 20; font-size: 0.9em; }
-#result-button.bottom-right { right: 26px; bottom: 26px; }
-#result-button.bottom-left { left: 26px; bottom: 26px; }
-#result-button.top-right { right: 26px; top: 26px; }
-#result-button.top-left { left: 26px; top: 26px; }
+/* The way on from a game's last screen, in the game's corner: Show result, or Awards and Results (D-216, D-217). */
+#result-button, #stats-button { position: absolute; z-index: 20; font-size: 0.9em; }
+:is(#result-button, #stats-button).bottom-right { right: 26px; bottom: 26px; }
+:is(#result-button, #stats-button).bottom-left { left: 26px; bottom: 26px; }
+:is(#result-button, #stats-button).top-right { right: 26px; top: 26px; }
+:is(#result-button, #stats-button).top-left { left: 26px; top: 26px; }
 /* The finished screen stays inside the center panel (D-142): a long statistics table scrolls (both ways, header row
    kept), the result text and the buttons stay in view, and the seats around the edge are never covered. */
 #center:has(> .main.finished) { grid-template-rows: minmax(0, 1fr); grid-template-columns: minmax(0, 1fr) 330px; }
@@ -413,13 +417,6 @@ button.copy:hover, button.copy.done { color: var(--brass); border-color: var(--b
 #elsewhere-layer button { font-size: 20px; padding: 12px 24px; }
 #elsewhere-layer .note { margin: 8px 0 0; }
 
-/* The statistics window (D-140). Its button sits beside Show result, toward the middle of that edge. */
-#stats-button { position: absolute; z-index: 20; font-size: 0.9em; }
-/* Right beside Show result, toward the middle (D-149); board.js sets the distance from Show result's width. */
-#stats-button.bottom-right { right: 214px; bottom: 26px; }
-#stats-button.bottom-left { left: 214px; bottom: 26px; }
-#stats-button.top-right { right: 214px; top: 26px; }
-#stats-button.top-left { left: 214px; top: 26px; }
 /* A remote board turned to a north seat: the game's corner as its player sees it, text upright (D-157). */
 #lobby-button.turned, #result-button.turned, #stats-button.turned { transform: rotate(180deg); }
 #lobby-button.turned:active, #result-button.turned:active, #stats-button.turned:active { transform: rotate(180deg) scale(0.97); }

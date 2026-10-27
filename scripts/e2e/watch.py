@@ -73,6 +73,30 @@ try:
         board.screenshot(path=os.path.join(OUT, "watch-list.png"))
         board.click(".overlay.watchers [data-close-overlay]")
 
+        # D-221: Wanda's own eye window has her name to change and Fullscreen (a watcher has no settings), and says the
+        # table's board lets her play, not "Settings".
+        wb = wanda.frame_locator("#board")
+        wb.locator("#watchers-button").click()
+        wb.locator(".overlay.watchers >> text=Your name").wait_for(timeout=5000)
+        note = wb.locator(".overlay.watchers p.faint").inner_text()
+        assert "ask the table" in note and "Settings" not in note, note
+        wb.locator(".overlay.watchers [data-fs]").click()
+        wb.locator(".overlay.watchers [data-fs]:has-text('Leave fullscreen')").wait_for(timeout=5000)
+        wanda.screenshot(path=os.path.join(OUT, "watch-own-window.png"))
+        wb.locator(".overlay.watchers [data-fs]").click()
+        wb.locator(".overlay.watchers [data-fs]:has-text('Fullscreen')").wait_for(timeout=5000)
+        for name in ("Wendy", "Wanda"):
+            wb.locator(".overlay.watchers [data-watcher-name]").click()
+            wb.locator(".overlay.name-pad input").fill(name)
+            wb.locator(".overlay.name-pad [data-save]").click()
+            wait(lambda: [w["name"] for w in api("GET", "/state")["watchers"]] == [name], 10, f"the watcher named {name}")
+            wb.locator(f".overlay.watchers >> text=Your name: {name}").wait_for(timeout=5000)
+        board.click("#watchers-button")
+        board.wait_for_selector(".overlay.watchers >> text=Wanda")
+        assert board.locator(".overlay.watchers >> text=Your name").count() == 0, "the table's board shows a watcher's own rows"
+        board.click(".overlay.watchers [data-close-overlay]")
+        wb.locator(".overlay.watchers [data-close-overlay]").click()
+
         # Exchange the AI player for Wanda: her page opens a deck, and she plays.
         ai = next(x for x in players().values() if x["kind"] == "ai")
         board.click("#settings-button")
