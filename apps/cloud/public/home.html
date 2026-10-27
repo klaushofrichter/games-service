@@ -653,7 +653,7 @@ footer a.terms { display: inline; margin: 0; }
       <div class="points">
         <div class="point rv" style="--d:.1s"><span class="n">1</span><div><h3>The board lies flat in the middle</h3><p>A touchscreen everyone can reach: dice roll, cards slide, pieces move under your finger. Each seat has its own edge, and the board turns its text toward whoever is playing.</p></div></div>
         <div class="point rv" style="--d:.16s"><span class="n">2</span><div><h3>Your phone is your hand</h3><p>Scan the QR code and you have a seat. No app and no account. Your cards, dice cup and bets stay on your phone; the table sees only what it should.</p></div></div>
-        <div class="point rv" style="--d:.22s"><span class="n">3</span><div><h3>Empty seats? Add an AI</h3><p>Every game ships with AI players, some with several styles. They play at the board's pace and wait for the animations, so they feel like people at the table.</p></div></div>
+        <div class="point rv" style="--d:.22s"><span class="n">3</span><div><h3>Empty seats? Add an AI</h3><p>Every game ships with AI players, some with several styles. They play at the board's pace and wait for the animations, so they feel like people at the table. Some bring in strong engines: Backgammon has wildbg, and Chess can ask Stockfish or the Lichess cloud.</p></div></div>
       </div>
       <div class="remote-note rv" style="--d:.28s"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18"/></svg><span><b style="color:var(--ink)">Someone couldn't make it?</b> Send an invite link. They see the same board in their browser with their own deck beside it, connected straight to your table. Up to four can join from afar, as players or as watchers.</span></div>
     </div>
@@ -1338,7 +1338,7 @@ docker compose -f deploy/local/docker-compose.yml up -d --build">Copy</button></
     { id: "liars-dice", name: "Liar's Dice", players: "2–6 players", src: "extra", phone: "liars-dice-phone",
       text: "Everyone rolls in secret under their phone. Bid how many dice show a face, or call the last bid a lie." },
     { id: "chess", name: "Chess", players: "2 players", src: "extra",
-      text: "Tap a piece on the board, then its square, or drag it there. Clocks from bullet to classical, or none; AI at a strength you choose." },
+      text: "Tap a piece on the board, then its square, or drag it there. Clocks from bullet to classical, or none. AI players use the game's own engine at an Elo from 400 to 2200, or Stockfish (via stockfish.online) or the Lichess cloud over the internet, with the own engine stepping in when they don't answer in time; the board says which engine made each move." },
     { id: "pachisi", name: "Pachisi", players: "2–4 players", src: "built-in",
       text: "Race your tokens around the board and home. Roll a 6 to leave the start, touch a token to move it, land on someone to send them back." },
     { id: "mexican-train", name: "Mexican Train", players: "2–8 players", src: "extra", phone: "mexican-train-phone",

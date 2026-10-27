@@ -48,7 +48,7 @@ try:
         assert board.locator(".overlay.settings [data-dev-no-local], .overlay.settings [data-viewer]").count() == 0
         board.click(".overlay.settings [data-close-overlay]")
 
-        # On: Advanced › Developer; the hammer and wrench show DEV.
+        # On: Developer settings; the hammer and wrench show DEV.
         board.click("#tools-button")
         board.wait_for_selector(".overlay.advanced button[data-adv=sim]")
         board.wait_for_selector(".overlay.advanced button[data-adv=logs]")

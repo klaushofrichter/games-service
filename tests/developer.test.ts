@@ -22,7 +22,7 @@ describe("games without a player at the table (D-118)", () => {
     await t.ok("POST", "/ai", {});
     await t.ok("POST", "/ai", {});
     await pick();
-    expect((await t.ok("GET", "/state")).game.needs).toEqual(["needs at least one player at the table (or, under Advanced › Developer, games without one)"]);
+    expect((await t.ok("GET", "/state")).game.needs).toEqual(["needs at least one player at the table (or, under Developer settings, games without one)"]);
     expect((await t.api("POST", "/game/start")).body.error).toMatch(/at least one player at the table/);
     const r = t.host.table.joinRemote("Rita", "sess-1");
     t.host.table.setReady(r.playerId, true);
@@ -147,7 +147,7 @@ describe("games without a player at the table (D-118)", () => {
     await until(async () => (await t.ok("GET", "/state")).phase === "finished");
     await t.ok("POST", "/game/close");
     await pick();
-    expect((await t.ok("GET", "/state")).game.needs).toEqual(["needs at least one player at the table (or, under Advanced › Developer, games without one)"]);
+    expect((await t.ok("GET", "/state")).game.needs).toEqual(["needs at least one player at the table (or, under Developer settings, games without one)"]);
   });
 
   it("is off again after a restart, unless the table starts with it on", async () => {
