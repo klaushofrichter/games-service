@@ -1614,3 +1614,8 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   board can't change the developer setting, so its question says the table's board has to. The lobby's reason a game
   can't start names the setting too. *Why:* after the last player left, two ready AI players could not start, and it
   was not clear why.
+- **D-224 · 2026-10-27 · Klaus** — A game's manifest may give its AI players a notice, `ai.notice` (plain text, up to
+  600 characters, `https://` links become links), which the board shows under the AI player's options, where they
+  are configured in the lobby and where an AI player's options are changed during a game. *Why:* Backgammon's
+  strongest AI players use wildbg's networks (extra-games E-039), and their credit and licence belong where the
+  strength is chosen. Older tables ignore the field.

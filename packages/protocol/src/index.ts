@@ -104,6 +104,11 @@ export const manifestSchema = z.object({
       timeoutSeconds: z.number().int().min(1).max(600).default(20),
       /** Run the AI in a worker thread, so a long search never blocks the table (D-112). */
       worker: z.boolean().default(false),
+      /**
+       * A short text the board shows under an AI player's options (D-224), e.g. the licence of an engine the game's AI
+       * uses. Plain text; https:// links become links.
+       */
+      notice: z.string().max(600).optional(),
     })
     .default({ supported: false, options: [], hostConfig: [], timeoutSeconds: 20, worker: false }),
   simulation: z.object({ supported: z.boolean(), headless: z.boolean() }).default({ supported: false, headless: false }),
@@ -338,6 +343,8 @@ export interface GameAvailability {
   players: number[];
   settings: Manifest["settings"];
   aiOptions: Manifest["ai"]["options"];
+  /** The game's text for its AI players' options window (D-224), if it has one. */
+  aiNotice?: string;
   /** The game came from an extra-game repository (D-097), not with the table. */
   extra?: boolean;
   /** Where the game's rules for players are, or null (D-099). */
