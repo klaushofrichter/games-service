@@ -1,4 +1,4 @@
-"""Browser check of "Play from the board" (D-175), a developer setting: switched on under Advanced › Developer, the
+"""Browser check of "Play from the board" (D-175), a developer setting: switched on under Developer settings, the
 board moves into a page with one player's deck beside it, laid out like a remote player's page; the deck takes a seat
 without a phone or join code, also with a stale session saved (no warning, D-218); the QR code goes and a phone with the code is turned away; the player plays a game of
 Coin Flip from the deck against an AI, handed to an AI player mid-game and taking the seat back as before (D-222); Hide and Show fold the deck; Fullscreen takes the whole page, deck included
@@ -37,7 +37,7 @@ try:
         # without "session expired; scan the QR code" (D-218).
         page.evaluate("() => localStorage.setItem('gametable.board-deck.' + location.host, 'from-an-earlier-run')")
 
-        # Advanced › Developer › Play from the board: the board moves into the page with the deck beside it.
+        # Developer settings › Play from the board: the board moves into the page with the deck beside it.
         page.click("#tools-button")
         page.click(".overlay.advanced [data-adv=board-deck]")
         page.wait_for_url("**/board/play.html", timeout=10000)

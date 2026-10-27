@@ -717,7 +717,7 @@ function openSettings() {
         ${REMOTE || IN_PLAY ? "" : `<div class="row"><span>Another screen on this WiFi, such as an iPad or a TV, shows the board instead</span><button data-screen>Board on another screen…</button></div>`}
         ${fullscreenRow()}</div>
       <div class="group"><div class="eyebrow">Joining</div>
-        ${state.developer?.boardDeck ? `<div class="row"><span class="faint">Played from the board (Advanced › Developer): no phone joins at the table</span></div>` : `<div class="row"><span>The QR code and address for phones, to join or rejoin, also during a game</span><button data-join-code>Show join code…</button></div>`}
+        ${state.developer?.boardDeck ? `<div class="row"><span class="faint">Played from the board (Developer settings): no phone joins at the table</span></div>` : `<div class="row"><span>The QR code and address for phones, to join or rejoin, also during a game</span><button data-join-code>Show join code…</button></div>`}
         <div class="row"><span>${remoteJoinText()}</span>${inviteButton("Invite remote player…")}</div></div>
       ${playerColors()}
       ${(state.watchers ?? []).length ? `<div class="group player-colors watchers-group"><div class="eyebrow">Watching</div>${watcherRows()}<div class="faint group-note">${WATCHER_NOTE}</div></div>` : ""}
@@ -1095,7 +1095,7 @@ function joinPanel() {
   if (REMOTE) return "";
   // Played from the board (D-175): no phone joins at the table, so no code to scan.
   if (state.developer?.boardDeck) return `<aside class="join board-deck"><div class="eyebrow">Played from the board</div>
-    <p class="faint">The deck beside the board is the one player at the table (Advanced › Developer). Remote players come with an invite.</p>
+    <p class="faint">The deck beside the board is the one player at the table (Developer settings). Remote players come with an invite.</p>
     <div class="right">${inviteButton("Invite remote player…")}</div></aside>`;
   const code = state.joinUrl.split("/").pop();
   // No free seat (D-129): the code still works for nobody, so the panel says so; a phone that scans it is told too.
@@ -1399,8 +1399,8 @@ function openExchange(playerId) {
     if (last) {
       const what = kind === "ai" ? "an AI player" : kind === "watcher" ? "a watcher" : "a remote player";
       const then = REMOTE
-        ? "Without a player at the table, the next game can start only once the table's board allows games without one (Advanced › Developer)."
-        : "Without a player at the table, the next game needs the developer setting “Games without a player at the table”, so it is switched on now (Advanced › Developer).";
+        ? "Without a player at the table, the next game can start only once the table's board allows games without one (Developer settings)."
+        : "Without a player at the table, the next game needs the developer setting “Games without a player at the table”, so it is switched on now (Developer settings).";
       if (!(await confirmDialog(`Exchange ${cur.name}, the last player at the table, for ${what}?`, `${kind === "ai" ? `An AI player takes over ${cur.name}'s seat for the rest of this game. ` : ""}${then}`, "Exchange"))) return;
     } else if (kind === "ai" && !(await confirmDialog(`Exchange ${cur.name} for an AI player?`, `An AI player takes over ${cur.name}'s seat for the rest of this game.`, "Exchange"))) return;
     error = "";
@@ -1754,7 +1754,7 @@ function openAdvanced() {
         <div class="row"><span>Games of AI players only, without the board, for testing and AI training</span><button data-adv="sim">Simulation…</button></div></div>`}
       <div class="group"><div class="eyebrow">Game logs</div>
         <div class="row"><span>Finished games on this table, move by move</span><button data-adv="logs">Game logs…</button></div></div>
-      ${REMOTE ? "" : `<div class="group developer"><div class="eyebrow">Developer</div>
+      ${REMOTE ? "" : `<div class="group developer"><div class="eyebrow">Developer settings</div>
         <div class="row"><span>Games without a player at the table</span><button data-adv="no-local" data-dev-no-local class="${dev ? "on" : ""}" role="switch" aria-checked="${dev}">${dev ? "On" : "Off"}</button></div>
         <div class="faint" style="font-size:.7em;margin-top:6px">For testing: games with remote and AI players only, or AI players only. Off again when the table restarts.</div>
         <div class="row" style="margin-top:10px"><span>Play from the board: one player's deck beside the board, no phone</span><button data-adv="board-deck" class="${state.developer?.boardDeck ? "on" : ""}" role="switch" aria-checked="${!!state.developer?.boardDeck}">${state.developer?.boardDeck ? "On" : "Off"}</button></div>
