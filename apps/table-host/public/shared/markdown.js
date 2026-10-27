@@ -6,8 +6,7 @@
 // be https and open in a new tab. Anything else stays visible as plain text, so a mistake shows instead of vanishing.
 // Pure string in, string out: no DOM needed, so the tests run it directly.
 
-const ESC = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
-const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ESC[c]);
+import { esc } from "./board-kit.js";
 
 /** An image path a game may use: assets/ plus plain path segments, no "..", no query. */
 const SAFE_ASSET = /^assets\/(?:[A-Za-z0-9_-][A-Za-z0-9._-]*\/)*[A-Za-z0-9_-][A-Za-z0-9._-]*\.(?:svg|png|jpe?g|webp|gif)$/;

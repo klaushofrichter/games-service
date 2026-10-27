@@ -25,7 +25,7 @@ export interface HistoryEntry {
   counts: RunMeta["counts"] | null;
 }
 
-export function entryOf(id: string, m: RunMeta): HistoryEntry {
+function entryOf(id: string, m: RunMeta): HistoryEntry {
   return {
     id,
     gameId: m.gameId,
@@ -49,6 +49,11 @@ export class History {
   private games: () => Map<string, InstalledGame>;
   /** Move lists built here (logs without one in the zip, e.g. simulations), by log id, game and modification. */
   private built = new Map<string, MoveList>();
+  /**
+   * `info` per opened log (the log store hands out the same object while the file is unchanged), and the rules it was
+   * worked out with: a simulation's log has no move lists, so each game is replayed to count its moves.
+   */
+  private infos = new WeakMap<object, { game: InstalledGame | undefined; rules: InstalledGame | undefined; value: Awaited<ReturnType<History["infoOf"]>> }>();
 
   constructor(logs: LogStore, games: () => Map<string, InstalledGame>) {
     this.logs = logs;
@@ -98,9 +103,21 @@ export class History {
   async info(id: string) {
     const log = await this.logs.open(id);
     if (!log) return null;
+    const game = this.games().get(log.meta.gameId);
+    const rules = this.rules(log.meta);
+    const hit = this.infos.get(log);
+    if (hit && hit.game === game && hit.rules === rules) return hit.value;
+    const value = await this.infoOf(id, log);
+    this.infos.set(log, { game, rules, value });
+    return value;
+  }
+
+  private async infoOf(id: string, log: NonNullable<Awaited<ReturnType<LogStore["open"]>>>) {
     const out = [];
+    let firstRows: MoveRow[] = [];
     for (let g = 1; g <= log.games.length; g++) {
       const l = (await this.load(id, g))!;
+      if (g === 1) firstRows = l.list.rows;
       const end = l.records.at(-1);
       out.push({
         game: g,
@@ -112,7 +129,7 @@ export class History {
         ...(l.list.note ? { note: l.list.note } : {}),
       });
     }
-    return { ...entryOf(id, log.meta), meta: log.meta, rulesInstalled: !!this.rules(log.meta), columns: this.columns(log.meta, out.length ? (await this.load(id, 1))!.list.rows : []), gameList: out };
+    return { ...entryOf(id, log.meta), meta: log.meta, rulesInstalled: !!this.rules(log.meta), columns: this.columns(log.meta, firstRows), gameList: out };
   }
 
   /** A finished game's statistics window (D-140): its summary with the statistics, read from the log; null without one. */

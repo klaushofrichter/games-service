@@ -334,7 +334,7 @@ fit();
 // ---------- seats ----------
 function renderSeats() {
   const pos = seatPositions(state.seatEdges);
-  const playing = state.phase === "active" || state.phase === "paused";
+  const playing = inRunningGame();
   const allowed = state.game?.edges;
   seatsEl.innerHTML = "";
   pos.forEach((p, seat) => {
@@ -881,7 +881,6 @@ function openCodePad() {
   const onKey = (e) => {
     // Shortcuts (Ctrl/⌘+V and the like) are not letters: let the browser handle them, and the paste event fills in.
     if (e.ctrlKey || e.metaKey || e.altKey) return;
-    if (e.key === "Escape") return (e.stopPropagation(), close());
     if (e.key === "Enter" && typed.length === 8) return void save(typed);
     if (e.key === "Backspace") return (e.preventDefault(), press("back"));
     const k = e.key.toUpperCase();
@@ -926,7 +925,7 @@ function render() {
   center.style.transform = `rotate(${ROT[front]}deg)`;
   center.classList.toggle("sideways", front === "east" || front === "west");
 
-  const playing = state.phase === "active" || state.phase === "paused" || state.phase === "terminating";
+  const playing = !lobbyPhase();
   // A game that ends by itself keeps its last screen until someone taps Show result (D-091); one ended from the
   // lobby goes straight to the result. This is per screen: each board (and remote board) moves on by itself.
   if (state.phase === "finished" && (lastPhase === "active" || lastPhase === "paused") && game) {
@@ -1555,14 +1554,9 @@ async function openTerms() {
     <div class="actions" style="display:flex;justify-content:flex-end;margin-top:20px"><button class="primary" data-close-terms>Close</button></div></div>`;
   faceFront(o.querySelector(".panel"));
   overlayRoot.appendChild(o);
-  const close = () => {
-    o.remove();
-    document.removeEventListener("keydown", onKey);
-  };
-  const onKey = (e) => e.key === "Escape" && close();
-  document.addEventListener("keydown", onKey);
+  // Escape is the board-wide handler's: a click on this overlay.
   o.addEventListener("click", (e) => {
-    if (e.target === o || e.target.closest("[data-close-terms]")) close();
+    if (e.target === o || e.target.closest("[data-close-terms]")) o.remove();
   });
   try {
     const r = await fetch("/shared/terms.md");
@@ -1887,7 +1881,6 @@ function openNamePad(initial, done) {
   });
   input.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && !e.isComposing) save();
-    if (e.key === "Escape") (e.stopPropagation(), close());
   });
   o.addEventListener("click", (e) => {
     const b = e.target.closest("button");
@@ -2149,7 +2142,7 @@ function connect() {
     } else if (m.ch === "game" && m.type === "board") {
       gameMsg = { ...m.payload, receivedAt: Date.now() };
       if (game?.inst && state) game.inst.update(gameMsg.view, gameMsg.events ?? [], gameInfo());
-      else if (state && (state.phase === "active" || state.phase === "paused")) showGame();
+      else if (state && inRunningGame()) showGame();
       for (const fn of gameViewListeners) fn();
       reportIdle(gameMsg.seq);
     }

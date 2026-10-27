@@ -604,7 +604,9 @@ $("#ret-form").addEventListener("submit", async (e) => {
 });
 
 start();
-setInterval(() => signedIn() && refresh(), 10000);
+// Not while the tab is hidden (each refresh scans the stored logs); at once when it shows again.
+setInterval(() => signedIn() && !document.hidden && refresh(), 10000);
+document.addEventListener("visibilitychange", () => signedIn() && !document.hidden && refresh());
 </script>
 </body>
 </html>
