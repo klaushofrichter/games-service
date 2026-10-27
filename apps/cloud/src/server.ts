@@ -53,6 +53,10 @@ export interface IceServer {
 }
 
 /** Pairing and invite codes use the access codes' easy-to-read alphabet (D-026). */
+/** Fail the request with this HTTP status and message (the handler's catch answers it). */
+function fail(status: number, message: string): never {
+  throw Object.assign(new Error(message), { status });
+}
 const code = (n: number) => Array.from({ length: n }, () => CODE_ALPHABET[randomInt(CODE_ALPHABET.length)]).join("");
 const MAX_PENDING = 500;
 const PENDING_TTL_MS = 10 * 60_000;
@@ -330,12 +334,12 @@ export function startCloud(o: CloudOptions) {
     if (s.kind === "repos") {
       const known = new Set([...gameRepos.repos.values()].map((r) => r.repo.toLowerCase()));
       const unknown = s.repos.filter((r) => !known.has(r));
-      if (unknown.length) throw Object.assign(new Error(`unknown repositories: ${unknown.join(", ")}`), { status: 400 });
+      if (unknown.length) fail(400, `unknown repositories: ${unknown.join(", ")}`);
     }
     return s;
   };
   const validityFrom = (v: unknown): Validity => {
-    if (!VALIDITIES.includes(v as Validity)) throw Object.assign(new Error(`validity must be one of ${VALIDITIES.join(", ")}`), { status: 400 });
+    if (!VALIDITIES.includes(v as Validity)) fail(400, `validity must be one of ${VALIDITIES.join(", ")}`);
     return v as Validity;
   };
   const labelFrom = (v: unknown) => String(v ?? "").trim().slice(0, 60);
@@ -355,24 +359,23 @@ export function startCloud(o: CloudOptions) {
   /** Repository ids from a request body, each one known: unknown ids are an error, not silently dropped. */
   const repoIds = (v: unknown): string[] => {
     if (v === undefined) return [];
-    if (!Array.isArray(v) || v.some((x) => typeof x !== "string")) throw Object.assign(new Error("repos must be a list of repository ids"), { status: 400 });
+    if (!Array.isArray(v) || v.some((x) => typeof x !== "string")) fail(400, "repos must be a list of repository ids");
     const unknown = v.filter((id) => !gameRepos.repos.has(id));
-    if (unknown.length) throw Object.assign(new Error(`unknown repositories: ${unknown.join(", ")}`), { status: 400 });
+    if (unknown.length) fail(400, `unknown repositories: ${unknown.join(", ")}`);
     return [...new Set(v as string[])];
   };
   const maxLogBytes = o.maxLogBytes ?? MAX_LOG_BYTES;
   const dataLimit = o.dataLimitBytes ?? 1024 * 1024 * 1024;
   /** The budget: the smaller of DATA_LIMIT_MB and the disk, less what the service's files take (and never more than the disk has free). */
-  const statVolume =
-    o.statVolume ??
-    (() => {
-      const vol = store.volume();
-      const use = store.usage();
-      if (!vol || !use) return null;
-      const own = use.database + use.snapshot + use.logs + use.aside;
-      const total = Math.min(dataLimit, vol.total);
-      return { total, free: Math.max(0, Math.min(vol.free, total - own)) };
-    });
+  const statVolume = (use?: ReturnType<typeof store.usage>) => {
+    if (o.statVolume) return o.statVolume();
+    const vol = store.volume();
+    if (use === undefined) use = store.usage(); // a scan of the logs directory: the console passes the one it has
+    if (!vol || !use) return null;
+    const own = use.database + use.snapshot + use.logs + use.aside;
+    const total = Math.min(dataLimit, vol.total);
+    return { total, free: Math.max(0, Math.min(vol.free, total - own)) };
+  };
   const logBytes = () => {
     let n = 0;
     for (const l of logs.values()) n += l.meta.bytes;
@@ -380,8 +383,8 @@ export function startCloud(o: CloudOptions) {
   };
   /** Storage for the console: the volume, the service's own files, and the log cap. Null without DATA_DIR. */
   const storage = () => {
-    const vol = statVolume();
     const use = store.usage();
+    const vol = statVolume(use);
     if (!vol || !use) return null;
     return { ...vol, reserve: reserveFor(vol.total), ...use, logCap: maxLogBytes, logBytes: logBytes(), low: vol.free < reserveFor(vol.total) * 1.5 };
   };
@@ -460,12 +463,16 @@ export function startCloud(o: CloudOptions) {
     const x = id ? tables.get(id) : undefined;
     return x && x.status === "approved" && x.tokenHash && same(x.tokenHash, key) ? x : undefined;
   };
+  /** The approved table a request comes from, by its token; else the request fails with 401. */
+  const requireTable = (req: IncomingMessage) => tableFor(req) ?? fail(401, "unknown or revoked table");
+  /** A table by id, for the console; else the request fails with 404. */
+  const tableById = (id: string) => tables.get(id) ?? fail(404, "no such table");
   const body = async (req: IncomingMessage, limit = 64 * 1024): Promise<Buffer> => {
     const chunks: Buffer[] = [];
     let n = 0;
     for await (const c of req) {
       n += (c as Buffer).length;
-      if (n > limit) throw Object.assign(new Error("too large"), { status: 413 });
+      if (n > limit) fail(413, "too large");
       chunks.push(c as Buffer);
     }
     return Buffer.concat(chunks);
@@ -479,9 +486,20 @@ export function startCloud(o: CloudOptions) {
     store.delete("log", id);
     if (store.persistent) store.deleteLog(id);
   };
-  const logData = (id: string) => {
+  /** A presented access code checked for a table; a wrong one is refused and counts against the address. */
+  const presentCode = (raw: unknown, tableId: string, ip: string) => {
+    const c = codeFor(raw);
+    const status = check(c, tableId);
+    if (status === "accepted") return { c: c!, status };
+    refuseCode(c);
+    codeFailed(ip);
+    return { c: null, status };
+  };
+  /** A table seen for the first time: waiting for approval, with the code shown on its board. */
+  const newTable = (tableId: string, name: string, pairingCode: string): TableRecord => ({ tableId, name, status: "pending", pairingCode, tokenHash: null, lastSeen: null, metrics: {}, createdAt: Date.now(), repos: [], codeId: null });
+  const logData = async (id: string) => {
     const l = logs.get(id);
-    return l ? (l.data ?? store.readLog(id)) : null;
+    return l ? (l.data ?? (await store.readLog(id))) : null;
   };
   const prune = () => {
     const now = Date.now();
@@ -644,17 +662,14 @@ export function startCloud(o: CloudOptions) {
         let codeStatus: CodeStatus | undefined;
         if (presented && (!t || t.status === "pending")) {
           if (codeBlocked(ip)) return json(res, 429, { error: "too many wrong access codes; wait a minute" });
-          const c = codeFor(b.accessCode);
-          codeStatus = check(c, tableId);
-          if (codeStatus === "accepted") {
-            t ??= { tableId, name, status: "pending", pairingCode: "", tokenHash: null, lastSeen: null, metrics: {}, createdAt: Date.now(), repos: [], codeId: null };
+          const { c, status } = presentCode(b.accessCode, tableId, ip);
+          codeStatus = status;
+          if (c) {
+            t ??= newTable(tableId, name, "");
             tables.set(tableId, t);
-            Object.assign(t, { name, status: "approved", pairingCode: "", lastHello: undefined, repos: [], codeId: c!.id });
-            useCode(c!, t);
+            Object.assign(t, { name, status: "approved", pairingCode: "", lastHello: undefined, repos: [], codeId: c.id });
+            useCode(c, t);
             saveTable(t);
-          } else {
-            refuseCode(c);
-            codeFailed(ip);
           }
         }
         // A disconnected table still hears about its code (say, that it was revoked), but the code changes nothing.
@@ -668,7 +683,7 @@ export function startCloud(o: CloudOptions) {
             prunePending();
             if (pendingCount() >= MAX_PENDING) return json(res, 503, { error: "too many tables waiting for approval; try again later" });
           }
-          t = { tableId, name, status: "pending", pairingCode: code(6), tokenHash: null, lastSeen: null, metrics: {}, createdAt: Date.now(), repos: [], codeId: null };
+          t = newTable(tableId, name, code(6));
           tables.set(tableId, t);
         }
         if (t.status === "revoked") return json(res, 403, withCode({ status: "revoked" }));
@@ -689,8 +704,7 @@ export function startCloud(o: CloudOptions) {
         return json(res, 200, withCode({ status: "approved", tableToken: bearer(req), config: tableConfig(t) }));
       }
       if (m === "POST" && p === "/api/tables/heartbeat") {
-        const t = tableFor(req);
-        if (!t) return json(res, 401, { error: "unknown or revoked table" });
+        const t = requireTable(req);
         const b = await jsonBody(req);
         t.lastSeen = Date.now();
         if (b.metrics && typeof b.metrics === "object") t.metrics = b.metrics;
@@ -701,16 +715,13 @@ export function startCloud(o: CloudOptions) {
         // which decides its repositories from now on (D-113). A code it had before is freed.
         let codeStatus: CodeStatus | undefined;
         if (presentsCode(b.accessCode) && !codeBlocked(clientIp(req))) {
-          const c = codeFor(b.accessCode);
-          codeStatus = check(c, t.tableId);
-          if (codeStatus === "accepted") {
+          const { c, status } = presentCode(b.accessCode, t.tableId, clientIp(req));
+          codeStatus = status;
+          if (c) {
             const old = codeOf(t);
-            if (old && old.id !== c!.id && old.tableId === t.tableId) unbindCode(old);
-            t.codeId = c!.id;
-            useCode(c!, t);
-          } else {
-            refuseCode(c);
-            codeFailed(clientIp(req));
+            if (old && old.id !== c.id && old.tableId === t.tableId) unbindCode(old);
+            t.codeId = c.id;
+            useCode(c, t);
           }
         }
         saveTable(t);
@@ -718,16 +729,14 @@ export function startCloud(o: CloudOptions) {
       }
       if (m === "GET" && (match = p.match(/^\/api\/tables\/bundles\/([0-9a-f]{64})$/))) {
         // Only the bundles of this table's repositories: a table can't fetch games it was not given.
-        const t = tableFor(req);
-        if (!t) return json(res, 401, { error: "unknown or revoked table" });
+        const t = requireTable(req);
         const data = gameRepos.payloadFor(reposFor(t), match[1]);
         if (!data) return json(res, 404, { error: "no such bundle for this table" });
         res.writeHead(200, { "content-type": "application/gzip", "cache-control": "no-store" });
         return res.end(data);
       }
       if (m === "PUT" && (match = p.match(/^\/api\/tables\/logs\/([\w-]+)$/))) {
-        const t = tableFor(req);
-        if (!t) return json(res, 401, { error: "unknown or revoked table" });
+        const t = requireTable(req);
         const existing = logs.get(match[1]);
         if (existing && existing.meta.tableId !== t.tableId) return json(res, 409, { error: "a log with this id belongs to another table" });
         const data = await body(req, 50 * 1024 * 1024);
@@ -763,14 +772,13 @@ export function startCloud(o: CloudOptions) {
           bytes: data.length,
           uploadedAt: Date.now(),
         };
-        if (store.persistent) store.writeLog(meta.id, data); // the file first: a record never points at a missing file
+        if (store.persistent) await store.writeLog(meta.id, data); // the file first: a record never points at a missing file
         store.put("log", meta.id, meta);
         logs.set(meta.id, { meta, data: store.persistent ? null : data });
         return json(res, 201, { ok: true });
       }
       if (m === "POST" && p === "/api/tables/invites") {
-        const t = tableFor(req);
-        if (!t) return json(res, 401, { error: "unknown or revoked table" });
+        const t = requireTable(req);
         const b = await jsonBody(req);
         // Live invites per table are capped (D-202): each lasts up to a day, in memory and in the store.
         const now = Date.now();
@@ -835,8 +843,7 @@ export function startCloud(o: CloudOptions) {
           return json(res, 200, { tableId: t.tableId, status: t.status, repos: t.repos });
         }
         if (m === "PUT" && (match = p.match(/^\/admin\/api\/tables\/([\w-]+)\/repos$/))) {
-          const t = tables.get(match[1]);
-          if (!t) return json(res, 404, { error: "no such table" });
+          const t = tableById(match[1]);
           const c = codeOf(t);
           if (c) return json(res, 409, { error: `this table's games come from its access code ${c.label ? `"${c.label}"` : c.hint + "…"}; change the code's scope instead` });
           t.repos = repoIds((await jsonBody(req)).repos);
@@ -873,16 +880,14 @@ export function startCloud(o: CloudOptions) {
           return json(res, 200, { ok: true });
         }
         if (m === "POST" && (match = p.match(/^\/admin\/api\/tables\/([\w-]+)\/revoke$/))) {
-          const t = tables.get(match[1]);
-          if (!t) return json(res, 404, { error: "no such table" });
+          const t = tableById(match[1]);
           disconnect(t);
           return json(res, 200, { tableId: t.tableId, status: t.status });
         }
         if (m === "DELETE" && (match = p.match(/^\/admin\/api\/tables\/([\w-]+)$/))) {
           // Remove a table for good (D-115): only one that is disconnected or still waiting, never one that is online.
           // Its access code is freed; its logs stay unless ?logs=1. If that PC says hello again, it is a new table.
-          const t = tables.get(match[1]);
-          if (!t) return json(res, 404, { error: "no such table" });
+          const t = tableById(match[1]);
           if (t.status === "approved") return json(res, 409, { error: "disconnect the table first" });
           for (const x of codes.values()) if (x.tableId === t.tableId) unbindCode(x);
           for (const [k, i] of invites) if (i.tableId === t.tableId) (invites.delete(k), store.delete("invite", k));
@@ -895,8 +900,7 @@ export function startCloud(o: CloudOptions) {
         }
         if (m === "POST" && (match = p.match(/^\/admin\/api\/tables\/([\w-]+)\/reconnect$/))) {
           // Undo a disconnect: the same table, approved again. It picks up a new token at its next hello (D-085).
-          const t = tables.get(match[1]);
-          if (!t) return json(res, 404, { error: "no such table" });
+          const t = tableById(match[1]);
           if (t.status !== "revoked") return json(res, 409, { error: `the table is ${t.status}, not disconnected` });
           t.status = "approved";
           // A revoked code no longer speaks for the table: it comes back with its own ticks (none until an admin ticks some).
@@ -946,7 +950,7 @@ export function startCloud(o: CloudOptions) {
           return json(res, 200, { deleted });
         }
         if (m === "GET" && (match = p.match(/^\/admin\/api\/logs\/([\w-]+)\.zip$/))) {
-          const data = logData(match[1]);
+          const data = await logData(match[1]);
           if (!data) return json(res, 404, { error: "no such log" });
           return zip(res, data);
         }
@@ -1065,7 +1069,7 @@ export function startCloud(o: CloudOptions) {
         const scope: LogFilter = { gameId: d.gameId ?? undefined, tableId: d.tableId ?? undefined, from: d.from ?? undefined, to: d.to ?? undefined };
         if (!match[2]) return json(res, 200, [...logs.values()].filter((l) => matches(l.meta, scope)).map((l) => l.meta));
         const l = logs.get(match[2]);
-        const data = l && matches(l.meta, scope) && logData(l.meta.id);
+        const data = l && matches(l.meta, scope) && (await logData(l.meta.id));
         if (!data) return json(res, 404, { error: "no such log for this token" });
         return zip(res, data);
       }

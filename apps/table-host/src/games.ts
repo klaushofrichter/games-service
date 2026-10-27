@@ -27,7 +27,7 @@ export const HOW_TO_PLAY = "how-to-play.md";
  * no copy of it. Registered once per process; built-in games may use either form.
  */
 const SDK_DIR = fileURLToPath(new URL("../../../packages/sdk/src/", import.meta.url));
-export const SDK_SPECIFIERS: Record<string, string> = {
+const SDK_SPECIFIERS: Record<string, string> = {
   "@game-table/sdk": join(SDK_DIR, "index.ts"),
   "@game-table/sdk/cards": join(SDK_DIR, "cards.ts"),
 };

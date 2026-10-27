@@ -31,7 +31,7 @@ export interface RemoteContext {
   /** sha256 of the invite the session came through (D-164). */
   invite?: string;
 }
-export const remoteOf = (req: IncomingMessage): RemoteContext | undefined => (req as IncomingMessage & { gtRemote?: RemoteContext }).gtRemote;
+const remoteOf = (req: IncomingMessage): RemoteContext | undefined => (req as IncomingMessage & { gtRemote?: RemoteContext }).gtRemote;
 
 type Client = ({ ws: WebSocket; role: "board" } | { ws: WebSocket; role: "deck"; playerId: string } | { ws: WebSocket; role: "pending" }) & {
   remote?: boolean;
@@ -282,6 +282,10 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
     }
   };
 
+  const assertDeckRoom = () => {
+    if ([...clients].filter((o) => o.role === "deck").length >= MAX_DECKS) throw new TableError(409, "the table serves eight phones at most");
+  };
+
   /** A new invite from the service (remote play), for a player, a watcher or an exchange. */
   const newInvite = async () => {
     if (!opts.createInvite) throw new TableError(409, "remote play needs the Game Table service (CLOUD_URL)");
@@ -307,6 +311,8 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
     } else if (!keyOk(req.headers["x-table-key"])) return json(res, 401, { error: "missing or wrong X-Table-Key" });
     const body = m === "GET" || m === "DELETE" ? {} : await readBody(req);
     let match: RegExpMatchArray | null;
+    /** The answer to most actions: the lobby state after them. */
+    const ok = () => json(res, 200, table.state());
 
     if (m === "GET" && path === "/state") return json(res, 200, forClient(!!remote, table.state(), remote?.session));
     if (m === "GET" && path === "/connections" && !remote) return json(res, 200, connections());
@@ -316,8 +322,8 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
       const decks = [...held].map(([c, q]) => ({ player: c.role === "deck" ? (table.player(c.playerId)?.name ?? c.playerId) : "?", held: q.length, oldestSeq: q[0]?.seq ?? null, oldestMsAgo: q[0] ? now - q[0].at : null }));
       return json(res, 200, { ...table.debugStatus(), decks });
     }
-    if (m === "POST" && path === "/developer") return (table.setDeveloper(body), json(res, 200, table.state()));
-    if (m === "POST" && path === "/remote") return (table.setRemoteBoardControl(!!body.boardControl), json(res, 200, table.state()));
+    if (m === "POST" && path === "/developer") return (table.setDeveloper(body), ok());
+    if (m === "POST" && path === "/remote") return (table.setRemoteBoardControl(!!body.boardControl), ok());
     if (m === "POST" && path === "/invites") {
       if (!opts.createInvite) throw new TableError(409, "remote play needs the Game Table service (CLOUD_URL)");
       const watch = body.watch === true; // an invite to watch (D-168): the board only, no seat
@@ -332,13 +338,13 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
       return json(res, 201, { ...inv, url: u.toString(), watch: true });
     }
     // Remote watchers (D-168): remove one (their board closes for good), or let one play (in the lobby).
-    if (m === "DELETE" && (match = path.match(/^\/watchers\/([\w-]+)$/))) return (table.removeWatcher(match[1]), json(res, 200, table.state()));
-    if (m === "POST" && (match = path.match(/^\/watchers\/([\w-]+)\/play$/))) return (table.letWatcherPlay(match[1]), json(res, 200, table.state()));
+    if (m === "DELETE" && (match = path.match(/^\/watchers\/([\w-]+)$/))) return (table.removeWatcher(match[1]), ok());
+    if (m === "POST" && (match = path.match(/^\/watchers\/([\w-]+)\/play$/))) return (table.letWatcherPlay(match[1]), ok());
     if (m === "POST" && path === "/cloud/code") {
       // The table's pre-approved access code (D-113), typed in the board's settings; "" removes it.
       if (!opts.setAccessCode) throw new TableError(409, "access codes need the Game Table service (CLOUD_URL)");
       await opts.setAccessCode(body.code ?? "");
-      return json(res, 200, table.state());
+      return ok();
     }
     if (m === "GET" && path === "/qr") {
       const text = qs.get("text") ?? "";
@@ -352,19 +358,19 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
     // The platform's version and protocol, as on /health, for the board's Advanced › Versions (D-182); remote boards too.
     if (m === "GET" && path === "/version") return json(res, 200, platformMeta());
     if (m === "GET" && path === "/metrics") return json(res, 200, table.metrics);
-    if (m === "POST" && path === "/layout") return (table.setLayout(Number(body.seats)), json(res, 200, table.state()));
-    if (m === "POST" && path === "/rotate") return (table.rotate(Number(body.degrees)), json(res, 200, table.state()));
-    if (m === "POST" && path === "/face") return (table.face(String(body.edge)), json(res, 200, table.state()));
-    if (m === "POST" && path === "/seats/move") return (table.moveSeat(String(body.playerId), Number(body.seat)), json(res, 200, table.state()));
+    if (m === "POST" && path === "/layout") return (table.setLayout(Number(body.seats)), ok());
+    if (m === "POST" && path === "/rotate") return (table.rotate(Number(body.degrees)), ok());
+    if (m === "POST" && path === "/face") return (table.face(String(body.edge)), ok());
+    if (m === "POST" && path === "/seats/move") return (table.moveSeat(String(body.playerId), Number(body.seat)), ok());
     if (m === "POST" && path === "/ai") {
       const id = table.addAi(body.seat === undefined ? undefined : Number(body.seat));
       return json(res, 201, { playerId: id });
     }
     if (m === "POST" && (match = path.match(/^\/players\/([\w-]+)\/ai-options$/))) {
       table.setAiOptions(match[1], (body.options ?? {}) as Record<string, unknown>);
-      return json(res, 200, table.state());
+      return ok();
     }
-    if (m === "POST" && (match = path.match(/^\/players\/([\w-]+)\/color$/))) return (table.setColor(match[1], body.color), json(res, 200, table.state()));
+    if (m === "POST" && (match = path.match(/^\/players\/([\w-]+)\/color$/))) return (table.setColor(match[1], body.color), ok());
     // Exchange a seat's player during a game (D-159): an AI at once, or open an exchange for a person (a local code or
     // a remote invite) that ends when they join; cancel it.
     if (m === "POST" && path === "/exchange") {
@@ -376,23 +382,23 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
       const url = kind === "remote" ? (await newInvite()).url : undefined;
       return json(res, 200, { ...table.exchange(seat, kind, url, body.watcher), state: table.state() });
     }
-    if (m === "DELETE" && path === "/exchange") return (table.cancelExchange(), json(res, 200, table.state()));
-    if (m === "DELETE" && (match = path.match(/^\/players\/([\w-]+)$/))) return (table.removePlayer(match[1], "evicted"), json(res, 200, table.state()));
+    if (m === "DELETE" && path === "/exchange") return (table.cancelExchange(), ok());
+    if (m === "DELETE" && (match = path.match(/^\/players\/([\w-]+)$/))) return (table.removePlayer(match[1], "evicted"), ok());
     if (m === "POST" && path === "/game/select") {
       table.selectGame(String(body.gameId), (body.settings as Record<string, unknown>) ?? {});
-      return json(res, 200, table.state());
+      return ok();
     }
-    if (m === "POST" && path === "/game/start") return (table.start(), json(res, 200, table.state()));
-    if (m === "POST" && path === "/game/end") return (table.end(), json(res, 200, table.state()));
-    if (m === "POST" && path === "/display") return (table.setDisplay(body), json(res, 200, table.state()));
-    if (m === "POST" && path === "/game/settings") return (table.updateSettings(body.settings), json(res, 200, table.state()));
-    if (m === "POST" && path === "/game/prefs") return (table.setPrefs(body.prefs), json(res, 200, table.state()));
-    if (m === "POST" && path === "/game/close") return (table.close(), json(res, 200, table.state()));
-    if (m === "POST" && path === "/game/resume") return (table.resumeGame(), json(res, 200, table.state()));
+    if (m === "POST" && path === "/game/start") return (table.start(), ok());
+    if (m === "POST" && path === "/game/end") return (table.end(), ok());
+    if (m === "POST" && path === "/display") return (table.setDisplay(body), ok());
+    if (m === "POST" && path === "/game/settings") return (table.updateSettings(body.settings), ok());
+    if (m === "POST" && path === "/game/prefs") return (table.setPrefs(body.prefs), ok());
+    if (m === "POST" && path === "/game/close") return (table.close(), ok());
+    if (m === "POST" && path === "/game/resume") return (table.resumeGame(), ok());
     // An AI player is out of time (D-112): play the game's quick move for it instead of waiting.
-    if (m === "POST" && path === "/game/play-now") return (table.playNow(), json(res, 200, table.state()));
+    if (m === "POST" && path === "/game/play-now") return (table.playNow(), ok());
     // Skip a game's wait, e.g. Hold'em's "Next hand" (D-136): fire a timer the manifest lists in skipTimers now.
-    if (m === "POST" && path === "/game/skip-timer") return (table.skipTimer(body.id), json(res, 200, table.state()));
+    if (m === "POST" && path === "/game/skip-timer") return (table.skipTimer(body.id), ok());
     if (m === "POST" && path === "/game/save") return json(res, 200, { saveId: await table.saveAndExit(), state: table.state() });
     if (m === "GET" && path === "/saves") return json(res, 200, await logs.listSaves());
     if (m === "GET" && path === "/game/board") {
@@ -654,12 +660,12 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
             const info = table.resume(String(p.sessionToken));
             // One deck per player (D-133): the player's newest window replaces the older one, which is told so.
             [...clients].filter((o) => o !== client && o.role === "deck" && o.playerId === info.id).forEach((o) => replaceClient(o));
-            if ([...clients].filter((o) => o.role === "deck").length >= MAX_DECKS) throw new TableError(409, "the table serves eight phones at most");
+            assertDeckRoom();
             c.role = "deck";
             c.playerId = info.id;
             reply("welcome", { role: "deck", playerId: info.id }, msg.seq);
           } else {
-            if ([...clients].filter((o) => o.role === "deck").length >= MAX_DECKS) throw new TableError(409, "the table serves eight phones at most");
+            assertDeckRoom();
             // The deck played from the board (D-175) proves itself with the table key instead of a join code.
             const fromBoard = !remoteCtx && p.boardKey !== undefined;
             if (fromBoard && !keyOk(p.boardKey)) throw new TableError(401, "the deck played from the board needs the table key");

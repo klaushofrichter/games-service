@@ -20,7 +20,7 @@ import {
 import { createRng, list, type GameEvent, type Intent, type SeatInfo } from "../../../packages/sdk/src/index.ts";
 import { HOW_TO_PLAY, settingsWithDefaults, type InstalledGame } from "./games.ts";
 import { withStatistics } from "./stats.ts";
-import { GameRuntime, realClock, type AiMoveMeta, type LogRecord } from "./runtime.ts";
+import { GameRuntime, realClock, type AiMoveMeta, type LogRecord, type PauseReason, type ResumeReason } from "./runtime.ts";
 import { movesFor } from "./moves.ts";
 import { baseMeta, countRecords, rebuild, verifyGame, verifySummary } from "./game-log.ts";
 import { AiCancelled, AiWorker, aiMove, isPromise, usesWorker } from "./ai.ts";
@@ -92,7 +92,7 @@ interface Player extends PlayerInfo {
 
 // Join tokens avoid look-alike characters so they can be read out loud.
 const TOKEN_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-export function shortToken(len = 8): string {
+function shortToken(len = 8): string {
   let s = "";
   for (let i = 0; i < len; i++) s += TOKEN_ALPHABET[randomInt(TOKEN_ALPHABET.length)];
   return s;
@@ -156,6 +156,26 @@ export class Table extends EventEmitter {
   /** A game is running (or ending): the lobby's seats, layout, names and games wait until it is over. */
   get playing() {
     return this.phase === "active" || this.phase === "paused" || this.phase === "terminating";
+  }
+
+  /** The runtime of a game that is running or paused and not over, else null. */
+  private get liveRuntime(): GameRuntime | null {
+    const rt = this.runtime;
+    return rt && !rt.over && (this.phase === "active" || this.phase === "paused") ? rt : null;
+  }
+
+  /** A pause record for the board and phones; `extra` adds the reason's details (who is waited for). */
+  private pauseOf<R extends PauseReason>(reason: R, extra: Partial<NonNullable<LobbyState["pause"]>> = {}) {
+    return { reason, since: Date.now(), canSave: !!this.selected?.game.manifest.saveGame, ...extra };
+  }
+
+  /** The game goes on after a pause: its timers run again. */
+  private resumeAfter(reason: ResumeReason) {
+    if (!this.runtime) return;
+    this.runtime.resume(reason);
+    this.phase = "active";
+    this.pause = null;
+    this.emit("game", [{ name: "resumed" }]);
   }
 
   private changed() {
@@ -243,13 +263,13 @@ export class Table extends EventEmitter {
   private playerPause(): NonNullable<LobbyState["pause"]> {
     const players = [...this.waitingFor].map(([playerId, w]) => ({ playerId, name: this.players.get(playerId)?.name ?? "a player", seat: w.seat, since: w.since, text: w.text, ...(this.players.get(playerId)?.leftGame ? { left: true } : {}) }));
     const since = this.pause?.reason === "player" ? this.pause.since : Date.now();
-    return { reason: "player", since, canSave: !!this.selected?.game.manifest.saveGame, players };
+    return this.pauseOf("player", { since, players });
   }
 
   /** Pause for the players the game waits for, or go on when the last one is back (D-119). */
   private syncPlayerPause() {
-    const rt = this.runtime;
-    if (!rt || rt.over || (this.phase !== "active" && this.phase !== "paused")) return;
+    const rt = this.liveRuntime;
+    if (!rt) return;
     if (this.waitingFor.size) {
       if (this.phase === "active") {
         rt.pause("player");
@@ -268,23 +288,20 @@ export class Table extends EventEmitter {
     if (this.phase !== "paused" || this.pause?.reason !== "player") return;
     if (!this.cloudOnline) {
       rt.pause("cloud");
-      this.pause = { reason: "cloud", since: Date.now(), canSave: !!this.selected?.game.manifest.saveGame };
+      this.pause = this.pauseOf("cloud");
       return;
     }
-    rt.resume("player");
-    this.phase = "active";
-    this.pause = null;
-    this.emit("game", [{ name: "resumed" }]);
+    this.resumeAfter("player");
     this.scheduleAi();
   }
 
   /** During a game: the seated players it can't go on without, with its reason (D-119). */
   private neededPlayers(): Record<string, string> {
-    const rt = this.runtime;
-    if (!rt || rt.over || (this.phase !== "active" && this.phase !== "paused")) return {};
+    const rt = this.liveRuntime;
+    if (!rt) return {};
     const out: Record<string, string> = {};
     for (const p of this.players.values()) {
-      if (p.seat === null || !rt.seats.some((s) => s.seat === p.seat)) continue;
+      if (p.seat === null || !rt.hasSeat(p.seat)) continue;
       const r = rt.canContinueWithout(p.seat);
       if (r !== true) out[p.id] = r.wait;
     }
@@ -296,7 +313,7 @@ export class Table extends EventEmitter {
     this.runtime.pause(reason);
     this.stopAllAi(); // AI players start again from the current view when the game resumes
     this.phase = "paused";
-    this.pause = { reason, since: Date.now(), canSave: !!this.selected?.game.manifest.saveGame };
+    this.pause = this.pauseOf(reason);
     this.emit("game", [{ name: "paused", data: { reason } }]);
   }
 
@@ -313,10 +330,7 @@ export class Table extends EventEmitter {
       this.changed();
       return;
     }
-    this.runtime.resume("cloud");
-    this.phase = "active";
-    this.pause = null;
-    this.emit("game", [{ name: "resumed" }]);
+    this.resumeAfter("cloud");
     this.scheduleAi();
     this.changed();
   }
@@ -494,7 +508,7 @@ export class Table extends EventEmitter {
     const made = invite ? this.invitesMade.get(invite) : undefined;
     if (made) {
       this.invitesMade.delete(invite!);
-      this.invitesJoined = [...this.invitesJoined, { invite: made.token, name: this.players.get(r.playerId)?.name ?? "" }].slice(-8);
+      this.noteInviteJoined(made.token, this.players.get(r.playerId)?.name ?? "");
     }
     this.changed();
     return r;
@@ -504,6 +518,9 @@ export class Table extends EventEmitter {
   private invitesMade = new Map<string, { token: string; watch: boolean }>();
   /** Invites that brought a player or a watcher, newest last: the board closes that invite's dialog. */
   private invitesJoined: { invite: string; name: string }[] = [];
+  private noteInviteJoined(invite: string, name: string) {
+    this.invitesJoined = [...this.invitesJoined, { invite, name }].slice(-8);
+  }
   inviteCreated(token: string, watch = false) {
     this.invitesMade.set(createHash("sha256").update(token).digest("hex"), { token, watch });
     while (this.invitesMade.size > 32) this.invitesMade.delete(this.invitesMade.keys().next().value!);
@@ -588,7 +605,7 @@ export class Table extends EventEmitter {
     v.boards++;
     if (made?.watch) {
       this.invitesMade.delete(invite!);
-      this.invitesJoined = [...this.invitesJoined, { invite: made.token, name: v.name || "Guest" }].slice(-8);
+      this.noteInviteJoined(made.token, v.name || "Guest");
     }
     this.changed();
   }
@@ -748,8 +765,7 @@ export class Table extends EventEmitter {
 
   /** The player has a seat in the game that is running. */
   private inRunningGame(p: Player): boolean {
-    const rt = this.runtime;
-    return !!rt && !rt.over && (this.phase === "active" || this.phase === "paused") && p.seat !== null && rt.seats.some((s) => s.seat === p.seat);
+    return p.seat !== null && !!this.liveRuntime?.hasSeat(p.seat);
   }
 
   disconnected(playerId: string) {
@@ -1293,7 +1309,7 @@ export class Table extends EventEmitter {
     const rt = this.runtime;
     const game = this.runningGame;
     if (!rt || !game || rt.over || (this.phase !== "active" && this.phase !== "paused")) throw new TableError(409, "no game is running");
-    if (!rt.seats.some((s) => s.seat === seat)) throw new TableError(404, `seat ${seat} is not in the game`);
+    if (!rt.hasSeat(seat)) throw new TableError(404, `seat ${seat} is not in the game`);
     const current = this.seated().find((p) => p.seat === seat);
     if (kind === "ai" && !game.manifest.ai.supported) throw new TableError(409, `${game.manifest.name} has no AI players`);
     if (kind === "ai" && current?.kind === "ai") throw new TableError(409, `${current.name} is an AI player already; change its options instead`);
@@ -1343,7 +1359,7 @@ export class Table extends EventEmitter {
         this.aiWorkers.get(old.id)?.terminate();
         this.aiWorkers.delete(old.id);
         // The game waited for this AI (D-112): nobody waits for an AI that has gone.
-        if (this.pause?.reason === "ai" && this.pause.ai?.playerId === old.id) this.resumeAfterAi("ai");
+        if (this.pause?.reason === "ai" && this.pause.ai?.playerId === old.id) this.resumeAfter("ai");
       } else if (old.sessionToken && !this.endedSessions.has(old.sessionToken)) {
         this.endedSessions.set(old.sessionToken, `your seat was handed to ${newcomer.name}; scan the QR code to join the next game`);
       }
@@ -1545,7 +1561,7 @@ export class Table extends EventEmitter {
     const p = this.mustPlayer(playerId);
     if (this.phase === "paused") throw new TableError(409, "the game is paused");
     if (this.phase !== "active" || !this.runtime) throw new TableError(409, "no game is running");
-    if (p.seat === null || !this.runtime.seats.some((s) => s.seat === p.seat)) throw new TableError(409, "you are not playing in this game");
+    if (p.seat === null || !this.runtime.hasSeat(p.seat)) throw new TableError(409, "you are not playing in this game");
     if (!intent || typeof intent.name !== "string") throw new TableError(400, "intent needs a name");
     this.changeByAi = p.kind === "ai";
     let r: ReturnType<GameRuntime["submit"]>;
@@ -1576,7 +1592,7 @@ export class Table extends EventEmitter {
     if (!this.runtime.manifest.boardIntents.includes(intent.name)) throw new TableError(403, `${intent.name} is done on the phone, not on the board`);
     if (remoteSession === null ? p.kind !== "human" || p.location !== "local" : p.remoteSession !== remoteSession)
       throw new TableError(403, remoteSession === null ? "only players at the table can move from the board" : "you can only move your own pieces");
-    if (p.seat === null || !this.runtime.seats.some((s) => s.seat === p.seat)) throw new TableError(409, `${p.name} is not playing in this game`);
+    if (p.seat === null || !this.runtime.hasSeat(p.seat)) throw new TableError(409, `${p.name} is not playing in this game`);
     const r = this.runtime.submit(p.seat, { name: intent.name, payload: intent.payload }, "board");
     if (r.ok) this.lastActorSeat = p.seat;
     return r;
@@ -1610,10 +1626,7 @@ export class Table extends EventEmitter {
       // Kept: a pause still running (its timer set, the move not started). Anything else (a move being worked out, a
       // pause that ended without a move because the game could not take one then) goes and is scheduled afresh.
       for (const [id, mv] of [...this.aiMoves]) if (mv.startedAt || mv.timer === undefined || !this.players.has(id)) this.cancelAiMove(id, mv);
-      if (this.stateDirty) {
-        this.stateDirty = false;
-        queueMicrotask(() => this.changed()); // a thinking marker went away
-      }
+      this.flushThinking();
     } else this.stopAllAi();
     for (const p of this.players.values()) {
       if (p.kind !== "ai" || p.seat === null) continue;
@@ -1763,16 +1776,7 @@ export class Table extends EventEmitter {
   /** An AI move ended (answered, failed or replaced): its timers go, and a pause waiting for it ends. */
   private endAiMove(playerId: string, mv: AiMoveState) {
     this.dropAiMove(playerId, mv);
-    if (this.pause?.reason === "ai" && this.pause.ai?.playerId === playerId) this.resumeAfterAi("ai");
-  }
-
-  /** Back from an AI pause (D-112): the game's timers run again. */
-  private resumeAfterAi(reason: "ai" | "playNow") {
-    if (!this.runtime) return;
-    this.runtime.resume(reason);
-    this.phase = "active";
-    this.pause = null;
-    this.emit("game", [{ name: "resumed" }]);
+    if (this.pause?.reason === "ai" && this.pause.ai?.playerId === playerId) this.resumeAfter("ai");
   }
 
   /** The AI threw or its worker failed: play the game's quick move instead, so the table never waits on a broken AI. */
@@ -1794,7 +1798,7 @@ export class Table extends EventEmitter {
     // Other AI players start again from the current view after the pause; this one keeps thinking.
     for (const [id, other] of [...this.aiMoves]) if (id !== p.id) this.cancelAiMove(id, other);
     this.phase = "paused";
-    this.pause = { reason: "ai", since: Date.now(), canSave: !!this.selected?.game.manifest.saveGame, ai: { playerId: p.id, name: p.name, seat: mv.seat, since: mv.startedAt } };
+    this.pause = this.pauseOf("ai", { ai: { playerId: p.id, name: p.name, seat: mv.seat, since: mv.startedAt } });
     this.emit("game", [{ name: "paused", data: { reason: "ai", playerId: p.id } }]);
     this.changed();
   }
@@ -1819,7 +1823,7 @@ export class Table extends EventEmitter {
     const p = this.players.get(this.pause.ai!.playerId);
     const mv = p ? this.aiMoves.get(p.id) : undefined;
     if (p && mv) this.cancelAiMove(p.id, mv);
-    this.resumeAfterAi("playNow");
+    this.resumeAfter("playNow");
     const fallback = p && p.seat !== null ? this.runtime.aiFallbackIntent(p.seat, this.aiRng(p)) : null;
     if (p && fallback) this.submitAi(p, fallback, { ms: mv?.startedAt ? Date.now() - mv.startedAt : 0, fallback: true, ...this.workerMeta() }, true);
     if ((this.phase as string) === "active" && !(p && fallback)) this.scheduleAi();
@@ -1860,10 +1864,14 @@ export class Table extends EventEmitter {
       for (const w of this.aiWorkers.values()) w.terminate();
       this.aiWorkers.clear();
     }
-    if (this.stateDirty) {
-      this.stateDirty = false;
-      queueMicrotask(() => this.changed()); // a thinking marker went away
-    }
+    this.flushThinking();
+  }
+
+  /** A thinking marker went away: tell the board and phones, once, after the current step. */
+  private flushThinking() {
+    if (!this.stateDirty) return;
+    this.stateDirty = false;
+    queueMicrotask(() => this.changed());
   }
 
   /** Marks a move of an AI that runs in a worker thread, also when its fallback was played. */
@@ -1887,7 +1895,7 @@ export class Table extends EventEmitter {
     if (!this.runtime) return [];
     const out = [];
     for (const p of this.players.values()) {
-      if (p.kind === "human" && p.seat !== null && this.runtime.seats.some((s) => s.seat === p.seat)) {
+      if (p.kind === "human" && p.seat !== null && this.runtime.hasSeat(p.seat)) {
         out.push({ playerId: p.id, seat: p.seat, view: this.runtime.view(p.seat) });
       }
     }
@@ -1991,7 +1999,7 @@ interface AiMoveState {
 }
 
 /** AI player names (D-081): short, so "Name (AI)" fits a seat plate; half female, half male. */
-export const AI_NAMES = [
+const AI_NAMES = [
   "Anna", "Bea", "Cleo", "Emma", "Ida", "Lena", "Lisa", "Mia", "Nora", "Rosa", "Sara", "Zoe",
   "Ben", "Bob", "Finn", "Jack", "Leo", "Max", "Noah", "Otto", "Paul", "Sam", "Tom", "Theo",
 ];

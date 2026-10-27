@@ -15,7 +15,8 @@
 // snapshot: if state.db is missing, fails to open or fails SQLite's quick_check, the snapshot replaces it (the damaged
 // file is kept beside it). The marker file forces that, for a restore runbook that wants the snapshot regardless.
 import { DatabaseSync } from "node:sqlite";
-import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statfsSync, statSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statfsSync, statSync } from "node:fs";
+import { readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 /** Damaged or replaced databases kept beside state.db after a recovery: the newest few, never an unbounded pile. */
@@ -113,15 +114,16 @@ export class Store {
     return join(this.dataDir!, "logs", `${id}.zip`);
   }
 
-  writeLog(id: string, data: Buffer) {
+  // Asynchronous: a log is up to 50 MB, and the other tables' heartbeats and signaling must not wait for the disk.
+  async writeLog(id: string, data: Buffer) {
     const p = this.logPath(id);
-    writeFileSync(`${p}.tmp`, data);
-    renameSync(`${p}.tmp`, p);
+    await writeFile(`${p}.tmp`, data);
+    await rename(`${p}.tmp`, p);
   }
 
-  readLog(id: string): Buffer | null {
+  async readLog(id: string): Promise<Buffer | null> {
     try {
-      return readFileSync(this.logPath(id));
+      return await readFile(this.logPath(id));
     } catch {
       return null;
     }

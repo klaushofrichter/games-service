@@ -5,6 +5,7 @@ import { parentPort, workerData } from "node:worker_threads";
 import { pathToFileURL } from "node:url";
 import { registerSdkHook } from "./games.ts";
 import { createRng, type GameDefinition } from "../../../packages/sdk/src/index.ts";
+import { randomContext } from "./random-context.ts";
 
 registerSdkHook();
 const def = (await import(pathToFileURL(workerData.rulesFile as string).href)).default as GameDefinition;
@@ -19,10 +20,8 @@ export interface WorkerRequest {
 }
 
 parentPort!.on("message", async (m: WorkerRequest) => {
-  const rng = createRng(m.seed);
   const ctx = {
-    random: rng,
-    randomInt: (min: number, max: number) => min + Math.floor(rng() * (max - min + 1)),
+    ...randomContext(createRng(m.seed)),
     signal: new AbortController().signal, // the host stops a stale search by terminating the thread
     deadline: m.deadline,
   };

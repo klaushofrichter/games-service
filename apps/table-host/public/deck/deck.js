@@ -164,6 +164,14 @@ function connect(hello) {
 app.innerHTML = `<div id="top"></div><div id="table" class="table-tab" role="tabpanel" aria-labelledby="tab-table"></div><div id="body" role="tabpanel"></div>`;
 const top = app.querySelector("#top");
 const tablePanel = app.querySelector("#table");
+// The header and the table tab are written only when their markup changes: every game message renders, and most leave
+// them as they were.
+const written = new WeakMap();
+const put = (el, markup) => {
+  if (written.get(el) === markup) return;
+  written.set(el, markup);
+  el.innerHTML = markup;
+};
 const body = app.querySelector("#body");
 
 // During a game (D-123) the header is a slim tab bar: the player's own tab (colour, name, seat) opens what the header
@@ -192,19 +200,19 @@ function renderTop() {
   const banners = paused;
   if (inGame) {
     const color = p?.seat == null ? null : colorOf(p.seat);
-    top.innerHTML = `${banners}<div class="tabs" role="tablist" aria-label="Deck">
+    put(top, `${banners}<div class="tabs" role="tablist" aria-label="Deck">
       <button type="button" role="tab" id="tab-table" data-tab="table" aria-selected="${tab === "table"}" aria-controls="table">
         ${color ? `<span class="pdot" style="background:${color}" aria-hidden="true"></span>` : ""}<span class="tab-name">${esc(p?.name ?? "")}</span>${p?.seat == null ? "" : `<span class="tab-seat">${esc(seatBadge(state.seatEdges, p.seat))}</span>`}</button>
-      <button type="button" role="tab" id="tab-game" data-tab="game" aria-selected="${tab === "game"}" aria-controls="body">${esc(state.game?.name ?? "Game")}</button></div>`;
+      <button type="button" role="tab" id="tab-game" data-tab="game" aria-selected="${tab === "game"}" aria-controls="body">${esc(state.game?.name ?? "Game")}</button></div>`);
     body.setAttribute("aria-labelledby", "tab-game");
-    tablePanel.innerHTML = tab === "table" ? `${whoHtml(p, true)}<div class="card list"><div class="eyebrow" style="margin-bottom:6px">At the table</div>${playersHtml()}</div>
+    put(tablePanel, tab === "table" ? `${whoHtml(p, true)}<div class="card list"><div class="eyebrow" style="margin-bottom:6px">At the table</div>${playersHtml()}</div>
       ${p?.seat != null ? leaveHtml(true) : ""}
-      <div class="center"><a href="/deck/terms.html" data-terms class="faint">Terms of service</a></div>` : "";
+      <div class="center"><a href="/deck/terms.html" data-terms class="faint">Terms of service</a></div>` : "");
   } else {
     tab = "game";
-    tablePanel.innerHTML = "";
-    top.innerHTML = `${banners}${whoHtml(p, false)}
-    ${p?.seat != null ? "" : `<div class="card muted">No seat yet. You'll get one when a seat opens.</div>`}`;
+    put(tablePanel, "");
+    put(top, `${banners}${whoHtml(p, false)}
+    ${p?.seat != null ? "" : `<div class="card muted">No seat yet. You'll get one when a seat opens.</div>`}`);
   }
   tablePanel.hidden = !(inGame && tab === "table");
   body.style.display = inGame && tab === "table" ? "none" : "";
@@ -385,16 +393,16 @@ const seatBadge = (edges, seat) => seatName(edges, seat).replace(/(north|south|e
 function render() {
   if (replaced) {
     closeGame();
-    top.innerHTML = "";
+    put(top, "");
     body.innerHTML = `<div class="card center"><h1>Your deck is open in another window</h1><p class="muted">Each player has one deck at a time, so a move is never made twice.</p><button class="primary" type="button" data-action="deck-here">Use this window</button></div>`;
     return;
   }
   if (removed) {
     closeGame();
-    top.innerHTML = "";
+    put(top, "");
     // Left from the own tab during a game (D-158): out of the game's layout, so the message shows.
     tablePanel.hidden = true;
-    tablePanel.innerHTML = "";
+    put(tablePanel, "");
     body.style.display = "";
     document.body.classList.remove("in-game");
     // Why: left from this phone (D-158), the seat exchanged for someone else (D-159), or removed on the board.
@@ -427,7 +435,7 @@ function render() {
 }
 
 function renderJoin() {
-  top.innerHTML = banner ? `<div class="banner">${esc(banner)}</div>` : "";
+  put(top, banner ? `<div class="banner">${esc(banner)}</div>` : "");
   const saved = storage.get();
   if (saved && !ws) {
     connect({ sessionToken: saved });
