@@ -1594,3 +1594,9 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   in minutes by the board's one 30-second tick (the same that counts the code down in Advanced). Past its end it says
   "Access code expired": the table keeps working until an admin disconnects it (D-113). The table's own board only;
   a remote player can do nothing about it.
+- **D-221 · 2026-10-27 · Klaus** — A watcher's own board, which has no settings, gets two of them in the eye's window:
+  *Your name* with *Change name* (the board's name pad; made unique as when they came in, also during a game, since a
+  watcher is not a player) and *Fullscreen*. That window tells them how they could play — the table's board can let
+  them take a free seat before a game or exchange a player for them during one — instead of pointing to Settings,
+  which they don't have; the invite page's note points to the eye. `POST /api/v1/watching/name {name}` is for a
+  watcher's own board only; their state carries `remote.watcherId`, so their board finds itself in `watchers`.

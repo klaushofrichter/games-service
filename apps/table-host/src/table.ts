@@ -617,6 +617,24 @@ export class Table extends EventEmitter {
     this.changed();
   }
 
+  /** The watcher's id for their own board (D-221), so it finds its name in the list; null when not a watcher. */
+  watcherIdOf(session: string): string | null {
+    return this.isWatcher(session) ? this.visitors.get(session)!.id : null;
+  }
+
+  /**
+   * A watcher changes their own name, from their board's watching window (D-221), also during a game: they are not a
+   * player. Made unique against the players and the other watchers, as when they came in.
+   */
+  renameWatcher(session: string, raw: unknown) {
+    if (!this.isWatcher(session)) throw new TableError(403, "only a watcher can change their name here");
+    if (!trimName(raw)) throw new TableError(400, "a name needs at least one character", "name-invalid");
+    const v = this.visitors.get(session)!;
+    v.name = ""; // their own name is free to keep
+    v.name = this.freeName(raw, undefined, session);
+    this.changed();
+  }
+
   private watcherSession(id: unknown) {
     for (const [s, v] of this.visitors) if (v.id === id && this.isWatcher(s)) return s;
     throw new TableError(404, "no such watcher");

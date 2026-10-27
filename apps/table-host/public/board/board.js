@@ -547,21 +547,46 @@ async function watcherAction(b) {
   } else act("POST", `/watchers/${w.id}/play`);
   return true;
 }
+/** The settings' Fullscreen row, also in a watcher's window (D-221): the whole page where it applies (D-184). */
+function fullscreenRow() {
+  return `<div class="row"><span>Fullscreen</span>${fsDoc.fullscreenEnabled ? `<button data-fs class="${fsDoc.fullscreenElement ? "on" : ""}">${fsDoc.fullscreenElement ? "Leave fullscreen" : "Fullscreen"}</button>` : `<span class="faint">not available in this browser</span>`}</div>`;
+}
+function toggleFullscreen() {
+  (fsDoc.fullscreenElement ? fsDoc.exitFullscreen() : fsDoc.documentElement.requestFullscreen()).catch(() => toast("Fullscreen was refused by the browser"));
+}
+/** The watcher this board belongs to (D-221): a remote board whose browser watches; null elsewhere. */
+const watcherSelf = () => (REMOTE && state.remote?.watching ? (state.watchers ?? []).find((w) => w.id === state.remote.watcherId) ?? null : null);
+/**
+ * The eye's window: who watches, and Remove / Let play where this board may. A watcher's own board, which has no
+ * settings, also gets their name to change and Fullscreen here (D-221), and is told how they could play: the table's
+ * board does that.
+ */
 function openWatchers() {
   const o = document.createElement("div");
   o.className = "overlay watchers";
   const draw = () => {
     if (!(state.watchers ?? []).length) return close();
+    const me = watcherSelf();
+    const note = me
+      ? "You see the board, never a player's private view. To play, ask the table: its board can let you take a free seat before a game, or exchange a player for you during one. To stop watching, close this window."
+      : `${WATCHER_NOTE}${lobbyPhase() ? "" : " During a game, a watcher can take a seat through Settings › Players: tap a player's name."}`;
     setPanel(o, `<div class="panel watchers-panel"><h2>Watching</h2>
+      ${me ? `<div class="group"><div class="row"><span>Your name: <b>${esc(me.name)}</b></span><button data-watcher-name>Change name</button></div>${fullscreenRow()}</div>` : ""}
       <div class="group player-colors">${watcherRows()}</div>
-      <p class="faint" style="font-size:.75em">${WATCHER_NOTE}${lobbyPhase() ? "" : " During a game, a watcher can take a seat through Settings › Players: tap a player's name."}</p>
+      <p class="faint" style="font-size:.75em">${note}</p>
       <div class="actions settings-actions"><button class="primary" data-close-overlay>Done</button></div></div>`);
   };
-  const close = () => (unsub(), o.remove());
+  const close = () => (unsub(), fsDoc.removeEventListener("fullscreenchange", draw), o.remove());
   const unsub = onState(draw);
+  fsDoc.addEventListener("fullscreenchange", draw);
   o.addEventListener("click", async (e) => {
     const b = e.target.closest("button");
     if (e.target === o || b?.dataset.closeOverlay !== undefined) return close();
+    if (b?.dataset.fs !== undefined) return toggleFullscreen();
+    if (b?.dataset.watcherName !== undefined) {
+      const me = watcherSelf();
+      return openNamePad(me?.name === "Guest" ? "" : (me?.name ?? ""), (n) => n && act("POST", "/watching/name", { name: n }), "Your name");
+    }
     if (b) await watcherAction(b);
   });
   draw();
@@ -641,7 +666,6 @@ function openSettings() {
       console.error("game settings failed", err);
       items = [];
     }
-    const fs = fsDoc.fullscreenEnabled;
     // The chosen game's own settings from its manifest (D-090): editable until it starts, then shown read-only.
     const fields = gameFields();
     const editable = state.phase === "ready";
@@ -686,7 +710,7 @@ function openSettings() {
       <div class="group"><div class="eyebrow">Display</div>
         <div class="row"><span>Sound effects</span><button data-sound class="${state.display?.sound !== false ? "on" : ""}" role="switch" aria-checked="${state.display?.sound !== false}">${state.display?.sound !== false ? "On" : "Off"}</button></div>
         ${REMOTE || IN_PLAY ? "" : `<div class="row"><span>Another screen on this WiFi, such as an iPad or a TV, shows the board instead</span><button data-screen>Board on another screen…</button></div>`}
-        <div class="row"><span>Fullscreen</span>${fs ? `<button data-fs class="${fsDoc.fullscreenElement ? "on" : ""}">${fsDoc.fullscreenElement ? "Leave fullscreen" : "Fullscreen"}</button>` : `<span class="faint">not available in this browser</span>`}</div></div>
+        ${fullscreenRow()}</div>
       <div class="group"><div class="eyebrow">Joining</div>
         ${state.developer?.boardDeck ? `<div class="row"><span class="faint">Played from the board (Advanced › Developer): no phone joins at the table</span></div>` : `<div class="row"><span>The QR code and address for phones, to join or rejoin, also during a game</span><button data-join-code>Show join code…</button></div>`}
         <div class="row"><span>${remoteJoinText()}</span>${inviteButton("Invite remote player…")}</div></div>
@@ -725,9 +749,7 @@ function openSettings() {
     const b = e.target.closest("button");
     if (e.target === o || b?.dataset.closeOverlay !== undefined) return close();
     if (!b) return;
-    if (b.dataset.fs !== undefined) {
-      (fsDoc.fullscreenElement ? fsDoc.exitFullscreen() : fsDoc.documentElement.requestFullscreen()).catch(() => toast("Fullscreen was refused by the browser"));
-    }
+    if (b.dataset.fs !== undefined) toggleFullscreen();
     if (b.dataset.sound !== undefined) return void act("POST", "/display", { sound: state.display?.sound === false });
     if (b.dataset.joinCode !== undefined) return openJoinCode();
     if (b.dataset.screen !== undefined) return openScreenLink();
@@ -1867,13 +1889,13 @@ const NAME_ROWS = [[..."QWERTYUIOP"], [..."ASDFGHJKL"], [..."ZXCVBNM"], [..."Ä�
  * method for any script, and pasting work in the field too. Calls done(name) with the cleaned name ("" for none).
  */
 let namePad = null;
-function openNamePad(initial, done) {
+function openNamePad(initial, done, title = "Player's name") {
   if (namePad) return;
   const o = (namePad = document.createElement("div"));
   o.className = "overlay name-pad";
   let shift = false;
   let digits = false;
-  o.innerHTML = `<div class="panel"><h2>Player's name</h2>
+  o.innerHTML = `<div class="panel"><h2>${esc(title)}</h2>
     <div class="name-field"><input maxlength="48" autocomplete="off" spellcheck="false" aria-label="Name"><span class="count"></span></div>
     <div class="keys"></div>
     <div class="actions"><button data-clear>Clear</button><span style="flex:1"></span><button data-cancel>Cancel</button><button class="primary" data-save>Use this name</button></div></div>`;

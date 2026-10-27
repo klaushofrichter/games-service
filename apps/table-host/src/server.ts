@@ -146,11 +146,12 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
     const s = { ...state, joinUrl: "", exchange: hideLink ? { ...state.exchange!, url: "" } : state.exchange };
     if (session === undefined) return s;
     const mayJoin = table.mayJoin(session);
-    return table.hasRemotePlayer(session) ? { ...s, remote: { ...s.remote, mayJoin } } : { ...s, remote: { ...s.remote, boardControl: false, watching: true, mayJoin } };
+    if (table.hasRemotePlayer(session)) return { ...s, remote: { ...s.remote, mayJoin } };
+    return { ...s, remote: { ...s.remote, boardControl: false, watching: true, mayJoin, watcherId: table.watcherIdOf(session) ?? undefined } };
   };
   /** The serialised state is shared by clients that see the same: the table's, remote decks, remote boards by their rights. */
   const stateKind = (c: Client) =>
-    !c.remote ? "local" : c.session === undefined ? "remote" : `board:${table.hasRemotePlayer(c.session) ? "p" : "w"}${table.mayJoin(c.session) ? "j" : ""}`;
+    !c.remote ? "local" : c.session === undefined ? "remote" : table.hasRemotePlayer(c.session) ? `board:p${table.mayJoin(c.session) ? "j" : ""}` : `board:w${table.mayJoin(c.session) ? "j" : ""}:${table.watcherIdOf(c.session) ?? ""}`; // a watcher's carries their id (D-221)
 
   table.on("state", (state) => {
     // Serialised once per kind of client (at the table, remote), not once per client.
@@ -298,6 +299,11 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
     const remote = remoteOf(req);
     const m = req.method ?? "GET";
     if (remote) {
+      // A watcher names themselves (D-221): only their own name, so it needs no board control.
+      if (m === "POST" && path === "/watching/name") {
+        table.renameWatcher(remote.session, (await readBody(req)).name);
+        return json(res, 200, forClient(true, table.state(), remote.session));
+      }
       // Remote boards are authorised by their invite (checked by the cloud), not by the table key.
       // The Game Viewer (D-120): finished games, read-only, for remote players the table gives board control.
       if (/^\/history(\/|$)/.test(path)) {
