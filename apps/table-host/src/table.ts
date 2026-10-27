@@ -432,7 +432,7 @@ export class Table extends EventEmitter {
    * ends); a different name is refused while someone else is at the table.
    */
   joinFromBoard(rawName: unknown) {
-    if (!this.boardDeck) throw new TableError(409, "playing from the board is switched off (Advanced › Developer)", "board-deck");
+    if (!this.boardDeck) throw new TableError(409, "playing from the board is switched off (Developer settings)", "board-deck");
     const others = this.localPeople();
     const k = nameKey(trimName(rawName));
     const same = others.find((p) => nameKey(p.name) === k);
@@ -1222,7 +1222,7 @@ export class Table extends EventEmitter {
         needs.push(counts.length === 1 ? `needs exactly ${counts[0]} players, ${more} more` : `needs ${more} more player${more === 1 ? "" : "s"}`);
       }
     }
-    if (!this.allowNoLocalPlayer && !seated.some((p) => p.kind === "human" && p.location === "local")) needs.push("needs at least one player at the table (or, under Advanced › Developer, games without one)");
+    if (!this.allowNoLocalPlayer && !seated.some((p) => p.kind === "human" && p.location === "local")) needs.push("needs at least one player at the table (or, under Developer settings, games without one)");
     return needs;
   }
 

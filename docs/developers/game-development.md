@@ -517,7 +517,7 @@ Tests use Vitest and run against the real host code.
   CLOUD_URL= scripts/local-table.sh --extra ../my-games    # your own games, no service
   ```
 
-- **By hand, without a phone:** *Advanced › Developer › Play from the board* on the board (or `BOARD_DECK=1`) puts one
+- **By hand, without a phone:** *Developer settings › Play from the board* on the board (the tools button) (or `BOARD_DECK=1`) puts one
   player's deck beside the board, as on a remote player's page, so you can play your game at one screen with AI players
   (D-175). Only one person plays at the table meanwhile, since the deck is private; remote players can still join.
 - **Browser:** `scripts/e2e/` drives a board and phones in Chromium with Playwright; `common.py` has the helpers.
