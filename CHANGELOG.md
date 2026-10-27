@@ -8,6 +8,8 @@ history.
 
 ## [Unreleased]
 
+- The board's settings window shows a game's switch change at once (it waited for a reopen), and dims the game settings
+  that are locked during a game (D-215).
 - The console shows remote players and watchers connected right now, per table and in total (counts only, D-214).
 - Tests: the Pachisi game played through two decks no longer fails now and then on the intent limit, nor the AI
   options test under load (D-213).
