@@ -169,9 +169,12 @@ describe("players away during a game (D-144)", () => {
     const phone = await Deck.connect(t.base, { sessionToken: back.sessionToken }); // the same phone, reconnecting
     await phone.request("lobby", "leave", {});
     await until(async () => ((await state()).away.length ? true : null));
-    // once the seat went to someone else, the name is free and joining is the ordinary way (no seat: refused)
+    // once the seat went to an AI player, Ann takes it back from "Ann (AI)" with her name (D-222)
     await t.ok("POST", "/exchange", { seat, kind: "ai" });
-    await expect(t.joinDeck("Ann")).rejects.toThrow(/seat/);
+    await t.joinDeck("Ann");
+    const after = await state();
+    expect(after.players.find((p: any) => p.name === "Ann")).toMatchObject({ seat, kind: "human" });
+    expect(after.players.some((p: any) => p.name === "Ann (AI)")).toBe(false);
   });
 
   it("coming back to a waiting seat also ends the pause of a game that can't go on without the player (D-172)", async () => {

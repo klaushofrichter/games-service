@@ -1,13 +1,13 @@
 """Browser check of "Play from the board" (D-175), a developer setting: switched on under Advanced › Developer, the
 board moves into a page with one player's deck beside it, laid out like a remote player's page; the deck takes a seat
 without a phone or join code, also with a stale session saved (no warning, D-218); the QR code goes and a phone with the code is turned away; the player plays a game of
-Coin Flip from the deck against an AI; Hide and Show fold the deck; Fullscreen takes the whole page, deck included
+Coin Flip from the deck against an AI, handed to an AI player mid-game and taking the seat back as before (D-222); Hide and Show fold the deck; Fullscreen takes the whole page, deck included
 (D-184); switched off, the board is alone again and the
 player stays at the table.
 A Table Host of its own (port 8139), without the cloud service.
   python3 scripts/e2e/board_deck.py out/
 """
-import os, sys
+import os, sys, time
 from playwright.sync_api import sync_playwright
 from common import call, errors, start_table, wait, watch
 
@@ -72,10 +72,24 @@ try:
         deck.locator("#ready").click()
         wait(lambda: all(x["ready"] for x in players().values()), 10, "everyone ready")
         a("POST", "/game/start", {})
-        for _ in range(3):
-            deck.locator("[data-guess=heads]:not([disabled])").first.click(timeout=20000)
-            page.wait_for_timeout(1500)
-        wait(lambda: a("GET", "/state")["phase"] == "finished", 60, "the game to finish")
+        deck.locator("[data-guess=heads]:not([disabled])").first.click(timeout=20000)
+        page.wait_for_timeout(1500)
+        # D-222: the board hands Dev's seat to an AI player ("Dev (AI)"); the deck offers the seat back, and takes it as
+        # Dev, without the name form.
+        seat = players()["Dev"]["seat"]
+        a("POST", "/exchange", {"seat": seat, "kind": "ai"})
+        deck.locator("[data-board-again]:has-text('Take your seat back')").wait_for(timeout=10000)
+        page.screenshot(path=os.path.join(OUT, "board-deck-seat-back.png"))
+        deck.locator("[data-board-again]").click()
+        wait(lambda: players().get("Dev", {}).get("seat") == seat and "Dev (AI)" not in players(), 15, "Dev back in the seat")
+        assert deck.locator("input[name=name]").count() == 0, "the name form after taking the seat back"
+        end = time.time() + 60
+        while a("GET", "/state")["phase"] != "finished" and time.time() < end:
+            guess = deck.locator("[data-guess=heads]:not([disabled])")
+            if guess.count():
+                guess.first.click()
+            page.wait_for_timeout(500)
+        wait(lambda: a("GET", "/state")["phase"] == "finished", 5, "the game to finish")
         page.screenshot(path=os.path.join(OUT, "board-deck-game.png"))
 
         # Hide and Show fold the deck, as on a remote player's page.

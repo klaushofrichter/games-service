@@ -88,6 +88,8 @@ interface Player extends PlayerInfo {
   leftGame?: boolean;
   /** The colour the player got when first seated (their seat's, else a free one); it moves with them (D-117). */
   keptColor?: string;
+  /** An AI player that took a person's seat in an exchange (D-159): that person's name, who gets the seat back (D-222). */
+  standsInFor?: string;
 }
 
 // Join tokens avoid look-alike characters so they can be read out loud.
@@ -686,6 +688,10 @@ export class Table extends EventEmitter {
       this.resume(back.sessionToken);
       return { playerId: back.id, sessionToken: back.sessionToken };
     }
+    // A player an AI took over from (D-159), coming back with their name, gets their seat back from it (D-222): during
+    // a game as an exchange does, after it straight away. Their name is theirs again, "Ann (AI)" goes.
+    const standIn = !exchange && location === "local" ? this.aiStandingInFor(rawName) : undefined;
+    if (standIn) return this.seatBack(standIn, rawName);
     // A seat is taken when a player joins (D-129): with none free, nobody joins to stand around without one.
     const noSeat = exchange ? null : this.noFreeSeat();
     if (noSeat) throw new TableError(409, noSeat, "no-seat");
@@ -774,6 +780,31 @@ export class Table extends EventEmitter {
   }
 
   /** A player at the table who left the running game and whose seat still waits, by name (ignoring case), D-172. */
+  /** The seated AI player that took this name's seat in an exchange (D-222), if any. */
+  private aiStandingInFor(raw: unknown) {
+    const k = nameKey(trimName(raw));
+    if (!k) return undefined;
+    return this.seated().find((p) => p.kind === "ai" && p.standsInFor !== undefined && nameKey(p.standsInFor) === k);
+  }
+
+  /** The person takes their seat back from the AI player that stood in for them (D-222). */
+  private seatBack(ai: Player, rawName: unknown) {
+    const seat = ai.seat!;
+    const p: Player = { id: newId("p"), name: this.cleanName(rawName, ai.id), kind: "human", location: "local", seat: null, connected: true, ready: true, sessionToken: newSessionToken() };
+    this.players.set(p.id, p);
+    if (this.liveRuntime?.hasSeat(seat)) this.takeSeat(p, seat);
+    else {
+      // Between games: the AI simply goes, the person sits where it sat, in its colour (theirs before).
+      const color = this.colors().get(ai.id);
+      this.players.delete(ai.id);
+      p.seat = seat;
+      if (color) (p.chosenColor = color), (p.keptColor = color);
+      if (this.phase === "ready") this.revalidateSelection();
+      this.changed();
+    }
+    return { playerId: p.id, sessionToken: p.sessionToken! };
+  }
+
   private leftPlayerNamed(raw: unknown) {
     const k = nameKey(trimName(raw));
     if (!k) return undefined;
@@ -1297,7 +1328,7 @@ export class Table extends EventEmitter {
       // "Ann (AI)", the old name cut to fit twelve characters with the mark (D-148), unless taken.
       const base = current ? `${Array.from(current.name).slice(0, MAX_NAME - 5).join("").trim()} (AI)` : "";
       const name = base && !this.nameTaken(base) ? base : this.aiName();
-      const ai: Player = { id: newId("ai"), name, kind: "ai", location: "local", seat: null, connected: true, ready: true, sessionToken: null, aiSeed: randomInt(2 ** 31), aiOptions: aiDefaults(game.manifest, {}) };
+      const ai: Player = { id: newId("ai"), name, kind: "ai", location: "local", seat: null, connected: true, ready: true, sessionToken: null, aiSeed: randomInt(2 ** 31), aiOptions: aiDefaults(game.manifest, {}), ...(current?.kind === "human" ? { standsInFor: current.name } : {}) };
       this.players.set(ai.id, ai);
       this.takeSeat(ai, seat);
       return { playerId: ai.id };
@@ -1379,7 +1410,8 @@ export class Table extends EventEmitter {
         // The game waited for this AI (D-112): nobody waits for an AI that has gone.
         if (this.pause?.reason === "ai" && this.pause.ai?.playerId === old.id) this.resumeAfter("ai");
       } else if (old.sessionToken && !this.endedSessions.has(old.sessionToken)) {
-        this.endedSessions.set(old.sessionToken, `your seat was handed to ${newcomer.name}; scan the QR code to join the next game`);
+        // Handed to an AI player, it is theirs again when they join with their name (D-222).
+        this.endedSessions.set(old.sessionToken, newcomer.kind === "ai" ? `your seat was handed to ${newcomer.name}; scan the QR code and join as ${old.name} to take it back` : `your seat was handed to ${newcomer.name}; scan the QR code to join the next game`);
       }
       this.players.delete(old.id);
       this.waitingFor.delete(old.id);
