@@ -1168,6 +1168,7 @@ function renderLobby() {
       ${gameTiles()}
       ${toolbar()}
     </section>${joinPanel()}`;
+  sizeTiles();
 }
 
 // The lobby shows the games a page at a time (three tiles fit beside the join panel), with arrows and dots.
@@ -1175,23 +1176,46 @@ const PAGE_SIZE = 3;
 let gamePage = 0;
 /** A remote board that may not operate the table: a watcher, or board control switched off (D-167, D-170). */
 const viewOnly = () => REMOTE && !state.remote?.boardControl;
+// A remote board without board control (a watcher, or control switched off) shows the games, not as buttons (D-170).
+const tileHtml = (g) => `<button class="tile ${g.selectable ? "selectable" : ""} ${viewOnly() ? "view-only" : ""}" data-game="${g.id}" ${g.selectable && !viewOnly() ? "" : viewOnly() ? 'tabindex="-1" aria-disabled="true"' : "disabled"}>
+          <span class="title">${esc(g.name)}</span><span class="desc">${esc(g.description ?? "")}</span>
+          <span class="faint" style="font-size:.66em">${playersLabel(g.players)}${g.ai ? " · AI" : ""}${g.extra ? ` · <span style="color:var(--brass)">extra</span>` : ""}</span>
+          ${g.selectable ? `<span class="hint">${esc(tileHint(g))}</span>` : `<span class="why">${esc(g.reasons[0])}</span>`}</button>`;
 function gameTiles() {
   const pages = Math.max(1, Math.ceil(games.length / PAGE_SIZE));
   gamePage = Math.min(gamePage, pages - 1);
-  const tiles = games
-    .slice(gamePage * PAGE_SIZE, (gamePage + 1) * PAGE_SIZE)
-    // A remote board without board control (a watcher, or control switched off) shows the games, not as buttons (D-170).
-    .map((g) => `<button class="tile ${g.selectable ? "selectable" : ""} ${viewOnly() ? "view-only" : ""}" data-game="${g.id}" ${g.selectable && !viewOnly() ? "" : viewOnly() ? 'tabindex="-1" aria-disabled="true"' : "disabled"}>
-          <span class="title">${esc(g.name)}</span><span class="desc">${esc(g.description ?? "")}</span>
-          <span class="faint" style="font-size:.66em">${playersLabel(g.players)}${g.ai ? " · AI" : ""}${g.extra ? ` · <span style="color:var(--brass)">extra</span>` : ""}</span>
-          ${g.selectable ? `<span class="hint">${esc(tileHint(g))}</span>` : `<span class="why">${esc(g.reasons[0])}</span>`}</button>`)
-    .join("");
+  const tiles = games.slice(gamePage * PAGE_SIZE, (gamePage + 1) * PAGE_SIZE).map(tileHtml).join("");
   const pager = pages < 2 ? "" : `<div class="pager">
       <button data-page="-1" ${gamePage === 0 ? "disabled" : ""} aria-label="Previous games">‹</button>
       ${Array.from({ length: pages }, (_, i) => `<button class="dot ${i === gamePage ? "on" : ""}" data-page-to="${i}" aria-label="Games page ${i + 1}"></button>`).join("")}
       <button data-page="1" ${gamePage === pages - 1 ? "disabled" : ""} aria-label="More games">›</button>
       <span class="faint">${games.length} games</span></div>`;
   return `<div class="games">${tiles}</div>${pager}`;
+}
+
+/**
+ * Every tile as tall as the tallest of all the games, on any page (D-228), so paging doesn't move the pager or what
+ * is below it. All tiles are laid out once, unseen, at the grid's width; that is redone only when their text or the
+ * width changes (games added or removed, a game's hint, a narrower remote board), not on every redraw.
+ */
+let tileSize = { key: "", height: 0 };
+function sizeTiles() {
+  const grid = center.querySelector(".games");
+  if (!grid) return;
+  const key = `${grid.clientWidth}|${games.map(tileHtml).join("")}`;
+  if (key !== tileSize.key) {
+    const probe = document.createElement("div");
+    probe.className = "games";
+    probe.setAttribute("aria-hidden", "true");
+    probe.style.cssText = `position:absolute;visibility:hidden;pointer-events:none;left:0;top:0;width:${grid.clientWidth}px`;
+    probe.innerHTML = games.map(tileHtml).join("");
+    grid.parentElement.appendChild(probe);
+    // offsetHeight: the layout size, before the surface's scale and rotation.
+    const height = Math.max(0, ...[...probe.children].map((t) => t.offsetHeight));
+    probe.remove();
+    tileSize = { key, height };
+  }
+  grid.style.setProperty("--tile-min", `${tileSize.height}px`);
 }
 
 /** What a choosable game still needs, or that it can start right away. */
