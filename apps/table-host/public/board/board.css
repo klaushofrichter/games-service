@@ -189,6 +189,11 @@ pre.raw { font-family: var(--mono); font-size: 0.7em; color: var(--ink-soft); ba
 :is(#result-button, #stats-button).bottom-left { left: 26px; bottom: 26px; }
 :is(#result-button, #stats-button).top-right { right: 26px; top: 26px; }
 :is(#result-button, #stats-button).top-left { left: 26px; top: 26px; }
+/* Beside the corner arrow when a game keeps them (D-227): along the edge, where the gear sits at the other end. */
+:is(#lobby-button, #result-button, #stats-button).beside.bottom-right { right: 102px; bottom: 32px; }
+:is(#lobby-button, #result-button, #stats-button).beside.bottom-left { left: 102px; bottom: 32px; }
+:is(#lobby-button, #result-button, #stats-button).beside.top-right { right: 102px; top: 32px; }
+:is(#lobby-button, #result-button, #stats-button).beside.top-left { left: 102px; top: 32px; }
 /* The finished screen stays inside the center panel (D-142): a long statistics table scrolls (both ways, header row
    kept), the result text and the buttons stay in view, and the seats around the edge are never covered. */
 #center:has(> .main.finished) { grid-template-rows: minmax(0, 1fr); grid-template-columns: minmax(0, 1fr) 330px; }

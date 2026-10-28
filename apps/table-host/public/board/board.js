@@ -399,11 +399,14 @@ const CORNERS = [
   { edge: "south", pos: "br", arrow: 180 },
   { edge: "west", pos: "bl", arrow: 270 },
 ];
+/** A game played from all four edges (manifest `facing: "any"`, D-227): the corner arrows stay during the game. */
+const anyFacing = () => state.game?.facing === "any";
 function renderCorners(hide) {
   cornersEl.hidden = REMOTE || hide;
   if (cornersEl.hidden) return;
+  const what = lobbyPhase() ? "lobby" : "game";
   cornersEl.innerHTML = CORNERS.map(({ edge, pos, arrow }) =>
-    `<button class="corner ${pos} ${state.frontEdge === edge ? "on" : ""}" data-face="${edge}" title="Face ${edge}" aria-label="Turn the lobby to face ${edge}">
+    `<button class="corner ${pos} ${state.frontEdge === edge ? "on" : ""}" data-face="${edge}" title="Face ${edge}" aria-label="Turn the ${what} to face ${edge}">
       <svg viewBox="0 0 24 24" width="22" height="22" style="transform:rotate(${arrow}deg)"><path d="M6 15l6-6 6 6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>`).join("");
 }
 cornersEl.addEventListener("click", (e) => {
@@ -505,7 +508,7 @@ function placeTools(playing, front, gearCorner) {
   if (toolsBtn.hidden) return placeAlong(watchBtn, REMOTE ? 102 : 172, front, gearCorner, placeWatchers());
   // The developer setting (D-118) marks it while it is on, so nobody forgets it.
   toolsBtn.classList.toggle("dev", !!(state.developer?.allowNoLocalPlayer || state.developer?.boardDeck) && !REMOTE);
-  const flipInside = playing && !REMOTE && gearCorner !== FRONT_CORNERS[front][0]; // the turn button at 172 px
+  const flipInside = playing && !REMOTE && !anyFacing() && gearCorner !== FRONT_CORNERS[front][0]; // the turn button at 172 px
   const along = REMOTE ? 102 : flipInside ? 242 : 172;
   placeAlong(toolsBtn, along, front, gearCorner, true);
   placeAlong(watchBtn, along + 70, front, gearCorner, placeWatchers());
@@ -614,7 +617,7 @@ watchBtn.addEventListener("click", () => openWatchers());
  * hidden during a game), else one step toward the middle.
  */
 function placeFlip(playing, front, gearCorner) {
-  flipBtn.hidden = REMOTE || !playing;
+  flipBtn.hidden = REMOTE || !playing || anyFacing(); // a game played from all sides has the corner arrows (D-227)
   if (flipBtn.hidden) return;
   const leftEnd = gearCorner === FRONT_CORNERS[front][0];
   const along = leftEnd ? 32 : 172; // the gear is 102 px from its corner; the button is 58 px wide, with a 12 px gap
@@ -1016,7 +1019,8 @@ function render() {
   lastPhase = state.phase;
   const showingGame = playing || holdFinal;
   lobbyBtn.hidden = !playing;
-  const gameCorner = cornerClass(state.game?.lobbyButton ?? "bottom-right");
+  // Beside its corner when the corner arrows stay during the game (D-227), so both have room.
+  const gameCorner = `${cornerClass(state.game?.lobbyButton ?? "bottom-right")}${!REMOTE && anyFacing() ? " beside" : ""}`;
   lobbyBtn.className = gameCorner;
   // The way on from a game's last screen (D-216): Awards and Results when the game has them (their window's Done leads
   // to the results), else Show result straight to the results.
@@ -1030,7 +1034,7 @@ function render() {
 
   renderPause();
   renderAway();
-  renderCorners(showingGame && state.phase !== "paused");
+  renderCorners(showingGame && state.phase !== "paused" && !anyFacing());
   placeSettings(showingGame);
   seatsEl.hidden = showingGame;
   center.hidden = showingGame;

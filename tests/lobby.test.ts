@@ -211,6 +211,29 @@ describe("seats and orientation", () => {
     expect((await t.ok("POST", "/rotate", { degrees: 90 })).gameFacing).toBe("south"); // east + 90 = south
   });
 
+  it("a game played from all four edges faces wherever the table does, also during the game (D-227)", async () => {
+    const m = t.host.table.games.get("roulette")!.manifest;
+    m.facing = "any";
+    try {
+      await t.ok("POST", "/face", { edge: "north" });
+      let s = await t.ok("POST", "/game/select", { gameId: "roulette" });
+      expect(s.game.facing).toBe("any");
+      s = await t.ok("POST", "/face", { edge: "east" });
+      expect([s.frontEdge, s.gameFacing]).toEqual(["east", "east"]);
+      const a = await t.joinDeck("Ann");
+      await a.request("lobby", "ready", { ready: true });
+      await t.ok("POST", "/game/start");
+      s = await t.ok("POST", "/face", { edge: "west" });
+      expect([s.phase, s.gameFacing]).toEqual(["active", "west"]);
+    } finally {
+      m.facing = "north-south";
+    }
+    // A north/south game chosen next faces the last of the two again.
+    await t.ok("POST", "/game/end");
+    const s = await t.ok("POST", "/game/select", { gameId: "quartet" });
+    expect([s.game.facing, s.gameFacing]).toEqual(["north-south", "north"]);
+  });
+
   it("names the edge of every seat for each layout", async () => {
     expect((await t.ok("POST", "/layout", { seats: 8 })).seatEdges).toEqual(["south", "south", "south", "north", "north", "north", "east", "west"]);
     expect((await t.ok("POST", "/layout", { seats: 6 })).seatEdges).toEqual(["south", "south", "north", "north", "east", "west"]);

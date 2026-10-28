@@ -1638,3 +1638,13 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   option values as a button (`trader`; label and value on hover, cut short with an ellipsis when long): during a game it opens *How this AI player plays from its next move on*
   (the exchange window's form, now `editAiOptions`), before one the AI player's window. A remote board without board
   control shows the text only.
+- **D-227 · 2026-10-28 · Klaus** — A game played from all four edges keeps the lobby's corner arrows during the game,
+  and they face it toward any edge; it has no turn button, and its *Lobby* button moves beside its corner to make
+  room. *Why:* in a game with players on every edge (Traders, four players) each of them should be able to turn the
+  board to them in one tap, and the north/south turn button doesn't help the players on the sides. Games with a front
+  (Chess, Backgammon) keep north/south. *Implementation (Claude):* manifest `facing`: `north-south` (default) or
+  `any`. For `any` the table reports its facing, any of the four, as `gameFacing` (so `info.frontEdge` and the phones'
+  `boardEdge` follow); the board shows `#corners` during the game, hides the turn button, places Advanced as in the
+  lobby, and gives the Lobby, Show result and Awards buttons the class `beside` (102 px from the corner, along the
+  edge). The Duel test game uses it; `scripts/e2e/facing.py` checks the arrows, the missing turn button, that no
+  platform button covers another, and that the east arrow turns the game.
