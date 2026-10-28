@@ -1648,3 +1648,12 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   lobby, and gives the Lobby, Show result and Awards buttons the class `beside` (102 px from the corner, along the
   edge). The Duel test game uses it; `scripts/e2e/facing.py` checks the arrows, the missing turn button, that no
   platform button covers another, and that the east arrow turns the game.
+- **D-228 · 2026-10-28 · Klaus** — In the lobby every game tile is as tall as the tallest of all the games, on any
+  page, so paging through the games doesn't move the pager and the buttons below it.
+  *Why:* the tiles took the height of their own text (a description of up to three lines, a hint that may wrap), so a
+  page of short descriptions was lower and the pager jumped up or down while paging.
+  *Implementation (Claude):* after the lobby is drawn, `sizeTiles` lays out all games' tiles once, unseen, at the
+  grid's width, and sets the tallest as `--tile-min` (the tiles' `min-height`, at least 120 px as before). It measures
+  again only when the tiles' text or the width changes (games added or removed, a game's hint as players come and go,
+  a narrower remote board), not on every redraw. `scripts/e2e/play.py pages` pages through all games, before and after
+  a player sits down: one tile height, the pager in one place.
