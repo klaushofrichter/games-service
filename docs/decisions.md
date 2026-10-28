@@ -1657,3 +1657,9 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   again only when the tiles' text or the width changes (games added or removed, a game's hint as players come and go,
   a narrower remote board), not on every redraw. `scripts/e2e/play.py pages` pages through all games, before and after
   a player sits down: one tile height, the pager in one place.
+- **D-231 · 2026-10-29 · Klaus** — Games should offer 12 or more awards. The developer guide (section 8 and the
+  checklist) and the cookbook recommend it; the platform sets no limit and shows every award a game hands out.
+  *Why:* an award shows only when someone stands out, so a game with few has a thin end screen; today the games offer
+  between 0 and 15 (Roulette 15, Last Card 10, Chess and Loopy 8, Hold'em 7, Backgammon 6, Mexican Train and
+  Starforge 5, Coin Flip 4, Pachisi and Liar's Dice none). A display cap of 12 was considered and not taken. Which
+  games get more awards is decided per game later.

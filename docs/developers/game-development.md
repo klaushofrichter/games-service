@@ -317,6 +317,8 @@ What this means for a game:
 - **`awards`** (optional): the statistics window's trophies. `mostAward(base, scores, value?)` and
   `leastAward(base, scores, value?)` build one from `[{ seat, score }]` and return `null` when nobody stands out: one
   player or everyone tied, and for `mostAward` also a best score of 0 or less. The platform drops awards that nobody or every player holds.
+  **Offer 12 or more** (D-231): only those where someone stands out are shown, so a game needs many to have a few
+  for every player at the end. There is no limit; the window shows them all.
 - **The platform adds** each seat's final player (`players`), a moves-and-thinking-time table (`play`) read from the
   log, and two pace awards for people (*Quick Draw* and *Deep Thinker*; a game award with the id `quick-draw` or
   `deep-thinker` replaces the platform's). A seat another player took over during the game shows the last player's name
@@ -566,7 +568,7 @@ my-games/
 - [ ] Rules use only `ctx.random()`, `ctx.randomInt()` and `ctx.now()` for chance and time; no input state is mutated.
 - [ ] Every intent is checked (turn, phase, payload) and rejections have a sentence for people.
 - [ ] `view(state, seat)` holds no other seat's secrets; `boardView` holds nothing private.
-- [ ] `isOver` returns a summary with a readable `text`; `table` has the player's name first.
+- [ ] `isOver` returns a summary with a readable `text`; `table` has the player's name first; 12 or more awards.
 - [ ] Names kept in the state are updated in `onSeatChanged`; nothing about leaving, replacing or timeouts is
       implemented by the game.
 - [ ] AI players answer `null` quickly when it is not their turn and only read their view.
