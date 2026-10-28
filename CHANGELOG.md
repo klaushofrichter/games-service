@@ -9,6 +9,7 @@ history.
 ## [Unreleased]
 
 - The website lists Chess's AI engines: its own, Stockfish (via stockfish.online) and the Lichess cloud.
+- The console marks repositories added there "console" (kept across restarts, D-114), no longer "until restart", and every label in it explains itself on hover (D-225).
 - The board's messages name the developer settings as the board shows them, "Developer settings", not "Advanced › Developer".
 - The website mentions drag and drop in Chess and Backgammon, and Backgammon's wildbg AI players.
 - A game can show a notice under its AI players' options, e.g. an engine's licence (`ai.notice`, D-224).

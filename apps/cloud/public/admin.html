@@ -185,6 +185,13 @@ let mode = null;
 let token = (() => { try { return sessionStorage.getItem(KEY) || ""; } catch { return ""; } })();
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+// What each status pill means, as its tooltip.
+const TIPS = {
+  table: { pending: "Waiting for approval: approve its pairing code here, or it drops off after a while", approved: "Approved: the table uses the service", revoked: "Disconnected: the table can't use the service until an admin reconnects it" },
+  code: { active: "Can approve a table", expired: "Past its validity: approves no new table (a table already using it is marked separately)", revoked: "Revoked: approves no table" },
+  end: { finished: "The game ended by its rules", terminated: "Ended early, from the board (End game)", seatLeft: "Ended because a player left (tables before D-159)", interrupted: "The table stopped during the game; the log was closed at its next start" },
+};
+const pillTip = (kind, key) => (TIPS[kind]?.[key] ? ` title="${esc(TIPS[kind][key])}"` : "");
 const ago = (t) => { if (!t) return "never"; const s = Math.round((Date.now() - t) / 1000); return s < 60 ? `${s}s ago` : s < 3600 ? `${Math.round(s / 60)} min ago` : `${Math.round(s / 3600)} h ago`; };
 const size = (b) => (b > 1e9 ? `${(b / 1e9).toFixed(1)} GB` : b > 1e6 ? `${(b / 1e6).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1e3))} kB`);
 
@@ -235,7 +242,7 @@ function drawRepos(data) {
     const b = r.bundle;
     const games = b ? b.games.map((g) => `${esc(g.name)} <span class="faint">${esc(g.version)}</span>${r.clashes.includes(g.id) ? ` <span class="pill revoked" title="another repository has a game with this id">id clash</span>` : ""}`).join(", ") : `<span class="faint">none yet</span>`;
     return `<tr>
-      <td><div class="mono">${esc(r.repo)}<span class="faint">@${esc(r.ref)}</span> ${r.origin === "deploy" ? `<span class="pill approved" title="deploy/game-repos.json: back after every restart">deploy config</span>` : `<span class="pill pending" title="added here: gone at the next restart; add it to deploy/game-repos.json to keep it">until restart</span>`}</div><div class="faint">id ${esc(r.id)}${b ? ` · commit <span class="mono">${esc(b.commit)}</span> · bundle <span class="mono">${esc(b.hash.slice(0, 12))}</span> · ${size(b.bytes)}` : ""}</div>
+      <td><div class="mono">${esc(r.repo)}<span class="faint">@${esc(r.ref)}</span> ${r.origin === "deploy" ? `<span class="pill approved" title="deploy/game-repos.json: back after every restart">deploy config</span>` : `<span class="pill pending" title="added here: kept across restarts (D-114) until you remove it">console</span>`}</div><div class="faint">id ${esc(r.id)}${b ? ` · commit <span class="mono">${esc(b.commit)}</span> · bundle <span class="mono">${esc(b.hash.slice(0, 12))}</span> · ${size(b.bytes)}` : ""}</div>
         ${r.error ? `<div class="msg err" style="margin-top:4px">${esc(r.error)}${b ? " (tables keep the last good bundle)" : ""}</div>` : ""}</td>
       <td class="games">${games}</td>
       <td>${b ? ago(b.fetchedAt) : r.lastAttempt ? "failed" : "…"}</td>
@@ -270,7 +277,7 @@ async function refresh() {
       + storageTile(m.storage);
     $("#tables").innerHTML = tables.map((t) => `<tr class="${t.code?.pastValidity ? "flag" : ""}">
       <td><div>${esc(t.name)}</div><div class="mono faint">${esc(t.tableId)}</div></td>
-      <td><span class="pill ${t.status}">${t.status}</span>${t.status === "pending" ? ` <span class="mono">${esc(t.pairingCode)}</span>` : ""}${t.code?.pastValidity ? ` <span class="pill past" title="Its access code has run out; disconnect it if it should stop">code past validity</span>` : ""}</td>
+      <td><span class="pill ${t.status}"${pillTip("table", t.status)}>${t.status}</span>${t.status === "pending" ? ` <span class="mono">${esc(t.pairingCode)}</span>` : ""}${t.code?.pastValidity ? ` <span class="pill past" title="Its access code has run out; disconnect it if it should stop">code past validity</span>` : ""}</td>
       <td><span class="dot ${t.online ? "on" : ""}"></span>${t.online ? "online" : `last seen ${ago(t.lastSeen)}`}${presenceLine(t.presence)}</td>
       <td>${t.metrics.gamesPlayed ?? 0}</td>
       <td>${t.status === "pending" ? `<span class="faint">ticked when approving</span>`
@@ -330,9 +337,9 @@ function drawCodes(list) {
   $("#codes").innerHTML = codes.map(codeRow).join("") || `<tr><td colspan="6" class="faint">No access codes yet.</td></tr>`;
 }
 function codeRow(c) {
-  const state = c.pastValidity ? `<span class="pill past" title="Its table is still connected">past validity</span>` : `<span class="pill ${c.state === "active" ? "active" : c.state}">${c.state}</span>`;
+  const state = c.pastValidity ? `<span class="pill past" title="Its table is still connected">past validity</span>` : `<span class="pill ${c.state === "active" ? "active" : c.state}"${pillTip("code", c.state)}>${c.state}</span>`;
   const t = c.table;
-  const table = t ? `<div><span class="dot ${t.online ? "on" : ""}"></span>${esc(t.name)}${t.status !== "approved" ? ` <span class="pill ${t.status}">${t.status}</span>` : ""}</div><div class="faint" style="font-size:13px">since ${day(c.boundAt)}</div>` : `<span class="faint">not used yet</span>`;
+  const table = t ? `<div><span class="dot ${t.online ? "on" : ""}"></span>${esc(t.name)}${t.status !== "approved" ? ` <span class="pill ${t.status}"${pillTip("table", t.status)}>${t.status}</span>` : ""}</div><div class="faint" style="font-size:13px">since ${day(c.boundAt)}</div>` : `<span class="faint">not used yet</span>`;
   return `<tr class="${c.pastValidity ? "flag" : ""}" data-code-row="${esc(c.id)}">
     <td><div><span class="codehint">${esc(c.hint)}••-••••</span> ${state}</div><div>${esc(c.label) || `<span class="faint">no label</span>`}</div><div class="faint" style="font-size:12px">by ${esc(c.createdBy)}, ${day(c.createdAt)}</div></td>
     <td class="games">${scopeText(c.scope)}</td>
@@ -447,13 +454,13 @@ function drawLogs() {
       ? `${l.games ?? "?"} game${l.games === 1 ? "" : "s"}${l.players?.length ? `, ${l.players.length} AI players` : ""}`
       : (l.players ?? []).map((p) => esc(p.name) + (p.location === "remote" ? ` <span class="faint">(remote)</span>` : "")).join(", ");
     const ended = l.simulation && l.endReasons
-      ? Object.entries(l.endReasons).map(([r, n]) => `<span class="pill ${esc(r)}">${n} ${esc(REASONS[r] ?? r)}</span>`).join(" ")
-      : l.endReason ? `<span class="pill ${esc(l.endReason)}">${esc(REASONS[l.endReason] ?? l.endReason)}</span>` : "";
+      ? Object.entries(l.endReasons).map(([r, n]) => `<span class="pill ${esc(r)}"${pillTip("end", r)}>${n} ${esc(REASONS[r] ?? r)}</span>`).join(" ")
+      : l.endReason ? `<span class="pill ${esc(l.endReason)}"${pillTip("end", l.endReason)}>${esc(REASONS[l.endReason] ?? l.endReason)}</span>` : "";
     const flags = (l.verified === false ? ` <span class="pill bad" title="Replaying the log did not reach the state the game ended in: the rules are not deterministic, or the log is incomplete">does not replay</span>` : "")
       + (l.errors ? ` <span class="pill bad" title="Exceptions thrown by the game's code; the log has them">${l.errors} error${l.errors === 1 ? "" : "s"}</span>` : "");
     return `<tr>
       <td style="white-space:nowrap">${started ? `<div>${esc(started.toLocaleDateString())} ${esc(started.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }))}</div>` : `<div class="faint">uploaded ${ago(l.uploadedAt)}</div>`}<div class="mono faint sub">${esc(l.id)}</div></td>
-      <td>${esc(l.gameName || l.gameId)}${l.simulation ? ` <span class="pill">sim</span>` : ""}${l.gameVersion ? `<div class="faint sub">${esc(l.gameVersion)}${l.gameSource ? " · extra" : ""}</div>` : ""}</td>
+      <td>${esc(l.gameName || l.gameId)}${l.simulation ? ` <span class="pill" title="A simulation: AI players only, no board or phones">sim</span>` : ""}${l.gameVersion ? `<div class="faint sub">${esc(l.gameVersion)}${l.gameSource ? " · extra" : ""}</div>` : ""}</td>
       <td>${esc(tableNames.get(l.tableId) ?? l.tableName ?? "deleted table")}</td>
       <td style="font-size:14px">${players}</td>
       <td>${ended}${flags}${l.durationMs != null ? `<div class="faint sub">${esc(dur(l.durationMs))}</div>` : ""}</td>
