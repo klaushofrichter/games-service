@@ -82,7 +82,7 @@ A game is one folder; the folder name is the game's id (`a-z`, `0-9`, `-`).
 | `deck.js` | no | The phone UI module. Without it the phone shows the seat's view as JSON. |
 | `board.css`, `deck.css` | no | Styles; load them from the module with `useStyles("/games/<id>/board.css")`. |
 | `how-to-play.md` | yes, in practice | Rules for players, opened from **Rules** on every phone (section 11). |
-| `assets/` | no | Images, SVG, sounds, extra CSS or JS the UIs load, at `/games/<id>/assets/…` (`ctx.assetUrl(path)`). |
+| `assets/` | no | Images, SVG, sounds, extra CSS or JS the UIs load, at `/games/<id>/assets/…`. `ctx.assetUrl(path)` takes the path inside `assets/`: `assetUrl("img/hex.svg")` is `/games/<id>/assets/img/hex.svg` (not `assetUrl("assets/img/hex.svg")`). |
 
 The host serves exactly `board.js`, `deck.js`, their CSS, `how-to-play.md` and `assets/` to browsers, never `rules.ts` or the manifest. Built-in games import
 the SDK by path (`../../packages/sdk/src/index.ts`); games in other repositories import it by name
