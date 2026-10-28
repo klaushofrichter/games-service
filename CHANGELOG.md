@@ -8,6 +8,8 @@ history.
 
 ## [Unreleased]
 
+- A game can give its AI players a random play style when they are added (`"random": true` on an AI option), and the
+  board's settings window shows each AI player's style beside its name, with a tap to change it, also during a game (D-226).
 - The website lists Chess's AI engines: its own, Stockfish (via stockfish.online) and the Lichess cloud.
 - The console marks repositories added there "console" (kept across restarts, D-114), no longer "until restart", and every label in it explains itself on hover (D-225).
 - The board's messages name the developer settings as the board shows them, "Developer settings", not "Advanced › Developer".

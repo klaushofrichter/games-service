@@ -255,6 +255,15 @@ async function configureAi(playerId) {
   } else if (opts && g) act("POST", `/players/${playerId}/ai-options`, { options: opts });
 }
 
+/** How an AI player in the running game plays, from its next move on (D-159, D-226). */
+async function editAiOptions(playerId) {
+  const p = state.players.find((x) => x.id === playerId);
+  const g = games.find((q) => q.id === state.game?.id);
+  if (!p || !g) return;
+  const opts = await formDialog(`${p.name} · ${g.name}`, "How this AI player plays from its next move on.", g.aiOptions ?? [], p.aiOptions ?? {}, "Save", null, g.aiNotice);
+  if (opts) act("POST", `/players/${p.id}/ai-options`, { options: opts });
+}
+
 // ---------- orientation ----------
 // The table's board faces `frontEdge` (turned with the corner buttons, D-080). A remote player's copy instead
 // turns the whole surface so their own seat is at the bottom of their screen, and faces text to it.
@@ -700,9 +709,19 @@ function openSettings() {
           ? `<button class="pname" data-exchange="${esc(p.id)}" aria-label="Exchange ${esc(p.name)}">${label}<span class="chev" aria-hidden="true">›</span></button>`
           : `<span class="pname">${label}</span>`;
       };
+      // How each AI player plays in the chosen game (D-226), shown beside its name; a tap changes it (from its next move
+      // on during a game).
+      const g = games.find((x) => x.id === state.game?.id);
+      const aiStyle = (p) => {
+        if (p.kind !== "ai" || !g?.aiOptions?.length) return "";
+        const text = g.aiOptions.map((o) => `${o.label ?? o.key}: ${p.aiOptions?.[o.key] ?? o.default}`).join(" · ");
+        return !REMOTE || state.remote?.boardControl
+          ? `<button class="ai-style" data-ai-options="${esc(p.id)}" aria-label="How ${esc(p.name)} plays">${esc(text)}</button>`
+          : `<span class="ai-style faint">${esc(text)}</span>`;
+      };
       return `<div class="group player-colors"><div class="eyebrow">${inRunningGame() ? "Players" : "Player colours"}</div>
         ${manage ? `<div class="faint group-note">Tap a player's name to exchange them for someone at the table, a remote player or an AI player, or to change how an AI player plays.</div>` : ""}
-        ${seated.map((p) => `<div class="row">${name(p)}<span class="swatches">${SEAT_COLORS.map((c, i) =>
+        ${seated.map((p) => `<div class="row">${name(p)}${aiStyle(p)}<span class="swatches">${SEAT_COLORS.map((c, i) =>
           `<button class="swatch ${c === p.color ? "on" : ""}" style="--c:${c}" data-color-player="${esc(p.id)}" data-color="${c}" aria-label="${esc(p.name)}: colour ${i + 1}"></button>`).join("")}</span></div>`).join("")}
         <div class="faint" style="font-size:.7em;margin-top:6px">Picking a colour someone else has swaps the two.</div></div>`;
     };
@@ -762,6 +781,7 @@ function openSettings() {
     if (b.dataset.watcherRemove || b.dataset.watcherPlay) return void watcherAction(b);
     if (b.dataset.invite !== undefined) return void openInvite(b.dataset.invite === "watch"); // D-169
     if (b.dataset.exchange) return void openExchange(b.dataset.exchange);
+    if (b.dataset.aiOptions) return void (inRunningGame() ? editAiOptions(b.dataset.aiOptions) : configureAi(b.dataset.aiOptions));
     if (b.dataset.setting) {
       const f = gameFields().find((x) => x.key === b.dataset.setting);
       if (!f) return;
@@ -1388,10 +1408,8 @@ function openExchange(playerId) {
     if (!kind) return;
     const cur = state.players.find((q) => q.seat === seat) ?? first;
     if (kind === "ai-options") {
-      const g = games.find((q) => q.id === state.game?.id);
-      const opts = await formDialog(`${cur.name} · ${g?.name ?? ""}`, "How this AI player plays from its next move on.", g?.aiOptions ?? [], cur.aiOptions ?? {}, "Save", null, g?.aiNotice);
-      if (opts) act("POST", `/players/${cur.id}/ai-options`, { options: opts });
-      return close();
+      close();
+      return void editAiOptions(cur.id);
     }
     // The last player at the table (D-223): without one, the next game starts only with the developer setting "Games
     // without a player at the table", so the board says so, and switches it on with the exchange.
