@@ -6,7 +6,7 @@
   -> the table's board shows the game, marked "extra"
   -> a remote player, through an invite, sees it on their board too, chooses it and plays it with a local phone
   -> unticking the repository on the table's row removes the game; ticking brings it back
-  -> a repository added in the console ("until restart") serves the table instead, and Remove takes the game away
+  -> a repository added in the console (marked "console", kept across restarts, D-114) serves the table instead, and Remove takes the game away
 
 Starts its own fake GitHub, cloud service (development sign-in with ADMIN_TOKEN) and table host.
   python3 scripts/e2e/extra.py out/
@@ -198,7 +198,10 @@ try:
         console.click("#repo-form button")
         console.wait_for_selector("#repos >> text=extra-games@main")
         added = console.locator("#repos tr", has_text="extra-games@main")
-        assert "until restart" in added.inner_text(), added.inner_text()
+        assert added.locator(".pill").first.inner_text() == "console", added.inner_text()
+        # Every label in the console says what it means on hover.
+        bare = console.evaluate("() => [...document.querySelectorAll('.pill')].filter((p) => !p.title).map((p) => p.textContent)")
+        assert bare == [], f"console labels without a tooltip: {bare}"
         console.uncheck("[data-table-repos] input[value=extra-games]")
         console.check("[data-table-repos] input[value=extra-games-2]")
         wait(lambda: "dice-duel" in table_games() and console.locator("[data-table-repos] input[value=extra-games]:not(:checked)").count(), 20, "the game from the console-added repository")

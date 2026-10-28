@@ -1619,3 +1619,10 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   are configured in the lobby and where an AI player's options are changed during a game. *Why:* Backgammon's
   strongest AI players use wildbg's networks (extra-games E-039), and their credit and licence belong where the
   strength is chosen. Older tables ignore the field.
+
+- **D-225 · 2026-10-28 · Klaus** — Every label in the console explains itself on hover. A repository added in the
+  console is marked *console*, not *until restart*: since D-114 it is kept across restarts, until removed.
+  *Why:* the *until restart* label (from D-098) was wrong after D-114, and the status labels (table, access code,
+  how a game ended, *sim*) had no explanation.
+  *Implementation (Claude):* `admin.html` keeps the meanings in `TIPS` and adds them as `title` with `pillTip`;
+  `scripts/e2e/extra.py` checks the new label and that no label in the console is without a tooltip.
