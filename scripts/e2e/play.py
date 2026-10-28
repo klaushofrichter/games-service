@@ -714,6 +714,37 @@ def tabs(browser, board):
     return [d]
 
 
+@scenario
+def pages(browser, board):
+    """D-228: every game tile in the lobby is as tall as the tallest of all games, so paging through the games doesn't
+    move the pager; again after a player sits down (the tiles' hints change, so the tiles are measured again)."""
+    def walk(label):
+        board.wait_for_selector(".pager")
+        while board.locator(".pager button[data-page='-1']:not([disabled])").count():
+            board.click(".pager button[data-page='-1']")
+        seen = []
+        while True:
+            board.wait_for_timeout(150)
+            heights = board.evaluate("() => [...document.querySelectorAll('.games .tile')].map((t) => t.offsetHeight)")
+            pager = board.evaluate("() => document.querySelector('.pager').offsetTop")
+            seen.append((heights, pager))
+            if not board.locator(".pager button[data-page='1']:not([disabled])").count():
+                break
+            board.click(".pager button[data-page='1']")
+        tiles = {h for hs, _ in seen for h in hs}
+        pagers = {p for _, p in seen}
+        assert len(seen) > 1, f"{label}: only one page of games"
+        assert len(tiles) == 1, f"{label}: tiles of different heights {sorted(tiles)}"
+        assert len(pagers) == 1, f"{label}: the pager moves between pages ({sorted(pagers)})"
+        return tiles.pop()
+    walk("empty table")
+    shot(board, "pages")
+    d = join(browser, "Klaus")
+    board.wait_for_timeout(400)
+    walk("a player at the table")
+    return [d]
+
+
 def main():
     with sync_playwright() as p:
         browser = p.chromium.launch()
