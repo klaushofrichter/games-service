@@ -126,11 +126,12 @@ the SDK by path (`../../packages/sdk/src/index.ts`); games in other repositories
 | `localSeat` | Optional edge for a single person at the table when everyone else is remote or AI (they are moved there at the start). For games whose board has a front, like chess. |
 | `dynamicPlayers` | `true`: people who join during a game get a free seat and `onSeatJoined` is called. Default `false`: newcomers wait for the next game. |
 | `settings` | Game options set on the board before the start: `{ key, type: "int" \| "number" \| "string" \| "bool" \| "enum", min?, max?, step?, values?, default?, label? }`. The rules get them in `setup`. |
-| `ai` | `{ supported, options, timeoutSeconds = 20 (1–600), worker = false, hostConfig = [], notice? }`. `options` uses the settings format (e.g. a play style); each AI player has its own values. `notice` (up to 600 characters, plain text, `https://` links become links) shows under the AI player's options on the board: credit and licence for an engine the AI uses (D-224). Section 7. |
+| `ai` | `{ supported, options, timeoutSeconds = 20 (1–600), worker = false, hostConfig = [], notice? }`. `options` uses the settings format (e.g. a play style), plus `random: true` on an enum to give each new AI player a random value (D-226); each AI player has its own values, shown beside its name in the board's settings. `notice` (up to 600 characters, plain text, `https://` links become links) shows under the AI player's options on the board: credit and licence for an engine the AI uses (D-224). Section 7. |
 | `simulation` | `{ supported, headless }`: AI-only games for testing, without a board. |
 | `boardIntents` | Intent names players may also send by touching the board (section 9). |
 | `skipTimers` | Timer ids the board may fire early, e.g. a pause after a hand (section 9). |
 | `lobbyButton` | Corner of the board's *Lobby* button during the game: `top-left`, `top-right`, `bottom-left`, `bottom-right` (default). |
+| `facing` | `north-south` (default): a running game faces north or south, the turn button flips it. `any`: for games played from all four edges; the lobby's corner arrows stay during the game and face it toward any edge, there is no turn button, and the *Lobby* button sits beside its corner (D-227). |
 | `viewer` | `{ columns: [{ key, label }] }`: up to four extra columns in the Game Viewer, filled by `describe` (section 12). |
 | `remoteBoardControl`, `saveGame`, `deck`, `permissions`, `seatConstraints`, `test` | Rarely needed; see the schema. `test: true` hides a game unless the table shows test games. |
 
@@ -246,7 +247,7 @@ The platform owns everything about players. A game must not reimplement any of t
 | The board exchanges a player (Settings › Players › tap the name, **Exchange …** on the away card, the in-game Lobby) | For anyone, away or connected: a person at the table (a QR code for this seat), a remote player (an invite; only with a remote place free), a watcher or an AI player (in games with AI players; for a seat an AI already plays, its options change instead) takes the seat, with its colour. Whoever had it goes; their phone is told, and a remote player's browser keeps watching. One exchange is open at a time; a new one replaces it, and it ends with the game. | `onSeatChanged(state, { seat, playerId, name, kind })`. |
 | Every seat is taken | Nobody else joins: phones with the join code, + AI player and player invites are refused with the reason. During a game the way in is an exchange; someone remote can still come as a watcher. | — |
 | Someone remote watches | They see the board only, take no seat and have no phone page; remote players and watchers together use at most the table's remote places (4 by default). | Nothing. |
-| An AI player's options change during the game | From its next move. | Nothing (options reach `ai()` as its `options`). |
+| An AI player's options change during the game (Settings › Players, its options beside its name, or the exchange window) | From its next move. | Nothing (options reach `ai()` as its `options`). |
 | Removing a player during a game | **Not possible.** The game always has the same players' seats. | — |
 | A timeout that hands a seat to an AI | **Does not exist.** Replacing a player is always a choice made at the table. | — |
 | The table loses its service connection, or an AI runs over its time | The game pauses (timers stop, nobody moves) and resumes by itself or from the board. | Nothing. |
@@ -350,12 +351,15 @@ export function settings({ info, setPrefs }) { return []; } // optional: items f
 - **The surface** is 1920 × 1080 logical pixels, scaled to the screen; `root` covers it. Seats sit around the edges
   (`info.seatPositions`), so keep the middle for the game and the edges for seat plates (`seatPlates()` draws them
   with names, colours and whose turn it is).
-- **Facing:** a game on the table's board faces `north` or `south` (the turn button switches); remote boards turn to
+- **Facing:** a game on the table's board faces `north` or `south` (the turn button switches), or any of the four
+  edges with `"facing": "any"` (the corner arrows, D-227); remote boards turn to
   their player. Draw for `info.frontEdge` / `info.rotation` (degrees: south 0, west 90, north 180, east −90). Text
   should face the reader it is for.
 - **Platform buttons:** the gear, the turn button, the *Advanced* button and (while anyone watches) the watchers'
   eye sit along the bottom edge from the bottom-left corner, up to about 300 px (from the bottom-right when
-  `lobbyButton` is bottom-left); the *Lobby* button is in the manifest's `lobbyButton` corner. Keep those clear.
+  `lobbyButton` is bottom-left); the *Lobby* button is in the manifest's `lobbyButton` corner. With `"facing": "any"`
+  the four corner arrows (58 px, 32 px from each corner) stay too, and the *Lobby* button sits beside its corner,
+  about 100–220 px along the edge. Keep those clear.
 - **`update(view, events, info)`** is called with every change (and when `info` changes, with `events` empty). Make
   it cheap and idempotent: redraw from `view`, animate only `events` you have not shown yet.
 - **`whenIdle()`** (strongly recommended if you animate): resolve when every event sent so far has been shown. The

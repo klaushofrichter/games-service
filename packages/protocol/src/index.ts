@@ -134,6 +134,12 @@ export const manifestSchema = z.object({
    */
   skipTimers: z.array(z.string().regex(/^[A-Za-z][\w-]{0,39}$/)).max(10).default([]),
   lobbyButton: z.enum(["top-left", "top-right", "bottom-left", "bottom-right"]).default("bottom-right"),
+  /**
+   * Which way a running game may face on the table's board (D-227): `north-south` (the turn button flips between the
+   * two, D-101) or `any`, for games played from all four edges: the lobby's corner arrows stay during the game and face
+   * it toward any edge, without the turn button, and the Lobby button moves beside its corner to make room.
+   */
+  facing: z.enum(["north-south", "any"]).default("north-south"),
   deck: z.object({ minWidth: z.number().optional(), orientation: z.string().optional() }).optional(),
   permissions: z.array(z.string()).default([]),
   /**
@@ -219,10 +225,11 @@ export interface LobbyState {
   seatEdges: Edge[];
   frontEdge: Edge;
   /**
-   * The edge a game faces on the table's board (D-151): north or south only (D-101), the last of the two the table
-   * faced. Turning the lobby east or west leaves it. Phones use it to show the board the way their player sees it.
+   * The edge a game faces on the table's board (D-151): north or south (D-101), the last of the two the table faced;
+   * turning the lobby east or west leaves it. For a game with `facing: "any"` (D-227) it is the table's facing, any of
+   * the four. Phones use it to show the board the way their player sees it.
    */
-  gameFacing: "north" | "south";
+  gameFacing: Edge;
   players: PlayerInfo[];
   phase: Phase;
   game: {
@@ -231,6 +238,8 @@ export interface LobbyState {
     version: string;
     settings: Record<string, unknown>;
     lobbyButton: string;
+    /** The manifest's `facing` (D-227): `any` keeps the corner arrows during the game. */
+    facing: "north-south" | "any";
     edges: Edge[];
     /** Player counts the game accepts. */
     players: number[];
