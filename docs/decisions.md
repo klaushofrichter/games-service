@@ -1626,3 +1626,15 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   how a game ended, *sim*) had no explanation.
   *Implementation (Claude):* `admin.html` keeps the meanings in `TIPS` and adds them as `title` with `pillTip`;
   `scripts/e2e/extra.py` checks the new label and that no label in the console is without a tooltip.
+- **D-226 · 2026-10-28 · Klaus** — An AI player's play style may be picked at random when it is added, and the
+  board's settings window shows how each AI player plays, beside its name, with a tap to change it, also during a
+  game. *Why:* a game with several AI characters: a table should meet a mix of them without anyone choosing, see which
+  one is which, and change one during the game without going through the exchange window.
+  *Implementation (Claude):* an AI option in the manifest may say `"random": true` (protocol `aiOptionSchema`); the
+  table gives a new AI player a random one of its `values` when it is added with the game chosen, when the game is
+  chosen, and on an exchange to an AI player (`pickRandomAiOptions`), and keeps it on the player, so the lobby, the
+  settings and the log show it and choosing the game again doesn't change it. Simulations use the default unless the
+  request gives options, so runs stay comparable. In the settings window's players, an AI player's row shows its
+  option values as a button (`trader`; label and value on hover, cut short with an ellipsis when long): during a game it opens *How this AI player plays from its next move on*
+  (the exchange window's form, now `editAiOptions`), before one the AI player's window. A remote board without board
+  control shows the text only.
