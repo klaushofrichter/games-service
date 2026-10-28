@@ -186,9 +186,10 @@ where a player acts, unless moves are made by touching the board (`boardIntents`
 ### Awards
 
 The end of a game opens the statistics window with awards: who did the most (or the least) of something. They make
-the end a story. Use `mostAward` and `leastAward`; an award shows only when someone stands out.
+the end a story. Use `mostAward` and `leastAward`; an award shows only when someone stands out, so offer 12 or more
+(D-231): then every game ends with a few, ideally one for each player.
 
-> Invent five awards for this game that would make people laugh at the end, and add them.
+> Invent twelve awards for this game that would make people laugh at the end, and add them.
 
 (Guide: *The end of a game*.)
 
