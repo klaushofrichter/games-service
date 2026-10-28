@@ -473,6 +473,8 @@ button.copy:hover, button.copy.done { color: var(--brass); border-color: var(--b
 .player-colors button.pname:hover, .player-colors button.pname:focus-visible { color: var(--brass); text-decoration-color: currentColor; }
 .player-colors button.pname .chev { margin-left: .4em; color: var(--brass); }
 .player-colors .swatches { margin-left: auto; }
+.player-colors .ai-style { margin-left: 12px; font-size: .8em; padding: 6px 14px; white-space: nowrap; max-width: 14em; min-width: 0; flex: 0 100 auto; overflow: hidden; text-overflow: ellipsis; }
+.player-colors span.ai-style { padding: 0; }
 .player-colors .group-note { font-size: .7em; margin: 2px 0 6px; }
 .overlay.exchange .exchange-panel { width: 640px; }
 .overlay.exchange h2 .pdot { width: 18px; height: 18px; margin-right: 12px; vertical-align: middle; }

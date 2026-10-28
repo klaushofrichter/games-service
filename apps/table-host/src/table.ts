@@ -965,6 +965,7 @@ export class Table extends EventEmitter {
     const target = seat ?? free[0];
     if (target === undefined || !free.includes(target)) throw new TableError(409, "no free seat");
     const p: Player = { id: newId("ai"), name: this.aiName(), kind: "ai", location: "local", seat: target, connected: true, ready: true, sessionToken: null, aiSeed: randomInt(2 ** 31) };
+    if (m) pickRandomAiOptions(m, p);
     this.players.set(p.id, p);
     if (this.phase === "ready") this.revalidateSelection();
     this.changed();
@@ -1329,7 +1330,7 @@ export class Table extends EventEmitter {
       // "Ann (AI)", the old name cut to fit twelve characters with the mark (D-148), unless taken.
       const base = current ? `${Array.from(current.name).slice(0, MAX_NAME - 5).join("").trim()} (AI)` : "";
       const name = base && !this.nameTaken(base) ? base : this.aiName();
-      const ai: Player = { id: newId("ai"), name, kind: "ai", location: "local", seat: null, connected: true, ready: true, sessionToken: null, aiSeed: randomInt(2 ** 31), aiOptions: aiDefaults(game.manifest, {}), ...(current?.kind === "human" ? { standsInFor: current.name } : {}) };
+      const ai: Player = { id: newId("ai"), name, kind: "ai", location: "local", seat: null, connected: true, ready: true, sessionToken: null, aiSeed: randomInt(2 ** 31), aiOptions: aiDefaults(game.manifest, pickRandomAiOptions(game.manifest, {} as { aiOptions?: Record<string, unknown> }).aiOptions), ...(current?.kind === "human" ? { standsInFor: current.name } : {}) };
       this.players.set(ai.id, ai);
       this.takeSeat(ai, seat);
       return { playerId: ai.id };
@@ -1475,6 +1476,7 @@ export class Table extends EventEmitter {
     this.placeLocalPlayer(g.manifest); // and the one player at the table on the game's edge (D-128b)
     this.summary = null;
     for (const p of this.players.values()) p.ready = p.kind === "ai";
+    for (const p of this.players.values()) if (p.kind === "ai") pickRandomAiOptions(g.manifest, p); // D-226
     this.phase = "ready";
     this.changed();
   }
@@ -2054,6 +2056,20 @@ const AI_NAMES = [
   "Anna", "Bea", "Cleo", "Emma", "Ida", "Lena", "Lisa", "Mia", "Nora", "Rosa", "Sara", "Zoe",
   "Ben", "Bob", "Finn", "Jack", "Leo", "Max", "Noah", "Otto", "Paul", "Sam", "Tom", "Theo",
 ];
+
+/**
+ * Options the manifest marks `random` (D-226) that this AI player doesn't have yet get a random value, kept on the
+ * player, so the board shows it and it stays until changed. Returns the player.
+ */
+export function pickRandomAiOptions<P extends { aiOptions?: Record<string, unknown> }>(m: InstalledGame["manifest"], p: P): P {
+  for (const o of m.ai.options) {
+    if (!o.random || !o.values?.length) continue;
+    const v = p.aiOptions?.[o.key];
+    if (v !== undefined && o.values.includes(String(v))) continue;
+    p.aiOptions = { ...(p.aiOptions ?? {}), [o.key]: o.values[randomInt(o.values.length)] };
+  }
+  return p;
+}
 
 /** AI options with manifest defaults; a seat's own choices (setAiOptions, the board's AI window) win where valid. */
 export function aiDefaults(m: InstalledGame["manifest"], given: Record<string, unknown> = {}): Record<string, unknown> {

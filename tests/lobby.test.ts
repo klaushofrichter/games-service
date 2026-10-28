@@ -562,6 +562,45 @@ describe("AI configuration", () => {
     // The AIs keep playing meanwhile, so the note need not be the log's last entry (D-213).
     expect(t.host.table.runtime!.log.findLast((e: any) => e.t === "aiOptions")).toMatchObject({ t: "aiOptions", seat: seatOf(ai2), aiOptions: { style: "erratic" } });
   });
+
+  it("an option marked random gives each AI player a random value, kept and shown, and changed as any (D-226)", async () => {
+    const style = t.host.table.games.get("roulette")!.manifest.ai.options[0];
+    style.random = true;
+    try {
+      const a = await t.joinDeck("Ann");
+      // Added before the game is chosen: the choice picks it; added after: at once.
+      const { playerId: early } = await t.ok("POST", "/ai", {});
+      expect((await t.ok("GET", "/state")).players.find((p: any) => p.id === early).aiOptions).toBeUndefined();
+      await t.ok("POST", "/game/select", { gameId: "roulette" });
+      const { playerId: late } = await t.ok("POST", "/ai", {});
+      const s = await t.ok("GET", "/state");
+      const styleOf = (id: string) => s.players.find((p: any) => p.id === id).aiOptions?.style;
+      for (const id of [early, late]) expect(style.values).toContain(styleOf(id));
+      // Choosing the game again keeps what they have.
+      const before = [styleOf(early), styleOf(late)];
+      await t.ok("POST", "/game/select", { gameId: "roulette" });
+      const again = await t.ok("GET", "/state");
+      expect([early, late].map((id) => again.players.find((p: any) => p.id === id).aiOptions.style)).toEqual(before);
+      // It is random: over many new AI players, more than one value comes up.
+      const seen = new Set<string>();
+      for (let k = 0; k < 24 && seen.size < 2; k++) {
+        const { playerId } = await t.ok("POST", "/ai", {});
+        seen.add((await t.ok("GET", "/state")).players.find((p: any) => p.id === playerId).aiOptions.style);
+        await t.ok("DELETE", `/players/${playerId}`);
+      }
+      expect(seen.size).toBeGreaterThan(1);
+      // The game gets the picked value; it can be changed as any option.
+      await t.ok("POST", `/players/${late}/ai-options`, { options: { style: "erratic" } });
+      await a.request("lobby", "ready", { ready: true });
+      await t.ok("POST", "/game/start");
+      const seatOf = (id: string) => s.players.find((p: any) => p.id === id).seat;
+      const start = t.host.table.runtime!.log[0] as any;
+      expect(start.aiOptions[seatOf(early)]).toEqual({ style: before[0] });
+      expect(start.aiOptions[seatOf(late)]).toEqual({ style: "erratic" });
+    } finally {
+      delete style.random;
+    }
+  });
 });
 
 describe("game display prefs (D-088)", () => {

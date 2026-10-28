@@ -285,7 +285,11 @@ What this means for a game:
 - **Errors:** if `ai()` throws or its worker fails, the platform plays `aiFallback()` at once (nothing without one); a
   rejected AI intent is asked for once more after a pause.
 - **Options** come from `ai.options` in the manifest, per AI player, e.g. `{ "key": "style", "type": "enum", "values":
-  ["cautious", "bold"], "default": "cautious", "label": "Play style" }`.
+  ["cautious", "bold"], "default": "cautious", "label": "Play style" }`. With `"random": true` (an enum with
+  `values`), each new AI player gets one of the values at random instead of the default, picked by the table when the
+  AI player comes to a table with the game chosen (or the game is chosen) and kept until changed (D-226); simulations
+  still use the default unless given. The board's settings window shows every AI player's option values beside its name (label and value on hover);
+  a tap changes them, during a game from the AI's next move on.
 - **Pace:** the platform pauses about 0.8 s before an AI acts (`AI_DELAY_MS`), lets it move only once the table's
   board has shown everything so far (section 9), and phones get an AI's move once the board has shown it. Do not add
   artificial delays in `ai()`; let the board stage moves.

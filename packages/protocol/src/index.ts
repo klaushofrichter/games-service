@@ -61,6 +61,15 @@ const settingSchema = z.object({
   step: z.number().positive().optional(),
 });
 
+/** An AI player's option (play style, level): a setting that may also be picked at random (D-226). */
+const aiOptionSchema = settingSchema.extend({
+  /**
+   * A new AI player gets one of `values` at random instead of `default` (D-226): the table picks it when the AI player
+   * joins a table with the game chosen (or the game is chosen), keeps it, and shows it; it can be changed as any option.
+   */
+  random: z.boolean().optional(),
+});
+
 export const manifestSchema = z.object({
   id: z.string().regex(/^[a-z0-9-]+$/),
   name: z.string(),
@@ -95,7 +104,7 @@ export const manifestSchema = z.object({
   ai: z
     .object({
       supported: z.boolean(),
-      options: z.array(settingSchema).default([]),
+      options: z.array(aiOptionSchema).default([]),
       hostConfig: z.array(z.unknown()).default([]),
       /**
        * Time an AI player may think about one move before the game pauses and the board offers "Play now" (D-112).
