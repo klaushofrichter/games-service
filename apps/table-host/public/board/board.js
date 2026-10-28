@@ -714,10 +714,13 @@ function openSettings() {
       const g = games.find((x) => x.id === state.game?.id);
       const aiStyle = (p) => {
         if (p.kind !== "ai" || !g?.aiOptions?.length) return "";
-        const text = g.aiOptions.map((o) => `${o.label ?? o.key}: ${p.aiOptions?.[o.key] ?? o.default}`).join(" · ");
+        // The values on the row (labels can be long, e.g. "Strength (Elo, approximate)"); label and value on hover.
+        const value = (o) => p.aiOptions?.[o.key] ?? o.default;
+        const text = g.aiOptions.map(value).join(" · ");
+        const full = g.aiOptions.map((o) => `${o.label ?? o.key}: ${value(o)}`).join(" · ");
         return !REMOTE || state.remote?.boardControl
-          ? `<button class="ai-style" data-ai-options="${esc(p.id)}" aria-label="How ${esc(p.name)} plays">${esc(text)}</button>`
-          : `<span class="ai-style faint">${esc(text)}</span>`;
+          ? `<button class="ai-style" data-ai-options="${esc(p.id)}" title="${esc(full)}" aria-label="How ${esc(p.name)} plays: ${esc(full)}">${esc(text)}</button>`
+          : `<span class="ai-style faint" title="${esc(full)}">${esc(text)}</span>`;
       };
       return `<div class="group player-colors"><div class="eyebrow">${inRunningGame() ? "Players" : "Player colours"}</div>
         ${manage ? `<div class="faint group-note">Tap a player's name to exchange them for someone at the table, a remote player or an AI player, or to change how an AI player plays.</div>` : ""}

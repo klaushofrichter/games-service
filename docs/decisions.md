@@ -1635,6 +1635,6 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   chosen, and on an exchange to an AI player (`pickRandomAiOptions`), and keeps it on the player, so the lobby, the
   settings and the log show it and choosing the game again doesn't change it. Simulations use the default unless the
   request gives options, so runs stay comparable. In the settings window's players, an AI player's row shows its
-  options (`Style: trader`) as a button: during a game it opens *How this AI player plays from its next move on*
+  option values as a button (`trader`; label and value on hover, cut short with an ellipsis when long): during a game it opens *How this AI player plays from its next move on*
   (the exchange window's form, now `editAiOptions`), before one the AI player's window. A remote board without board
   control shows the text only.

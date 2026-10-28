@@ -2057,7 +2057,6 @@ const AI_NAMES = [
   "Ben", "Bob", "Finn", "Jack", "Leo", "Max", "Noah", "Otto", "Paul", "Sam", "Tom", "Theo",
 ];
 
-/** AI options with manifest defaults; a seat's own choices (setAiOptions, the board's AI window) win where valid. */
 /**
  * Options the manifest marks `random` (D-226) that this AI player doesn't have yet get a random value, kept on the
  * player, so the board shows it and it stays until changed. Returns the player.
@@ -2072,6 +2071,7 @@ export function pickRandomAiOptions<P extends { aiOptions?: Record<string, unkno
   return p;
 }
 
+/** AI options with manifest defaults; a seat's own choices (setAiOptions, the board's AI window) win where valid. */
 export function aiDefaults(m: InstalledGame["manifest"], given: Record<string, unknown> = {}): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const o of m.ai.options) {

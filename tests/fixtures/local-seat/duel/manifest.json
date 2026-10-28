@@ -3,7 +3,7 @@
   "name": "Duel",
   "version": "1.0.0",
   "sdk": "^0.1",
-  "description": "Test game for localSeat (D-128b) and the board's settings window (D-129b): two players, the one at the table sits south; a setting with five choices and one with two.",
+  "description": "Test game for localSeat (D-128b) and the board's settings window (D-129b): two players, the one at the table sits south; a setting with five choices and one with two. AI options with long labels, like Chess's, for the settings' players rows (D-226).",
   "players": [
     2
   ],
@@ -18,7 +18,32 @@
   "localSeat": "south",
   "ai": {
     "supported": true,
-    "options": []
+    "options": [
+      {
+        "key": "engine",
+        "type": "enum",
+        "values": [
+          "own engine",
+          "online engine"
+        ],
+        "default": "own engine",
+        "label": "Engine (online ones fall back to the own engine)",
+        "random": true
+      },
+      {
+        "key": "strength",
+        "type": "enum",
+        "values": [
+          "800",
+          "1200",
+          "1600",
+          "2000",
+          "2400"
+        ],
+        "default": "1600",
+        "label": "Strength (Elo, approximate)"
+      }
+    ]
   },
   "test": true,
   "settings": [
