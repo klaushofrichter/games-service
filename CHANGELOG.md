@@ -8,6 +8,8 @@ history.
 
 ## [Unreleased]
 
+- A game played from all four edges (`"facing": "any"`) keeps the corner arrows during the game to face any edge,
+  without the turn button; its Lobby button moves beside the corner (D-227).
 - A game can give its AI players a random play style when they are added (`"random": true` on an AI option), and the
   board's settings window shows each AI player's style beside its name, with a tap to change it, also during a game (D-226).
 - The website lists Chess's AI engines: its own, Stockfish (via stockfish.online) and the Lichess cloud.

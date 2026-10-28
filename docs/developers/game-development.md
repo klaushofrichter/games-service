@@ -131,6 +131,7 @@ the SDK by path (`../../packages/sdk/src/index.ts`); games in other repositories
 | `boardIntents` | Intent names players may also send by touching the board (section 9). |
 | `skipTimers` | Timer ids the board may fire early, e.g. a pause after a hand (section 9). |
 | `lobbyButton` | Corner of the board's *Lobby* button during the game: `top-left`, `top-right`, `bottom-left`, `bottom-right` (default). |
+| `facing` | `north-south` (default): a running game faces north or south, the turn button flips it. `any`: for games played from all four edges; the lobby's corner arrows stay during the game and face it toward any edge, there is no turn button, and the *Lobby* button sits beside its corner (D-227). |
 | `viewer` | `{ columns: [{ key, label }] }`: up to four extra columns in the Game Viewer, filled by `describe` (section 12). |
 | `remoteBoardControl`, `saveGame`, `deck`, `permissions`, `seatConstraints`, `test` | Rarely needed; see the schema. `test: true` hides a game unless the table shows test games. |
 
@@ -350,12 +351,15 @@ export function settings({ info, setPrefs }) { return []; } // optional: items f
 - **The surface** is 1920 × 1080 logical pixels, scaled to the screen; `root` covers it. Seats sit around the edges
   (`info.seatPositions`), so keep the middle for the game and the edges for seat plates (`seatPlates()` draws them
   with names, colours and whose turn it is).
-- **Facing:** a game on the table's board faces `north` or `south` (the turn button switches); remote boards turn to
+- **Facing:** a game on the table's board faces `north` or `south` (the turn button switches), or any of the four
+  edges with `"facing": "any"` (the corner arrows, D-227); remote boards turn to
   their player. Draw for `info.frontEdge` / `info.rotation` (degrees: south 0, west 90, north 180, east −90). Text
   should face the reader it is for.
 - **Platform buttons:** the gear, the turn button, the *Advanced* button and (while anyone watches) the watchers'
   eye sit along the bottom edge from the bottom-left corner, up to about 300 px (from the bottom-right when
-  `lobbyButton` is bottom-left); the *Lobby* button is in the manifest's `lobbyButton` corner. Keep those clear.
+  `lobbyButton` is bottom-left); the *Lobby* button is in the manifest's `lobbyButton` corner. With `"facing": "any"`
+  the four corner arrows (58 px, 32 px from each corner) stay too, and the *Lobby* button sits beside its corner,
+  about 100–220 px along the edge. Keep those clear.
 - **`update(view, events, info)`** is called with every change (and when `info` changes, with `events` empty). Make
   it cheap and idempotent: redraw from `view`, animate only `events` you have not shown yet.
 - **`whenIdle()`** (strongly recommended if you animate): resolve when every event sent so far has been shown. The

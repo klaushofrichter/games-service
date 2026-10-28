@@ -192,7 +192,8 @@ export class Table extends EventEmitter {
       layout: this.layout,
       seatEdges: seatEdges(this.layout),
       frontEdge: this.frontEdge,
-      gameFacing: this.gameFacing,
+      // A game played from all four edges faces wherever the table does (D-227).
+      gameFacing: this.selected?.game.manifest.facing === "any" ? this.frontEdge : this.gameFacing,
       players: this.playerInfos(),
       phase: this.phase,
       game: this.selected
@@ -202,6 +203,7 @@ export class Table extends EventEmitter {
             version: this.selected.game.manifest.version,
             settings: this.selected.settings,
             lobbyButton: this.selected.game.manifest.lobbyButton,
+            facing: this.selected.game.manifest.facing,
             edges: this.selected.game.manifest.edges,
             players: allowedPlayerCounts(this.selected.game.manifest),
             needs: this.needsFor(this.selected.game.manifest),
