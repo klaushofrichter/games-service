@@ -386,7 +386,10 @@ function renderSeats() {
 
 // A tap anywhere but a seat, the selected player's buttons or a window deselects the selected player (D-230).
 document.addEventListener("click", (e) => {
-  if (!selectedPlayer || e.target.closest?.(".seat, .toolbar.selected, [data-config], [data-remove], .overlay, .dialog-backdrop")) return;
+  if (!selectedPlayer) return;
+  // Only in the lobby: a selection left over from it never redraws a running game (D-230).
+  if (!lobbyPhase()) return void (selectedPlayer = null);
+  if (e.target.closest?.(".seat, .toolbar.selected, [data-config], [data-remove], .overlay, .dialog-backdrop")) return;
   selectedPlayer = null;
   render();
 });

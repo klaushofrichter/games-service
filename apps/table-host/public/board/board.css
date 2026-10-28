@@ -217,7 +217,7 @@ pre.raw { font-family: var(--mono); font-size: 0.7em; color: var(--ink-soft); ba
 .overlay .panel {
   width: min(760px, 92vw); max-height: 88vh; overflow: auto;
   background: var(--felt); border: 1px solid var(--brass-deep); border-radius: 18px; padding: 26px 30px;
-  /* A panel that scrolls keeps its scrollbar inside the rounded corners (D-228). */
+  /* A panel that scrolls keeps its scrollbar inside the rounded corners (D-229). */
   clip-path: inset(0 round 18px); scrollbar-width: thin; scrollbar-color: var(--brass-deep) transparent;
 }
 .overlay h2 { font-family: var(--display); margin: 0 0 14px; }
@@ -428,7 +428,7 @@ button.copy:hover, button.copy.done { color: var(--brass); border-color: var(--b
 #lobby-button.turned, #result-button.turned, #stats-button.turned { transform: rotate(180deg); }
 #lobby-button.turned:active, #result-button.turned:active, #stats-button.turned:active { transform: rotate(180deg) scale(0.97); }
 .overlay.statistics { z-index: 42; }
-/* Head fixed, the rest scrolls inside, so the scrollbar stays clear of the rounded corners (D-228). */
+/* Head fixed, the rest scrolls inside, so the scrollbar stays clear of the rounded corners (D-229). */
 .overlay .panel.stats-panel { width: min(1100px, 92vw); max-height: 88vh; padding: 0; display: flex; flex-direction: column; overflow: hidden; }
 .overlay .panel.stats-panel.sideways { width: min(1100px, 88vh); max-height: 92vw; }
 .stats-head { flex: none; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 16px 28px 12px; background: var(--felt); border-bottom: 1px solid var(--felt-line); }

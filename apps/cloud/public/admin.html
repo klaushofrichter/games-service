@@ -195,10 +195,11 @@ const pillTip = (kind, key) => (TIPS[kind]?.[key] ? ` title="${esc(TIPS[kind][ke
 const ago = (t) => { if (!t) return "never"; const s = Math.round((Date.now() - t) / 1000); return s < 60 ? `${s}s ago` : s < 3600 ? `${Math.round(s / 60)} min ago` : `${Math.round(s / 3600)} h ago`; };
 const size = (b) => (b > 1e9 ? `${(b / 1e9).toFixed(1)} GB` : b > 1e6 ? `${(b / 1e6).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1e3))} kB`);
 
-async function api(method, path, body) {
+/** `timeoutMs`: give up after that long; the error then has the name "TimeoutError". */
+async function api(method, path, body, timeoutMs) {
   const headers = { "content-type": "application/json" };
   if (mode === "token") headers.authorization = `Bearer ${token}`;
-  const r = await fetch(path, { method, headers, body: body ? JSON.stringify(body) : undefined });
+  const r = await fetch(path, { method, headers, body: body ? JSON.stringify(body) : undefined, ...(timeoutMs ? { signal: AbortSignal.timeout(timeoutMs) } : {}) });
   if (r.status === 401) {
     if (mode === "google") { location.href = "/"; throw new Error("Your session ended. Please sign in again."); }
     signOut(); throw new Error("Signed out: the token was not accepted");
@@ -209,6 +210,14 @@ async function api(method, path, body) {
   return data;
 }
 function msg(id, text, ok) { const el = $(id); el.textContent = text; el.className = `msg ${ok ? "ok" : "err"}`; }
+
+// A repository's fetch from GitHub (Refresh, Add) takes a few seconds. Its Refresh stays disabled until the answer
+// comes, through the 10-second redraws, so it can't start twice; after 30 s without one the console gives up, says
+// so, and Refresh works again (the service gives up on GitHub itself after 60 s) (D-232).
+const REPO_FETCH_MS = 30_000;
+const repoBusy = new Set();
+const repoFetchError = (err, what) =>
+  err.name === "TimeoutError" ? `${what} didn't finish in ${REPO_FETCH_MS / 1000} s (GitHub may be unreachable); try again.` : err.message;
 
 function signOut() {
   // Google: the server clears the cookie and lands on the public page (200, with a Sign in link).
@@ -246,7 +255,7 @@ function drawRepos(data) {
         ${r.error ? `<div class="msg err" style="margin-top:4px">${esc(r.error)}${b ? " (tables keep the last good bundle)" : ""}</div>` : ""}</td>
       <td class="games">${games}</td>
       <td>${b ? ago(b.fetchedAt) : r.lastAttempt ? "failed" : "…"}</td>
-      <td style="text-align:right;white-space:nowrap"><button data-repo-refresh="${esc(r.id)}">Refresh</button> ${r.origin === "deploy" ? "" : `<button class="danger" data-repo-remove="${esc(r.id)}">Remove</button>`}</td></tr>`;
+      <td style="text-align:right;white-space:nowrap"><button data-repo-refresh="${esc(r.id)}" ${repoBusy.has(r.id) ? "disabled" : ""}>${repoBusy.has(r.id) ? "Refreshing…" : "Refresh"}</button> ${r.origin === "deploy" ? "" : `<button class="danger" data-repo-remove="${esc(r.id)}">Remove</button>`}</td></tr>`;
   }).join("") || `<tr><td colspan="4" class="faint">No repositories yet.</td></tr>`;
   // The approval checkboxes are redrawn only when the list changes, so the 10-second refresh keeps what is ticked.
   const key = repos.map((r) => r.id).join(",");
@@ -541,19 +550,26 @@ $("#repo-form").addEventListener("submit", async (e) => {
   const repo = $("#repo-name").value.trim(), ref = $("#repo-ref").value.trim();
   msg("#repo-msg", "Fetching…", true);
   try {
-    const r = await api("POST", "/admin/api/repos", { repo, ref: ref || undefined });
+    const r = await api("POST", "/admin/api/repos", { repo, ref: ref || undefined }, REPO_FETCH_MS);
     if (r.error) msg("#repo-msg", `Added, but the fetch failed: ${r.error}`);
     else msg("#repo-msg", `Added ${r.repo} with ${r.bundle.games.length} game${r.bundle.games.length === 1 ? "" : "s"}.`, true);
     $("#repo-name").value = ""; $("#repo-ref").value = ""; refresh();
-  } catch (err) { msg("#repo-msg", err.message); }
+  } catch (err) { msg("#repo-msg", repoFetchError(err, `Fetching ${repo}`)); refresh(); }
 });
 
 document.addEventListener("click", async (e) => {
   const b = e.target.closest("button"); if (!b) return;
   if (b.dataset.repoRefresh) {
+    const id = b.dataset.repoRefresh;
+    if (repoBusy.has(id)) return;
+    repoBusy.add(id);
     b.disabled = true;
-    try { const r = await api("POST", `/admin/api/repos/${encodeURIComponent(b.dataset.repoRefresh)}/refresh`); r.error ? msg("#repo-msg", r.error) : msg("#repo-msg", `${r.repo} is at commit ${r.bundle.commit}.`, true); refresh(); }
-    catch (err) { msg("#repo-msg", err.message); } finally { b.disabled = false; }
+    b.textContent = "Refreshing…";
+    try {
+      const r = await api("POST", `/admin/api/repos/${encodeURIComponent(id)}/refresh`, undefined, REPO_FETCH_MS);
+      r.error ? msg("#repo-msg", r.error) : msg("#repo-msg", `${r.repo} is at commit ${r.bundle.commit}.`, true);
+    } catch (err) { msg("#repo-msg", repoFetchError(err, `Repository discovery for ${id}`)); }
+    finally { repoBusy.delete(id); refresh(); }
   }
   if (b.dataset.repoRemove && confirm(`Remove ${b.dataset.repoRemove}? Tables lose its games at their next heartbeat.`)) {
     try { await api("DELETE", `/admin/api/repos/${encodeURIComponent(b.dataset.repoRemove)}`); msg("#repo-msg", "Removed.", true); refresh(); } catch (err) { msg("#repo-msg", err.message); }
