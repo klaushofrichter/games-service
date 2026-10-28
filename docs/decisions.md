@@ -1640,7 +1640,7 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   control shows the text only.
 - **D-227 · 2026-10-28 · Klaus** — A game played from all four edges keeps the lobby's corner arrows during the game,
   and they face it toward any edge; it has no turn button, and its *Lobby* button moves beside its corner to make
-  room. *Why:* in a game with players on every edge (Traders, four players) each of them should be able to turn the
+  room. *Why:* in a game with players on every edge (four players around the table) each of them should be able to turn the
   board to them in one tap, and the north/south turn button doesn't help the players on the sides. Games with a front
   (Chess, Backgammon) keep north/south. *Implementation (Claude):* manifest `facing`: `north-south` (default) or
   `any`. For `any` the table reports its facing, any of the four, as `gameFacing` (so `info.frontEdge` and the phones'
