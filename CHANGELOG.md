@@ -8,6 +8,7 @@ history.
 
 ## [Unreleased]
 
+- The console's Refresh for a game repository stays disabled while it fetches, and after 30 s without an answer says so and works again (D-232).
 - The lobby's game tiles are all as tall as the tallest game, so paging through the games no longer moves the pager (D-228).
 - A game played from all four edges (`"facing": "any"`) keeps the corner arrows during the game to face any edge,
   without the turn button; its Lobby button moves beside the corner (D-227).

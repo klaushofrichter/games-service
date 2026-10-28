@@ -1663,3 +1663,13 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   between 0 and 15 (Roulette 15, Last Card 10, Chess and Loopy 8, Hold'em 7, Backgammon 6, Mexican Train and
   Starforge 5, Coin Flip 4, Pachisi and Liar's Dice none). A display cap of 12 was considered and not taken. Which
   games get more awards is decided per game later.
+- **D-232 · 2026-10-29 · Klaus** — In the console, a repository's *Refresh* is disabled ("Refreshing…") from the click
+  until the answer comes, so a double click starts one fetch. After 30 s without an answer (GitHub unreachable, for
+  instance) the console stops waiting, says "Repository discovery for … didn't finish in 30 s (GitHub may be
+  unreachable); try again", and *Refresh* works again; an error from the service shows the same way at once, and the
+  next successful refresh replaces the message. *Add* waits at most 30 s the same way.
+  *Implementation (Claude):* `admin.html` keeps the repositories being fetched in `repoBusy`, so the console's
+  10-second redraw keeps their button disabled, and its `api()` takes a time-out (`AbortSignal.timeout`). The service
+  already shares one fetch per repository and gives up on GitHub after 60 s. `scripts/e2e/extra.py` lets its fake
+  GitHub hang: a double click makes one request, the button stays disabled through a redraw, the message comes after
+  30 s with *Refresh* usable, and the next refresh succeeds.

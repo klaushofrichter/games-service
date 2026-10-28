@@ -41,6 +41,10 @@ def tarball(sha):
     return buf.getvalue()
 
 
+attempts = []  # every authorised tarball request, including ones the fake GitHub leaves hanging
+hang = {"on": False}
+
+
 class FakeGitHub(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
         m = re.match(r"^/repos/klaushofrichter/extra-games/tarball/(production|main)$", self.path)
@@ -49,6 +53,9 @@ class FakeGitHub(http.server.BaseHTTPRequestHandler):
             self.send_response(404)
             self.end_headers()
             return self.wfile.write(b'{"message":"Not Found"}')
+        attempts.append(time.time())
+        if hang["on"]:
+            time.sleep(45)  # GitHub not answering: the console gives up after 30 s (D-232), the service after 60 s
         fetches.append(time.time())
         body = tarball("e2e0001")
         self.send_response(200)
@@ -192,7 +199,7 @@ try:
         shot(board, "local-board-played")
         t("POST", "/game/close")
 
-        # ----- a repository added in the console lasts until the restart, and Remove takes it away -----
+        # ----- a repository added in the console is kept (D-114) until Remove takes it away -----
         console.fill("#repo-name", "klaushofrichter/extra-games")
         console.fill("#repo-ref", "main")
         console.click("#repo-form button")
@@ -211,6 +218,24 @@ try:
         console.wait_for_selector("#repos >> text=extra-games@production")
         assert console.locator("#repos >> text=extra-games@main").count() == 0
         shot(console, "console-removed")
+
+        # ----- D-232: Refresh is disabled while the fetch runs; after 30 s without an answer it says so, and works again -----
+        hang["on"] = True
+        n0 = len(attempts)
+        refresh_btn = console.locator("button[data-repo-refresh=extra-games]")
+        refresh_btn.dblclick()
+        console.wait_for_selector("button[data-repo-refresh=extra-games]:disabled >> text=Refreshing…")
+        time.sleep(12)  # through the console's 10-second redraw
+        assert refresh_btn.is_disabled() and refresh_btn.inner_text() == "Refreshing…", "Refresh came back during the fetch"
+        console.wait_for_selector("#repo-msg.err >> text=didn't finish in 30 s", timeout=30000)
+        assert "GitHub may be unreachable" in console.inner_text("#repo-msg")
+        assert not refresh_btn.is_disabled() and refresh_btn.inner_text() == "Refresh", "Refresh stayed disabled after the time-out"
+        assert len(attempts) - n0 == 1, f"a double click started {len(attempts) - n0} fetches"
+        shot(console, "console-refresh-timeout")
+        hang["on"] = False
+        time.sleep(15)  # the hanging fetch finishes on the service (it shares one fetch per repository)
+        refresh_btn.click()
+        console.wait_for_selector("#repo-msg.ok >> text=is at commit", timeout=30000)
         b.close()
 finally:
     host.terminate()
