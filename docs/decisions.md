@@ -1684,4 +1684,10 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   *Done*: it closes the window and shows the game's last screen again, with *Awards and Results* still in its corner;
   *Done* still leads to the results in the lobby (D-216). Opened elsewhere (the results page, the Game Viewer), the
   window has only *Done*, as before.
-
+- **D-234 · 2026-10-29 · Klaus** — In the lobby, an AI player's seat plate shows how it plays after *Ready*, on the same
+  line: the values of the chosen game's AI options, such as a play style or a strength ("Ready · trader", Chess's
+  "Ready · own engine · 1200"). *Why:* the table should see which AI player is which character or strength before the
+  game starts, without opening the settings. *Implementation (Claude):* the same text as the settings window's
+  players (D-226), from one helper (`aiPlays` in `board.js`), with each option's label and value on hover; a long
+  value is cut short with an ellipsis inside the plate. A game without AI options shows *Ready* only.
+  `scripts/e2e/ai_style.py` checks the plates.
