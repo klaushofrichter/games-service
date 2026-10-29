@@ -253,6 +253,11 @@ async function configureAi(playerId) {
       act("DELETE", `/players/${playerId}`);
     }
   } else if (opts && g) act("POST", `/players/${playerId}/ai-options`, { options: opts });
+  // However the window was left, the AI player is no longer selected (D-230).
+  if (selectedPlayer === playerId) {
+    selectedPlayer = null;
+    render();
+  }
 }
 
 /** How an AI player in the running game plays, from its next move on (D-159, D-226). */
@@ -378,6 +383,16 @@ function renderSeats() {
     seatsEl.appendChild(el);
   });
 }
+
+// A tap anywhere but a seat, the selected player's buttons or a window deselects the selected player (D-230).
+document.addEventListener("click", (e) => {
+  if (!selectedPlayer) return;
+  // Only in the lobby: a selection left over from it never redraws a running game (D-230).
+  if (!lobbyPhase()) return void (selectedPlayer = null);
+  if (e.target.closest?.(".seat, .toolbar.selected, [data-config], [data-remove], .overlay, .dialog-backdrop")) return;
+  selectedPlayer = null;
+  render();
+});
 
 function onSeatTap(seat, pl) {
   if (selectedPlayer && (!pl || pl.id !== selectedPlayer)) {

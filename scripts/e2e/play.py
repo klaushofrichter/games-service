@@ -336,6 +336,10 @@ def coinflip(browser, board):
     shot(board, "held-final")
     board.click("#stats-button")
     board.wait_for_selector(".overlay.statistics .stats-panel")
+    # D-229: the window itself doesn't scroll (its scrollbar crossed the rounded corners); its inner body does.
+    over = board.evaluate("""() => { const p = document.querySelector('.stats-panel'); const b = p.querySelector('.stats-body');
+      return [getComputedStyle(p).overflowY, b && getComputedStyle(b).overflowY, !!p.querySelector('.stats-head [data-close-stats]')]; }""")
+    assert over == ["hidden", "auto", True], f"Awards and Results scrolling: {over}"
     board.click(".overlay.statistics [data-close-stats]")
     board.wait_for_selector(".summary-table >> text=Heads %")
     decks[0].wait_for_selector(".summary-table >> text=Klaus")
@@ -519,8 +523,15 @@ def dialogs(browser, board):
     st = api("GET", "/state")
     assert next(p for p in st["players"] if p["id"] == ai)["aiOptions"] == {"style": "aggressive"}
     shot(board, "ready-with-ai")
-    # D-103: the AI player's window removes it (after a confirmation); Cancel there keeps it. The seat is still
-    # selected from before, so its Configure button is still there.
+    # D-230: leaving the AI player's window deselects it; so does a tap beside the seats.
+    assert board.locator("#seats .seat.selected").count() == 0, "the AI player stayed selected after its window"
+    board.locator(".seat").nth(seat).click()
+    board.wait_for_selector("#seats .seat.selected")
+    board.locator("#center .main .eyebrow").first.click()
+    time.sleep(0.2)
+    assert board.locator("#seats .seat.selected").count() == 0, "a tap beside the seats kept the selection"
+    # D-103: the AI player's window removes it (after a confirmation); Cancel there keeps it.
+    board.locator(".seat").nth(seat).click()
     board.click(f"[data-config='{ai}']")
     board.wait_for_selector(".dialog.form [data-x=remove]")
     shot(board, "ai-dialog-remove")
@@ -529,6 +540,7 @@ def dialogs(browser, board):
     board.click(".dialog [data-x=no]")
     time.sleep(0.3)
     assert any(p["id"] == ai for p in api("GET", "/state")["players"]), "cancelling must keep the AI player"
+    board.locator(".seat").nth(seat).click()
     board.click(f"[data-config='{ai}']")
     board.click(".dialog.form [data-x=remove]")
     board.click(".dialog:not(.form) [data-x=yes]")
