@@ -340,6 +340,12 @@ def coinflip(browser, board):
     over = board.evaluate("""() => { const p = document.querySelector('.stats-panel'); const b = p.querySelector('.stats-body');
       return [getComputedStyle(p).overflowY, b && getComputedStyle(b).overflowY, !!p.querySelector('.stats-head [data-close-stats]')]; }""")
     assert over == ["hidden", "auto", True], f"Awards and Results scrolling: {over}"
+    # D-233: Back to game shows the last screen again, its way on still in the corner.
+    board.click(".overlay.statistics [data-back-stats]")
+    board.wait_for_selector(".overlay.statistics", state="detached")
+    assert board.locator("#stats-button:not([hidden])").count() == 1, "Back to game left no way on"
+    board.click("#stats-button")
+    board.wait_for_selector(".overlay.statistics .stats-panel")
     board.click(".overlay.statistics [data-close-stats]")
     board.wait_for_selector(".summary-table >> text=Heads %")
     decks[0].wait_for_selector(".summary-table >> text=Klaus")

@@ -8,6 +8,7 @@ history.
 
 ## [Unreleased]
 
+- Awards and Results, opened from a game's last screen, has *Back to game* beside *Done*: it shows the game's last screen again (D-233).
 - Awards and Results scrolls inside its rounded corners: its head stays, the rest scrolls; every board window keeps its scrollbar inside its corners (D-229).
 - In the lobby, a tap beside the seats deselects the selected player, and so does leaving an AI player's Configure window (D-230).
 - The console's Refresh for a game repository stays disabled while it fetches, and after 30 s without an answer says so and works again (D-232).

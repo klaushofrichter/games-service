@@ -477,12 +477,13 @@ function settleFinal() {
 }
 /**
  * The statistics window (D-140): it faces the board's front edge; at the table it can be turned to any edge. Opened
- * from a game's last screen it is the way on (D-216): its Done leads to the results in the lobby, as Show result did.
+ * from a game's last screen it is the way on (D-216): its Done leads to the results in the lobby, as Show result did;
+ * its Back to game shows that last screen again, with Awards and Results still in the corner (D-233).
  */
 function showStatistics(fromEnd = false) {
   if (!state?.summary || overlayRoot.querySelector(".overlay.statistics")) return;
   const onClose = fromEnd ? () => ((holdFinal = false), render()) : undefined;
-  openStatistics({ summary: state.summary, gameName: state.game?.name, overlayRoot, edge: overlayEdge(), turnable: !REMOTE, onClose });
+  openStatistics({ summary: state.summary, gameName: state.game?.name, overlayRoot, edge: overlayEdge(), turnable: !REMOTE, onClose, backToGame: fromEnd });
 }
 statsBtn.addEventListener("click", () => showStatistics(true));
 resultBtn.addEventListener("click", () => {
