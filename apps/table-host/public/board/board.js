@@ -351,6 +351,15 @@ if (window.ResizeObserver) new ResizeObserver(fit).observe(document.documentElem
 fit();
 
 // ---------- seats ----------
+// How an AI player plays in the chosen game (D-226): its option values ("trader", "own engine · 1200"), and with each
+// label for a hover ("Play style: trader"). Null for a person, or a game without AI options.
+function aiPlays(p) {
+  const g = games.find((x) => x.id === state.game?.id);
+  if (p?.kind !== "ai" || !g?.aiOptions?.length) return null;
+  const value = (o) => p.aiOptions?.[o.key] ?? o.default;
+  return { text: g.aiOptions.map(value).join(" · "), full: g.aiOptions.map((o) => `${o.label ?? o.key}: ${value(o)}`).join(" · ") };
+}
+
 function renderSeats() {
   const pos = seatPositions(state.seatEdges);
   const playing = inRunningGame();
@@ -370,12 +379,14 @@ function renderSeats() {
     el.style.left = `${p.x}px`;
     el.style.top = `${p.y}px`;
     el.style.transform = `translate(-50%, -50%) rotate(${p.rot}deg)`;
+    // An AI player's style or strength follows "Ready" on the same line (D-234).
+    const plays = aiPlays(pl);
     const status = !pl
       ? "Open seat"
       : !pl.connected
         ? "Reconnecting…"
         : state.phase === "ready" // AI players are always ready, and show it like everyone else (D-089)
-          ? `<span class="dot"></span>${pl.ready ? "Ready" : "Not ready"}`
+          ? `<span class="dot"></span>${pl.ready ? "Ready" : "Not ready"}${plays ? `<span class="ai-plays" title="${esc(plays.full)}">${esc(plays.text)}</span>` : ""}`
           : pl.kind === "ai" ? `AI player${pl.aiOptions ? ` · ${esc(Object.values(pl.aiOptions).join(", "))}` : ""}` : pl.location === "remote" ? "Remote" : "";
     el.innerHTML = `<div class="num">${esc(seatName(state.seatEdges, seat))}</div>
       <div class="name${pl && [...pl.name].length > 12 ? " long" : ""}">${pl ? `<span class="pdot" aria-hidden="true"></span>${esc(pl.name)}` : "—"}</div><div class="status">${status}</div>`;
@@ -730,13 +741,11 @@ function openSettings() {
       };
       // How each AI player plays in the chosen game (D-226), shown beside its name; a tap changes it (from its next move
       // on during a game).
-      const g = games.find((x) => x.id === state.game?.id);
       const aiStyle = (p) => {
-        if (p.kind !== "ai" || !g?.aiOptions?.length) return "";
         // The values on the row (labels can be long, e.g. "Strength (Elo, approximate)"); label and value on hover.
-        const value = (o) => p.aiOptions?.[o.key] ?? o.default;
-        const text = g.aiOptions.map(value).join(" · ");
-        const full = g.aiOptions.map((o) => `${o.label ?? o.key}: ${value(o)}`).join(" · ");
+        const plays = aiPlays(p);
+        if (!plays) return "";
+        const { text, full } = plays;
         return !REMOTE || state.remote?.boardControl
           ? `<button class="ai-style" data-ai-options="${esc(p.id)}" title="${esc(full)}" aria-label="How ${esc(p.name)} plays: ${esc(full)}">${esc(text)}</button>`
           : `<span class="ai-style faint" title="${esc(full)}">${esc(text)}</span>`;
