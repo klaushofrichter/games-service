@@ -24,7 +24,7 @@ function table(t, cls) {
  * Open the window. `edge` is the edge it first faces; `turnable` shows the S/N/W/E buttons that turn it to another
  * edge (the board at the table; a remote board faces its own player). Returns the overlay element.
  */
-export function openStatistics({ summary, gameName, overlayRoot, edge = "south", turnable = false, onClose }) {
+export function openStatistics({ summary, gameName, overlayRoot, edge = "south", turnable = false, onClose, backToGame = false }) {
   const o = document.createElement("div");
   o.className = "overlay statistics";
   // A seat another player took over shows the last player's name with * (D-159), explained under the window.
@@ -47,7 +47,7 @@ export function openStatistics({ summary, gameName, overlayRoot, edge = "south",
     ? `<div class="stats-turn" role="group" aria-label="Turn the window"><span>Turn to</span>${EDGES.map(([e, l]) => `<button type="button" data-face="${e}" aria-label="Turn to the ${e} edge">${l}</button>`).join("")}</div>`
     : "";
   o.innerHTML = `<div class="panel stats-panel" role="dialog" aria-modal="true" aria-label="Awards and Results">
-    <div class="stats-head"><h2>${esc(gameName ?? "Game")} · Awards and Results</h2>${turn}<button type="button" class="primary" data-close-stats>Done</button></div>
+    <div class="stats-head"><h2>${esc(gameName ?? "Game")} · Awards and Results</h2>${turn}${backToGame ? `<button type="button" data-back-stats>Back to game</button>` : ""}<button type="button" class="primary" data-close-stats>Done</button></div>
     <div class="stats-body"><p class="stats-result">${esc(summary.text ?? "")}</p>
     <h4>Awards</h4>${awardsHtml}
     ${summary.table ? `<h4>Statistics</h4>${table(summary.table, "game")}` : ""}
@@ -69,6 +69,8 @@ export function openStatistics({ summary, gameName, overlayRoot, edge = "south",
   o.addEventListener("click", (e) => {
     const b = e.target.closest("button");
     if (e.target === o || b?.dataset.closeStats !== undefined) return close();
+    // Opened from a game's last screen: back to that screen, which keeps its way on (D-233).
+    if (b?.dataset.backStats !== undefined) return void o.remove();
     if (b?.dataset.face) face(b.dataset.face);
   });
   overlayRoot.appendChild(o);

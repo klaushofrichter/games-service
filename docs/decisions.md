@@ -1680,3 +1680,8 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   already shares one fetch per repository and gives up on GitHub after 60 s. `scripts/e2e/extra.py` lets its fake
   GitHub hang: a double click makes one request, the button stays disabled through a redraw, the message comes after
   30 s with *Refresh* usable, and the next refresh succeeds.
+- **D-233 · 2026-10-29 · Klaus** — Awards and Results opened from a game's last screen has **Back to game** beside
+  *Done*: it closes the window and shows the game's last screen again, with *Awards and Results* still in its corner;
+  *Done* still leads to the results in the lobby (D-216). Opened elsewhere (the results page, the Game Viewer), the
+  window has only *Done*, as before.
+
