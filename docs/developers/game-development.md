@@ -385,6 +385,37 @@ export function settings({ info, setPrefs }) { return []; } // optional: items f
   and rebuilding big SVG or DOM trees per frame; split static and moving layers, update only what changed, and move
   pieces with transforms or the Web Animations API (one animation along the whole path, not a step per frame).
 
+### Badges on seat plates
+
+A **badge** is a small tab on a player's seat plate that names something lasting about that player: *Winner* at the
+end, and later perhaps *Dealer*, *Leader* or *Last round*. It is a convention, not platform code yet (D-235): a game
+that wants one draws it on its own seat plates, following these rules, so every game's badges look and behave alike.
+The platform will take it over (an option of `seatPlates()`) once a second game needs one.
+
+- **Where:** on the plate's top edge (the edge toward the middle of the board), near its right end: 22 px from the
+  right, sticking out 18 px above the plate. It belongs to the plate, so it turns with it and faces the player.
+- **How it looks:** one word, with a small inline SVG icon before it if it helps (a trophy for *Winner*); 13 px bold
+  system font, dark ink (`#1b1407`) on a filled tab; top corners rounded 10 px, bottom 4 px; a small shadow. Gold
+  (`#ffd23f`) is for *Winner* only; other badges use the brass of the board's titles or the player's own colour.
+- **At most one** per plate. If two apply, show the one that matters more now.
+- **From the view, not from events:** draw it from the board view (for example the winner's seat in the final view),
+  so a reloaded board, a remote board and the game's last screen show it too.
+- **Keep clear of it:** anything the game draws near a seat plate (boxes, scores, logs) stays at least 6 px from where
+  a badge would be, in every facing, also on plates that don't carry one yet. Test it by putting a badge on every plate
+  and checking for overlaps in each facing.
+- **Not on the lobby's plates:** badges are part of a game, and the lobby's seat plates are the platform's.
+
+```css
+/* A badge: inside the plate (position: absolute), so it turns with it. */
+.my-badge { position: absolute; top: -18px; right: 22px; display: flex; align-items: center; gap: 5px;
+  padding: 3px 10px 2px; border-radius: 10px 10px 4px 4px; background: #ffd23f; color: #1b1407;
+  font: 700 13px system-ui, sans-serif; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5); }
+.my-badge svg { width: 15px; height: 15px; }
+```
+
+With `seatPlates(layer, info, extra)`, return the badge from `extra(seat)`: `.kit-plate` is positioned, so the badge
+places itself on the plate.
+
 ### `info` on the board
 
 | Field | Meaning |

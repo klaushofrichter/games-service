@@ -66,7 +66,8 @@ buttons turn them to north, east, south or west (D-080). In code: `seatEdges(lay
 | --- | --- | --- | --- |
 | **Player** | Anyone with a seat in the lobby or a game: a person at the table, a remote player or an AI player. | `players`, `PlayerInfo` | user |
 | **Seat** | A place at the table, on an edge (2, 4, 6 or 8 per layout). A player takes a seat; a game's rules know players by seat number. | `seat`, `seats` | position, slot |
-| **Seat plate** | The box on the board with a player's name, colour and status, at their seat; games may restyle it. | `seatPlates()`, `.kit-plate` (in a game), `.seat` (in the lobby) | player box, name tag, badge |
+| **Seat plate** | The box on the board with a player's name, colour and status, at their seat; games may restyle it. | `seatPlates()`, `.kit-plate` (in a game), `.seat` (in the lobby) | player box, name tag |
+| **Badge** | A small tab on a seat plate's top edge naming something lasting about that player, such as *Winner*; a convention games follow, not platform code yet (developer guide, *Badges on seat plates*; D-235). | — | label, tag, ribbon |
 | **AI player** | A seat played by the game's AI, shown as "(AI)". | `kind: "ai"` | bot, CPU, computer |
 | **AI options** | How one AI player plays: a play style, a strength, an engine, as the game's manifest offers. Each AI player has its own; a game may have one picked at random for each new AI player (D-226). Shown and changed beside its name in the board's settings, also during a game. | `ai.options`, `aiOptions` | AI settings, difficulty (unless the game calls it that) |
 | **Remote player** | A person who plays from elsewhere, through an invite: the remote board in their browser and their deck beside it. | `location: "remote"` | online player, guest |
