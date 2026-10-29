@@ -8,6 +8,7 @@ history.
 
 ## [Unreleased]
 
+- Developer guide: *Badges on seat plates*, the convention for a tab such as *Winner* on a player's seat plate, and the cookbook's request for it (D-235).
 - In the lobby, an AI player's seat plate shows its play style or strength after *Ready*, on the same line (D-234).
 - Awards and Results, opened from a game's last screen, has *Back to game* beside *Done*: it shows the game's last screen again (D-233).
 - Awards and Results scrolls inside its rounded corners: its head stays, the rest scrolls; every board window keeps its scrollbar inside its corners (D-229).

@@ -193,6 +193,18 @@ the end a story. Use `mostAward` and `leastAward`; an award shows only when some
 
 (Guide: *The end of a game*.)
 
+### Badges
+
+A badge is a small tab on a player's seat plate: *Winner* when the game ends, and whatever else a game wants to mark
+about a player for a while. Every game draws them the same way (D-235), so ask for one in these words:
+
+> Read https://games.skylar.technology/llms.txt, then the developer guide's *Badges on seat plates*. When the game
+> ends, give the winner's seat plate a **Winner** badge with a trophy, as the guide describes: on the plate's top
+> edge near its right end, gold, drawn from the final board view. Make sure nothing the game draws near the seat
+> plates overlaps a badge on any plate, in any facing, and add a browser check for it.
+
+(Guide: *The board UI › Badges on seat plates*.)
+
 ### Player placement
 
 - `players` (how many), `seatLayouts` (2, 4, 6 or 8 seats) and `edges` (which edges of the table may have seats).

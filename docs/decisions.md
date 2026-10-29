@@ -1691,3 +1691,10 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   players (D-226), from one helper (`aiPlays` in `board.js`), with each option's label and value on hover; a long
   value is cut short with an ellipsis inside the plate. A game without AI options shows *Ready* only.
   `scripts/e2e/ai_style.py` checks the plates.
+- **D-235 · 2026-10-29 · Klaus** — **Badges** are a general idea for games: a small tab on a seat plate naming
+  something lasting about that player, *Winner* first. For now it is a convention in the developer guide (*Badges on
+  seat plates*: where, how it looks, from the view, keeping clear of it), with no common code until a second game
+  uses one; then the platform draws them (an option of `seatPlates()`). The cookbook has the request to give a game
+  one. *Why:* one game has a Winner badge; others should look and behave the same, without platform code built for a
+  single user. *Implementation (Claude):* the guide's rules follow that first badge (a gold tab, 18 px above the
+  plate's top edge, 22 px from its right end) and what it taught: boxes near the plates must leave room for a badge.
