@@ -1657,6 +1657,13 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   again only when the tiles' text or the width changes (games added or removed, a game's hint as players come and go,
   a narrower remote board), not on every redraw. `scripts/e2e/play.py pages` pages through all games, before and after
   a player sits down: one tile height, the pager in one place.
+- **D-229 · 2026-10-28 · Klaus** — A window that scrolls keeps its scrollbar inside its rounded corners. *Implementation
+  (Claude):* Awards and Results keeps its head (title, Turn to, Done) fixed and scrolls the rest in an inner box, set
+  in from the right and bottom edges; every overlay panel is clipped to its rounded shape and has the thin brass
+  scrollbar.
+- **D-230 · 2026-10-28 · Klaus** — In the lobby a selected player is deselected by a tap anywhere but a seat, its
+  Configure and Remove buttons, or a window; and leaving an AI player's Configure window, any way, deselects it too.
+  A tap on another seat still moves the selected player there (D-086).
 - **D-231 · 2026-10-29 · Klaus** — Games should offer 12 or more awards. The developer guide (section 8 and the
   checklist) and the cookbook recommend it; the platform sets no limit and shows every award a game hands out.
   *Why:* an award shows only when someone stands out, so a game with few has a thin end screen; today the games offer

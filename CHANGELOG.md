@@ -8,6 +8,8 @@ history.
 
 ## [Unreleased]
 
+- Awards and Results scrolls inside its rounded corners: its head stays, the rest scrolls; every board window keeps its scrollbar inside its corners (D-229).
+- In the lobby, a tap beside the seats deselects the selected player, and so does leaving an AI player's Configure window (D-230).
 - The console's Refresh for a game repository stays disabled while it fetches, and after 30 s without an answer says so and works again (D-232).
 - The lobby's game tiles are all as tall as the tallest game, so paging through the games no longer moves the pager (D-228).
 - A game played from all four edges (`"facing": "any"`) keeps the corner arrows during the game to face any edge,
