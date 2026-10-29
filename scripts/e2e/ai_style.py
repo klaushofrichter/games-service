@@ -6,6 +6,8 @@ player's style beside its name ("Play style: conservative"), not Ann's. During t
 "How this AI player plays from its next move on"; picking "aggressive" and Save changes it for the running game, and
 the row says so. Nothing in the players' rows overlaps. Then a second table (port 8140) with the Duel test game, whose
 AI options have long labels like Chess's: the rows keep their colours on one line and stay low.
+In the lobby each AI player's seat plate shows its style after "Ready", on the same line and inside the plate (D-234);
+Ann's plate shows none.
 """
 import os, sys
 from playwright.sync_api import sync_playwright
@@ -40,6 +42,17 @@ ROWS_CLEAR = """() => {
   return out;
 }"""
 
+# Every taken seat plate: its status text, the AI style shown after it, whether that is on the status's line and
+# inside the plate.
+PLATES = """() => [...document.querySelectorAll('.seat.taken')].map((seat) => {
+  // Layout offsets, not screen rectangles: the plates are turned toward their edges.
+  const st = seat.querySelector('.status'), dot = st.querySelector('.dot'), plays = st.querySelector('.ai-plays');
+  const mid = (e) => e.offsetTop + e.offsetHeight / 2;
+  return { status: st.textContent.trim(), plays: plays ? plays.textContent : null, title: plays?.title ?? null,
+    oneLine: !!(plays && Math.abs(mid(plays) - mid(dot)) < 4),
+    inside: !!(plays && plays.offsetLeft + plays.offsetWidth <= seat.clientWidth) };
+})"""
+
 proc = start_table(8139, TABLE_KEY=KEY, PUBLIC_URL=BASE)
 try:
     with sync_playwright() as p:
@@ -65,6 +78,18 @@ try:
             assert styles.nth(k).get_attribute("title").startswith("Play style: "), styles.nth(k).get_attribute("title")
         assert board.evaluate(ROWS_CLEAR) == [], board.evaluate(ROWS_CLEAR)
         board.click(".overlay.settings [data-close-overlay]")
+
+        # The seat plates: "Ready · conservative" for each AI player, nothing after Ann's status.
+        plates = board.evaluate(PLATES)
+        board.screenshot(path=os.path.join(OUT, "ai-style-seat-plates.png"))
+        assert sorted(pl["plays"] is not None for pl in plates) == [False, True, True], plates
+        for pl in plates:
+            if pl["plays"] is None:
+                continue
+            assert pl["plays"] in ("conservative", "aggressive", "erratic"), pl
+            assert pl["status"].startswith("Ready"), pl
+            assert pl["title"].startswith("Play style: "), pl
+            assert pl["oneLine"] and pl["inside"], pl
 
         ann.click("#ready")
         wait(lambda: all(pl["ready"] for pl in players().values()), 10, "everyone ready")
@@ -99,6 +124,13 @@ try:
             btn = b2.locator(".overlay.settings .ai-style").first
             assert btn.get_attribute("title").startswith("Engine (online ones fall back to the own engine): "), btn.get_attribute("title")
             assert "Strength (Elo, approximate)" not in btn.inner_text(), btn.inner_text()
+            b2.click(".overlay.settings [data-close-overlay]")
+            plate = [pl for pl in b2.evaluate(PLATES) if pl["plays"] is not None]
+            b2.screenshot(path=os.path.join(OUT, "ai-style-seat-plate-long.png"))
+            assert len(plate) == 1 and plate[0]["oneLine"] and plate[0]["inside"], plate
+            assert plate[0]["title"].startswith("Engine (online ones fall back to the own engine): "), plate
+            b2.click("#settings-button")
+            b2.wait_for_selector(".overlay.settings .ai-style")
             clear = b2.evaluate(ROWS_CLEAR)
             assert clear == [], clear
             b2.screenshot(path=os.path.join(OUT, "ai-style-long-labels.png"))

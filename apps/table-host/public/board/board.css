@@ -36,7 +36,10 @@ html, body { overflow: hidden; }
 .seat .name { font-family: var(--display); font-size: 1.5em; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 270px; }
 /* A name longer than a player can choose (an AI that took a seat over, "Christophers (AI)", D-148): a size smaller, so it fits. */
 .seat .name.long { font-size: 1.2em; }
-.seat .status { font-size: 0.7em; display: flex; gap: 10px; align-items: center; }
+.seat .status { font-size: 0.7em; display: flex; gap: 10px; align-items: center; max-width: 270px; }
+/* An AI player's style or strength after "Ready" (D-234), cut short when long (Chess's online engines). */
+.seat .status .ai-plays { min-width: 0; margin-left: -6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.seat .status .ai-plays::before { content: "· "; }
 .seat.taken { border-style: solid; border-color: var(--pc, var(--brass-deep)); background: rgba(214, 169, 74, 0.07); }
 /* The player's colour (D-106): the card's border and a dot before the name. */
 .player-colors .pdot { display: inline-block; width: 0.7em; height: 0.7em; border-radius: 50%; margin-right: 0.5em; vertical-align: 0.02em; }
