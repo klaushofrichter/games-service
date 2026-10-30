@@ -494,7 +494,7 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
       // A phone that scanned the QR code asks first whether there is a seat for it (D-129); only with the current code.
       if ((match = path.match(/^\/j\/([A-Za-z0-9]{4,12})\/seat$/))) {
         if (!remoteOf(req) && table.isExchangeToken(match[1])) return json(res, 200, { free: true, message: null, exchange: true }); // D-159
-        if (remoteOf(req) || match[1].toUpperCase() !== table.currentJoin().token) return json(res, 403, { error: "join code is invalid or expired; scan the QR code again" });
+        if (remoteOf(req) || match[1].toUpperCase() !== table.currentJoin().token) return json(res, 403, { error: "join code is invalid or expired (the table restarted, or a new code was made); scan the code the board shows now" });
         const noSeat = table.noFreeSeat();
         return json(res, 200, { free: !noSeat, message: noSeat });
       }

@@ -55,6 +55,7 @@ run python3 scripts/e2e/viewer.py "$OUT"
 run python3 scripts/e2e/one_board.py "$OUT"
 run python3 scripts/e2e/settings_choice.py "$OUT"
 run python3 scripts/e2e/next_hand.py "$OUT"
+run python3 scripts/e2e/join_restart.py "$OUT"
 
 if ((${#failed[@]})); then
   printf '::error::e2e failed: %s\n' "${failed[@]}"

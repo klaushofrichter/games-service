@@ -1733,3 +1733,11 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   multiple local players and the local QR code in the Developer settings." It has no *Invite remote player…* of its
   own: the lobby's button row has one.
 
+- **D-241 · 2026-10-30 · Klaus** — A board never shows a join code the table may no longer take. Every start of the
+  Table Host makes a new code (D-066; codes have no time limit), so a board left open while the table stops or restarts
+  (`scripts/local-table.sh` updates before it starts) hides its QR code, code and link and says it is connecting; the
+  new code shows as soon as the table answers. A phone that scans an old code is told at once, before typing a name,
+  that the table restarted or made a new code, and to scan the code the board shows now. *Implementation (Claude):*
+  the board sets `body.offline` while its connection is closed; the deck reads the 403 of its seat check
+  (`/j/<code>/seat`).
+
