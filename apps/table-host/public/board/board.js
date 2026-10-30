@@ -516,7 +516,9 @@ function settleFinal() {
 function showStatistics(fromEnd = false) {
   if (!state?.summary || overlayRoot.querySelector(".overlay.statistics")) return;
   const onClose = fromEnd ? () => ((holdFinal = false), render()) : undefined;
-  openStatistics({ summary: state.summary, gameName: state.game?.name, overlayRoot, edge: overlayEdge(), turnable: !REMOTE, onClose, backToGame: fromEnd });
+  // Award holders in their players' colours, as the table has them now (D-239); render() recolours an open window.
+  const colorOf = (seat) => state?.players?.find((p) => p.seat === seat)?.color ?? null;
+  openStatistics({ summary: state.summary, gameName: state.game?.name, overlayRoot, edge: overlayEdge(), turnable: !REMOTE, onClose, backToGame: fromEnd, colorOf });
 }
 statsBtn.addEventListener("click", () => showStatistics(true));
 resultBtn.addEventListener("click", () => {
@@ -1058,6 +1060,7 @@ function cornerClass(name) {
 // ---------- center panel ----------
 function render() {
   if (!state) return;
+  overlayRoot.querySelector(".overlay.statistics")?.recolor?.(); // a colour changed while Awards and Results is open (D-239)
   gameEdge(); // keeps the last north/south facing current, so a game starts facing the way the lobby last did
   renderSeats();
   if (REMOTE) fit();
@@ -1182,10 +1185,9 @@ function remoteJoinText() {
 
 function joinPanel() {
   if (REMOTE) return "";
-  // Played from the board (D-175): no phone joins at the table, so no code to scan.
-  if (state.developer?.boardDeck) return `<aside class="join board-deck"><div class="eyebrow">Played from the board</div>
-    <p class="faint">The deck beside the board is the one player at the table (Developer settings). Remote players come with an invite.</p>
-    <div class="right">${inviteButton("Invite remote player…")}</div></aside>`;
+  // Played from the board (D-175): no phone joins at the table, so no code to scan. The lobby has its own invite (D-240).
+  if (state.developer?.boardDeck) return `<aside class="join board-deck"><div class="eyebrow">Single local player</div>
+    <p class="faint">The deck beside the board is the one player at the table. Enable multiple local players and the local QR code in the Developer settings.</p></aside>`;
   const code = state.joinUrl.split("/").pop();
   // No free seat (D-129): the code still works for nobody, so the panel says so; a phone that scans it is told too.
   if (state.noSeat) return `<aside class="join full">

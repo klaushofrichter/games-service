@@ -46,6 +46,7 @@ try:
         board.locator("text=Pick a game").wait_for(timeout=15000)
         assert board.locator("aside.join img").count() == 0, "no QR code while played from the board"
         board.locator("aside.join.board-deck").wait_for()
+        assert board.locator("aside.join.board-deck button").count() == 0, "the lobby's own invite is enough (D-240)"
 
         # The deck takes a seat with a name, without a join code.
         deck.locator("input[name=name]").wait_for(timeout=10000)
