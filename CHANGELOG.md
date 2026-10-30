@@ -8,6 +8,7 @@ history.
 
 ## [Unreleased]
 
+- Played from the board, the lobby's side panel reads *Single local player* and has no second invite button (D-240).
 - Awards and Results shows the award holders in their players' colours, also after a colour changes (D-239).
 - A game's description can show its settings: `{key}` becomes the setting's value on the game's tile and in the window that chooses the game (D-238).
 - Table rules in the board's settings: an away player can be replaced by an AI player after 3 or 5 minutes (off by default, D-236), and AI players get different play styles (on by default, D-237).
