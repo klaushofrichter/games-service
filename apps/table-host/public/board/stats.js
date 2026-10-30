@@ -22,16 +22,18 @@ function table(t, cls) {
 
 /**
  * Open the window. `edge` is the edge it first faces; `turnable` shows the S/N/W/E buttons that turn it to another
- * edge (the board at the table; a remote board faces its own player). Returns the overlay element.
+ * edge (the board at the table; a remote board faces its own player). `colorOf(seat)` gives a seat's player colour
+ * now (D-239): award holders show in it, and the overlay's `recolor()` applies a colour changed while it is open; the
+ * Game Viewer gives none (old games keep no colours), so names stay brass. Returns the overlay element.
  */
-export function openStatistics({ summary, gameName, overlayRoot, edge = "south", turnable = false, onClose, backToGame = false }) {
+export function openStatistics({ summary, gameName, overlayRoot, edge = "south", turnable = false, onClose, backToGame = false, colorOf = null }) {
   const o = document.createElement("div");
   o.className = "overlay statistics";
   // A seat another player took over shows the last player's name with * (D-159), explained under the window.
   const names = new Map((summary.players ?? []).map((p) => [p.seat, p.changed ? `${p.name} *` : p.name]));
   const changed = (summary.players ?? []).some((p) => p.changed);
   const holders = (seats) => {
-    const n = seats.map((s) => esc(names.get(s) ?? `Seat ${s + 1}`));
+    const n = seats.map((s) => `<span class="award-name" data-seat="${s}">${esc(names.get(s) ?? `Seat ${s + 1}`)}</span>`);
     return n.length < 2 ? (n[0] ?? "") : `${n.slice(0, -1).join(", ")} and ${n.at(-1)}`;
   };
   const awards = summary.awards ?? [];
@@ -62,6 +64,10 @@ export function openStatistics({ summary, gameName, overlayRoot, edge = "south",
     for (const b of o.querySelectorAll("[data-face]")) b.classList.toggle("on", b.dataset.face === e);
   };
   face(edge);
+  o.recolor = () => {
+    for (const el of o.querySelectorAll(".award-name")) el.style.color = (colorOf && colorOf(Number(el.dataset.seat))) || "";
+  };
+  o.recolor();
   const close = () => {
     o.remove();
     onClose?.();

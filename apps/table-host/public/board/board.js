@@ -516,7 +516,9 @@ function settleFinal() {
 function showStatistics(fromEnd = false) {
   if (!state?.summary || overlayRoot.querySelector(".overlay.statistics")) return;
   const onClose = fromEnd ? () => ((holdFinal = false), render()) : undefined;
-  openStatistics({ summary: state.summary, gameName: state.game?.name, overlayRoot, edge: overlayEdge(), turnable: !REMOTE, onClose, backToGame: fromEnd });
+  // Award holders in their players' colours, as the table has them now (D-239); render() recolours an open window.
+  const colorOf = (seat) => state?.players?.find((p) => p.seat === seat)?.color ?? null;
+  openStatistics({ summary: state.summary, gameName: state.game?.name, overlayRoot, edge: overlayEdge(), turnable: !REMOTE, onClose, backToGame: fromEnd, colorOf });
 }
 statsBtn.addEventListener("click", () => showStatistics(true));
 resultBtn.addEventListener("click", () => {
@@ -1058,6 +1060,7 @@ function cornerClass(name) {
 // ---------- center panel ----------
 function render() {
   if (!state) return;
+  overlayRoot.querySelector(".overlay.statistics")?.recolor?.(); // a colour changed while Awards and Results is open (D-239)
   gameEdge(); // keeps the last north/south facing current, so a game starts facing the way the lobby last did
   renderSeats();
   if (REMOTE) fit();
