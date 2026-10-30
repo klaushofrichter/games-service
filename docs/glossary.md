@@ -69,7 +69,7 @@ buttons turn them to north, east, south or west (D-080). In code: `seatEdges(lay
 | **Seat plate** | The box on the board with a player's name, colour and status, at their seat; games may restyle it. | `seatPlates()`, `.kit-plate` (in a game), `.seat` (in the lobby) | player box, name tag |
 | **Badge** | A small tab on a seat plate's top edge naming something lasting about that player, such as *Winner*; a convention games follow, not platform code yet (developer guide, *Badges on seat plates*; D-235). | — | label, tag, ribbon |
 | **AI player** | A seat played by the game's AI, shown as "(AI)". | `kind: "ai"` | bot, CPU, computer |
-| **AI options** | How one AI player plays: a play style, a strength, an engine, as the game's manifest offers. Each AI player has its own; a game may have one picked at random for each new AI player (D-226). Shown and changed beside its name in the board's settings, also during a game. | `ai.options`, `aiOptions` | AI settings, difficulty (unless the game calls it that) |
+| **AI options** | How one AI player plays: a play style, a strength, an engine, as the game's manifest offers. Each AI player has its own; a game may have one picked at random for each new AI player (D-226), one no other AI player has while the table's rule asks for different styles (D-237). Shown and changed beside its name in the board's settings, also during a game. | `ai.options`, `aiOptions` | AI settings, difficulty (unless the game calls it that) |
 | **Remote player** | A person who plays from elsewhere, through an invite: the remote board in their browser and their deck beside it. | `location: "remote"` | online player, guest |
 | **Relay** | A TURN server that carries a remote player's connection when a direct one can't be made (a phone's hotspot, cellular data, some strict networks). Optional; Cloudflare's, through the game service (D-209). | `iceServers`, `apps/cloud/src/turn.ts` | TURN |
 | **Watcher** | Someone remote who sees the board only: no seat, no deck, not one of the players. | `watchers` | spectator, viewer (the Game Viewer is something else) |
@@ -90,6 +90,7 @@ buttons turn them to north, east, south or west (D-080). In code: `seatEdges(lay
 | **Board control** | What a board may do for players: moves by touching the board (`boardIntents`) for the seats in `info.controlSeats`, and skipping a wait. A remote board controls only its own player's seat. | `boardControl`, `controlSeats`, `remoteControl` | — |
 | **Play from the board** | A developer setting: one player's deck shown beside the board, to test without a phone (D-175). | `boardDeck` | — |
 | **Settings** | The table's choices for a game (rounds, timers, house rules), set in the lobby before it starts. | `settings` (manifest) | options (that's an AI player's), config |
+| **Table rules** | The table's own choices for games with AI players, in the board's settings outside a game: whether an away player is replaced by an AI player after 3 or 5 minutes (D-236), and whether AI players get different play styles (D-237). | `rules`, `POST /rules` | — |
 | **Preferences** | How the board looks and sounds for a game (a background, card speed, sound), changeable any time. | `prefs` | settings |
 
 ## Games

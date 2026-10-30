@@ -23,6 +23,7 @@ const host = await startHost({
   gamesDir: env.GAMES_DIR,
   dataDir: env.DATA_DIR,
   graceMs: num(env.GRACE_MS),
+  awayToAiMinuteMs: num(env.AWAY_TO_AI_MINUTE_MS), // a shorter "minute" for the browser tests (D-236)
   aiDelayMs: num(env.AI_DELAY_MS),
   boardPacing: env.BOARD_PACING === "0" ? false : undefined, // BOARD_PACING=0: AI players don't wait for the board (D-141)
   requireCloud: env.REQUIRE_CLOUD === "1",

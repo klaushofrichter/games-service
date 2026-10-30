@@ -1698,3 +1698,22 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   one. *Why:* one game has a Winner badge; others should look and behave the same, without platform code built for a
   single user. *Implementation (Claude):* the guide's rules follow that first badge (a gold tab, 18 px above the
   plate's top edge, 22 px from its right end) and what it taught: boxes near the plates must leave room for a badge.
+- **D-236 · 2026-10-30 · Klaus** — A table rule *A player away this long is replaced by an AI player*: off (the
+  default), 3 or 5 minutes. With it on, a player of the running game, at the table or remote, whose phone or browser
+  has been away that long (or who left the game) gets an AI player in their seat, as *Exchange › AI player* would.
+  It amends D-159 for tables that choose it; off, a seat waits as D-159 says and replacing someone stays the table's
+  choice. *Why:* a table that plays on without someone who went home should not have to stop and exchange them by
+  hand. *Implementation (Claude):* table rules are set in the board's settings outside a game, like a game's
+  settings, and kept in memory until a restart (`POST /rules {awayToAi: 0 | 3 | 5}`, state `rules`; remote boards
+  with board control may change them too). A timer starts when the player goes away during a game and ends when
+  they are back; when it fires and they are still away in the running game, the table calls the same exchange as the
+  board ("Ann (AI)", standing in for Ann, so a person at the table who scans the code with that name takes the seat
+  back, D-222). An exchange the board has open for that seat wins (the seat stays as it is). `AWAY_TO_AI_MINUTE_MS`
+  shortens a minute for the tests.
+- **D-237 · 2026-10-30 · Klaus** — A table rule *AI players get different play styles*, on by default: an AI option
+  the game marks `random` (D-226) gets a value no other AI player at the table has, while any are left; when every
+  value is taken, any of them. Values chosen by hand stay as chosen. *Why:* a table should meet a mix of characters,
+  not the same one twice. *Implementation (Claude):* `pickRandomAiOptions` leaves out the other seated AI players'
+  values (`POST /rules {distinctAiStyles}`, state `rules`), for a new AI player, for the game being chosen and for an
+  exchange to an AI player.
+

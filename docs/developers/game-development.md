@@ -242,7 +242,7 @@ The platform owns everything about players. A game must not reimplement any of t
 | --- | --- | --- |
 | Players join, take seats, pick colours, change names, move seats | In the lobby, before the game. Seats are fixed when the game starts. | `ctx.seats` in `setup`. |
 | Someone joins during a game | Seated only if the manifest says `"dynamicPlayers": true` and a seat is free; else they wait for the next game. | `onSeatJoined`. |
-| A player's phone goes away (locked, out of range, closed) | Their seat **waits, with no time limit**; the game goes on and simply waits when it is their move. After 15 s the board shows "… is away" at their seat with **Exchange …**. The phone rejoins by itself when it is back. | Nothing (the state does not change). If the game answers `{ wait }` in `canContinueWithout`, the game pauses meanwhile. |
+| A player's phone goes away (locked, out of range, closed) | Their seat **waits, with no time limit**; the game goes on and simply waits when it is their move. After 15 s the board shows "… is away" at their seat with **Exchange …**. The phone rejoins by itself when it is back. With the table rule *A player away this long is replaced by an AI player* (3 or 5 minutes; off by default, D-236), an AI player takes the seat once that time is up, as an exchange would. | Nothing (the state does not change). If the game answers `{ wait }` in `canContinueWithout`, the game pauses meanwhile. |
 | A player taps **Leave the game** on their phone | Their phone is done with this game. The seat is handled like an away player's at once: "… left the game" with **Exchange …**. Scanning the join code again with the same name brings a player at the table back to their seat; a remote player's browser keeps watching. | Nothing until the seat is exchanged. |
 | The board exchanges a player (Settings › Players › tap the name, **Exchange …** on the away card, the in-game Lobby) | For anyone, away or connected: a person at the table (a QR code for this seat), a remote player (an invite; only with a remote place free), a watcher or an AI player (in games with AI players; for a seat an AI already plays, its options change instead) takes the seat, with its colour. Whoever had it goes; their phone is told, and a remote player's browser keeps watching. One exchange is open at a time; a new one replaces it, and it ends with the game. | `onSeatChanged(state, { seat, playerId, name, kind })`. |
 | Every seat is taken | Nobody else joins: phones with the join code, + AI player and player invites are refused with the reason. During a game the way in is an exchange; someone remote can still come as a watcher. | — |
@@ -288,8 +288,9 @@ What this means for a game:
 - **Options** come from `ai.options` in the manifest, per AI player, e.g. `{ "key": "style", "type": "enum", "values":
   ["cautious", "bold"], "default": "cautious", "label": "Play style" }`. With `"random": true` (an enum with
   `values`), each new AI player gets one of the values at random instead of the default, picked by the table when the
-  AI player comes to a table with the game chosen (or the game is chosen) and kept until changed (D-226); simulations
-  still use the default unless given. The board's settings window shows every AI player's option values beside its name (label and value on hover);
+  AI player comes to a table with the game chosen (or the game is chosen) and kept until changed (D-226); with the
+  table rule *AI players get different play styles* (on by default, D-237) the pick leaves out values other AI players
+  at the table have, while any are left. Simulations still use the default unless given. The board's settings window shows every AI player's option values beside its name (label and value on hover);
   a tap changes them, during a game from the AI's next move on.
 - **Pace:** the platform pauses about 0.8 s before an AI acts (`AI_DELAY_MS`), lets it move only once the table's
   board has shown everything so far (section 9), and phones get an AI's move once the board has shown it. Do not add

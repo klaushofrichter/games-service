@@ -761,6 +761,18 @@ function openSettings() {
           ${fields.map((f) => `<div class="row"><span>${esc(f.label ?? f.key)}</span>${setting(f)}</div>`).join("")}
           ${editable ? "" : `<div class="faint" style="font-size:.7em;margin-top:6px">These can be changed before the game starts.</div>`}</div>`
       : "";
+    // The table's rules for games with AI players (D-236, D-237): outside a game only, like the game settings.
+    const rules = state.rules ?? { awayToAi: 0, distinctAiStyles: true };
+    const rulesEditable = !inRunningGame() && (!REMOTE || state.remote?.boardControl);
+    const awayText = (m) => (m ? `After ${m} minutes` : "Off");
+    const tableRules = `<div class="group table-rules ${rulesEditable ? "" : "locked"}"><div class="eyebrow">Table rules${rulesEditable ? "" : ` <span class="lock" aria-label="locked">🔒 locked during the game</span>`}</div>
+        <div class="row"><span title="A player of the running game whose phone or browser stays away this long gets an AI player in their seat, as Exchange › AI player would. Off: the seat waits, and the table decides.">A player away this long is replaced by an AI player</span>${rulesEditable
+          ? `<span class="seg">${[0, 3, 5].map((m) => `<button class="${rules.awayToAi === m ? "on" : ""}" data-rule-away="${m}">${m ? `${m} min` : "Off"}</button>`).join("")}</span>`
+          : `<span class="value">${awayText(rules.awayToAi)}</span>`}</div>
+        <div class="row"><span title="A new AI player's play style picked at random is one no other AI player at the table has, while there are some left. Styles chosen by hand stay as chosen.">AI players get different play styles</span>${rulesEditable
+          ? `<button data-rule-distinct class="${rules.distinctAiStyles ? "on" : ""}" role="switch" aria-checked="${rules.distinctAiStyles}">${rules.distinctAiStyles ? "On" : "Off"}</button>`
+          : `<span class="value">${rules.distinctAiStyles ? "On" : "Off"}</span>`}</div>
+        ${rulesEditable ? "" : `<div class="faint" style="font-size:.7em;margin-top:6px">These can be changed before the game starts.</div>`}</div>`;
     setPanel(o, `<div class="panel"><h2>Settings</h2>
       <div class="group"><div class="eyebrow">Display</div>
         <div class="row"><span>Sound effects</span><button data-sound class="${state.display?.sound !== false ? "on" : ""}" role="switch" aria-checked="${state.display?.sound !== false}">${state.display?.sound !== false ? "On" : "Off"}</button></div>
@@ -772,6 +784,7 @@ function openSettings() {
       ${playerColors()}
       ${(state.watchers ?? []).length ? `<div class="group player-colors watchers-group"><div class="eyebrow">Watching</div>${watcherRows()}<div class="faint group-note">${WATCHER_NOTE}</div></div>` : ""}
       ${gameSettings}
+      ${tableRules}
       ${items.length ? `<div class="group game-settings"><div class="eyebrow">${esc(state.game.name)}</div>${items.map((it, k) => `<div class="row"><span>${esc(it.label)}</span>${control(it, k)}</div>`).join("")}</div>` : ""}
       <div class="actions settings-actions"><button class="primary" data-close-overlay>Done</button></div></div>`);
   };
@@ -806,6 +819,8 @@ function openSettings() {
     if (!b) return;
     if (b.dataset.fs !== undefined) toggleFullscreen();
     if (b.dataset.sound !== undefined) return void act("POST", "/display", { sound: state.display?.sound === false });
+    if (b.dataset.ruleAway !== undefined) return void act("POST", "/rules", { awayToAi: Number(b.dataset.ruleAway) });
+    if (b.dataset.ruleDistinct !== undefined) return void act("POST", "/rules", { distinctAiStyles: !(state.rules?.distinctAiStyles ?? true) });
     if (b.dataset.joinCode !== undefined) return openJoinCode();
     if (b.dataset.screen !== undefined) return openScreenLink();
     if (b.dataset.colorPlayer) return void act("POST", `/players/${encodeURIComponent(b.dataset.colorPlayer)}/color`, { color: b.dataset.color });
