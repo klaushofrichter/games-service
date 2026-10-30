@@ -1741,3 +1741,7 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   the board sets `body.offline` while its connection is closed; the deck reads the 403 of its seat check
   (`/j/<code>/seat`).
 
+- **D-242 · 2026-10-30 · Klaus** — In Awards and Results, the "," and "and" between two or more award holders are white;
+  the names stay in their players' colours (D-239), brass where there are none. The game's own table is titled
+  *Results* (was *Statistics*), the moves and time *Statistics* (was *Moves and time*).
+
