@@ -48,7 +48,12 @@ let seatTimer = null;
 async function checkSeat() {
   try {
     const r = await fetch(`/j/${encodeURIComponent(joinToken)}/seat`, { cache: "no-store" });
-    if (!r.ok) return; // an old code: the hello says so
+    // An old code (the table restarted, or a new code was made): said at once, before the name is typed (D-241).
+    if (r.status === 403 && !me) {
+      banner = (await r.json().catch(() => ({}))).error ?? "This join code no longer works; scan the code the board shows now.";
+      return render();
+    }
+    if (!r.ok) return;
     const b = await r.json();
     const was = noSeat;
     noSeat = b.free ? null : b.message;

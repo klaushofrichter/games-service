@@ -1194,10 +1194,12 @@ function joinPanel() {
     <div class="eyebrow">No free seat</div>
     <img src="/qr.svg?u=${encodeURIComponent(state.joinUrl)}" alt="QR code to join this table, while no seat is free" class="dimmed">
     <div class="full-note">${esc(state.noSeat)}</div>
+    <div class="offline-note">Connecting to the table… The code shows again once it answers.</div>
     <button data-new-code style="font-size:.7em">New code</button>
   </aside>`;
   return `<aside class="join">
     <div class="eyebrow">Scan to join locally</div>
+    <div class="offline-note">Connecting to the table… The code shows again once it answers.</div>
     <img src="/qr.svg?u=${encodeURIComponent(state.joinUrl)}" alt="QR code to join this table locally">
     <div>${linkLine(state.joinUrl)}<div class="code" style="text-align:center;margin-top:6px">${esc(code)}</div></div>
     <div class="faint" style="font-size:.7em;text-align:center">Everyone at the table scans this same code</div>
@@ -1799,6 +1801,7 @@ function openJoinCode() {
         <img src="/qr.svg?u=${encodeURIComponent(state.joinUrl)}" alt="QR code to join this table" class="${state.noSeat ? "dimmed" : ""}">
         <div>${linkLine(state.joinUrl)}<div class="code" style="text-align:center;margin-top:6px">${esc(code)}</div></div>
         ${state.noSeat ? `<div class="full-note">${esc(state.noSeat)}</div>` : `<div class="faint" style="font-size:.75em;text-align:center">Scan with the phone's camera to join, or to rejoin after the phone lost its seat.</div>`}
+        <div class="offline-note">Connecting to the table… The code shows again once it answers.</div>
       </div>
       <div class="actions settings-actions"><button data-new-code-here>New code</button><button class="primary" data-close-overlay>Done</button></div></div>`);
   };
@@ -2302,6 +2305,7 @@ function connect() {
     }
     if (m.ch === "lobby" && m.type === "state") {
       state = m.payload;
+      document.body.classList.remove("offline");
       if (selectedPlayer && !state.players.some((p) => p.id === selectedPlayer)) selectedPlayer = null;
       // The games list serves only the lobby and its dialogs: skip it while a game runs.
       if (state.phase !== "active" && state.phase !== "paused" && state.phase !== "terminating") await refreshGames();
@@ -2326,6 +2330,9 @@ function connect() {
     }
   };
   ws.onclose = () => {
+    // Without the table, a QR code on screen may be one it no longer takes (a new code at every start): hidden until
+    // the table answers again (D-241).
+    document.body.classList.add("offline");
     for (const r of wsPending.values()) r({ ok: false, reason: "connection lost" });
     wsPending.clear();
     // A window without the table waits for "Show the board here"; that button reconnects (D-132).

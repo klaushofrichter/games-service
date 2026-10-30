@@ -117,6 +117,10 @@ html, body { overflow: hidden; }
 .join .full-note { max-width: 250px; text-align: center; font-size: .78em; line-height: 1.4; color: var(--ink); }
 .join .url { font-family: var(--mono); font-size: 0.78em; color: var(--ink); word-break: break-all; text-align: center; }
 .join .code { font-family: var(--mono); font-size: 1.5em; letter-spacing: 0.18em; color: var(--brass); }
+/* Not connected to the table (D-241): no join code that may be stale, but a note in its place. */
+.offline-note { display: none; text-align: center; font-size: 0.8em; color: var(--brass); }
+body.offline .offline-note { display: block; }
+body.offline :is(.join, .join-big) :is(img[src^="/qr.svg?u="], .code, .url-line) { visibility: hidden; }
 
 .waiting { display: flex; flex-direction: column; gap: 18px; }
 .ready-list { display: flex; flex-wrap: wrap; gap: 10px; }
