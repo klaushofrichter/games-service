@@ -8,6 +8,7 @@ history.
 
 ## [Unreleased]
 
+- Awards and Results: "," and "and" between award holders in white; the sections read *Results* and *Statistics* (D-242).
 - A board that lost its table (stopped or restarting) hides the join code until the table answers with its new one; a phone with an old code is told at once why it no longer works (D-241).
 - Played from the board, the lobby's side panel reads *Single local player* and has no second invite button (D-240).
 - Awards and Results shows the award holders in their players' colours, also after a colour changes (D-239).

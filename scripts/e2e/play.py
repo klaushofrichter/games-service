@@ -402,6 +402,14 @@ def endings(browser, board):
     if not summary["awards"]:
         board.wait_for_selector(".overlay.statistics >> text=No awards in this game.")
     assert board.locator(".overlay.statistics .stats-table.play tr").count() == 3, "moves and time for both players"
+    # The game's own table is "Results", moves and time "Statistics" (D-242).
+    heads = board.locator(".overlay.statistics h4").all_inner_texts()
+    want = (["results"] if summary.get("table") else []) + ["statistics"]
+    assert [h.strip().lower() for h in heads if h.strip().lower() in ("results", "statistics", "moves and time")] == want, f"the section titles read {heads}"
+    # Between two or more award holders "," and "and" are white (D-242).
+    if board.locator(".overlay.statistics .award-holders").count():
+        ink = board.evaluate("() => getComputedStyle(document.querySelector('.overlay.statistics .award-holders')).color")
+        assert ink == "rgb(243, 238, 226)", f"the words between award holders are {ink}, not white"
     # Award holders in their players' colours (D-239), and a colour changed while the window is open follows.
     COLOURS = """() => [...document.querySelectorAll('.overlay.statistics .award-name')].map((e) => [Number(e.dataset.seat), getComputedStyle(e).color])"""
     hex_rgb = lambda h: f"rgb({int(h[1:3], 16)}, {int(h[3:5], 16)}, {int(h[5:7], 16)})"

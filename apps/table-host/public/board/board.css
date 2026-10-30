@@ -450,7 +450,9 @@ button.copy:hover, button.copy.done { color: var(--brass); border-color: var(--b
 .award { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 16px 14px; text-align: center; background: var(--felt-deep); border: 1px solid var(--felt-line); border-radius: 14px; }
 .award-icon { font-size: 44px; line-height: 1.1; }
 .award h3 { margin: 4px 0 0; font-family: var(--display); font-size: 22px; }
-.award-holders { margin: 0; font-size: 19px; color: var(--brass); font-weight: 600; }
+/* The names in brass, or in their players' colours (D-239); the "," and "and" between them in white (D-242). */
+.award-holders { margin: 0; font-size: 19px; color: var(--ink); font-weight: 600; }
+.award-holders .award-name { color: var(--brass); }
 .award em { font-style: normal; font-size: 16px; }
 .award small { color: var(--ink-soft); font-size: 14px; }
 .no-awards { color: var(--ink-soft); font-size: 19px; margin: 6px 0; }
