@@ -116,7 +116,7 @@ the SDK by path (`../../packages/sdk/src/index.ts`); games in other repositories
 
 | Field | Meaning |
 | --- | --- |
-| `id`, `name`, `description` | Id (= folder name), the name shown everywhere, one sentence for the game menu. |
+| `id`, `name`, `description` | Id (= folder name), the name shown everywhere, one sentence for the game menu. `{key}` in the description names a setting and shows its value: the default on the game's tile, and the value being chosen in the window that chooses the game ("be the first to {target} points", D-238). |
 | `version` | Calendar version `YYYY.MM.DD.N` (section 13). |
 | `sdk` | The SDK version range the game is written for (`"^0.1"` today). |
 | `players` | `{ "min", "max" }` or a list of allowed counts, 1–8. |

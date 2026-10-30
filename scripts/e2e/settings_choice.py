@@ -5,7 +5,8 @@ list (Chess's eight time controls) never runs out of the window.
 
 A Table Host of its own (port 8105). Duel chosen, the settings window opened: "Pace of play" (five choices) is a
 pulldown listing all five, inside the window; "Side" (two) is buttons. Picking from the pulldown and tapping a button
-both change the table's settings, and the pulldown shows the new choice.
+both change the table's settings, and the pulldown shows the new choice. Before that, Duel's description names a setting
+(D-238): the tile shows its default ("Pace: no limit"), and the window that chooses the game follows the pulldown.
 """
 import os, sys
 from playwright.sync_api import sync_playwright
@@ -29,6 +30,17 @@ try:
         board = br.new_page(viewport={"width": 1920, "height": 1080})
         watch(board, "board")
         board.goto(BASE + "/board/")
+        # A setting in the description (D-238): the default on the tile, the value being chosen in the window.
+        tile = board.locator(".tile[data-game=duel] .desc")
+        tile.wait_for()
+        assert "Pace: no limit (" in tile.inner_text(), tile.inner_text()
+        board.click(".tile[data-game=duel]")
+        intro = board.locator(".dialog.form .form-intro")
+        intro.wait_for()
+        assert "Pace: no limit (" in intro.inner_text(), intro.inner_text()
+        board.select_option(".dialog.form select[name=pace]", "quick")
+        assert "Pace: quick (" in intro.inner_text(), intro.inner_text()
+        board.click(".dialog.form [data-x=no]")
         a("POST", "/game/select", {"gameId": "duel"})
         board.click("#settings-button")
         rows = board.locator(".game-rules .row")

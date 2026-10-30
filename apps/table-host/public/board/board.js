@@ -176,6 +176,19 @@ function numberProblem(f, raw) {
 const linkified = (text) => esc(text).replace(/https:\/\/[^\s<]+[^\s<.,;:!?)]/g, (u) => `<a href="${u}" target="_blank" rel="noopener">${u}</a>`);
 
 /** A form for settings or options; `note`: a game's text under the fields (an AI engine's licence, D-224). */
+/**
+ * A game's description with its settings filled in (D-238): `{key}` names a setting and shows its value, as chosen or
+ * the manifest's default ("first to {target} points"). Anything else in braces stays as it is.
+ */
+function withSettings(text, fields = [], values = {}) {
+  return String(text ?? "").replace(/\{(\w+)\}/g, (m, key) => {
+    const f = fields.find((x) => x.key === key);
+    if (!f) return m;
+    const v = values[key] ?? f.default;
+    return f.type === "bool" ? (v ? "on" : "off") : String(v);
+  });
+}
+
 function formDialog(title, intro, fields, values = {}, okLabel = "OK", removeLabel = null, note = "") {
   return new Promise((resolve) => {
     const d = document.createElement("div");
@@ -187,10 +200,19 @@ function formDialog(title, intro, fields, values = {}, okLabel = "OK", removeLab
       if (f.type === "int" || f.type === "number") return `<input type="number" name="${f.key}" value="${esc(v)}" ${f.min !== undefined ? `min="${f.min}"` : ""} ${f.max !== undefined ? `max="${f.max}"` : ""}>`;
       return `<input type="text" name="${f.key}" value="${esc(v ?? "")}">`;
     };
-    d.innerHTML = `<div class="dialog form"><h2>${esc(title)}</h2>${intro ? `<div class="muted">${esc(intro)}</div>` : ""}
+    d.innerHTML = `<div class="dialog form"><h2>${esc(title)}</h2>${intro ? `<div class="muted form-intro">${esc(withSettings(intro, fields, values))}</div>` : ""}
       <div class="fields">${fields.map((f) => `<label><span>${esc(f.label ?? f.key)}</span>${input(f)}</label>`).join("") || `<div class="faint">${state?.game ? "Nothing to set for this game." : "Pick a game to choose how it plays."}</div>`}</div>
       ${note ? `<div class="faint form-note">${linkified(note)}</div>` : ""}
       <div class="actions">${removeLabel ? `<button class="danger" data-x="remove" style="margin-right:auto">${esc(removeLabel)}</button>` : ""}<button data-x="no">Cancel</button><button class="primary" data-x="yes">${esc(okLabel)}</button></div></div>`;
+    // The description follows the settings while they change (D-238): "first to 8 points" as 8 is typed.
+    const introEl = () => d.querySelector(".form-intro");
+    const current = () => Object.fromEntries(fields.map((f) => {
+      const el = d.querySelector(`[name="${f.key}"]`);
+      return [f.key, f.type === "bool" ? el.checked : f.type === "int" || f.type === "number" ? (el.value === "" ? f.default : Number(el.value)) : el.value];
+    }));
+    const follow = () => introEl() && (introEl().textContent = withSettings(intro, fields, current()));
+    d.addEventListener("input", follow);
+    d.addEventListener("change", follow);
     d.addEventListener("click", (e) => {
       const x = e.target.closest("button")?.dataset.x;
       if (!x && e.target !== d) return;
@@ -1218,7 +1240,7 @@ let gamePage = 0;
 const viewOnly = () => REMOTE && !state.remote?.boardControl;
 // A remote board without board control (a watcher, or control switched off) shows the games, not as buttons (D-170).
 const tileHtml = (g) => `<button class="tile ${g.selectable ? "selectable" : ""} ${viewOnly() ? "view-only" : ""}" data-game="${g.id}" ${g.selectable && !viewOnly() ? "" : viewOnly() ? 'tabindex="-1" aria-disabled="true"' : "disabled"}>
-          <span class="title">${esc(g.name)}</span><span class="desc">${esc(g.description ?? "")}</span>
+          <span class="title">${esc(g.name)}</span><span class="desc">${esc(withSettings(g.description, g.settings))}</span>
           <span class="faint" style="font-size:.66em">${playersLabel(g.players)}${g.ai ? " · AI" : ""}${g.extra ? ` · <span style="color:var(--brass)">extra</span>` : ""}</span>
           ${g.selectable ? `<span class="hint">${esc(tileHint(g))}</span>` : `<span class="why">${esc(g.reasons[0])}</span>`}</button>`;
 function gameTiles() {
