@@ -3,7 +3,7 @@
   "name": "Duel",
   "version": "1.0.0",
   "sdk": "^0.1",
-  "description": "Test game for localSeat (D-128b) and the board's settings window (D-129b): two players, the one at the table sits south; a setting with five choices and one with two. AI options with long labels, like Chess's, for the settings' players rows (D-226). Played from all four edges (facing: any, D-227).",
+  "description": "Test game for localSeat (D-128b) and the board's settings window (D-129b): two players, the one at the table sits south; a setting with five choices and one with two. AI options with long labels, like Chess's, for the settings' players rows (D-226). Played from all four edges (facing: any, D-227). Pace: {pace} (a setting in the description, D-238).",
   "players": [
     2
   ],
