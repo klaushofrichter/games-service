@@ -690,7 +690,7 @@ export class Table extends EventEmitter {
     if (location === "local" && this.boardDeck && !fromBoard)
       throw new TableError(403, "this table is played from its board right now (a developer setting); phones can't join at the table", "board-deck");
     if (!fromBoard && !exchange && location === "local" && (!joinToken || joinToken.toUpperCase() !== this.currentJoin().token))
-      throw new TableError(403, "join code is invalid or expired; scan the QR code again");
+      throw new TableError(403, "join code is invalid or expired (the table restarted, or a new code was made); scan the code the board shows now");
     if (location === "remote") this.assertRemoteRoom(remoteSession, old);
     // A player who left the running game (D-158) and scans the join code again with their name gets back the seat that
     // waits for them (D-172): the same player, so the game goes on with them as before; it takes no free seat.
