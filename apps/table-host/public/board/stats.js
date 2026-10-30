@@ -52,8 +52,8 @@ export function openStatistics({ summary, gameName, overlayRoot, edge = "south",
     <div class="stats-head"><h2>${esc(gameName ?? "Game")} · Awards and Results</h2>${turn}${backToGame ? `<button type="button" data-back-stats>Back to game</button>` : ""}<button type="button" class="primary" data-close-stats>Done</button></div>
     <div class="stats-body"><p class="stats-result">${esc(summary.text ?? "")}</p>
     <h4>Awards</h4>${awardsHtml}
-    ${summary.table ? `<h4>Statistics</h4>${table(summary.table, "game")}` : ""}
-    ${summary.play ? `<h4>Moves and time</h4>${table(summary.play, "play")}` : ""}
+    ${summary.table ? `<h4>Results</h4>${table(summary.table, "game")}` : ""}
+    ${summary.play ? `<h4>Statistics</h4>${table(summary.play, "play")}` : ""}
     ${changed ? `<p class="stats-note">* Another player took over this seat during the game.</p>` : ""}</div>
   </div>`;
   const panel = o.querySelector(".panel");
