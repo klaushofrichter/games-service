@@ -43,7 +43,8 @@ try:
         board.click(".overlay.settings [data-rule-distinct]")
         wait(lambda: a("GET", "/state")["rules"]["distinctAiStyles"] is False, 5, "different styles off")
         board.wait_for_selector(".overlay.settings .table-rules [data-rule-away='3'].on")
-        board.locator(".overlay.settings .table-rules").screenshot(path=os.path.join(OUT, "table-rules.png"))
+        # The whole page: the settings window redraws as the state comes in, so an element shot can lose its element.
+        board.screenshot(path=os.path.join(OUT, "table-rules.png"))
         board.click(".overlay.settings [data-close-overlay]")
 
         # During the game: locked, with the values.
