@@ -1722,4 +1722,8 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   description: the game's tile (the setting's default) and the window that chooses the game, which follows the fields
   as they change; a key that isn't one of the game's settings stays as written, and an on/off setting shows "on" or
   "off". Tables on an older release show the braces as written.
+- **D-239 · 2026-10-30 · Klaus** — In Awards and Results, the award holders' names are in their players' colours, as
+  the table has them now: a colour changed while the window is open changes the names too. *Implementation (Claude):*
+  `openStatistics` takes `colorOf(seat)`; the board gives the current players' colours and recolours an open window on
+  every state. The Game Viewer gives none (a past game keeps no colours), so its names stay brass.
 

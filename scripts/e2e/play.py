@@ -402,6 +402,17 @@ def endings(browser, board):
     if not summary["awards"]:
         board.wait_for_selector(".overlay.statistics >> text=No awards in this game.")
     assert board.locator(".overlay.statistics .stats-table.play tr").count() == 3, "moves and time for both players"
+    # Award holders in their players' colours (D-239), and a colour changed while the window is open follows.
+    COLOURS = """() => [...document.querySelectorAll('.overlay.statistics .award-name')].map((e) => [Number(e.dataset.seat), getComputedStyle(e).color])"""
+    hex_rgb = lambda h: f"rgb({int(h[1:3], 16)}, {int(h[3:5], 16)}, {int(h[5:7], 16)})"
+    if summary["awards"]:
+        by_seat = {pl["seat"]: pl for pl in api("GET", "/state")["players"] if pl["seat"] is not None}
+        for seat, colour in board.evaluate(COLOURS):
+            assert colour == hex_rgb(by_seat[seat]["color"]), (seat, colour, by_seat[seat]["color"])
+        seat = board.evaluate(COLOURS)[0][0]
+        new = next(c for c in ["#9d6bf0", "#f08a3c", "#ef8fcf"] if c not in {pl["color"] for pl in by_seat.values()})
+        api("POST", f"/players/{by_seat[seat]['id']}/color", {"color": new})
+        wait(lambda: all(c == hex_rgb(new) for s, c in board.evaluate(COLOURS) if s == seat), 5, "the award holder's new colour")
     board.screenshot(path=os.path.join(OUT, "statistics-south.png"))
     board.click(".overlay.statistics [data-face=east]")
     board.wait_for_timeout(500)  # the turn animates
