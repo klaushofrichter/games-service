@@ -1,5 +1,6 @@
 // Automated lobby tests: drive the board control API and fake decks against a real Table Host.
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { pickRandomAiOptions } from "../apps/table-host/src/table.ts";
 import { Deck, sleep, testHost, until } from "./helpers.ts";
 import { LogStore } from "../apps/table-host/src/logs.ts";
 import { replay } from "../apps/table-host/src/runtime.ts";
@@ -604,7 +605,9 @@ describe("AI configuration", () => {
       await t.ok("POST", "/game/select", { gameId: "roulette" });
       const again = await t.ok("GET", "/state");
       expect([early, late].map((id) => again.players.find((p: any) => p.id === id).aiOptions.style)).toEqual(before);
-      // It is random: over many new AI players, more than one value comes up.
+      // It is random: over many new AI players, more than one value comes up (with the table's rule for different
+      // styles off; on, the next one could only get the value nobody has, D-237).
+      await t.ok("POST", "/rules", { distinctAiStyles: false });
       const seen = new Set<string>();
       for (let k = 0; k < 24 && seen.size < 2; k++) {
         const { playerId } = await t.ok("POST", "/ai", {});
@@ -620,6 +623,48 @@ describe("AI configuration", () => {
       const start = t.host.table.runtime!.log[0] as any;
       expect(start.aiOptions[seatOf(early)]).toEqual({ style: before[0] });
       expect(start.aiOptions[seatOf(late)]).toEqual({ style: "erratic" });
+    } finally {
+      delete style.random;
+    }
+  });
+});
+
+describe("the table's rules (D-236, D-237)", () => {
+  it("are on the state, checked, and locked during a game", async () => {
+    expect((await t.ok("GET", "/state")).rules).toEqual({ awayToAi: 0, distinctAiStyles: true });
+    expect((await t.ok("POST", "/rules", { awayToAi: 5 })).rules).toEqual({ awayToAi: 5, distinctAiStyles: true });
+    expect((await t.ok("POST", "/rules", { distinctAiStyles: false })).rules).toEqual({ awayToAi: 5, distinctAiStyles: false });
+    expect((await t.api("POST", "/rules", { awayToAi: 4 })).status).toBe(400);
+    expect((await t.api("POST", "/rules", { distinctAiStyles: "yes" })).status).toBe(400);
+    const a = await t.joinDeck("Ann");
+    await t.ok("POST", "/game/select", { gameId: "coin-flip" });
+    await a.request("lobby", "ready", { ready: true });
+    await t.ok("POST", "/game/start");
+    expect((await t.api("POST", "/rules", { awayToAi: 3 })).status).toBe(409);
+    expect((await t.ok("GET", "/state")).rules.awayToAi).toBe(5);
+  });
+
+  it("gives AI players different random styles while there are some left (D-237)", async () => {
+    const style = t.host.table.games.get("roulette")!.manifest.ai.options[0];
+    style.random = true;
+    try {
+      await t.joinDeck("Ann");
+      await t.ok("POST", "/game/select", { gameId: "roulette" });
+      // Roulette has three styles: three AI players get all three, every time.
+      for (let round = 0; round < 6; round++) {
+        const ids: string[] = [];
+        for (let k = 0; k < 3; k++) ids.push((await t.ok("POST", "/ai", {})).playerId);
+        const s = await t.ok("GET", "/state");
+        const styles = ids.map((id) => s.players.find((p: any) => p.id === id).aiOptions.style);
+        expect(new Set(styles).size).toBe(3);
+        for (const id of ids) await t.ok("DELETE", `/players/${id}`);
+      }
+      // With every value taken, a new one gets any of them; without other AI players, any too.
+      const m = t.host.table.games.get("roulette")!.manifest;
+      const taken = style.values!.map((v) => ({ style: v }));
+      expect(style.values).toContain(pickRandomAiOptions(m, {} as { aiOptions?: Record<string, unknown> }, taken).aiOptions!.style);
+      const left = pickRandomAiOptions(m, {} as { aiOptions?: Record<string, unknown> }, taken.slice(1)).aiOptions!.style;
+      expect(left).toBe(style.values![0]);
     } finally {
       delete style.random;
     }

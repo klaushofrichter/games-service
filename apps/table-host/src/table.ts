@@ -61,6 +61,8 @@ export interface TableConfig {
   tableName: string;
   publicUrl: string; // e.g. http://192.168.1.20:8080
   graceMs: number; // how long a disconnected seat is held
+  /** A minute of the away-to-AI rule (D-236); shorter only for the browser tests (AWAY_TO_AI_MINUTE_MS). */
+  awayToAiMinuteMs?: number;
   aiDelayMs: number; // pause before an AI acts, so people can follow
   /** AI players wait until the table's board has shown everything (D-141); off for fast tests (BOARD_PACING=0). */
   boardPacing?: boolean;
@@ -114,6 +116,14 @@ export class Table extends EventEmitter {
   private selected: { game: InstalledGame; settings: Record<string, unknown> } | null = null;
   /** Sound effects on the boards (D-092); on until someone turns them off in the board's settings. */
   private sound = true;
+  /**
+   * The table's rules for games with AI players (D-236, D-237), set in the board's settings before a game: minutes a
+   * player of a running game may be away before an AI player takes their seat (0: never, D-159), and whether a random AI
+   * option avoids values other AI players have. In memory, so they last until a restart.
+   */
+  private awayToAi: 0 | 3 | 5 = 0;
+  private distinctAiStyles = true;
+  private awayToAiTimers = new Map<string, ReturnType<typeof setTimeout>>();
   /** Display choices per game id (D-088), set from the board's settings; in memory, so they last until a restart. */
   private prefs = new Map<string, Record<string, unknown>>();
   runtime: GameRuntime | null = null;
@@ -223,6 +233,7 @@ export class Table extends EventEmitter {
         .filter(([, m]) => m.shown)
         .map(([playerId, m]) => ({ playerId, seat: m.seat, since: m.startedAt, deadline: m.deadline })),
       display: { sound: this.sound },
+      rules: { awayToAi: this.awayToAi, distinctAiStyles: this.distinctAiStyles },
       away: this.awayPlayers(),
       exchange: this.exchangeInfo(),
       developer: { allowNoLocalPlayer: this.allowNoLocalPlayer, boardDeck: this.boardDeck, protectedPlayer: this.protectedPlayer()?.id ?? null },
@@ -776,6 +787,7 @@ export class Table extends EventEmitter {
     p.connected = true;
     if (wasAway && this.inRunningGame(p)) this.runtime!.noteConnection(p.seat!, true);
     this.awaySince.delete(p.id);
+    this.clearAwayToAi(p.id);
     if (this.waitingFor.delete(p.id)) this.syncPlayerPause(); // the game goes on when everyone it needs is back
     this.changed();
     return p;
@@ -837,7 +849,34 @@ export class Table extends EventEmitter {
       this.awaySince.set(p.id, Date.now());
       setTimeout(() => this.awaySince.has(p.id) && this.changed(), Table.AWAY_SHOW_MS + 50);
     } else p.graceTimer = setTimeout(() => this.removeAfterGrace(playerId), this.config.graceMs);
+    if (inGame) this.scheduleAwayToAi(p);
     this.changed();
+  }
+
+  /** With the table's rule on (D-236), a player of the running game away this long gets an AI player in their seat. */
+  private scheduleAwayToAi(p: Player) {
+    this.clearAwayToAi(p.id);
+    if (!this.awayToAi) return;
+    this.awayToAiTimers.set(p.id, setTimeout(() => this.awayToAiNow(p.id), this.awayToAi * (this.config.awayToAiMinuteMs ?? 60_000)));
+  }
+
+  private clearAwayToAi(playerId: string) {
+    const t = this.awayToAiTimers.get(playerId);
+    if (t) clearTimeout(t);
+    this.awayToAiTimers.delete(playerId);
+  }
+
+  /** The time is up: still away and still in the running game, the seat is exchanged for an AI player (as on the board). */
+  private awayToAiNow(playerId: string) {
+    this.awayToAiTimers.delete(playerId);
+    const p = this.players.get(playerId);
+    if (this.closed || !p || p.connected || !this.inRunningGame(p)) return;
+    try {
+      this.exchange(p.seat!, "ai");
+    } catch (e) {
+      // An exchange the board has open for this seat (or a game that just ended) wins; the seat stays as it is.
+      console.warn(`away player ${p.name} not replaced by an AI player: ${(e as Error).message}`);
+    }
   }
 
   // ---------- seats ----------
@@ -967,7 +1006,7 @@ export class Table extends EventEmitter {
     const target = seat ?? free[0];
     if (target === undefined || !free.includes(target)) throw new TableError(409, "no free seat");
     const p: Player = { id: newId("ai"), name: this.aiName(), kind: "ai", location: "local", seat: target, connected: true, ready: true, sessionToken: null, aiSeed: randomInt(2 ** 31) };
-    if (m) pickRandomAiOptions(m, p);
+    if (m) pickRandomAiOptions(m, p, this.otherAiOptions(p));
     this.players.set(p.id, p);
     if (this.phase === "ready") this.revalidateSelection();
     this.changed();
@@ -1332,7 +1371,7 @@ export class Table extends EventEmitter {
       // "Ann (AI)", the old name cut to fit twelve characters with the mark (D-148), unless taken.
       const base = current ? `${Array.from(current.name).slice(0, MAX_NAME - 5).join("").trim()} (AI)` : "";
       const name = base && !this.nameTaken(base) ? base : this.aiName();
-      const ai: Player = { id: newId("ai"), name, kind: "ai", location: "local", seat: null, connected: true, ready: true, sessionToken: null, aiSeed: randomInt(2 ** 31), aiOptions: aiDefaults(game.manifest, pickRandomAiOptions(game.manifest, {} as { aiOptions?: Record<string, unknown> }).aiOptions), ...(current?.kind === "human" ? { standsInFor: current.name } : {}) };
+      const ai: Player = { id: newId("ai"), name, kind: "ai", location: "local", seat: null, connected: true, ready: true, sessionToken: null, aiSeed: randomInt(2 ** 31), aiOptions: aiDefaults(game.manifest, pickRandomAiOptions(game.manifest, {} as { aiOptions?: Record<string, unknown> }, this.otherAiOptions({ id: current?.id })).aiOptions), ...(current?.kind === "human" ? { standsInFor: current.name } : {}) };
       this.players.set(ai.id, ai);
       this.takeSeat(ai, seat);
       return { playerId: ai.id };
@@ -1435,6 +1474,24 @@ export class Table extends EventEmitter {
     this.changed();
   }
 
+  /** The table's rules (D-236, D-237), changeable only outside a running game. */
+  setRules(r: unknown) {
+    const o = (r ?? {}) as { awayToAi?: unknown; distinctAiStyles?: unknown };
+    if (typeof r !== "object" || r === null || Array.isArray(r)) throw new TableError(400, "rules must be an object");
+    if (o.awayToAi !== undefined && ![0, 3, 5].includes(o.awayToAi as number)) throw new TableError(400, "awayToAi must be 0, 3 or 5 (minutes)");
+    if (o.distinctAiStyles !== undefined && typeof o.distinctAiStyles !== "boolean") throw new TableError(400, "distinctAiStyles must be true or false");
+    this.assertNotPlaying("change the table's rules");
+    if (o.awayToAi !== undefined) this.awayToAi = o.awayToAi as 0 | 3 | 5;
+    if (o.distinctAiStyles !== undefined) this.distinctAiStyles = o.distinctAiStyles;
+    this.changed();
+  }
+
+  /** The other AI players' options, when the table wants AI players to differ (D-237); none otherwise. */
+  private otherAiOptions(p: { id?: string }): Record<string, unknown>[] {
+    if (!this.distinctAiStyles) return [];
+    return [...this.players.values()].filter((q) => q.kind === "ai" && q.id !== p.id && q.seat !== null).map((q) => q.aiOptions ?? {});
+  }
+
   setDisplay(d: unknown) {
     const sound = (d as { sound?: unknown } | null)?.sound;
     if (typeof sound !== "boolean") throw new TableError(400, "sound must be true or false");
@@ -1478,7 +1535,7 @@ export class Table extends EventEmitter {
     this.placeLocalPlayer(g.manifest); // and the one player at the table on the game's edge (D-128b)
     this.summary = null;
     for (const p of this.players.values()) p.ready = p.kind === "ai";
-    for (const p of this.players.values()) if (p.kind === "ai") pickRandomAiOptions(g.manifest, p); // D-226
+    for (const p of this.players.values()) if (p.kind === "ai") pickRandomAiOptions(g.manifest, p, this.otherAiOptions(p)); // D-226, D-237
     this.phase = "ready";
     this.changed();
   }
@@ -2061,14 +2118,18 @@ const AI_NAMES = [
 
 /**
  * Options the manifest marks `random` (D-226) that this AI player doesn't have yet get a random value, kept on the
- * player, so the board shows it and it stays until changed. Returns the player.
+ * player, so the board shows it and it stays until changed. Values `others` (the other AI players' options) have are
+ * left out while any remain (D-237). Returns the player.
  */
-export function pickRandomAiOptions<P extends { aiOptions?: Record<string, unknown> }>(m: InstalledGame["manifest"], p: P): P {
+export function pickRandomAiOptions<P extends { aiOptions?: Record<string, unknown> }>(m: InstalledGame["manifest"], p: P, others: Record<string, unknown>[] = []): P {
   for (const o of m.ai.options) {
     if (!o.random || !o.values?.length) continue;
     const v = p.aiOptions?.[o.key];
     if (v !== undefined && o.values.includes(String(v))) continue;
-    p.aiOptions = { ...(p.aiOptions ?? {}), [o.key]: o.values[randomInt(o.values.length)] };
+    const taken = new Set(others.map((x) => String(x[o.key])));
+    const free = o.values.filter((x) => !taken.has(x));
+    const pool = free.length ? free : o.values;
+    p.aiOptions = { ...(p.aiOptions ?? {}), [o.key]: pool[randomInt(pool.length)] };
   }
   return p;
 }

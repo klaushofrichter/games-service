@@ -196,3 +196,54 @@ describe("players away during a game (D-144)", () => {
     expect((await state()).phase).toBe("active");
   });
 });
+
+describe("an away player replaced by an AI player (D-236)", () => {
+  async function partnersWithRule(minutes: 0 | 3 | 5) {
+    t = await testHost({ gamesDir: GAMES, showTestGames: true, awayToAiMinuteMs: 100 }); // a "minute" of 100 ms
+    await t.ok("POST", "/rules", { awayToAi: minutes });
+    const ann = await t.joinDeck("Ann");
+    const ben = await t.joinDeck("Ben");
+    await t.ok("POST", "/ai", {});
+    await t.ok("POST", "/ai", {});
+    await t.ok("POST", "/game/select", { gameId: "partners", settings: { mode: "free" } });
+    await ann.request("lobby", "ready", { ready: true });
+    await ben.request("lobby", "ready", { ready: true });
+    await t.ok("POST", "/game/start");
+    return { ann, ben };
+  }
+  const seatOf = (s: any, id: string) => s.players.find((p: any) => p.id === id)?.seat;
+
+  it("after the chosen minutes away, an AI player takes the seat, standing in for the person", async () => {
+    const { ann } = await partnersWithRule(3);
+    const seat = seatOf(await state(), ann.playerId);
+    ann.close();
+    await sleep(150);
+    expect(seatOf(await state(), ann.playerId)).toBe(seat); // not yet: 3 "minutes" are 300 ms
+    const s = await until(async () => {
+      const now = await state();
+      return now.players.find((p: any) => p.seat === seat && p.kind === "ai") ? now : null;
+    });
+    expect(s.players.find((p: any) => p.seat === seat)).toMatchObject({ kind: "ai", name: "Ann (AI)" });
+    expect(s.phase).toBe("active");
+    expect(s.away).toEqual([]);
+  });
+
+  it("not if the player comes back in time, and never with the rule off (D-159)", async () => {
+    const { ann } = await partnersWithRule(3);
+    const seat = seatOf(await state(), ann.playerId);
+    ann.close();
+    await sleep(150);
+    const again = await Deck.connect(t.base, { sessionToken: ann.sessionToken });
+    await sleep(400); // past the 300 ms
+    expect((await state()).players.find((p: any) => p.seat === seat)).toMatchObject({ id: ann.playerId, kind: "human" });
+    again.close();
+    await t.close();
+
+    const off = await partnersWithRule(0);
+    const seat2 = seatOf(await state(), off.ann.playerId);
+    off.ann.close();
+    await sleep(700);
+    expect((await state()).players.find((p: any) => p.seat === seat2)).toMatchObject({ id: off.ann.playerId, kind: "human", connected: false });
+  });
+});
+

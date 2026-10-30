@@ -299,6 +299,12 @@ export interface LobbyState {
   /** The table's display choices from the board's settings (D-092), followed by every board, remote ones too. */
   display: { sound: boolean };
   /**
+   * The table's rules for games with AI players, set in the board's settings outside a game: `awayToAi`, the minutes a
+   * player of a running game may be away before an AI player takes their seat (0: never, D-159, D-236);
+   * `distinctAiStyles`, a random AI option avoids values other AI players have (D-237).
+   */
+  rules: { awayToAi: 0 | 3 | 5; distinctAiStyles: boolean };
+  /**
    * Players away during the game, whose seat waits (D-144); the board offers to exchange them (D-159). `left`: they
    * left the game from their phone (D-158) and won't come back to it.
    */

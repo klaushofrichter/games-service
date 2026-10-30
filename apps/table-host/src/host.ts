@@ -52,6 +52,7 @@ export async function startHost(o: HostOptions = {}) {
     tableName: o.tableName ?? "Game Table",
     publicUrl: o.publicUrl ?? "",
     graceMs: o.graceMs ?? DECK_GRACE_MS,
+    awayToAiMinuteMs: o.awayToAiMinuteMs ?? 60_000,
     aiDelayMs: o.aiDelayMs ?? 800,
     boardPacing: o.boardPacing ?? true,
     boardPaceTimeoutMs: o.boardPaceTimeoutMs ?? 20_000,

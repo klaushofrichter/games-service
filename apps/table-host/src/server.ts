@@ -85,8 +85,9 @@ const REMOTE_DENIED = /^\/(join|simulation|logs|saves|invites|remote|qr|cloud|de
  * board (remote boards face their own seat), remove or move players, add AI seats, change AI options,
  * save, or resume — those stay with the people at the table. "Play now" for an AI that is out of time (D-112) and
  * skipping a game's wait (D-136) are moves of the running game, so remote players with board control may tap them too.
+ * The table's rules (D-236, D-237) go with the game settings.
  */
-const REMOTE_ACTIONS = /^\/(layout|exchange|game\/(select|start|end|close|play-now|skip-timer|settings)|players\/[\w-]+\/(color|ai-options)|watchers\/[\w-]+(\/play)?)$/;
+const REMOTE_ACTIONS = /^\/(layout|exchange|rules|game\/(select|start|end|close|play-now|skip-timer|settings)|players\/[\w-]+\/(color|ai-options)|watchers\/[\w-]+(\/play)?)$/;
 
 const MIME: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
@@ -400,6 +401,7 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
     if (m === "POST" && path === "/game/start") return (table.start(), ok());
     if (m === "POST" && path === "/game/end") return (table.end(), ok());
     if (m === "POST" && path === "/display") return (table.setDisplay(body), ok());
+    if (m === "POST" && path === "/rules") return (table.setRules(body), ok());
     if (m === "POST" && path === "/game/settings") return (table.updateSettings(body.settings), ok());
     if (m === "POST" && path === "/game/prefs") return (table.setPrefs(body.prefs), ok());
     if (m === "POST" && path === "/game/close") return (table.close(), ok());
