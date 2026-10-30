@@ -1723,3 +1723,8 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   as they change; a key that isn't one of the game's settings stays as written, and an on/off setting shows "on" or
   "off". Tables on an older release show the braces as written.
 
+- **D-240 · 2026-10-30 · Klaus** — Played from the board (D-175), the lobby's side panel is titled *Single local
+  player* and says how to get the QR code back: "The deck beside the board is the one player at the table. Enable
+  multiple local players and the local QR code in the Developer settings." It has no *Invite remote player…* of its
+  own: the lobby's button row has one.
+

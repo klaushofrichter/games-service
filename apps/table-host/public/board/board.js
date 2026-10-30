@@ -1182,10 +1182,9 @@ function remoteJoinText() {
 
 function joinPanel() {
   if (REMOTE) return "";
-  // Played from the board (D-175): no phone joins at the table, so no code to scan.
-  if (state.developer?.boardDeck) return `<aside class="join board-deck"><div class="eyebrow">Played from the board</div>
-    <p class="faint">The deck beside the board is the one player at the table (Developer settings). Remote players come with an invite.</p>
-    <div class="right">${inviteButton("Invite remote player…")}</div></aside>`;
+  // Played from the board (D-175): no phone joins at the table, so no code to scan. The lobby has its own invite (D-240).
+  if (state.developer?.boardDeck) return `<aside class="join board-deck"><div class="eyebrow">Single local player</div>
+    <p class="faint">The deck beside the board is the one player at the table. Enable multiple local players and the local QR code in the Developer settings.</p></aside>`;
   const code = state.joinUrl.split("/").pop();
   // No free seat (D-129): the code still works for nobody, so the panel says so; a phone that scans it is told too.
   if (state.noSeat) return `<aside class="join full">
