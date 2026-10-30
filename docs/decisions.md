@@ -1716,4 +1716,10 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   not the same one twice. *Implementation (Claude):* `pickRandomAiOptions` leaves out the other seated AI players'
   values (`POST /rules {distinctAiStyles}`, state `rules`), for a new AI player, for the game being chosen and for an
   exchange to an AI player.
+- **D-238 · 2026-10-30 · Klaus** — A game's description may name its settings: `{key}` shows that setting's value, so
+  a description that says "be the first to {target} points" says 8 when 8 is chosen. *Why:* a description with a fixed
+  number contradicted the setting right beside it. *Implementation (Claude):* the board fills it in where it shows the
+  description: the game's tile (the setting's default) and the window that chooses the game, which follows the fields
+  as they change; a key that isn't one of the game's settings stays as written, and an on/off setting shows "on" or
+  "off". Tables on an older release show the braces as written.
 
