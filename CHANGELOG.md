@@ -8,6 +8,7 @@ history.
 
 ## [Unreleased]
 
+- Table rules in the board's settings: an away player can be replaced by an AI player after 3 or 5 minutes (off by default, D-236), and AI players get different play styles (on by default, D-237).
 - Developer guide: *Badges on seat plates*, the convention for a tab such as *Winner* on a player's seat plate, and the cookbook's request for it (D-235).
 - In the lobby, an AI player's seat plate shows its play style or strength after *Ready*, on the same line (D-234).
 - Awards and Results, opened from a game's last screen, has *Back to game* beside *Done*: it shows the game's last screen again (D-233).
