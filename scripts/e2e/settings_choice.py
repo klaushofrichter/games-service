@@ -45,7 +45,11 @@ try:
         field = board.locator(".dialog.form input[name=seed]")
         field.wait_for()
         assert field.is_disabled() and field.input_value() == "", "the seed should be disabled and blank for a fixed board"
+        # What the chosen board means, under the setting, following the choice (D-246).
+        hint = board.locator(".dialog.form [data-hint=board]")
+        assert hint.inner_text() == "The same board every game.", hint.inner_text()
         board.select_option(".dialog.form select[name=board]", "random")
+        assert hint.inner_text() == "A new board from a seed.", hint.inner_text()
         assert not field.is_disabled() and field.input_value().isdigit(), f"no fresh seed: {field.input_value()!r}"
         field.fill("")
         field.type("1e-2.3--4567890")
@@ -81,8 +85,10 @@ try:
         # A setting that applies only with another (D-245): no seed row for a fixed board; choosing random draws one,
         # which the number pad changes (digits, Clear, Enter), turning with the board.
         assert board.locator(".game-rules .row", has_text="Board's seed").count() == 0, "a seed row for a fixed board"
+        assert "The same board every game." in board.locator(".game-rules .row", has_text="Board").first.inner_text(), "no description under the board setting (D-246)"
         board.locator(".game-rules [data-setting=board][data-value=random]").click()
         wait(lambda: a("GET", "/state")["game"]["settings"]["seed"] >= 1, 5, "a random seed")
+        wait(lambda: "A new board from a seed." in board.locator(".game-rules .row", has_text="Board").first.inner_text(), 5, "the description to follow the choice")
         seed = board.locator(".game-rules [data-setting-pad=seed]")
         seed.wait_for(timeout=5000)
         assert seed.inner_text().strip() == str(a("GET", "/state")["game"]["settings"]["seed"])

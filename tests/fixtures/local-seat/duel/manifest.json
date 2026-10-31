@@ -78,7 +78,11 @@
         "random"
       ],
       "default": "fixed",
-      "label": "Board"
+      "label": "Board",
+      "hints": {
+        "fixed": "The same board every game.",
+        "random": "A new board from a seed."
+      }
     },
     {
       "key": "seed",

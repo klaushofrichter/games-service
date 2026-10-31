@@ -179,6 +179,8 @@ function settingActive(f, values, fields = []) {
     return [].concat(want).map(String).includes(String(v));
   });
 }
+/** What a choice means (D-246): a setting's `hints` for its value, e.g. a board's description; "" without one. */
+const hintFor = (f, v) => (f.hints && f.hints[String(v)]) || "";
 /** A fresh value for an int setting with `random: true` (D-245), e.g. a board's seed: from max(min, 1) to max. */
 const randomFor = (f) => {
   const lo = Math.max(f.min ?? 1, 1);
@@ -243,7 +245,7 @@ function formDialog(title, intro, fields, values = {}, okLabel = "OK", removeLab
       return `<input type="text" name="${f.key}" value="${esc(v ?? "")}">`;
     };
     d.innerHTML = `<div class="dialog form"><h2>${esc(title)}</h2>${intro ? `<div class="muted form-intro">${esc(withSettings(intro, fields, values))}</div>` : ""}
-      <div class="fields">${fields.map((f) => `<label><span>${esc(f.label ?? f.key)}</span>${input(f)}</label>`).join("") || `<div class="faint">${state?.game ? "Nothing to set for this game." : "Pick a game to choose how it plays."}</div>`}</div>
+      <div class="fields">${fields.map((f) => `<label><span>${esc(f.label ?? f.key)}</span>${input(f)}${f.hints ? `<small class="field-hint" data-hint="${f.key}">${esc(hintFor(f, now[f.key] ?? f.default))}</small>` : ""}</label>`).join("") || `<div class="faint">${state?.game ? "Nothing to set for this game." : "Pick a game to choose how it plays."}</div>`}</div>
       ${note ? `<div class="faint form-note">${linkified(note)}</div>` : ""}
       <div class="actions">${removeLabel ? `<button class="danger" data-x="remove" style="margin-right:auto">${esc(removeLabel)}</button>` : ""}<button data-x="no">Cancel</button><button class="primary" data-x="yes">${esc(okLabel)}</button></div></div>`;
     // The description follows the settings while they change (D-238): "first to 8 points" as 8 is typed.
@@ -275,7 +277,12 @@ function formDialog(title, intro, fields, values = {}, okLabel = "OK", removeLab
         }
       }
     };
-    const follow = (e) => (e && digitsOnly(e), whens(), introEl() && (introEl().textContent = withSettings(intro, fields, current())));
+    // A choice's description follows the choice (D-246).
+    const hints = () => {
+      const vals = current();
+      for (const el of d.querySelectorAll("[data-hint]")) el.textContent = hintFor(fields.find((f) => f.key === el.dataset.hint), vals[el.dataset.hint]);
+    };
+    const follow = (e) => (e && digitsOnly(e), whens(), hints(), introEl() && (introEl().textContent = withSettings(intro, fields, current())));
     d.addEventListener("input", follow);
     d.addEventListener("change", follow);
     d.addEventListener("click", (e) => {
@@ -852,7 +859,10 @@ function openSettings() {
     };
     const gameSettings = fields.length
       ? `<div class="group game-rules ${editable ? "" : "locked"}"><div class="eyebrow">${esc(state.game.name)} · game settings${editable ? "" : ` <span class="lock" aria-label="locked">🔒 locked during the game</span>`}</div>
-          ${fields.filter((f) => settingActive(f, cur, fields)).map((f) => `<div class="row"><span>${esc(f.label ?? f.key)}</span>${setting(f)}</div>`).join("")}
+          ${fields.filter((f) => settingActive(f, cur, fields)).map((f) => {
+            const hint = hintFor(f, cur[f.key] ?? f.default); // what the choice means (D-246)
+            return `<div class="row ${hint ? "with-hint" : ""}"><span>${esc(f.label ?? f.key)}${hint ? `<small class="row-hint">${esc(hint)}</small>` : ""}</span>${setting(f)}</div>`;
+          }).join("")}
           ${editable ? "" : `<div class="faint" style="font-size:.7em;margin-top:6px">These can be changed before the game starts.</div>`}</div>`
       : "";
     // The table's rules for games with AI players (D-236, D-237): outside a game only, like the game settings.
@@ -879,7 +889,11 @@ function openSettings() {
       ${(state.watchers ?? []).length ? `<div class="group player-colors watchers-group"><div class="eyebrow">Watching</div>${watcherRows()}<div class="faint group-note">${WATCHER_NOTE}</div></div>` : ""}
       ${gameSettings}
       ${tableRules}
-      ${items.length ? `<div class="group game-settings"><div class="eyebrow">${esc(state.game.name)}</div>${items.map((it, k) => `<div class="row"><span>${esc(it.label)}</span>${control(it, k)}</div>`).join("")}</div>` : ""}
+      ${items.length ? `<div class="group game-settings"><div class="eyebrow">${esc(state.game.name)}</div>${items.map((it, k) => {
+        // A choice option's `hint` says what the chosen one means (D-246).
+        const hint = it.type === "choice" ? it.options?.find((op) => op.value === it.value)?.hint ?? "" : "";
+        return `<div class="row ${hint ? "with-hint" : ""}"><span>${esc(it.label)}${hint ? `<small class="row-hint">${esc(hint)}</small>` : ""}</span>${control(it, k)}</div>`;
+      }).join("")}</div>` : ""}
       <div class="actions settings-actions"><button class="primary" data-close-overlay>Done</button></div></div>`);
   };
   const close = () => {
