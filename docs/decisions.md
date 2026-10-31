@@ -1766,3 +1766,8 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   and its field's frame shows whole; before a game is chosen *Leave* sits beside it; the deck beside the board starts
   with "Player N" too. "Another screen on this LAN" (was WiFi).
 
+- **D-246 · 2026-10-31 · Klaus** — A choice can say what its options mean: a setting's `hints` (`{ value: text }`) show
+  the chosen value's text under it, in the window that chooses the game (following the choice as it changes) and in the
+  settings window; a game's own `choice` item takes a `hint` per option the same way. For boards with a name, e.g.
+  "Six forests on strong numbers: wood in plenty."
+

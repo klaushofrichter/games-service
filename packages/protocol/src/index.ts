@@ -64,6 +64,8 @@ const settingSchema = z.object({
   when: z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.array(z.union([z.string(), z.number(), z.boolean()]))])).optional(),
   /** An int that gets a fresh random value, from max(min, 1) to max, whenever it comes to apply (D-245): a seed. */
   random: z.boolean().optional(),
+  /** What each value means, shown under the setting for the one chosen (D-246), e.g. a board's description. */
+  hints: z.record(z.string(), z.string()).optional(),
 });
 
 /** An AI player's option (play style, level): a setting that may also be picked at random (D-226). */

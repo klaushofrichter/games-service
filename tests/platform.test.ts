@@ -155,6 +155,8 @@ describe("game settings", () => {
       ],
     });
     expect(w.settings[1]).toMatchObject({ when: { board: "random" }, random: true }); // kept by the schema
+    const h = manifestSchema.parse({ ...base, settings: [{ key: "board", type: "enum", values: ["a", "b"], default: "a", hints: { a: "The first.", b: "The second." } }] });
+    expect(h.settings[0].hints).toEqual({ a: "The first.", b: "The second." }); // and the descriptions of the values (D-246)
     expect(settingsWithDefaults(w, { board: "random", seed: 4242 })).toEqual({ board: "random", seed: 4242 });
     expect(settingsWithDefaults(w, { board: "beginner", seed: 4242 })).toEqual({ board: "beginner", seed: 0 });
   });

@@ -8,6 +8,7 @@ history.
 
 ## [Unreleased]
 
+- A choice can describe its options (`hints`, a choice item's `hint`): the chosen one's text shows under the setting (D-246).
 - Game settings can depend on others (`when`) and draw a fresh value (`random`, a seed); whole numbers take digits only, and a wide one is typed on the board's number pad, also a game's own `number` setting. Deck: Change name at the top, Leave beside it, a default name beside the board (D-245).
 - A phone joining by QR code, and a player's invite, start with the name "Player N", which they can change; a game's settings may show a line of text (D-244).
 - `scripts/local-table.sh` says phones must be on the computer's WiFi and warns when the QR code's address does not answer; a new e2e check opens that address on a phone page (D-243).

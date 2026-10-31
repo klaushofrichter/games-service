@@ -536,3 +536,6 @@ button.pad-value { min-width: 120px; font: 600 1em var(--mono); letter-spacing: 
 /* A game's text under an AI player's options, such as an engine's licence (D-224). */
 .dialog.form .form-note { font-size: .7em; line-height: 1.45; margin-top: 12px; overflow-wrap: anywhere; }
 .dialog.form .form-note a { color: inherit; }
+/* What a choice means, under the setting (D-246): a board's description. */
+.dialog .fields .field-hint { font-size: 0.9em; color: var(--ink-faint); line-height: 1.3; min-height: 1.3em; }
+.row-hint { display: block; font-size: 0.75em; color: var(--ink-soft); margin-top: 2px; line-height: 1.3; max-width: 520px; }
