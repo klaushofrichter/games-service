@@ -40,6 +40,18 @@ try:
         assert "Pace: no limit (" in intro.inner_text(), intro.inner_text()
         board.select_option(".dialog.form select[name=pace]", "quick")
         assert "Pace: quick (" in intro.inner_text(), intro.inner_text()
+        # The window that chooses the game: the seed disabled and blank for a fixed board, a fresh one for random; only
+        # digits typed (no "e", ".", "-"), at most six.
+        field = board.locator(".dialog.form input[name=seed]")
+        field.wait_for()
+        assert field.is_disabled() and field.input_value() == "", "the seed should be disabled and blank for a fixed board"
+        board.select_option(".dialog.form select[name=board]", "random")
+        assert not field.is_disabled() and field.input_value().isdigit(), f"no fresh seed: {field.input_value()!r}"
+        field.fill("")
+        field.type("1e-2.3--4567890")
+        assert field.input_value() == "123456", field.input_value()
+        board.select_option(".dialog.form select[name=board]", "fixed")
+        assert field.is_disabled() and field.input_value() == ""
         board.click(".dialog.form [data-x=no]")
         a("POST", "/game/select", {"gameId": "duel"})
         board.click("#settings-button")
@@ -65,6 +77,34 @@ try:
         board.locator(".game-rules [data-setting=side][data-value=right]").click()
         wait(lambda: a("GET", "/state")["game"]["settings"]["side"] == "right", 5, "side to become right")
         assert a("GET", "/state")["game"]["settings"]["pace"] == "quick", "changing one setting must keep the other"
+
+        # A setting that applies only with another (D-245): no seed row for a fixed board; choosing random draws one,
+        # which the number pad changes (digits, Clear, Enter), turning with the board.
+        assert board.locator(".game-rules .row", has_text="Board's seed").count() == 0, "a seed row for a fixed board"
+        board.locator(".game-rules [data-setting=board][data-value=random]").click()
+        wait(lambda: a("GET", "/state")["game"]["settings"]["seed"] >= 1, 5, "a random seed")
+        seed = board.locator(".game-rules [data-setting-pad=seed]")
+        seed.wait_for(timeout=5000)
+        assert seed.inner_text().strip() == str(a("GET", "/state")["game"]["settings"]["seed"])
+        seed.click()
+        pad = board.locator(".overlay.number-pad")
+        pad.wait_for()
+        pad.locator("[data-clear]").click()
+        assert pad.locator("[data-enter]").is_disabled(), "Enter with nothing typed"
+        for k in "4242":
+            pad.locator(f"[data-key='{k}']").click()
+        board.screenshot(path=os.path.join(OUT, "settings-number-pad.png"))
+        # It turns with the board while open (D-245).
+        before = pad.locator(".panel").evaluate("e => e.style.transform")
+        a("POST", "/rotate", {"degrees": 90})
+        wait(lambda: pad.locator(".panel").evaluate("e => e.style.transform") != before, 5, "the pad to turn with the board")
+        a("POST", "/rotate", {"degrees": 180}); a("POST", "/rotate", {"degrees": 90})
+        pad.locator("[data-enter]").click()
+        wait(lambda: a("GET", "/state")["game"]["settings"]["seed"] == 4242, 5, "the seed typed on the pad")
+        board.locator(".game-rules [data-setting=board][data-value=fixed]").click()
+        wait(lambda: a("GET", "/state")["game"]["settings"]["seed"] == 0, 5, "the seed back at its default")
+        board.click(".overlay.settings [data-close-overlay]")
+
         br.close()
 finally:
     proc.terminate()

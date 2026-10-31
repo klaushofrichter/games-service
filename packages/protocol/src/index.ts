@@ -59,6 +59,11 @@ const settingSchema = z.object({
   label: z.string().optional(),
   /** How far one tap on − or + moves a number in the board's settings (D-090). */
   step: z.number().positive().optional(),
+  /** Applies only when other settings have these values (D-245), e.g. `{ "board": "random" }` or a list of values;
+   *  otherwise it is disabled, left out of the settings window and kept at its default. */
+  when: z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.array(z.union([z.string(), z.number(), z.boolean()]))])).optional(),
+  /** An int that gets a fresh random value, from max(min, 1) to max, whenever it comes to apply (D-245): a seed. */
+  random: z.boolean().optional(),
 });
 
 /** An AI player's option (play style, level): a setting that may also be picked at random (D-226). */

@@ -146,6 +146,19 @@ describe("game settings", () => {
     expect(settingsWithDefaults(m, { rounds: "4.6", speed: "fast", cheat: true })).toEqual({ rounds: 5, speed: "fast" });
   });
 
+  it("keeps a setting that applies only with others at its default when they don't match (D-245)", () => {
+    const w = manifestSchema.parse({
+      ...base,
+      settings: [
+        { key: "board", type: "enum", values: ["beginner", "random"], default: "beginner" },
+        { key: "seed", type: "int", min: 0, max: 999999, default: 0, when: { board: "random" }, random: true },
+      ],
+    });
+    expect(w.settings[1]).toMatchObject({ when: { board: "random" }, random: true }); // kept by the schema
+    expect(settingsWithDefaults(w, { board: "random", seed: 4242 })).toEqual({ board: "random", seed: 4242 });
+    expect(settingsWithDefaults(w, { board: "beginner", seed: 4242 })).toEqual({ board: "beginner", seed: 0 });
+  });
+
   it("refuses values outside the declared range or set", () => {
     // The refusal names the setting by its label when it has one, else by its key (D-146).
     const label = m.settings.find((x) => x.key === "rounds")?.label;

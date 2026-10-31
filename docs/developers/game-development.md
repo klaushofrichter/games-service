@@ -125,7 +125,7 @@ the SDK by path (`../../packages/sdk/src/index.ts`); games in other repositories
 | `edges` | Edges seats may be on; must include `north` and `south`. |
 | `localSeat` | Optional edge for a single person at the table when everyone else is remote or AI (they are moved there at the start). For games whose board has a front, like chess. |
 | `dynamicPlayers` | `true`: people who join during a game get a free seat and `onSeatJoined` is called. Default `false`: newcomers wait for the next game. |
-| `settings` | Game options set on the board before the start: `{ key, type: "int" \| "number" \| "string" \| "bool" \| "enum", min?, max?, step?, values?, default?, label? }`. The rules get them in `setup`. |
+| `settings` | Game options set on the board before the start: `{ key, type: "int" \| "number" \| "string" \| "bool" \| "enum", min?, max?, step?, values?, default?, label?, when?, random? }`. `when: { other: value \| [values] }` makes a setting apply only with those values of others (disabled and blank otherwise, kept at its default); `random: true` gives an int a fresh value from max(min, 1) to max whenever it comes to apply (a board's seed). Whole numbers take digits only; one with a wide range is typed on the board's number pad. The rules get them in `setup`. |
 | `ai` | `{ supported, options, timeoutSeconds = 20 (1–600), worker = false, hostConfig = [], notice? }`. `options` uses the settings format (e.g. a play style), plus `random: true` on an enum to give each new AI player a random value (D-226); each AI player has its own values, shown beside its name in the board's settings. `notice` (up to 600 characters, plain text, `https://` links become links) shows under the AI player's options on the board: credit and licence for an engine the AI uses (D-224). Section 7. |
 | `simulation` | `{ supported, headless }`: AI-only games for testing, without a board. |
 | `boardIntents` | Intent names players may also send by touching the board (section 9). |
@@ -377,8 +377,9 @@ export function settings({ info, setPrefs }) { return []; } // optional: items f
   true (not while the game is paused) and resolves with `{ ok, reason }`. Use it for a pause on a result ("Next hand").
 - **Settings:** `settings({ info, setPrefs })` returns items `{ type: "toggle" | "choice" | "swatches" | "button" |
   "text", label, value, options, onChange }`: a `choice` takes `options: [{ value, label }]` (a pulldown above three),
-  `swatches` takes `options: ["#rrggbb", …]`, a `button` shows `action` (or `label`) and calls `onChange()`, and a
-  `text` only shows its `value` (e.g. a board's seed). `setPrefs(patch)` stores display choices for this game (`info.prefs`), never
+  `swatches` takes `options: ["#rrggbb", …]`, a `button` shows `action` (or `label`) and calls `onChange()`, a
+  `text` only shows its `value` (e.g. a board's seed), and a `number` shows its `value` and opens the board's number pad
+  (digits, Clear, Enter; `min`, `max`), calling `onChange(n)`. `setPrefs(patch)` stores display choices for this game (`info.prefs`), never
   rules.
 - **Sound:** `playSound(info, name, make)` from the board kit plays only when the table's sound is on (`info.sound`).
   A browser other than the table's kiosk plays it only after the board has been touched; the platform wakes it on the

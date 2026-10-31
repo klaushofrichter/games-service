@@ -169,6 +169,43 @@ function numberProblem(f, raw) {
 }
 
 /**
+ * A setting that applies only with certain values of others (D-245): `when: { board: "random" }` (a value or a list of
+ * them). Otherwise it is disabled and blank in forms, left out of the settings window, and keeps its default.
+ */
+function settingActive(f, values, fields = []) {
+  if (!f.when) return true;
+  return Object.entries(f.when).every(([k, want]) => {
+    const v = values[k] ?? fields.find((x) => x.key === k)?.default;
+    return [].concat(want).map(String).includes(String(v));
+  });
+}
+/** A fresh value for an int setting with `random: true` (D-245), e.g. a board's seed: from max(min, 1) to max. */
+const randomFor = (f) => {
+  const lo = Math.max(f.min ?? 1, 1);
+  const hi = f.max ?? 999999;
+  return lo + Math.floor(Math.random() * (hi - lo + 1));
+};
+/** Digits an int field takes at most (D-245): those of its largest value, plus a minus sign when it may be negative. */
+const intDigits = (f) => (f.max !== undefined ? String(Math.trunc(Math.abs(f.max))).length : 9) + ((f.min ?? 0) < 0 ? 1 : 0);
+/** A whole number as typed: digits only (a leading minus where negatives are allowed), at most intDigits (D-245). */
+const intTyped = (f, raw) => {
+  const neg = (f.min ?? 0) < 0 && String(raw).trim().startsWith("-");
+  return ((neg ? "-" : "") + String(raw).replace(/\D/g, "")).slice(0, intDigits(f));
+};
+/**
+ * The settings to send when one changes (D-245): with it, any `random` setting that only now applies gets a fresh
+ * value (choosing a random board draws a new seed).
+ */
+function settingPatch(key, value) {
+  const fields = gameFields();
+  const before = { ...(state.game?.settings ?? {}) };
+  const after = { ...before, [key]: value };
+  const patch = { [key]: value };
+  for (const f of fields) if (f.random && f.when && settingActive(f, after, fields) && !settingActive(f, before, fields)) patch[f.key] = randomFor(f);
+  return patch;
+}
+
+/**
  * A small form for manifest-described fields (game settings, AI options). Resolves with the values,
  * or null when cancelled. With `removeLabel`, a red button on the left resolves with "remove" (D-103).
  */
@@ -193,8 +230,13 @@ function formDialog(title, intro, fields, values = {}, okLabel = "OK", removeLab
   return new Promise((resolve) => {
     const d = document.createElement("div");
     d.className = "dialog-backdrop";
+    const now = { ...values };
     const input = (f) => {
-      const v = values[f.key] ?? f.default;
+      let v = values[f.key] ?? f.default;
+      // A setting that doesn't apply now (D-245): disabled and blank; a random one that does, with a fresh value.
+      if (!settingActive(f, now, fields)) return `<input type="text" name="${f.key}" value="" disabled>`;
+      if (f.random && (v === undefined || v === f.default)) v = now[f.key] = randomFor(f);
+      if (f.type === "int") return `<input type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off" maxlength="${intDigits(f)}" name="${f.key}" value="${esc(v)}">`;
       if (f.type === "enum") return `<select name="${f.key}">${f.values.map((x) => `<option ${String(v) === x ? "selected" : ""}>${esc(x)}</option>`).join("")}</select>`;
       if (f.type === "bool") return `<input type="checkbox" name="${f.key}" ${v ? "checked" : ""}>`;
       if (f.type === "int" || f.type === "number") return `<input type="number" name="${f.key}" value="${esc(v)}" ${f.min !== undefined ? `min="${f.min}"` : ""} ${f.max !== undefined ? `max="${f.max}"` : ""}>`;
@@ -208,9 +250,32 @@ function formDialog(title, intro, fields, values = {}, okLabel = "OK", removeLab
     const introEl = () => d.querySelector(".form-intro");
     const current = () => Object.fromEntries(fields.map((f) => {
       const el = d.querySelector(`[name="${f.key}"]`);
-      return [f.key, f.type === "bool" ? el.checked : f.type === "int" || f.type === "number" ? (el.value === "" ? f.default : Number(el.value)) : el.value];
+      return [f.key, f.type === "bool" ? el.checked : f.type === "int" || f.type === "number" ? (el.value === "" || el.disabled ? f.default : Number(el.value)) : el.value];
     }));
-    const follow = () => introEl() && (introEl().textContent = withSettings(intro, fields, current()));
+    // Only digits in a whole number (D-245): "e", ".", "-" and "--" were let through by number fields.
+    const digitsOnly = (e) => {
+      const f = fields.find((x) => x.key === e.target.name);
+      if (f?.type !== "int") return;
+      const v = intTyped(f, e.target.value);
+      if (v !== e.target.value) e.target.value = v;
+    };
+    // Settings that apply only with others (D-245) follow them: disabled and blank, or back with a fresh random value.
+    const whens = () => {
+      const vals = current();
+      for (const f of fields) {
+        if (!f.when) continue;
+        const el = d.querySelector(`[name="${f.key}"]`);
+        const on = settingActive(f, vals, fields);
+        if (on === !el.disabled) continue;
+        el.disabled = !on;
+        if (!on) el.value = "";
+        else {
+          el.value = String(f.random ? randomFor(f) : f.default ?? "");
+          if (f.type === "int") Object.assign(el, { inputMode: "numeric", maxLength: intDigits(f) });
+        }
+      }
+    };
+    const follow = (e) => (e && digitsOnly(e), whens(), introEl() && (introEl().textContent = withSettings(intro, fields, current())));
     d.addEventListener("input", follow);
     d.addEventListener("change", follow);
     d.addEventListener("click", (e) => {
@@ -222,6 +287,7 @@ function formDialog(title, intro, fields, values = {}, okLabel = "OK", removeLab
         for (const f of fields) {
           if (f.type !== "int" && f.type !== "number") continue;
           const el = d.querySelector(`[name="${f.key}"]`);
+          if (el.disabled) continue; // doesn't apply now (D-245)
           const problem = numberProblem(f, el.value);
           if (problem) {
             noticeDialog("Check this setting", problem).then(() => {
@@ -234,7 +300,7 @@ function formDialog(title, intro, fields, values = {}, okLabel = "OK", removeLab
         out = {};
         for (const f of fields) {
           const el = d.querySelector(`[name="${f.key}"]`);
-          out[f.key] = f.type === "bool" ? el.checked : f.type === "int" || f.type === "number" ? Number(el.value) : el.value;
+          out[f.key] = el.disabled ? f.default : f.type === "bool" ? el.checked : f.type === "int" || f.type === "number" ? Number(el.value) : el.value;
         }
       }
       d.remove();
@@ -721,6 +787,7 @@ function openSettings() {
     if (it.type === "toggle") return `<button data-item="${k}" class="${it.value ? "on" : ""}" role="switch" aria-checked="${!!it.value}">${it.value ? "On" : "Off"}</button>`;
     if (it.type === "button") return `<button data-item="${k}">${esc(it.action ?? it.label)}</button>`;
     if (it.type === "text") return `<span class="value">${esc(it.value ?? "")}</span>`; // shown only (D-244)
+    if (it.type === "number") return `<button class="pad-value" data-item="${k}">${esc(it.value ?? "")}</button>`; // typed on the number pad (D-245)
     if (it.type === "swatches")
       return `<span class="swatches">${it.options.map((c, i) => `<button class="swatch ${c === it.value ? "on" : ""}" style="--c:${esc(c)}" data-item="${k}" data-val="${i}" aria-label="${esc(it.label)}: colour ${i + 1}"></button>`).join("")}</span>`;
     if (it.options.length > SEG_MAX) return pulldown(`data-item-select="${k}"`, it.options.map((op, i) => ({ value: String(i), label: op.label ?? op.value, on: op.value === it.value })), it.label);
@@ -742,6 +809,8 @@ function openSettings() {
     const setting = (f) => {
       const v = cur[f.key] ?? f.default;
       if (!editable) return `<span class="value">${esc(f.type === "bool" ? (v ? "On" : "Off") : v)}</span>`;
+      // A whole number with a wide range (a seed) is typed on the board's number pad, not stepped (D-245).
+      if (f.type === "int" && (f.max ?? Infinity) - (f.min ?? -Infinity) > 1000) return `<button class="pad-value" data-setting-pad="${esc(f.key)}">${esc(v)}</button>`;
       if (f.type === "int" || f.type === "number")
         return `<span class="stepper"><button data-setting="${esc(f.key)}" data-delta="-1" ${f.min !== undefined && v <= f.min ? "disabled" : ""} aria-label="Less">−</button>
           <span class="value">${esc(v)}</span><button data-setting="${esc(f.key)}" data-delta="1" ${f.max !== undefined && v >= f.max ? "disabled" : ""} aria-label="More">+</button></span>`;
@@ -783,7 +852,7 @@ function openSettings() {
     };
     const gameSettings = fields.length
       ? `<div class="group game-rules ${editable ? "" : "locked"}"><div class="eyebrow">${esc(state.game.name)} · game settings${editable ? "" : ` <span class="lock" aria-label="locked">🔒 locked during the game</span>`}</div>
-          ${fields.map((f) => `<div class="row"><span>${esc(f.label ?? f.key)}</span>${setting(f)}</div>`).join("")}
+          ${fields.filter((f) => settingActive(f, cur, fields)).map((f) => `<div class="row"><span>${esc(f.label ?? f.key)}</span>${setting(f)}</div>`).join("")}
           ${editable ? "" : `<div class="faint" style="font-size:.7em;margin-top:6px">These can be changed before the game starts.</div>`}</div>`
       : "";
     // The table's rules for games with AI players (D-236, D-237): outside a game only, like the game settings.
@@ -801,7 +870,7 @@ function openSettings() {
     setPanel(o, `<div class="panel"><h2>Settings</h2>
       <div class="group"><div class="eyebrow">Display</div>
         <div class="row"><span>Sound effects</span><button data-sound class="${state.display?.sound !== false ? "on" : ""}" role="switch" aria-checked="${state.display?.sound !== false}">${state.display?.sound !== false ? "On" : "Off"}</button></div>
-        ${REMOTE || IN_PLAY ? "" : `<div class="row"><span>Another screen on this WiFi, such as an iPad or a TV, shows the board instead</span><button data-screen>Board on another screen…</button></div>`}
+        ${REMOTE || IN_PLAY ? "" : `<div class="row"><span>Another screen on this LAN, such as an iPad or a TV, shows the board instead</span><button data-screen>Board on another screen…</button></div>`}
         ${fullscreenRow()}</div>
       <div class="group"><div class="eyebrow">Joining</div>
         ${state.developer?.boardDeck ? `<div class="row"><span class="faint">Played from the board (Developer settings): no phone joins at the table</span></div>` : `<div class="row"><span>The QR code and address for phones, to join or rejoin, also during a game</span><button data-join-code>Show join code…</button></div>`}
@@ -832,7 +901,7 @@ function openSettings() {
     if (!sel) return;
     if (sel.dataset.settingSelect) {
       const f = gameFields().find((x) => x.key === sel.dataset.settingSelect);
-      if (f && sel.value !== String(state.game.settings?.[f.key] ?? f.default)) act("POST", "/game/settings", { settings: { [f.key]: sel.value } });
+      if (f && sel.value !== String(state.game.settings?.[f.key] ?? f.default)) act("POST", "/game/settings", { settings: settingPatch(f.key, sel.value) });
     } else if (sel.dataset.itemSelect !== undefined) {
       const it = items[Number(sel.dataset.itemSelect)];
       it?.onChange?.(it.options[Number(sel.value)].value);
@@ -863,13 +932,19 @@ function openSettings() {
         next = Math.min(f.max ?? Infinity, Math.max(f.min ?? -Infinity, Number(v) + Number(b.dataset.delta) * step));
       } else if (b.dataset.toggle !== undefined) next = !v;
       else if (b.dataset.value !== undefined) next = b.dataset.value;
-      if (next !== v) act("POST", "/game/settings", { settings: { [f.key]: next } });
+      if (next !== v) act("POST", "/game/settings", { settings: settingPatch(f.key, next) });
+      return;
+    }
+    if (b.dataset.settingPad) {
+      const f = gameFields().find((x) => x.key === b.dataset.settingPad);
+      if (f) openNumberPad(f.label ?? f.key, state.game.settings?.[f.key] ?? f.default, f, (n) => act("POST", "/game/settings", { settings: { [f.key]: n } }));
       return;
     }
     const it = items[Number(b.dataset.item)];
     if (!it || b.dataset.item === undefined) return;
     if (it.type === "toggle") it.onChange?.(!it.value);
     else if (it.type === "button") it.onChange?.();
+    else if (it.type === "number") openNumberPad(it.label, it.value ?? "", { min: it.min ?? 0, max: it.max }, (n) => it.onChange?.(n));
     else it.onChange?.(it.type === "swatches" ? it.options[Number(b.dataset.val)] : it.options[Number(b.dataset.val)].value);
   });
   overlayRoot.appendChild(o);
@@ -1062,6 +1137,8 @@ function cornerClass(name) {
 function render() {
   if (!state) return;
   overlayRoot.querySelector(".overlay.statistics")?.recolor?.(); // a colour changed while Awards and Results is open (D-239)
+  // The pads turn with the board, also while open (D-245).
+  for (const p of overlayRoot.querySelectorAll(".overlay.name-pad > .panel")) faceFront(p);
   gameEdge(); // keeps the last north/south facing current, so a game starts facing the way the lobby last did
   renderSeats();
   if (REMOTE) fit();
@@ -1830,7 +1907,7 @@ function openScreenLink() {
     <div class="join-big">
       <img src="/qr.svg?screen" alt="QR code that opens the board on another screen">
       <div>${linkLine(link)}</div>
-      <div class="faint" style="font-size:.75em;text-align:center;max-width:520px">Scan it with the iPad's camera, or open the link in its browser. The screen must be on this WiFi. It shows the board from then on, also after a restart; this window offers to take the board back.<br><b>The link lets a screen run the table:</b> show it only on screens you own.</div>
+      <div class="faint" style="font-size:.75em;text-align:center;max-width:520px">Scan it with the iPad's camera, or open the link in its browser. The screen must be on this LAN. It shows the board from then on, also after a restart; this window offers to take the board back.<br><b>The link lets a screen run the table:</b> show it only on screens you own.</div>
     </div>
     <div class="actions settings-actions"><button class="primary" data-close-overlay>Done</button></div></div>`);
   const close = () => o.remove();
@@ -1892,7 +1969,7 @@ function openAdvanced() {
     if (!sel) return;
     if (sel.dataset.settingSelect) {
       const f = gameFields().find((x) => x.key === sel.dataset.settingSelect);
-      if (f && sel.value !== String(state.game.settings?.[f.key] ?? f.default)) act("POST", "/game/settings", { settings: { [f.key]: sel.value } });
+      if (f && sel.value !== String(state.game.settings?.[f.key] ?? f.default)) act("POST", "/game/settings", { settings: settingPatch(f.key, sel.value) });
     } else if (sel.dataset.itemSelect !== undefined) {
       const it = items[Number(sel.dataset.itemSelect)];
       it?.onChange?.(it.options[Number(sel.value)].value);
@@ -2078,6 +2155,41 @@ function openNamePad(initial, done, title = "Player's name") {
   drawKeys();
   overlayRoot.appendChild(o);
   faceFront(o.querySelector(".panel"));
+}
+
+/**
+ * The board's number pad (D-245): digits, Clear and Enter, for a whole number such as a board's seed, without a
+ * keyboard. Turns with the board, also while it is open. `f` gives min and max; Enter answers with a number in range.
+ */
+let numberPad = null;
+function openNumberPad(title, initial, f, done) {
+  if (numberPad) return;
+  const o = (numberPad = document.createElement("div"));
+  o.className = "overlay name-pad number-pad";
+  let value = String(initial ?? "").replace(/\D/g, "");
+  const max = intDigits(f);
+  const ok = () => value !== "" && Number(value) >= (f.min ?? 0) && (f.max === undefined || Number(value) <= f.max);
+  const draw = () => {
+    o.innerHTML = `<div class="panel"><h2>${esc(title)}</h2>
+      <div class="name-field"><input readonly value="${esc(value)}" aria-label="${esc(title)}"><span class="count">${f.max !== undefined ? `${f.min ?? 0} to ${f.max}` : ""}</span></div>
+      <div class="keys">${[[..."123"], [..."456"], [..."789"]].map((r) => `<div class="row">${r.map((k) => `<button data-key="${k}" ${value.length >= max ? "disabled" : ""}>${k}</button>`).join("")}</div>`).join("")}
+        <div class="row"><button data-clear>Clear</button><button data-key="0" ${value.length >= max ? "disabled" : ""}>0</button><button data-back aria-label="Delete the last digit" ${value ? "" : "disabled"}>⌫</button></div></div>
+      <div class="actions"><span style="flex:1"></span><button data-cancel>Cancel</button><button class="primary" data-enter ${ok() ? "" : "disabled"}>Enter</button></div></div>`;
+    faceFront(o.querySelector(".panel"));
+  };
+  const close = () => (o.remove(), (numberPad = null));
+  o.addEventListener("click", (e) => {
+    const b = e.target.closest("button");
+    if (e.target === o || b?.dataset.cancel !== undefined) return close();
+    if (!b || b.disabled) return;
+    if (b.dataset.key !== undefined) value = (value === "0" ? "" : value) + b.dataset.key;
+    else if (b.dataset.back !== undefined) value = value.slice(0, -1);
+    else if (b.dataset.clear !== undefined) value = "";
+    else if (b.dataset.enter !== undefined) return void (done(Number(value)), close());
+    draw();
+  });
+  draw();
+  overlayRoot.appendChild(o);
 }
 
 // ---------- remote invites (phase 1c) ----------

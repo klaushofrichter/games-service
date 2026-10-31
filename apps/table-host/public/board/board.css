@@ -477,6 +477,12 @@ button.copy:hover, button.copy.done { color: var(--brass); border-color: var(--b
 .name-pad .keys button { flex: 0 0 62px; height: 58px; padding: 0; font: 600 22px inherit; border-radius: 12px; }
 .name-pad .keys button.wide { flex-basis: 96px; }
 .name-pad .keys button.space { flex: 1 1 auto; font-size: 16px; }
+/* The number pad (D-245): three keys a row, the allowed range beside the number. */
+.overlay.number-pad .panel { width: 440px; }
+.number-pad .name-field input { padding-right: 170px; letter-spacing: .08em; font-variant-numeric: tabular-nums; }
+.number-pad .keys button { flex-basis: 104px; }
+/* A number typed on the pad, e.g. a seed, shows as a button with its value (D-245). */
+button.pad-value { min-width: 120px; font: 600 1em var(--mono); letter-spacing: .05em; }
 .name-pad .keys button[aria-pressed="true"] { background: var(--brass-deep); color: #1b1407; }
 .name-pad .actions { display: flex; gap: 12px; margin-top: 18px; }
 
