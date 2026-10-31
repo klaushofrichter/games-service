@@ -92,5 +92,11 @@ export function settingsWithDefaults(manifest: Manifest, given: Record<string, u
     }
     out[s.key] = v;
   }
+  // A setting that doesn't apply with the others' values keeps its default (D-245).
+  for (const s of manifest.settings) {
+    if (!s.when) continue;
+    const on = Object.entries(s.when).every(([k, want]) => ([] as unknown[]).concat(want).map(String).includes(String(out[k])));
+    if (!on) out[s.key] = s.default;
+  }
   return out;
 }

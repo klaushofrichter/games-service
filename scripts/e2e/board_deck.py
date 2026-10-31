@@ -52,11 +52,26 @@ try:
         deck.locator("input[name=name]").wait_for(timeout=10000)
         page.wait_for_timeout(300)
         assert deck.locator("#top").inner_text().strip() == "", f"a warning over the name form: {deck.locator('#top').inner_text()}"
+        # A name to start with (D-245), as a phone that scans the code gets.
+        wait(lambda: deck.locator("input[name=name]").input_value().startswith("Player "), 5, "the name field to start with Player N")
         deck.locator("input[name=name]").fill("Dev")
         deck.locator("button[type=submit]").click()
         wait(lambda: "Dev" in players(), 10, "Dev at the table")
         assert players()["Dev"]["location"] == "local"
         page.screenshot(path=os.path.join(OUT, "board-deck-lobby.png"))
+        # Before a game is chosen, Leave sits beside Change name (D-245); Change name opens at the top, so a phone's
+        # keyboard leaves its field in view, with room for the field's focus frame.
+        assert deck.locator(".who-actions [data-leave]").count() == 1, "no Leave beside Change name"
+        deck.locator("[data-rename]").click()
+        field = deck.locator(".rules-modal.top input[name=name]")
+        field.wait_for(timeout=5000)
+        box, vh = field.bounding_box(), page.viewport_size["height"]
+        assert box["y"] < vh / 3, f"the name field at {box['y']:.0f} of {vh}, not in the top third"
+        clipped = deck.locator(".rules-modal .rules-body").evaluate("""b => { const i = b.querySelector('input').getBoundingClientRect(), r = b.getBoundingClientRect();
+          return i.top - 3 < r.top || i.left - 3 < r.left || i.right + 3 > r.right; }""")
+        assert not clipped, "the field's focus frame is cut off by the sheet"
+        page.screenshot(path=os.path.join(OUT, "board-deck-rename.png"))
+        deck.locator(".rules-modal [data-close]").first.click()
 
         # A phone with the join code is turned away.
         phone = b.new_page(viewport={"width": 390, "height": 844})
