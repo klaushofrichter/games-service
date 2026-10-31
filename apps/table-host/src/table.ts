@@ -238,6 +238,7 @@ export class Table extends EventEmitter {
       exchange: this.exchangeInfo(),
       developer: { allowNoLocalPlayer: this.allowNoLocalPlayer, boardDeck: this.boardDeck, protectedPlayer: this.protectedPlayer()?.id ?? null },
       noSeat: this.noFreeSeat(),
+      suggestedName: this.suggestedName(),
       remote: {
         boardControl: this.remoteBoardControl,
         maxPlayers: this.config.maxRemotePlayers,
@@ -890,6 +891,14 @@ export class Table extends EventEmitter {
    * is taken as soon as a player has joined (phone, invite or AI), connected or reconnecting. Full: every seat of the
    * layout on the edges the chosen game uses is taken, or the chosen game has as many players as it takes.
    */
+  /** A name for someone joining without one (D-244): "Player N", the lowest N no one at the table has. */
+  suggestedName(): string {
+    const taken = new Set([...this.players.values()].map((p) => nameKey(p.name)));
+    let n = 1;
+    while (taken.has(nameKey(`Player ${n}`))) n++;
+    return `Player ${n}`;
+  }
+
   noFreeSeat(): string | null {
     const playing = this.playing;
     const m = this.phase === "ready" || playing ? this.selected?.game.manifest : undefined;
