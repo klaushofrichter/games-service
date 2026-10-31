@@ -1745,3 +1745,8 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   the names stay in their players' colours (D-239), brass where there are none. The game's own table is titled
   *Results* (was *Statistics*), the moves and time *Statistics* (was *Moves and time*).
 
+- **D-243 · 2026-10-31 · Klaus** — `scripts/local-table.sh` is checked end to end: an e2e check starts it as on a
+  developer's computer and opens the address in the board's QR code on a phone page, which must show the name form.
+  The script says that phones must be on the computer's WiFi, and warns when the QR code's address does not answer on
+  the computer itself (a wrong address or port). A phone on another network, or a firewall, shows only on the phone.
+
