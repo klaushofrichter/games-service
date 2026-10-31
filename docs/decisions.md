@@ -1745,3 +1745,14 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   the names stay in their players' colours (D-239), brass where there are none. The game's own table is titled
   *Results* (was *Statistics*), the moves and time *Statistics* (was *Moves and time*).
 
+- **D-243 · 2026-10-31 · Klaus** — `scripts/local-table.sh` is checked end to end: an e2e check starts it as on a
+  developer's computer and opens the address in the board's QR code on a phone page, which must show the name form.
+  The script says that phones must be on the computer's WiFi, and warns when the QR code's address does not answer on
+  the computer itself (a wrong address or port). A phone on another network, or a firewall, shows only on the phone.
+
+- **D-244 · 2026-10-31 · Klaus** — Someone joining without a name starts with one: "Player N", the lowest N no one at
+  the table has. A phone that scans the QR code finds it in its name field, and the board's invite dialog fills it in
+  for a player (not a watcher); either can be changed before joining. A game's board settings may also show a line of
+  text only (`type: "text"`), e.g. a board's seed. *Implementation (Claude):* `Table.suggestedName()`, in the lobby
+  state and in the phone's seat check (`/j/<code>/seat`).
+

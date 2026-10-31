@@ -8,6 +8,8 @@ history.
 
 ## [Unreleased]
 
+- A phone joining by QR code, and a player's invite, start with the name "Player N", which they can change; a game's settings may show a line of text (D-244).
+- `scripts/local-table.sh` says phones must be on the computer's WiFi and warns when the QR code's address does not answer; a new e2e check opens that address on a phone page (D-243).
 - Awards and Results: "," and "and" between award holders in white; the sections read *Results* and *Statistics* (D-242).
 - A board that lost its table (stopped or restarting) hides the join code until the table answers with its new one; a phone with an old code is told at once why it no longer works (D-241).
 - Played from the board, the lobby's side panel reads *Single local player* and has no second invite button (D-240).

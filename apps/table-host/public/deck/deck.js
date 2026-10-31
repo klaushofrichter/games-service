@@ -42,6 +42,7 @@ let retry = 0;
 let joinError = "";
 /** No free seat at the table (D-129): the reason, shown instead of the name form until a seat is free. */
 let noSeat = null;
+let suggested = ""; // "Player N" from the table (D-244)
 let seatTimer = null;
 
 /** Ask the table whether a seat is free for this join code; look again every few seconds while there is none. */
@@ -55,6 +56,12 @@ async function checkSeat() {
     }
     if (!r.ok) return;
     const b = await r.json();
+    // A name to start with (D-244): "Player N", in the field while nothing is typed there; it can be changed.
+    if (b.name) {
+      suggested = b.name;
+      const field = body.querySelector("#join input[name=name]");
+      if (field && !field.value) field.value = suggested;
+    }
     const was = noSeat;
     noSeat = b.free ? null : b.message;
     if (noSeat) watchSeat();
@@ -495,7 +502,7 @@ function renderJoin() {
   if (body.querySelector("#join")) return;
   body.innerHTML = `<div><div class="eyebrow">Game Table</div><h1>What should we call you?</h1></div>
     <form id="join" class="card" style="display:flex;flex-direction:column;gap:14px">
-      <input type="text" name="name" maxlength="12" autocomplete="nickname" placeholder="Your name" autofocus>
+      <input type="text" name="name" maxlength="12" autocomplete="nickname" placeholder="Your name" value="${esc(suggested)}" autofocus>
       <div id="join-error" class="join-error" role="alert">${esc(joinError)}</div>
       <button class="primary big" type="submit">Take a seat</button>
       <div class="faint" style="font-size:.8em">No account needed. Up to 12 characters; each name once at a table.</div>
