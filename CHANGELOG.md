@@ -8,6 +8,7 @@ history.
 
 ## [Unreleased]
 
+- Pulldowns on the board turn with their window; a setting that doesn't apply is hidden when choosing a game; `labels` for how values read (D-248).
 - `scripts/local-table.sh --offline --all-games` plays every game checked out beside games-service at a table without the service or console (D-247).
 - A choice can describe its options (`hints`, a choice item's `hint`): the chosen one's text shows under the setting (D-246).
 - Game settings can depend on others (`when`) and draw a fresh value (`random`, a seed); whole numbers take digits only, and a wide one is typed on the board's number pad, also a game's own `number` setting. Deck: Change name at the top, Leave beside it, a default name beside the board (D-245).

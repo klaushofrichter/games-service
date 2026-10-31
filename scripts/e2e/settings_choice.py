@@ -5,7 +5,8 @@ list (Chess's eight time controls) never runs out of the window.
 
 A Table Host of its own (port 8105). Duel chosen, the settings window opened: "Pace of play" (five choices) is a
 pulldown listing all five, inside the window; "Side" (two) is buttons. Picking from the pulldown and tapping a button
-both change the table's settings, and the pulldown shows the new choice. Before that, Duel's description names a setting
+both change the table's settings, and the pulldown shows the new choice; its list opens inside the window and turns with
+it (D-248). Before that, Duel's description names a setting
 (D-238): the tile shows its default ("Pace: no limit"), and the window that chooses the game follows the pulldown.
 """
 import os, sys
@@ -43,13 +44,22 @@ try:
         # The window that chooses the game: the seed disabled and blank for a fixed board, a fresh one for random; only
         # digits typed (no "e", ".", "-"), at most six.
         field = board.locator(".dialog.form input[name=seed]")
-        field.wait_for()
+        field.wait_for(state="attached")
         assert field.is_disabled() and field.input_value() == "", "the seed should be disabled and blank for a fixed board"
+        assert not field.is_visible(), "the seed and its title should be hidden for a fixed board (D-248)"
         # What the chosen board means, under the setting, following the choice (D-246).
         hint = board.locator(".dialog.form [data-hint=board]")
         assert hint.inner_text() == "The same board every game.", hint.inner_text()
-        board.select_option(".dialog.form select[name=board]", "random")
+        # The pulldown opens its options inside the window, which turns with the board (D-248), and reads the labels.
+        board.click(".dialog.form .pick:has(select[name=board]) .pick-cover")
+        menu = board.locator(".dialog.form .pick-menu")
+        menu.wait_for()
+        assert menu.locator("button").all_inner_texts() == ["Fixed", "Random"], menu.locator("button").all_inner_texts()
+        menu.locator("button", has_text="Random").click()
+        assert board.locator(".dialog.form .pick-menu").count() == 0, "the list should close once a board is picked"
+        assert board.locator(".dialog.form select[name=board]").input_value() == "random"
         assert hint.inner_text() == "A new board from a seed.", hint.inner_text()
+        assert field.is_visible(), "the seed should show for a random board"
         assert not field.is_disabled() and field.input_value().isdigit(), f"no fresh seed: {field.input_value()!r}"
         field.fill("")
         field.type("1e-2.3--4567890")
@@ -75,8 +85,21 @@ try:
         assert out == 0, f"{out} game settings controls stick out of the settings window"
         board.screenshot(path=os.path.join(OUT, "settings-choice.png"))
         # Choosing from the pulldown and from the buttons both reach the table.
-        pace.select_option("quick")
+        # The pulldown's list turns with the window (D-248): on a board facing the other edge it opens under the select in
+        # the window's own frame, which is above it on the screen.
+        before = board.locator(".overlay.settings .panel").evaluate("e => e.style.transform")
+        a("POST", "/rotate", {"degrees": 180})
+        wait(lambda: board.locator(".overlay.settings .panel").evaluate("e => e.style.transform") != before, 5, "the window to turn")
+        board.click(".game-rules .pick:has(select[data-setting-select=pace]) .pick-cover")
+        menu = board.locator(".game-rules .pick-menu")
+        menu.wait_for()
+        assert menu.locator("button").all_inner_texts() == PACE, menu.locator("button").all_inner_texts()
+        sel_box, menu_box = pace.bounding_box(), menu.bounding_box()
+        assert menu_box["y"] + menu_box["height"] <= sel_box["y"] + 1, f"the list should turn with the window: {menu_box} vs {sel_box}"
+        board.screenshot(path=os.path.join(OUT, "settings-pulldown-turned.png"))
+        menu.locator("button[data-val=quick]").click()
         wait(lambda: a("GET", "/state")["game"]["settings"]["pace"] == "quick", 5, "pace to become quick")
+        a("POST", "/rotate", {"degrees": 180})
         wait(lambda: board.locator(".game-rules select[data-setting-select=pace]").input_value() == "quick", 5, "the pulldown to show quick")
         board.locator(".game-rules [data-setting=side][data-value=right]").click()
         wait(lambda: a("GET", "/state")["game"]["settings"]["side"] == "right", 5, "side to become right")

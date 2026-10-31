@@ -66,6 +66,9 @@ const settingSchema = z.object({
   random: z.boolean().optional(),
   /** What each value means, shown under the setting for the one chosen (D-246), e.g. a board's description. */
   hints: z.record(z.string(), z.string()).optional(),
+  /** How each value reads in forms and the settings window (D-248), e.g. `{ "beginner": "Beginner" }`; the value is
+   *  what the game gets. */
+  labels: z.record(z.string(), z.string()).optional(),
 });
 
 /** An AI player's option (play style, level): a setting that may also be picked at random (D-226). */

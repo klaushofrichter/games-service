@@ -82,6 +82,10 @@
       "hints": {
         "fixed": "The same board every game.",
         "random": "A new board from a seed."
+      },
+      "labels": {
+        "fixed": "Fixed",
+        "random": "Random"
       }
     },
     {
