@@ -1771,3 +1771,9 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   settings window; a game's own `choice` item takes a `hint` per option the same way. For boards with a name, e.g.
   "Six forests on strong numbers: wood in plenty."
 
+- **D-247 · 2026-10-31 · Klaus** — Local play without the console, with every game at hand: `scripts/local-table.sh
+  --offline` leaves the live service out (as `CLOUD_URL=`), and `--all-games [DIR]` adds every git checkout in DIR (by
+  default the folder that holds games-service) with a games/ folder, each brought up to its branch's latest on GitHub
+  unless `--no-pull` (one with changes of its own, or that can't fast-forward, is used as it is). Private game
+  repositories stay unnamed here: the script finds them where they are checked out.
+

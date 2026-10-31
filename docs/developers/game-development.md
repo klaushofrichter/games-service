@@ -549,7 +549,9 @@ Tests use Vitest and run against the real host code.
   brings the checkout up to the latest `main`; `--branch NAME` runs another branch (`production`, a feature branch),
   `--no-pull` runs the checkout as it is. `--extra ../my-games` adds the games of another checkout, so you can play a
   game from your own repository before it is released; start it with `CLOUD_URL=` to leave the live service out (it
-  would otherwise also install its own extra games). `--code ABCD-EFGH` connects the table to a game service with an
+  would otherwise also install its own extra games). `--all-games` adds every checkout with games beside this one
+  (updated like it unless `--no-pull`), and `--offline` leaves the service and its console out: `--offline --all-games`
+  plays every game you have checked out at a table of its own (D-247). `--code ABCD-EFGH` connects the table to a game service with an
   access code. The table keeps its identity and key in `~/.gametable-local`. To see the board on an iPad or a TV
   while the table runs on your computer, use the board's settings › *Board on another screen…* (a QR code and link
   for any screen on the same network, D-190). A table in Docker instead:
@@ -559,6 +561,7 @@ Tests use Vitest and run against the real host code.
   scripts/local-table.sh                                   # latest main, against the live service
   scripts/local-table.sh --branch my-feature               # a branch
   CLOUD_URL= scripts/local-table.sh --extra ../my-games    # your own games, no service
+  scripts/local-table.sh --offline --all-games             # every checked-out game beside this one, no service
   ```
 
 - **By hand, without a phone:** *Developer settings › Play from the board* on the board (the tools button) (or `BOARD_DECK=1`) puts one
