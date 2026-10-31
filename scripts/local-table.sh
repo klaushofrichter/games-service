@@ -7,6 +7,11 @@
 #   scripts/local-table.sh --no-pull    start this checkout as it is: no fetch, no switching branches
 #   scripts/local-table.sh --extra ../extra-games      also the games of another checkout, as it is (repeatable);
 #                                                      with CLOUD_URL= the live service adds none of its own
+#   scripts/local-table.sh --all-games   also every game checked out next to this one (D-247): each git checkout in the
+#                                        folder that holds games-service with a games/ folder, updated like this one
+#                                        unless --no-pull (also --all-games DIR for another folder)
+#   scripts/local-table.sh --offline    without the live service and its console: a table on its own (CLOUD_URL=)
+#   scripts/local-table.sh --offline --all-games   every game you have checked out, played here alone
 #   scripts/local-table.sh --no-open    start it without opening the board
 #   scripts/local-table.sh --code ABCD-EFGH    approved at once with an access code from the console (D-113)
 # Updating (D-188) switches to the branch and fast-forwards it to GitHub's; it stops instead when this checkout has
@@ -34,6 +39,8 @@ PULL=1
 BRANCH=main
 EXTRA=()
 NEXTRA=0 # bash 3.2 (macOS) calls an empty array unbound under set -u: count instead
+ALLDIR=""
+OFFLINE=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --no-open) OPEN=0 ;;
@@ -44,7 +51,12 @@ while [ $# -gt 0 ]; do
     --extra=*) EXTRA+=("${1#--extra=}"); NEXTRA=$((NEXTRA + 1)) ;;
     --code) [ $# -ge 2 ] || { echo "--code needs a value, e.g. --code ABCD-EFGH" >&2; exit 2; }; TABLE_CODE="$2"; shift ;;
     --code=*) TABLE_CODE="${1#--code=}" ;;
-    *) echo "unknown option: $1 (use --branch NAME, --extra DIR, --no-pull, --no-open, --code ABCD-EFGH)" >&2; exit 2 ;;
+    --offline) OFFLINE=1 ;;
+    --all-games)
+      # The folder that holds this checkout, or the one given (D-247).
+      if [ $# -ge 2 ] && [ "${2#-}" = "$2" ]; then ALLDIR="$2"; shift; else ALLDIR="$(dirname "$LOCAL_TABLE_REPO")"; fi ;;
+    --all-games=*) ALLDIR="${1#--all-games=}" ;;
+    *) echo "unknown option: $1 (use --branch NAME, --extra DIR, --all-games [DIR], --offline, --no-pull, --no-open, --code ABCD-EFGH)" >&2; exit 2 ;;
   esac
   shift
 done
@@ -65,6 +77,32 @@ if [ "$PULL" = 1 ]; then
   fi
 fi
 echo "Running $(git rev-parse --abbrev-ref HEAD) at $(git log -1 --format='%h %s' | cut -c1-80)"
+
+# Every game checked out next to this one (D-247): each git checkout in ALLDIR with a games/ folder of games (a
+# manifest.json each), updated to its branch's latest on GitHub unless --no-pull; one with changes of its own, or
+# that can't fast-forward, is used as it is.
+if [ -n "$ALLDIR" ]; then
+  case "$ALLDIR" in /*) ;; *) ALLDIR="${LOCAL_TABLE_CWD:-$PWD}/$ALLDIR" ;; esac
+  [ -d "$ALLDIR" ] || { echo "--all-games $ALLDIR: no such folder" >&2; exit 1; }
+  here="$(pwd -P)"
+  for d in "$ALLDIR"/*/; do
+    d="$(cd "$d" && pwd -P)"
+    [ "$d" = "$here" ] && continue
+    ls "$d"/games/*/manifest.json >/dev/null 2>&1 || continue
+    if [ "$PULL" = 1 ] && [ -d "$d/.git" ]; then
+      if [ -n "$(git -C "$d" status --porcelain --untracked-files=no)" ]; then
+        echo "$(basename "$d"): changes of its own, used as it is"
+      elif ! git -C "$d" pull --ff-only --quiet 2>/dev/null; then
+        echo "$(basename "$d"): could not update (offline, or commits GitHub doesn't have), used as it is"
+      fi
+    fi
+    EXTRA+=("$d")
+    NEXTRA=$((NEXTRA + 1))
+  done
+  [ "$NEXTRA" -gt 0 ] || echo "--all-games: no other checkout with games in $ALLDIR"
+fi
+# Without the live service and its console (D-247): a table on its own.
+[ "$OFFLINE" = 1 ] && CLOUD_URL=""
 
 major=$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0)
 if [ "$major" -lt 26 ]; then
