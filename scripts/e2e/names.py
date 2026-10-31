@@ -41,6 +41,8 @@ try:
         watch(ben, "Ben")
         ben.goto(url)
         assert ben.get_attribute("input[name=name]", "maxlength") == "12"
+        # The name field starts with "Player N" (D-244).
+        wait(lambda: ben.input_value("input[name=name]").startswith("Player "), 5, "the name field to start with Player N")
         ben.fill("input[name=name]", "ann")
         ben.click("button[type=submit]")
         ben.wait_for_selector("#join-error:has-text('already at this table')")

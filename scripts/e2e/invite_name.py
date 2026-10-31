@@ -31,6 +31,10 @@ try:
         assert board.inner_text("button[data-invite]").strip() == "Invite remote player…", board.inner_text("button[data-invite]")
         board.click("button[data-invite]")
         board.wait_for_selector(".invite-body .code")
+        # It starts with "Player N" (D-244); the ✕ takes it away.
+        assert "?name=Player" in board.inner_text(".invite-body .url"), board.inner_text(".invite-body .url")
+        board.click(".invite-name button[data-x=noname]")
+        board.wait_for_selector(".invite-name .name-value.empty")
         plain = board.inner_text(".invite-body .url").strip()
         assert "?" not in plain, plain
         qr0 = board.inner_html(".invite-body .qr")

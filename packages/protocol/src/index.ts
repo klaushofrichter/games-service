@@ -325,6 +325,8 @@ export interface LobbyState {
   developer: { allowNoLocalPlayer: boolean; boardDeck: boolean; protectedPlayer: string | null };
   /** Why nobody can take a seat now (every seat taken, or the chosen game is full), or null (D-129). */
   noSeat: string | null;
+  /** "Player N" for someone joining without a name (D-244): the deck's name field and the invite start with it. */
+  suggestedName: string;
 }
 
 export interface CloudStatus {

@@ -19,12 +19,24 @@ const seat = async (token: string) => {
   return { status: r.status, body: await r.json() };
 };
 
+describe("a name to start with (D-244)", () => {
+  it("is Player N with the lowest N no one at the table has, for the phone and the board's invite", async () => {
+    t = await testHost();
+    const { token } = await t.ok("GET", "/join");
+    expect((await seat(token)).body.name).toBe("Player 1");
+    await t.joinDeck("Player 1");
+    await t.joinDeck("player 3");
+    expect((await seat(token)).body.name).toBe("Player 2");
+    expect((await t.ok("GET", "/state")).suggestedName).toBe("Player 2");
+  });
+});
+
 describe("no free seat (D-129)", () => {
   it("tells a phone before it joins, and refuses the join with the reason", async () => {
     t = await testHost();
     await t.ok("POST", "/layout", { seats: 2 });
     const { token } = await t.ok("GET", "/join");
-    expect((await seat(token)).body).toEqual({ free: true, message: null });
+    expect((await seat(token)).body).toEqual({ free: true, message: null, name: "Player 1" });
     await t.joinDeck("Ann");
     await t.ok("POST", "/ai", {});
     const s = await seat(token);

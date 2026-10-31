@@ -375,9 +375,10 @@ export function settings({ info, setPrefs }) { return []; } // optional: items f
   with `{ ok, reason }`; a rejection is shown as a toast by the platform. The rules decide as for any intent.
 - **Skipping a wait:** list timer ids in `skipTimers`; `ctx.skipTimer(id)` fires it now when `info.boardControl` is
   true (not while the game is paused) and resolves with `{ ok, reason }`. Use it for a pause on a result ("Next hand").
-- **Settings:** `settings({ info, setPrefs })` returns items `{ type: "toggle" | "choice" | "swatches" | "button",
-  label, value, options, onChange }`: a `choice` takes `options: [{ value, label }]` (a pulldown above three),
-  `swatches` takes `options: ["#rrggbb", …]`, and a `button` shows `action` (or `label`) and calls `onChange()`. `setPrefs(patch)` stores display choices for this game (`info.prefs`), never
+- **Settings:** `settings({ info, setPrefs })` returns items `{ type: "toggle" | "choice" | "swatches" | "button" |
+  "text", label, value, options, onChange }`: a `choice` takes `options: [{ value, label }]` (a pulldown above three),
+  `swatches` takes `options: ["#rrggbb", …]`, a `button` shows `action` (or `label`) and calls `onChange()`, and a
+  `text` only shows its `value` (e.g. a board's seed). `setPrefs(patch)` stores display choices for this game (`info.prefs`), never
   rules.
 - **Sound:** `playSound(info, name, make)` from the board kit plays only when the table's sound is on (`info.sound`).
   A browser other than the table's kiosk plays it only after the board has been touched; the platform wakes it on the

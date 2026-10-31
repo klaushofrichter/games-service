@@ -720,6 +720,7 @@ function openSettings() {
   const control = (it, k) => {
     if (it.type === "toggle") return `<button data-item="${k}" class="${it.value ? "on" : ""}" role="switch" aria-checked="${!!it.value}">${it.value ? "On" : "Off"}</button>`;
     if (it.type === "button") return `<button data-item="${k}">${esc(it.action ?? it.label)}</button>`;
+    if (it.type === "text") return `<span class="value">${esc(it.value ?? "")}</span>`; // shown only (D-244)
     if (it.type === "swatches")
       return `<span class="swatches">${it.options.map((c, i) => `<button class="swatch ${c === it.value ? "on" : ""}" style="--c:${esc(c)}" data-item="${k}" data-val="${i}" aria-label="${esc(it.label)}: colour ${i + 1}"></button>`).join("")}</span>`;
     if (it.options.length > SEG_MAX) return pulldown(`data-item-select="${k}"`, it.options.map((op, i) => ({ value: String(i), label: op.label ?? op.value, on: op.value === it.value })), it.label);
@@ -2113,7 +2114,7 @@ async function openInvite(watch = false) {
   const until = new Date(inv.expiresAt).toLocaleString([], { weekday: "short", hour: "2-digit", minute: "2-digit" });
   // An optional name for the player (D-155): it travels in the link (?name=) and fills in their name field, which they
   // can still change. Cut to MAX_NAME characters like every name (D-148).
-  let guest = "";
+  let guest = watch ? "" : state.suggestedName ?? ""; // a player's name to start with (D-244); they can change it
   const link = () => {
     const u = new URL(inv.url);
     if (guest) u.searchParams.set("name", guest);
@@ -2125,6 +2126,7 @@ async function openInvite(watch = false) {
       if (r.ok) qr = await r.text();
     } catch {}
   };
+  if (guest) await loadQr(); // the code carries the name it starts with
   o.addEventListener("click", (e) => {
     const b = e.target.closest("button");
     if (b?.dataset.x === "name") openNamePad(guest, async (n) => ((guest = n), await loadQr(), draw()));
