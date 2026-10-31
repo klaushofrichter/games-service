@@ -1777,3 +1777,8 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   unless `--no-pull` (one with changes of its own, or that can't fast-forward, is used as it is). Private game
   repositories stay unnamed here: the script finds them where they are checked out.
 
+- **D-248 · 2026-10-31 · Klaus** — The board's pulldowns turn with their window: a native list opened upright on the
+  screen, sideways or upside down on a board facing another edge. A cover over the select opens the options as buttons
+  under it, inside the window (the select stays for keyboards). A setting that doesn't apply now (`when`) is hidden in
+  the window that chooses the game, title and all, as in the settings window. A setting's `labels` (`{ value: text }`)
+  say how its values read ("Beginner" for "beginner"); the game still gets the value.

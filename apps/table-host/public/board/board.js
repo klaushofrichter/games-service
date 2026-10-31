@@ -181,6 +181,44 @@ function settingActive(f, values, fields = []) {
 }
 /** What a choice means (D-246): a setting's `hints` for its value, e.g. a board's description; "" without one. */
 const hintFor = (f, v) => (f.hints && f.hints[String(v)]) || "";
+/** How a setting's value reads (D-248): its `labels` entry ("Beginner" for "beginner"), else the value itself. */
+const labelFor = (f, v) => (f.labels && f.labels[String(v)]) || String(v);
+
+/**
+ * A pulldown that turns with its window (D-248). A native <select> opens its list upright on the screen, so on a board
+ * facing another edge the list read sideways or upside down. The select stays (keyboards and tests use it), with a
+ * cover over it: a tap opens the options as buttons under it, inside the window, and picking one changes the select as
+ * a choice there would (input and change events).
+ */
+const pickWrap = (select) => `<span class="pick"><span class="pick-face">${select}<button type="button" class="pick-cover" tabindex="-1" aria-hidden="true"></button></span></span>`;
+document.addEventListener("click", (e) => {
+  const t = e.target;
+  const cover = t.closest?.(".pick-cover");
+  const opt = t.closest?.(".pick-menu button");
+  for (const m of document.querySelectorAll(".pick-menu")) if (!m.contains(t) && m.parentElement !== cover?.closest(".pick")) m.remove();
+  if (opt) {
+    const pick = opt.closest(".pick");
+    const sel = pick.querySelector("select");
+    pick.querySelector(".pick-menu").remove();
+    if (sel && sel.value !== opt.dataset.val) {
+      sel.value = opt.dataset.val;
+      sel.dispatchEvent(new Event("input", { bubbles: true }));
+      sel.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    return;
+  }
+  if (!cover) return;
+  const pick = cover.closest(".pick");
+  const open = pick.querySelector(".pick-menu");
+  if (open) return void open.remove();
+  const sel = pick.querySelector("select");
+  if (!sel || sel.disabled) return;
+  const m = document.createElement("span");
+  m.className = "pick-menu";
+  m.setAttribute("role", "listbox");
+  m.innerHTML = [...sel.options].map((o) => `<button type="button" role="option" class="${o.selected ? "on" : ""}" aria-selected="${o.selected}" data-val="${esc(o.value)}">${esc(o.textContent)}</button>`).join("");
+  pick.appendChild(m);
+});
 /** A fresh value for an int setting with `random: true` (D-245), e.g. a board's seed: from max(min, 1) to max. */
 const randomFor = (f) => {
   const lo = Math.max(f.min ?? 1, 1);
@@ -224,7 +262,7 @@ function withSettings(text, fields = [], values = {}) {
     const f = fields.find((x) => x.key === key);
     if (!f) return m;
     const v = values[key] ?? f.default;
-    return f.type === "bool" ? (v ? "on" : "off") : String(v);
+    return f.type === "bool" ? (v ? "on" : "off") : f.type === "enum" ? labelFor(f, v) : String(v);
   });
 }
 
@@ -239,13 +277,13 @@ function formDialog(title, intro, fields, values = {}, okLabel = "OK", removeLab
       if (!settingActive(f, now, fields)) return `<input type="text" name="${f.key}" value="" disabled>`;
       if (f.random && (v === undefined || v === f.default)) v = now[f.key] = randomFor(f);
       if (f.type === "int") return `<input type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off" maxlength="${intDigits(f)}" name="${f.key}" value="${esc(v)}">`;
-      if (f.type === "enum") return `<select name="${f.key}">${f.values.map((x) => `<option ${String(v) === x ? "selected" : ""}>${esc(x)}</option>`).join("")}</select>`;
+      if (f.type === "enum") return pickWrap(`<select name="${f.key}">${f.values.map((x) => `<option value="${esc(x)}" ${String(v) === x ? "selected" : ""}>${esc(labelFor(f, x))}</option>`).join("")}</select>`);
       if (f.type === "bool") return `<input type="checkbox" name="${f.key}" ${v ? "checked" : ""}>`;
       if (f.type === "int" || f.type === "number") return `<input type="number" name="${f.key}" value="${esc(v)}" ${f.min !== undefined ? `min="${f.min}"` : ""} ${f.max !== undefined ? `max="${f.max}"` : ""}>`;
       return `<input type="text" name="${f.key}" value="${esc(v ?? "")}">`;
     };
     d.innerHTML = `<div class="dialog form"><h2>${esc(title)}</h2>${intro ? `<div class="muted form-intro">${esc(withSettings(intro, fields, values))}</div>` : ""}
-      <div class="fields">${fields.map((f) => `<label><span>${esc(f.label ?? f.key)}</span>${input(f)}${f.hints ? `<small class="field-hint" data-hint="${f.key}">${esc(hintFor(f, now[f.key] ?? f.default))}</small>` : ""}</label>`).join("") || `<div class="faint">${state?.game ? "Nothing to set for this game." : "Pick a game to choose how it plays."}</div>`}</div>
+      <div class="fields">${fields.map((f) => `<label ${settingActive(f, now, fields) ? "" : "hidden"}><span>${esc(f.label ?? f.key)}</span>${input(f)}${f.hints ? `<small class="field-hint" data-hint="${f.key}">${esc(hintFor(f, now[f.key] ?? f.default))}</small>` : ""}</label>`).join("") || `<div class="faint">${state?.game ? "Nothing to set for this game." : "Pick a game to choose how it plays."}</div>`}</div>
       ${note ? `<div class="faint form-note">${linkified(note)}</div>` : ""}
       <div class="actions">${removeLabel ? `<button class="danger" data-x="remove" style="margin-right:auto">${esc(removeLabel)}</button>` : ""}<button data-x="no">Cancel</button><button class="primary" data-x="yes">${esc(okLabel)}</button></div></div>`;
     // The description follows the settings while they change (D-238): "first to 8 points" as 8 is typed.
@@ -261,7 +299,8 @@ function formDialog(title, intro, fields, values = {}, okLabel = "OK", removeLab
       const v = intTyped(f, e.target.value);
       if (v !== e.target.value) e.target.value = v;
     };
-    // Settings that apply only with others (D-245) follow them: disabled and blank, or back with a fresh random value.
+    // Settings that apply only with others (D-245) follow them: hidden (D-248), disabled and blank, or back with a fresh
+    // random value.
     const whens = () => {
       const vals = current();
       for (const f of fields) {
@@ -270,6 +309,7 @@ function formDialog(title, intro, fields, values = {}, okLabel = "OK", removeLab
         const on = settingActive(f, vals, fields);
         if (on === !el.disabled) continue;
         el.disabled = !on;
+        el.closest("label").hidden = !on;
         if (!on) el.value = "";
         else {
           el.value = String(f.random ? randomFor(f) : f.default ?? "");
@@ -771,7 +811,7 @@ let settingsOverlay = null;
  */
 const SEG_MAX = 3;
 const pulldown = (attr, options, label) =>
-  `<select class="pulldown" ${attr} aria-label="${esc(label)}">${options.map((op) => `<option value="${esc(op.value)}" ${op.on ? "selected" : ""}>${esc(op.label)}</option>`).join("")}</select>`;
+  pickWrap(`<select class="pulldown" ${attr} aria-label="${esc(label)}">${options.map((op) => `<option value="${esc(op.value)}" ${op.on ? "selected" : ""}>${esc(op.label)}</option>`).join("")}</select>`);
 /** The chosen game's settings fields from its manifest (D-090), or none. */
 const gameFields = () => (state.game && games.find((x) => x.id === state.game.id)?.settings) || [];
 function openSettings() {
@@ -815,7 +855,7 @@ function openSettings() {
     const cur = state.game?.settings ?? {};
     const setting = (f) => {
       const v = cur[f.key] ?? f.default;
-      if (!editable) return `<span class="value">${esc(f.type === "bool" ? (v ? "On" : "Off") : v)}</span>`;
+      if (!editable) return `<span class="value">${esc(f.type === "bool" ? (v ? "On" : "Off") : f.type === "enum" ? labelFor(f, v) : v)}</span>`;
       // A whole number with a wide range (a seed) is typed on the board's number pad, not stepped (D-245).
       if (f.type === "int" && (f.max ?? Infinity) - (f.min ?? -Infinity) > 1000) return `<button class="pad-value" data-setting-pad="${esc(f.key)}">${esc(v)}</button>`;
       if (f.type === "int" || f.type === "number")
@@ -824,8 +864,8 @@ function openSettings() {
       if (f.type === "bool") return `<button data-setting="${esc(f.key)}" data-toggle class="${v ? "on" : ""}" role="switch" aria-checked="${!!v}">${v ? "On" : "Off"}</button>`;
       if (f.type === "enum")
         return f.values.length > SEG_MAX
-          ? pulldown(`data-setting-select="${esc(f.key)}"`, f.values.map((x) => ({ value: x, label: x, on: String(v) === x })), f.label ?? f.key)
-          : `<span class="seg">${f.values.map((x) => `<button class="${String(v) === x ? "on" : ""}" data-setting="${esc(f.key)}" data-value="${esc(x)}">${esc(x)}</button>`).join("")}</span>`;
+          ? pulldown(`data-setting-select="${esc(f.key)}"`, f.values.map((x) => ({ value: x, label: labelFor(f, x), on: String(v) === x })), f.label ?? f.key)
+          : `<span class="seg">${f.values.map((x) => `<button class="${String(v) === x ? "on" : ""}" data-setting="${esc(f.key)}" data-value="${esc(x)}">${esc(labelFor(f, x))}</button>`).join("")}</span>`;
       return `<span class="value">${esc(v)}</span>`;
     };
     // Player colours (D-106): a table setting for every seated player, used in the lobby and by every game. During a
