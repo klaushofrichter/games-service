@@ -145,13 +145,26 @@ fi
 cat <<EOF
 Game Table host on this computer
   board:     http://localhost:$PORT/board/   (only from this computer)
-  phones:    scan the QR code on the board${PUBLIC_URL:+ ($PUBLIC_URL)}
+  phones:    scan the QR code on the board${PUBLIC_URL:+ ($PUBLIC_URL)}; on this computer's WiFi, not mobile data
   service:   ${CLOUD_URL:-none (development mode)}
   data:      $DATA_DIR   (API key: X-Table-Key from $KEY_FILE)
 If the system asks whether "node" may accept incoming connections, allow it, or phones cannot join.
 ${pairing}Stop with Ctrl-C.
 
 EOF
+
+# Once it runs: the address in the QR code must answer, from this computer at least; a wrong address or port would
+# not (D-243). A phone on another network, or a firewall, only shows from the phone.
+if [ -n "${PUBLIC_URL:-}" ]; then
+  ( for _ in $(seq 1 60); do
+      if curl -fs "http://127.0.0.1:$PORT/health" >/dev/null 2>&1; then
+        curl -fs --max-time 3 "$PUBLIC_URL/health" >/dev/null 2>&1 ||
+          echo "WARNING: $PUBLIC_URL (the address in the QR code) does not answer on this computer; set PUBLIC_URL to an address phones can reach." >&2
+        exit 0
+      fi
+      sleep 0.5
+    done ) &
+fi
 
 opener=""
 [ "$(uname)" = "Darwin" ] && opener=open
