@@ -251,8 +251,10 @@ function renderTop() {
 function whoHtml(p, inGame) {
   const rules = state.game?.howToPlay ? `<button type="button" class="rules-btn" data-rules aria-haspopup="dialog">Rules</button>` : "";
   const rename = inGame || p?.kind !== "human" ? "" : `<button type="button" class="rules-btn" data-rename aria-haspopup="dialog">Change name</button>`;
+  // Before a game is chosen, leaving sits beside Change name (D-245); with a game chosen the Ready screen has it.
+  const leaveBtn = rename && !state.game && p?.seat != null ? `<button type="button" class="rules-btn" data-leave="table">Leave</button>` : "";
   // Outside a game both buttons go under the name; in a game Rules stays beside it (no Change name there).
-  const below = rename ? `<div class="who-actions">${rename}${rules}</div>` : "";
+  const below = rename ? `<div class="who-actions">${rename}${leaveBtn}${rules}</div>` : "";
   return `<div class="who"><div><div class="eyebrow">${esc(state.tableName)}${inGame ? ` · ${esc(state.game?.name)}` : ""}</div><h1>${esc(p?.name ?? "")}</h1></div>
       <div class="who-side">${below ? "" : rules}${p?.seat == null ? "" : seatBadgeHtml(p)}</div></div>${below}`;
 }
@@ -324,6 +326,7 @@ function openRename(back) {
   const me_ = self();
   const modal = openSheet(state.tableName, "Change name", "Change name", back);
   if (!modal || !me_) return;
+  modal.classList.add("top"); // the field in the top third, clear of a phone's keyboard (D-245)
   const bodyEl = modal.querySelector(".rules-body");
   bodyEl.innerHTML = `<form id="rename" style="display:flex;flex-direction:column;gap:12px">
     <input type="text" name="name" maxlength="12" autocomplete="nickname" value="${esc(me_.name)}">
@@ -507,6 +510,7 @@ function renderJoin() {
       <button class="primary big" type="submit">Take a seat</button>
       <div class="faint" style="font-size:.8em">No account needed. Up to 12 characters; each name once at a table.</div>
     </form>`;
+  if (BOARD && !suggested) fetchSuggested();
   body.querySelector("#join").addEventListener("submit", (e) => {
     e.preventDefault();
     banner = "";
@@ -695,3 +699,15 @@ function genericDeck(root) {
 render();
 // Joining by QR code (D-129): is there a seat? Asked before the name form, so nobody types a name for nothing.
 if (joinToken && !REMOTE && !storage.get()) void checkSeat();
+/** The deck beside the board (D-175) starts with a name too (D-245): "Player N", as a phone that scans the code. */
+function fetchSuggested() {
+  fetch("/suggested-name", { cache: "no-store" })
+    .then((r) => (r.ok ? r.json() : null))
+    .then((b) => {
+      if (!b?.name) return;
+      suggested = b.name;
+      const field = body.querySelector("#join input[name=name]");
+      if (field && !field.value) field.value = suggested;
+    })
+    .catch(() => {});
+}

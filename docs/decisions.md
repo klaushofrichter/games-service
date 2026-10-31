@@ -1756,3 +1756,13 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   text only (`type: "text"`), e.g. a board's seed. *Implementation (Claude):* `Table.suggestedName()`, in the lobby
   state and in the phone's seat check (`/j/<code>/seat`).
 
+- **D-245 · 2026-10-31 · Klaus** — Settings that depend on others, numbers without a keyboard, and deck details.
+  A game setting may apply only with certain values of others (`when`): otherwise it is disabled and blank in the
+  window that chooses the game, left out of the settings window, and kept at its default by the table. An int with
+  `random: true` gets a fresh value whenever it comes to apply (a board's seed when a random board is chosen). Whole
+  numbers take digits only (no "e", ".", "-"), at most as many as the largest value has. One with a wide range is typed
+  on the board's number pad (digits, Clear, Enter; it turns with the board, also while open), which a game's own
+  settings can use too (`type: "number"`). On the deck, *Change name* opens at the top, clear of a phone's keyboard,
+  and its field's frame shows whole; before a game is chosen *Leave* sits beside it; the deck beside the board starts
+  with "Player N" too. "Another screen on this LAN" (was WiFi).
+

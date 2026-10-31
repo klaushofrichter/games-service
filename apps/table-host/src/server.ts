@@ -498,6 +498,8 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
         const noSeat = table.noFreeSeat();
         return json(res, 200, { free: !noSeat, message: noSeat, name: table.suggestedName() }); // the name to start with (D-244)
       }
+      // A name to start with for the deck beside the board (D-245), as the seat check gives a phone; nothing more.
+      if (path === "/suggested-name" && !remoteOf(req)) return json(res, 200, { name: table.suggestedName() });
       if ((match = path.match(/^\/j\/([A-Za-z0-9]{4,12})$/))) {
         res.writeHead(302, { location: `/deck/?t=${match[1].toUpperCase()}` });
         return res.end();

@@ -73,7 +73,12 @@ body.modal-open { overflow: hidden; }
 .rules-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .rules-head h2 { font-family: var(--display); font-weight: 600; font-size: 1.5em; margin: 2px 0 0; line-height: 1.15; }
 .rules-close { width: 44px; height: 44px; min-height: 44px; padding: 0; border-radius: 50%; flex: none; font-size: 1.1em; }
-.rules-body { overflow-y: auto; overscroll-behavior: contain; flex: 1; min-height: 0; padding-right: 2px; }
+/* Room for a focused field's frame, which the scrolling body would cut off (D-245). */
+.rules-body { overflow-y: auto; overscroll-behavior: contain; flex: 1; min-height: 0; padding: 4px; }
+/* A sheet with a text field opens at the top, so a phone's keyboard doesn't cover the field (D-245). */
+.rules-modal.top { align-items: flex-start; padding: 0; }
+.rules-modal.top .rules-sheet { border-radius: 0 0 18px 18px; border: 1px solid var(--felt-line); border-top: 0;
+  padding-top: max(16px, env(safe-area-inset-top)); box-shadow: 0 20px 60px rgba(0,0,0,.5); }
 .rules-settings { border: 1px solid var(--felt-line); border-radius: 12px; padding: 10px 12px; margin-bottom: 14px; }
 .rules-settings table { width: 100%; border-collapse: collapse; font-size: 0.85em; margin-top: 4px; }
 .rules-settings td { padding: 5px 0; border-top: 1px solid var(--felt-line); color: var(--ink-soft); }
