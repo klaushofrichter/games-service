@@ -72,6 +72,7 @@ Categories=Game;
 | `--port 8081` | Another port, if 8080 is taken |
 | `--no-open` | Don't open the browser, e.g. on a computer without a screen; open the board from another one |
 | `--service`, `--code ABCD-EFGH` | Join the Game Table service, see below |
+| `--version` | The package's version, and every game on the table with its version and source |
 
 ## Remote players: the Game Table service
 
@@ -95,6 +96,8 @@ The table keeps its approval, so later starts need only `--service`. Without `--
 | | |
 | --- | --- |
 | `~/apps/game-table` | The program: Node.js, the table host, the built-in games |
+| `~/apps/game-table/MANIFEST.json` | The package: its version and build time, Node.js, and the built-in games with their versions |
+| `~/.local/share/game-table/games.json` | Every game on the table at the last start: version, repository, commit, download time |
 | `~/.local/share/game-table/repos` | The downloaded games (`$XDG_DATA_HOME/game-table` if that is set) |
 | `~/.local/share/game-table/data` | The table's key, logs and saved games |
 | `~/.local/share/game-table/tools/gh` | The GitHub CLI, if it was needed |

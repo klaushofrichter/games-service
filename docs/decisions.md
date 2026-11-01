@@ -1870,6 +1870,12 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   - **Install guides** for each system: [`docs/install/`](install/) (windows, macos, linux).
   - **Tests of the packages** are separate from the usual CI and run only on request. They install each package on
     a clean GitHub host and start it without the service.
+  - **Versions (Klaus, 2026-11-01):** each package holds a manifest, `MANIFEST.json`. It lists the package's version
+    and build time, the games-service commit, Node.js, and every built-in game with its version. The release also
+    publishes it as `game-table-<os>.manifest.json`, and the release notes list the built-in games. Games downloaded at
+    start are listed at each start in `games.json` in the user's folder, and `--version` prints them. Each entry gives
+    the game's version, repository, branch, commit and download time. Public repositories appear as GitHub links,
+    private ones by name only.
   - **Joining the service:** an installed table joins the Game Table service with `--service`, and needs no
     reinstall. The board shows a pairing code for the console, or `--code ABCD-EFGH` uses an access code (D-113).
     The table keeps its approval in its data folder.

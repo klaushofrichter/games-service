@@ -18,6 +18,7 @@ import { homedir, platform as osPlatform, arch as osArch } from "node:os";
 import { delimiter, dirname, join, resolve } from "node:path";
 import { createInterface } from "node:readline/promises";
 import { fileURLToPath } from "node:url";
+import { gunzipSync } from "node:zlib";
 import JSZip from "jszip";
 import { readTarGz } from "../../packages/protocol/src/bundle.ts";
 
@@ -26,6 +27,19 @@ const PUBLIC_REPOS = [`${OWNER}/extra-games`];
 const SERVICE_URL = "https://games.skylar.technology";
 const CONSOLE_URL = "https://games-console.skylar.technology";
 const UA = { "User-Agent": "game-table-launcher" };
+/** Repositories anyone can see: games.json links them; private ones are named only. */
+const PUBLIC_LINKS: Record<string, string> = {
+  "games-service": `https://github.com/${OWNER}/games-service`,
+  [`${OWNER}/extra-games`]: `https://github.com/${OWNER}/extra-games`,
+};
+
+/** Where a downloaded repository's games came from: <reposDir>/<name>.json. */
+interface Download {
+  repository: string;
+  branch: string;
+  commit: string;
+  downloaded: string;
+}
 
 const isWin = osPlatform() === "win32";
 const isMac = osPlatform() === "darwin";
@@ -45,6 +59,7 @@ interface Options {
   home?: string;
   smokeTest: boolean;
   expectGames: string[];
+  showVersion?: boolean;
 }
 
 function parseArgs(argv: string[]): Options {
@@ -67,6 +82,7 @@ function parseArgs(argv: string[]): Options {
       case "service": o.service = true; break;
       case "code": o.code = value(); o.service = true; break;
       case "home": o.home = value(); break;
+      case "version": case "v": o.showVersion = true; break;
       case "smoketest": o.smokeTest = true; o.open = false; break;
       case "expectgames": o.expectGames = value().split(",").map((s) => s.trim()).filter(Boolean); break;
       case "help": case "h": case "?":
@@ -92,6 +108,7 @@ function readmeText() {
     "  --service         join the Game Table service (remote players); approve the table in the console",
     "  --code ABCD-EFGH  join the service with an access code from the console",
     "  --home DIR        another folder for downloads and data",
+    "  --version         the package's version and the games on the table (MANIFEST.json, games.json)",
   ].join("\n");
 }
 
@@ -238,7 +255,14 @@ async function choosePrivate(o: Options, savedFile: string): Promise<string[]> {
 }
 
 // --- Game repositories -------------------------------------------------------------------------------------------
-/** Downloads a repository's branch and keeps its games/ folder: <reposDir>/<name>/games, and <name>.commit. */
+/** The commit a GitHub tarball was made from: its first entry, a pax global header, says "comment=<sha>". */
+function tarCommit(gz: Buffer): string {
+  const head = gunzipSync(gz).subarray(0, 2048);
+  if (String.fromCharCode(head[156]) !== "g") return "";
+  return head.subarray(512, 1024).toString("utf8").match(/comment=([0-9a-f]{40})/)?.[1] ?? "";
+}
+
+/** Downloads a repository's branch and keeps its games/ folder: <reposDir>/<name>/games, and <name>.json. */
 async function fetchGames(repo: string, branch: string, reposDir: string, token: string | null) {
   // With a token through the API; without one from codeload, which anonymous API limits don't count.
   const gz = token
@@ -267,10 +291,12 @@ async function fetchGames(repo: string, branch: string, reposDir: string, token:
   const target = join(reposDir, name);
   await rm(target, { recursive: true, force: true });
   await rename(staging, target);
-  // The API names the folder <owner>-<name>-<sha>; codeload <name>-<branch>, and keeps the commit in the global header.
-  const commit = token ? (top.split("-").at(-1) ?? "") : "latest";
-  await writeFile(join(reposDir, `${name}.commit`), commit + "\n");
-  return commit;
+  // The API names the folder <owner>-<name>-<sha>; both keep the full commit in the global header.
+  const commit = tarCommit(gz) || (token ? (top.split("-").at(-1) ?? "") : "");
+  const info: Download = { repository: repo, branch, commit, downloaded: new Date().toISOString().replace(/\.\d+Z$/, "Z") };
+  await writeFile(join(reposDir, `${name}.json`), JSON.stringify(info, null, 2) + "\n");
+  await rm(join(reposDir, `${name}.commit`), { force: true }); // before games.json, the commit alone
+  return commit.slice(0, 7) || "an unknown commit";
 }
 
 // --- The table host ----------------------------------------------------------------------------------------------
@@ -313,11 +339,70 @@ function openBrowser(url: string) {
   }
 }
 
+interface PackageManifest {
+  package: { version: string; platform: string; built: string };
+  gamesService: { repository: string; commit: string; commitDate: string };
+  node: Record<string, string>;
+  games: { id: string; name: string; version: string; test?: boolean }[];
+}
+
+async function readJson<T>(file: string): Promise<T | null> {
+  try {
+    return JSON.parse(await readFile(file, "utf8")) as T;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * games.json in the user's folder: every game on the table this start, with its version and where it came from (the
+ * package, or a repository's branch, commit and download time). Public repositories are linked, private ones named.
+ */
+async function writeGamesList(home: string, gamesDir: string, from: Map<string, string>, reposDir: string) {
+  const pkg = await readJson<PackageManifest>(join(bundled, "MANIFEST.json"));
+  const games = [];
+  for (const [id, label] of [...from].sort(([a], [b]) => a.localeCompare(b))) {
+    const m = await readJson<{ name: string; version: string; test?: boolean }>(join(gamesDir, id, "manifest.json"));
+    let source: Record<string, string>;
+    if (label === "games-service") {
+      source = { repository: PUBLIC_LINKS["games-service"], package: pkg?.package.version ?? "dev", commit: pkg?.gamesService.commit ?? "" };
+    } else {
+      const d = await readJson<Download>(join(reposDir, `${label.split("/")[1]}.json`));
+      source = { repository: PUBLIC_LINKS[label] ?? label, branch: d?.branch ?? "", commit: d?.commit ?? "", downloaded: d?.downloaded ?? "" };
+    }
+    games.push({ id, name: m?.name ?? id, version: m?.version ?? "", ...(m?.test ? { test: true } : {}), ...source });
+  }
+  const list = { format: "game-table-games/1", package: pkg?.package ?? null, written: new Date().toISOString().replace(/\.\d+Z$/, "Z"), games };
+  await writeFile(join(home, "games.json"), JSON.stringify(list, null, 2) + "\n");
+  return list;
+}
+
+async function showVersion(home: string) {
+  const pkg = await readJson<PackageManifest>(join(bundled, "MANIFEST.json"));
+  if (pkg) {
+    say(`Game Table ${pkg.package.version} for ${pkg.package.platform}, built ${pkg.package.built}`);
+    say(`  games-service ${pkg.gamesService.commit.slice(0, 7)} (${pkg.gamesService.commitDate}) ${pkg.gamesService.repository}`);
+    say(`  Node.js ${[...new Set(Object.values(pkg.node))].join(", ")}`);
+  } else say("Game Table (no MANIFEST.json: not an installed package)");
+  const list = await readJson<{ written: string; games: { id: string; version: string; repository: string; commit?: string; test?: boolean }[] }>(join(home, "games.json"));
+  if (!list) {
+    say("No games.json yet: start the table once.");
+    return;
+  }
+  say(`Games on the table at the last start (${list.written}):`);
+  for (const g of list.games.filter((g) => !g.test)) say(`  ${g.id.padEnd(16)} ${g.version.padEnd(14)} ${g.repository}${g.commit ? ` @ ${g.commit.slice(0, 7)}` : ""}`);
+  say(`Details: ${join(home, "games.json")}`);
+}
+
 async function main() {
   const o = parseArgs(process.argv.slice(2));
   const major = Number(process.versions.node.split(".")[0]);
   if (major < 26) fail(`Node.js 26 is needed (this is ${process.versions.node}).`);
   const home = resolve(o.home || defaultHome());
+  if (o.showVersion) {
+    await showVersion(home);
+    return;
+  }
   const tools = join(home, "tools");
   const reposDir = join(home, "repos");
   const dataDir = join(home, "data");
@@ -381,6 +466,7 @@ async function main() {
     }
     say(`Games from ${label}: ${ids.join(", ") || "(none)"}`);
   }
+  const gamesList = await writeGamesList(home, gamesDir, from, reposDir);
 
   const keyFile = join(dataDir, "table-key");
   if (!existsSync(keyFile)) await writeFile(keyFile, randomBytes(16).toString("hex") + "\n", { mode: 0o600 });
@@ -459,6 +545,11 @@ async function main() {
         const listed = line.replace(/^.*?games:\s*/, "").replace(/\s+\(.*$/, "").split(/,\s*/);
         for (const g of o.expectGames) if (!listed.includes(g)) problems.push(`game ${g} is not on the table`);
       }
+      for (const g of o.expectGames) {
+        const entry = gamesList.games.find((x) => x.id === g);
+        if (!entry || !entry.version || !("commit" in entry) || !entry.commit) problems.push(`games.json has no version and commit for ${g}`);
+      }
+      if (!existsSync(join(bundled, "MANIFEST.json"))) problems.push("the package has no MANIFEST.json");
     }
     child.kill();
     say("--- table host output ---");

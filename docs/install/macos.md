@@ -56,6 +56,7 @@ Run the starter in Terminal with options:
 | `--port 8081` | Another port, if 8080 is taken |
 | `--no-open` | Don't open the browser |
 | `--service`, `--code ABCD-EFGH` | Join the Game Table service, see below |
+| `--version` | The package's version, and every game on the table with its version and source |
 
 ## Remote players: the Game Table service
 
@@ -79,6 +80,8 @@ The table keeps its approval, so later starts need only `--service`. Without `--
 | | |
 | --- | --- |
 | `/Applications/Game Table.app` | The program: Node.js, the table host, the built-in games |
+| `/Applications/Game Table.app/Contents/Resources/MANIFEST.json` | The package: its version and build time, Node.js, and the built-in games with their versions |
+| `~/Library/Application Support/Game Table/games.json` | Every game on the table at the last start: version, repository, commit, download time |
 | `~/Library/Application Support/Game Table/repos` | The downloaded games |
 | `~/Library/Application Support/Game Table/data` | The table's key, logs and saved games |
 | `~/Library/Application Support/Game Table/tools/gh` | The GitHub CLI, if it was needed |

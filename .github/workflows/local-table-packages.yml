@@ -7,6 +7,8 @@
 name: local-table-packages
 
 on:
+  push: # TEMPORARY: testing from the branch; removed before merging
+    branches: [local-table-packages]
   workflow_dispatch:
     inputs:
       ref:
@@ -61,6 +63,8 @@ jobs:
         run: |
           npm ci --no-audit --no-fund --loglevel=error
           node scripts/package/build.ts --os ${{ matrix.os }} --out dist
+        env:
+          PACKAGE_REF: ${{ inputs.ref || github.ref_name }}
       - name: Windows installer (Inno Setup)
         if: matrix.os == 'windows' && ((inputs.os || 'all') == 'all' || inputs.os == 'windows')
         shell: pwsh
@@ -198,7 +202,13 @@ jobs:
           - macOS: game-table-macos.pkg (docs/install/macos.md)
           - Linux: game-table-linux.tar.gz (docs/install/linux.md)
 
-          Each start downloads extra-games and the private game repositories you name; your GitHub sign-in is needed only for those."
+          Each start downloads extra-games and the private game repositories you name; your GitHub sign-in is needed only for those.
+          Each package holds MANIFEST.json (also here as game-table-<os>.manifest.json): its version, build time, Node.js and built-in games.
+          After a start, games.json in the table's folder lists every game on the table with its version, repository and commit (game-table --version)."
+          m=$(ls game-table-*.manifest.json | head -1)
+          notes="$notes
+
+          Built-in games: $(jq -r '[.games[] | select(.test | not) | "\(.name) \(.version)"] | join(", ")' "$m")"
           if gh release view local-table >/dev/null 2>&1; then
             gh api -X PATCH "repos/$GH_REPO/git/refs/tags/local-table" -f sha="$sha" -F force=true >/dev/null
             gh release edit local-table --title "Game Table for your computer" --notes "$notes" --latest

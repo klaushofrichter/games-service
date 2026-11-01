@@ -54,6 +54,7 @@ Add them to the starter in a terminal: `"%LOCALAPPDATA%\Programs\Game Table\game
 | `--port 8081` | Another port, if 8080 is taken |
 | `--no-open` | Don't open the browser |
 | `--service`, `--code ABCD-EFGH` | Join the Game Table service, see below |
+| `--version` | The package's version, and every game on the table with its version and source |
 
 ## Remote players: the Game Table service
 
@@ -78,6 +79,8 @@ The table keeps its approval, so later starts need only `--service`. Without `--
 | | |
 | --- | --- |
 | `%LOCALAPPDATA%\Programs\Game Table` | The program: Node.js, the table host, the built-in games |
+| `%LOCALAPPDATA%\Programs\Game Table\MANIFEST.json` | The package: its version and build time, Node.js, and the built-in games with their versions |
+| `%LOCALAPPDATA%\GameTable\games.json` | Every game on the table at the last start: version, repository, commit, download time |
 | `%LOCALAPPDATA%\GameTable\repos` | The downloaded games |
 | `%LOCALAPPDATA%\GameTable\data` | The table's key, logs and saved games |
 | `%LOCALAPPDATA%\GameTable\tools\gh` | The GitHub CLI, if it was needed |
