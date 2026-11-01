@@ -349,7 +349,6 @@ button.copy:hover, button.copy.done { color: var(--brass); border-color: var(--b
 .code-status { font-size: .8em; padding: 2px 10px; border-radius: 999px; border: 1px solid var(--felt-line); color: var(--ink-soft); }
 .code-status.accepted { border-color: #5fbf8f; color: #8fe0b5; }
 .code-status.unknown, .code-status.expired, .code-status.revoked, .code-status.in-use { border-color: #d2574a; color: #f1a197; }
-.overlay.code-pad { z-index: 46; }
 .overlay.code-pad .panel { width: 720px; }
 .code-pad .slots { display: flex; justify-content: center; align-items: center; gap: 8px; margin: 6px 0 20px; }
 .code-pad .slot { width: 58px; height: 70px; display: grid; place-items: center; font: 600 34px var(--mono); color: var(--brass);
@@ -477,7 +476,8 @@ button.copy:hover, button.copy.done { color: var(--brass); border-color: var(--b
 .invite-name > span { flex: 1; }
 .invite-name .name-value { min-width: 220px; font-weight: 600; }
 .invite-name .name-value.empty { font-weight: 400; color: var(--ink-soft); }
-.overlay.name-pad { z-index: 46; }
+/* The pads (D-250) lie above everything they are opened from: the settings window, a dialog that chooses a game. */
+.overlay.key-pad { z-index: 55; }
 .overlay.name-pad .panel { width: 760px; }
 .name-pad .name-field { position: relative; margin: 6px 0 18px; }
 .name-pad .name-field input { width: 100%; box-sizing: border-box; font: 600 30px var(--display, inherit); padding: 12px 70px 12px 16px;

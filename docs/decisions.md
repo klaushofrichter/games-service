@@ -1788,3 +1788,13 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   the choice, and doesn't repeat it under the field. The tile leaves it out. The settings window shows the same text
   under the setting before the game; during it, the locked row leaves it out, so a game's own item can say what its
   value means now (any item takes a `hint`) without the text showing twice.
+
+- **D-250 · 2026-11-01 · Klaus** — The board's pads for typing without a keyboard share one shell:
+  - The pads are the name pad (letters, digits by a switch), the number pad (a seed) and the access-code pad.
+  - The shell keeps one pad of a kind at a time, faces the front edge and turns with the board while open, and lies
+    above the window it was opened from.
+  - A tap beside a pad or Escape cancels it. A real keyboard types into it too: the number pad takes digits,
+    Backspace or Delete and Enter; it takes at most the digits of the setting's maximum and answers only in range.
+  - The window that chooses a game opens the number pad for a wide-range whole number (more than 1000 values, a
+    seed), as the settings window does.
+  - A future pad (letters and digits for a game's text setting) builds its keys in the same shell.
