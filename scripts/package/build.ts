@@ -151,7 +151,20 @@ exec "$DIR/node/$N/node" "$DIR/runtime/scripts/package/launch.ts" "$@"
 # Starts Game Table (games-service scripts/package/launch.ts, D-256). Options go to it, e.g. --no-update.
 DIR="$(cd "$(dirname "$0")" && pwd)"
 case "$(uname -m)" in x86_64|amd64) N=linux-x64 ;; aarch64|arm64) N=linux-arm64 ;; *) echo "Game Table runs on x64 and arm64 Linux, not $(uname -m)." >&2; exit 1 ;; esac
-exec "$DIR/node/$N/node" "$DIR/runtime/scripts/package/launch.ts" "$@"
+NODE="$DIR/node/$N/node"
+# Node.js needs libatomic, which minimal systems leave out: say what to install instead of a loader error.
+if ! err=$("$NODE" -e 0 2>&1); then
+  case "$err" in
+    *libatomic*)
+      echo "Game Table needs the system library libatomic. Install it, then start again:" >&2
+      echo "  Debian, Ubuntu, Raspberry Pi OS:  sudo apt install libatomic1" >&2
+      echo "  Fedora, RHEL:                     sudo dnf install libatomic" >&2
+      echo "  Arch:                             sudo pacman -S gcc-libs" >&2 ;;
+    *) echo "$err" >&2 ;;
+  esac
+  exit 1
+fi
+exec "$NODE" "$DIR/runtime/scripts/package/launch.ts" "$@"
 `,
   );
 }

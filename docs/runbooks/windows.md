@@ -5,7 +5,8 @@ private game repositories you can read on GitHub. It runs **without the Game Tab
 with their phones on the same WiFi by the QR code on the board, as many as a game takes. Remote players, watchers and
 invites need the service, so there are none here.
 
-For running only. To develop games, use `scripts/local-table.sh` on macOS or Linux (developer guide, section 14) or
+The installer is simpler for most people: [`docs/install/windows.md`](../install/windows.md) (D-256). This
+script is the way without an installer. For running only. To develop games, use `scripts/local-table.sh` on macOS or Linux (developer guide, section 14) or
 Docker ([`local-docker.md`](local-docker.md)).
 
 ## Install and start

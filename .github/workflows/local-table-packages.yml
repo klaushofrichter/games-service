@@ -164,6 +164,11 @@ jobs:
         run: |
           if command -v node || command -v gh || command -v git; then echo "node, gh or git is in the container"; exit 1; fi
           mkdir -p "$HOME/apps" && tar -xzf game-table-linux.tar.gz -C "$HOME/apps"
+          # Node.js needs libatomic (docs/install/linux.md): without it the starter says what to install.
+          if "$HOME/apps/game-table/game-table" --no-update 2>err.txt; then echo "started without libatomic?"; exit 1; fi
+          cat err.txt
+          grep -q "apt install libatomic1" err.txt
+          apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq libatomic1 >/dev/null
           "$HOME/apps/game-table/game-table" --repos none --sign-in --smoke-test --expect-games "$EXPECT"
           "$HOME/apps/game-table/game-table" --no-update --smoke-test --expect-games "$EXPECT"
           test -x "${XDG_DATA_HOME:-$HOME/.local/share}/game-table/tools/gh/bin/gh"
