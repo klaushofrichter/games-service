@@ -86,6 +86,21 @@ try:
         assert board.locator(".overlay.number-pad").count() == 0, "Enter on the pad opened it again"
         board.select_option(".dialog.form select[name=board]", "fixed")
         assert field.is_disabled() and field.input_value() == ""
+        # Text on the board's keyboard (D-252), which faces the way its window does on every edge, also while open.
+        board.click(".dialog.form input[name=motto]")
+        kb = board.locator(".overlay.name-pad:not(.number-pad)")
+        kb.wait_for()
+        assert kb.locator("input").input_value() == "Good luck", kb.locator("input").input_value()
+        assert kb.locator(".count").inner_text() == "9/20", kb.locator(".count").inner_text()
+        for deg in (90, 90, 90, 90):
+            a("POST", "/rotate", {"degrees": deg}) if deg != 180 else None
+            wait(lambda: kb.locator(".panel").evaluate("e => e.style.transform") == board.locator(".dialog.form").evaluate("e => e.style.transform"), 5, "the keyboard to face as its window")
+        board.click(".overlay.name-pad [data-clear]")
+        for k in "Go":
+            board.click(f".overlay.name-pad .keys button[data-key='{k}']")
+        board.click(".overlay.name-pad [data-save]")
+        kb.wait_for(state="detached")
+        assert board.input_value(".dialog.form input[name=motto]") == "Go", board.input_value(".dialog.form input[name=motto]")
         board.click(".dialog.form [data-x=no]")
         a("POST", "/game/select", {"gameId": "duel"})
         board.click("#settings-button")

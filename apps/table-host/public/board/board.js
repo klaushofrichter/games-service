@@ -225,6 +225,40 @@ const randomFor = (f) => {
   const hi = f.max ?? 999999;
   return lo + Math.floor(Math.random() * (hi - lo + 1));
 };
+/**
+ * A field the board's pads fill (D-252): a number opens the number pad, text the board's keyboard, by a tap or Enter,
+ * in any window (the one that chooses a game, an AI player's, the simulation). The field itself takes no typing: the
+ * board is a touchscreen without a keyboard, and a real keyboard types into the pad. Its range, type and label ride on
+ * data- attributes; a value picked fires input and change, as typing did.
+ */
+function padInput(f, v, off = false) {
+  const text = f.type === "string";
+  const attrs = text
+    ? `data-textpad data-max="${esc(f.max ?? 48)}"`
+    : `data-pad data-type="${f.type === "number" ? "number" : "int"}" ${f.min !== undefined ? `data-min="${esc(f.min)}"` : ""} ${f.max !== undefined ? `data-max="${esc(f.max)}"` : ""}`;
+  return `<input type="text" readonly inputmode="none" autocomplete="off" ${attrs} data-label="${esc(f.label ?? f.key)}" name="${esc(f.key)}" value="${off ? "" : esc(v ?? "")}" ${off ? "disabled" : ""} aria-label="${esc(f.label ?? f.key)}: tap to type">`;
+}
+function openPadFor(el) {
+  if (el.disabled) return;
+  const set = (v) => {
+    el.value = String(v);
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+    el.dispatchEvent(new Event("change", { bubbles: true }));
+  };
+  const num = (k) => (el.dataset[k] === undefined || el.dataset[k] === "" ? undefined : Number(el.dataset[k]));
+  if (el.dataset.textpad !== undefined) return openNamePad(el.value, set, el.dataset.label, { max: num("max") ?? 48, text: true, saveLabel: "OK" });
+  openNumberPad(el.dataset.label ?? "", el.value, { type: el.dataset.type, min: num("min"), max: num("max") }, set);
+}
+document.addEventListener("click", (e) => {
+  const el = e.target.closest?.("input[data-pad], input[data-textpad]");
+  if (el) openPadFor(el);
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Enter" || !e.target.matches?.("input[data-pad], input[data-textpad]")) return;
+  e.preventDefault();
+  openPadFor(e.target);
+});
+
 /** A whole number with a wide range (a seed): typed on the board's number pad, not stepped or typed in a field (D-245, D-250). */
 const onPad = (f) => f.type === "int" && (f.max ?? Infinity) - (f.min ?? -Infinity) > 1000;
 /** Digits an int field takes at most (D-245): those of its largest value, plus a minus sign when it may be negative. */
@@ -283,14 +317,12 @@ function formDialog(title, intro, fields, values = {}, okLabel = "OK", removeLab
     const input = (f) => {
       let v = values[f.key] ?? f.default;
       // A setting that doesn't apply now (D-245): disabled and blank; a random one that does, with a fresh value.
-      if (!settingActive(f, now, fields)) return `<input type="text" name="${f.key}" value="" disabled ${onPad(f) ? `readonly inputmode="none" data-pad` : ""}>`;
+      if (!settingActive(f, now, fields)) return padInput(f, "", true);
       if (f.random && (v === undefined || v === f.default)) v = now[f.key] = randomFor(f);
-      // On the number pad (D-250): the field opens it, as the settings window's value does.
-      if (onPad(f)) return `<input type="text" readonly inputmode="none" data-pad autocomplete="off" name="${f.key}" value="${esc(v)}" aria-label="${esc(f.label ?? f.key)}: tap to type">`;
-      if (f.type === "int") return `<input type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off" maxlength="${intDigits(f)}" name="${f.key}" value="${esc(v)}">`;
+      // Numbers on the number pad, text on the board's keyboard (D-250, D-252): the board has no keyboard of its own.
+      if (f.type === "int" || f.type === "number" || f.type === "string") return padInput(f, v);
       if (f.type === "enum") return pickWrap(`<select name="${f.key}">${f.values.map((x) => `<option value="${esc(x)}" ${String(v) === x ? "selected" : ""}>${esc(labelFor(f, x))}</option>`).join("")}</select>`);
       if (f.type === "bool") return `<input type="checkbox" name="${f.key}" ${v ? "checked" : ""}>`;
-      if (f.type === "int" || f.type === "number") return `<input type="number" name="${f.key}" value="${esc(v)}" ${f.min !== undefined ? `min="${f.min}"` : ""} ${f.max !== undefined ? `max="${f.max}"` : ""}>`;
       return `<input type="text" name="${f.key}" value="${esc(v ?? "")}">`;
     };
     d.innerHTML = `<div class="dialog form"><h2>${esc(title)}</h2>${intro ? `<div class="muted form-intro">${esc(withSettings(intro, fields, values))}</div>` : ""}
@@ -324,7 +356,6 @@ function formDialog(title, intro, fields, values = {}, okLabel = "OK", removeLab
         if (!on) el.value = "";
         else {
           el.value = String(f.random ? randomFor(f) : f.default ?? "");
-          if (f.type === "int" && !onPad(f)) Object.assign(el, { inputMode: "numeric", maxLength: intDigits(f) });
         }
       }
     };
@@ -336,20 +367,7 @@ function formDialog(title, intro, fields, values = {}, okLabel = "OK", removeLab
     const follow = (e) => (e && digitsOnly(e), whens(), hints(), introEl() && (introEl().textContent = withSettings(intro, fields, current())));
     d.addEventListener("input", follow);
     d.addEventListener("change", follow);
-    // A wide-range number opens the number pad (D-250), by a tap or Enter on its field.
-    const openPad = (el) => {
-      const f = fields.find((x) => x.key === el.name);
-      if (!f || el.disabled) return;
-      openNumberPad(f.label ?? f.key, el.value, f, (n) => {
-        el.value = String(n);
-        el.dispatchEvent(new Event("input", { bubbles: true }));
-      });
-    };
-    d.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" && e.target.matches?.("input[data-pad]")) (e.preventDefault(), openPad(e.target));
-    });
     d.addEventListener("click", (e) => {
-      if (e.target.matches?.("input[data-pad]")) return openPad(e.target);
       const x = e.target.closest("button")?.dataset.x;
       if (!x && e.target !== d) return;
       let out = x === "remove" ? "remove" : null;
@@ -1239,6 +1257,8 @@ function render() {
   overlayRoot.querySelector(".overlay.statistics")?.recolor?.(); // a colour changed while Awards and Results is open (D-239)
   // The pads turn with the board, also while open (D-245).
   for (const p of overlayRoot.querySelectorAll(".overlay.key-pad > .panel")) faceFront(p);
+  // Dialogs too (D-252): a pad opened from one turns with the board, and the window behind it must turn with it.
+  for (const d of overlayRoot.querySelectorAll(".dialog-backdrop > .dialog")) faceFront(d);
   gameEdge(); // keeps the last north/south facing current, so a game starts facing the way the lobby last did
   renderSeats();
   if (REMOTE) fit();
@@ -2151,9 +2171,9 @@ function openSimulation() {
     <p class="muted" style="font-size:.85em">Runs games with AI players only, without the board, and stores a replayable log for AI training.</p>
     <div class="group" style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
       <label>Game<select name="game" style="font:inherit;padding:8px;border-radius:10px;background:var(--felt-deep);color:var(--ink)">${sims.map((g) => `<option value="${g.id}">${esc(g.name)}</option>`).join("")}</select></label>
-      <label>AI players<input name="players" type="number" min="1" max="8" value="4"></label>
-      <label>Games<input name="games" type="number" min="1" max="1000" value="10"></label>
-      <label>Seed<input name="seed" type="number" value="${Math.floor(Math.random() * 1e6)}"></label>
+      <label>AI players${padInput({ key: "players", type: "int", min: 1, max: 8, label: "AI players" }, 4)}</label>
+      <label>Games${padInput({ key: "games", type: "int", min: 1, max: 1000, label: "Games" }, 10)}</label>
+      <label>Seed${padInput({ key: "seed", type: "int", min: 0, max: 999999, label: "Seed" }, Math.floor(Math.random() * 1e6))}</label>
     </div><div class="out muted" style="font-size:.85em"></div>
     <div class="actions" style="display:flex;justify-content:flex-end;gap:12px"><button data-x="close">Close</button><button class="primary" data-x="run">Run…</button></div></div>`;
   faceFront(o.querySelector(".panel"));
@@ -2196,23 +2216,31 @@ const NAME_ROWS = [[..."QWERTYUIOP"], [..."ASDFGHJKL"], [..."ZXCVBNM"], [..."Ä�
  * ⇧ for the other case), common accented letters, digits by a switch, space and delete. A real keyboard, an input
  * method for any script, and pasting work in the field too. Calls done(name) with the cleaned name ("" for none).
  */
-function openNamePad(initial, done, title = "Player's name") {
+function openNamePad(initial, done, title = "Player's name", opts = {}) {
+  // A game's text setting uses the same keyboard (D-252): its own length, kept as typed (no name rules), "OK".
+  const limit = opts.max ?? MAX_NAME;
+  const clean = opts.text
+    ? (raw, trim = true) => {
+        const t = Array.from(String(raw ?? "").normalize("NFC").replace(/[\u0000-\u001f\u007f-\u009f]/g, "")).slice(0, limit).join("");
+        return trim ? t.trim() : t;
+      }
+    : cleanName;
   const pad = keyPad("name", "name-pad");
   if (!pad) return;
   const { o } = pad;
   let shift = false;
   let digits = false;
   o.innerHTML = `<div class="panel"><h2>${esc(title)}</h2>
-    <div class="name-field"><input maxlength="48" autocomplete="off" spellcheck="false" aria-label="Name"><span class="count"></span></div>
+    <div class="name-field"><input maxlength="${Math.max(limit, 48)}" autocomplete="off" spellcheck="false" aria-label="${esc(title)}"><span class="count"></span></div>
     <div class="keys"></div>
-    <div class="actions"><button data-clear>Clear</button><span style="flex:1"></span><button data-cancel>Cancel</button><button class="primary" data-save>Use this name</button></div></div>`;
+    <div class="actions"><button data-clear>Clear</button><span style="flex:1"></span><button data-cancel>Cancel</button><button class="primary" data-save>${esc(opts.saveLabel ?? "Use this name")}</button></div></div>`;
   const input = o.querySelector("input");
-  input.value = cleanName(initial);
+  input.value = clean(initial);
   const length = () => Array.from(input.value).length;
   const capital = () => shift !== (input.value === "" || input.value.endsWith(" "));
   const drawKeys = () => {
     const up = capital();
-    const full = length() >= MAX_NAME;
+    const full = length() >= limit;
     const rows = digits ? [[..."1234567890"], [..."-'.&!?"]] : NAME_ROWS.map((r) => (up ? r : r.map((c) => c.toLowerCase())));
     const key = (k, cls = "") => `<button class="${cls}" data-key="${esc(k)}" ${full ? "disabled" : ""}>${k === " " ? "space" : esc(k)}</button>`;
     o.querySelector(".keys").innerHTML =
@@ -2220,10 +2248,10 @@ function openNamePad(initial, done, title = "Player's name") {
       `<div class="row"><button class="wide" data-shift aria-pressed="${shift}" ${digits ? "disabled" : ""}>⇧</button>` +
       `<button class="wide" data-digits>${digits ? "ABC" : "123"}</button>${digits ? "" : key("ß")}${key(" ", "space")}` +
       `<button class="wide" data-back aria-label="Delete the last character" ${input.value ? "" : "disabled"}>⌫</button></div>`;
-    o.querySelector(".count").textContent = `${length()}/${MAX_NAME}`;
+    o.querySelector(".count").textContent = `${length()}/${limit}`;
   };
   const set = (v) => {
-    input.value = cleanName(v, false);
+    input.value = clean(v, false);
     input.setSelectionRange(input.value.length, input.value.length); // keys type at the end
     shift = false;
     drawKeys();
@@ -2231,9 +2259,9 @@ function openNamePad(initial, done, title = "Player's name") {
   // Keys don't take the focus from the field, so a real keyboard can carry on where the keys left off.
   o.addEventListener("mousedown", (e) => e.target.closest(".keys button") && e.preventDefault());
   const close = pad.close;
-  const save = () => (done(cleanName(input.value)), close());
+  const save = () => (done(clean(input.value)), close());
   input.addEventListener("input", () => {
-    const v = cleanName(input.value, false);
+    const v = clean(input.value, false);
     if (v !== input.value) input.value = v;
     drawKeys();
   });
@@ -2264,14 +2292,19 @@ function openNumberPad(title, initial, f, done) {
   const pad = keyPad("number", "name-pad number-pad", (e) => onKey(e));
   if (!pad) return;
   const { o } = pad;
-  let value = String(initial ?? "").replace(/\D/g, "");
-  const max = intDigits(f);
-  const ok = () => value !== "" && Number(value) >= (f.min ?? 0) && (f.max === undefined || Number(value) <= f.max);
+  const decimal = f.type === "number"; // a number with a fraction (D-252): a decimal point
+  const negative = (f.min ?? 0) < 0;
+  let value = String(initial ?? "").replace(decimal ? /[^\d.-]/g : /[^\d-]/g, "");
+  if (!negative) value = value.replace(/-/g, "");
+  const max = decimal ? 12 : intDigits(f);
+  const digits = () => value.replace(/[^\d]/g, "").length;
+  const ok = () => value !== "" && value !== "-" && Number.isFinite(Number(value)) && Number(value) >= (f.min ?? (negative ? -Infinity : 0)) && (f.max === undefined || Number(value) <= f.max);
   const draw = () => {
     o.innerHTML = `<div class="panel"><h2>${esc(title)}</h2>
       <div class="name-field"><input readonly value="${esc(value)}" aria-label="${esc(title)}"><span class="count">${f.max !== undefined ? `${f.min ?? 0} to ${f.max}` : ""}</span></div>
-      <div class="keys">${[[..."123"], [..."456"], [..."789"]].map((r) => `<div class="row">${r.map((k) => `<button data-key="${k}" ${value.length >= max ? "disabled" : ""}>${k}</button>`).join("")}</div>`).join("")}
-        <div class="row"><button data-clear>Clear</button><button data-key="0" ${value.length >= max ? "disabled" : ""}>0</button><button data-back aria-label="Delete the last digit" ${value ? "" : "disabled"}>⌫</button></div></div>
+      <div class="keys">${[[..."123"], [..."456"], [..."789"]].map((r) => `<div class="row">${r.map((k) => `<button data-key="${k}" ${digits() >= max ? "disabled" : ""}>${k}</button>`).join("")}</div>`).join("")}
+        <div class="row"><button data-clear>Clear</button><button data-key="0" ${digits() >= max ? "disabled" : ""}>0</button><button data-back aria-label="Delete the last digit" ${value ? "" : "disabled"}>⌫</button></div>
+        ${negative || decimal ? `<div class="row">${negative ? `<button data-key="-" aria-label="Minus">−</button>` : ""}${decimal ? `<button data-key="." aria-label="Decimal point" ${value.includes(".") ? "disabled" : ""}>.</button>` : ""}</div>` : ""}</div>
       <div class="actions"><span style="flex:1"></span><button data-cancel>Cancel</button><button class="primary" data-enter ${ok() ? "" : "disabled"}>Enter</button></div></div>`;
     faceFront(o.querySelector(".panel"));
   };
@@ -2280,12 +2313,14 @@ function openNumberPad(title, initial, f, done) {
     if (k === "enter") return void (ok() && (done(Number(value)), close()));
     if (k === "back") value = value.slice(0, -1);
     else if (k === "clear") value = "";
-    else if (value.length < max) value = (value === "0" ? "" : value) + k;
+    else if (k === "-") value = value.startsWith("-") ? value.slice(1) : "-" + value; // the sign, wherever typed
+    else if (k === ".") value.includes(".") || (value = (value === "" || value === "-" ? value + "0" : value) + ".");
+    else if (digits() < max) value = (value === "0" ? "" : value === "-0" ? "-" : value) + k;
     draw();
   };
   const onKey = (e) => {
     if (e.ctrlKey || e.metaKey || e.altKey) return;
-    const k = /^[0-9]$/.test(e.key) ? e.key : { Backspace: "back", Delete: "back", Enter: "enter" }[e.key];
+    const k = /^[0-9]$/.test(e.key) || (e.key === "-" && negative) || (e.key === "." && decimal) ? e.key : { Backspace: "back", Delete: "back", Enter: "enter" }[e.key];
     if (!k) return;
     e.preventDefault();
     e.stopPropagation(); // Enter here is not also Enter on the field that opened the pad
