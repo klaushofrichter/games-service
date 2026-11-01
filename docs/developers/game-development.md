@@ -555,7 +555,9 @@ Tests use Vitest and run against the real host code.
   access code. The table keeps its identity and key in `~/.gametable-local`. To see the board on an iPad or a TV
   while the table runs on your computer, use the board's settings › *Board on another screen…* (a QR code and link
   for any screen on the same network, D-190). A table in Docker instead:
-  [`docs/runbooks/local-docker.md`](../runbooks/local-docker.md).
+  [`docs/runbooks/local-docker.md`](../runbooks/local-docker.md). On Windows 11, for playing rather than developing:
+  `scripts/windows/game-table.ps1` downloads the released games and starts a table without the service
+  ([`docs/runbooks/windows.md`](../runbooks/windows.md), D-255).
 
   ```
   scripts/local-table.sh                                   # latest main, against the live service
