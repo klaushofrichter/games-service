@@ -41,6 +41,13 @@ try:
         assert "Pace: no limit (" in intro.inner_text(), intro.inner_text()
         board.select_option(".dialog.form select[name=pace]", "quick")
         assert "Pace: quick (" in intro.inner_text(), intro.inner_text()
+        # A setting's meaning as a paragraph of the description (D-249): the chosen side's, following the choice, and
+        # not again under the field; the tile leaves it out.
+        assert "Left: the first move is yours" in intro.inner_text(), intro.inner_text()
+        assert board.locator(".dialog.form [data-hint=side]").count() == 0, "the side's meaning shows twice"
+        assert "first move" not in tile.inner_text(), tile.inner_text()
+        board.select_option(".dialog.form select[name=side]", "right")
+        assert "Right: the other player moves first" in intro.inner_text(), intro.inner_text()
         # The window that chooses the game: the seed disabled and blank for a fixed board, a fresh one for random; only
         # digits typed (no "e", ".", "-"), at most six.
         field = board.locator(".dialog.form input[name=seed]")
@@ -90,6 +97,8 @@ try:
         before = board.locator(".overlay.settings .panel").evaluate("e => e.style.transform")
         a("POST", "/rotate", {"degrees": 180})
         wait(lambda: board.locator(".overlay.settings .panel").evaluate("e => e.style.transform") != before, 5, "the window to turn")
+        # The window turns with a transition: measure once it has come to rest.
+        wait(lambda: board.locator(".overlay.settings .panel").evaluate("e => e.getAnimations().length === 0"), 5, "the window to stop turning")
         board.click(".game-rules .pick:has(select[data-setting-select=pace]) .pick-cover")
         menu = board.locator(".game-rules .pick-menu")
         menu.wait_for()

@@ -255,22 +255,29 @@ const linkified = (text) => esc(text).replace(/https:\/\/[^\s<]+[^\s<.,;:!?)]/g,
 /** A form for settings or options; `note`: a game's text under the fields (an AI engine's licence, D-224). */
 /**
  * A game's description with its settings filled in (D-238): `{key}` names a setting and shows its value, as chosen or
- * the manifest's default ("first to {target} points"). Anything else in braces stays as it is.
+ * the manifest's default ("first to {target} points"). `{key.hint}` shows what the chosen value means, its `hints`
+ * text (D-249): in the window that chooses the game, a paragraph about the board chosen; on the tile (`hints: false`)
+ * nothing. Anything else in braces stays as it is.
  */
-function withSettings(text, fields = [], values = {}) {
-  return String(text ?? "").replace(/\{(\w+)\}/g, (m, key) => {
+function withSettings(text, fields = [], values = {}, { hints = true } = {}) {
+  const out = String(text ?? "").replace(/\{(\w+)(\.hint)?\}/g, (m, key, hint) => {
     const f = fields.find((x) => x.key === key);
     if (!f) return m;
     const v = values[key] ?? f.default;
+    if (hint) return hints ? hintFor(f, v) : "";
     return f.type === "bool" ? (v ? "on" : "off") : f.type === "enum" ? labelFor(f, v) : String(v);
   });
+  return out.trim();
 }
+/** Settings whose meaning the description shows as `{key.hint}` (D-249): no second copy under the field. */
+const hintsInText = (text) => new Set([...String(text ?? "").matchAll(/\{(\w+)\.hint\}/g)].map((m) => m[1]));
 
 function formDialog(title, intro, fields, values = {}, okLabel = "OK", removeLabel = null, note = "") {
   return new Promise((resolve) => {
     const d = document.createElement("div");
     d.className = "dialog-backdrop";
     const now = { ...values };
+    const inIntro = hintsInText(intro);
     const input = (f) => {
       let v = values[f.key] ?? f.default;
       // A setting that doesn't apply now (D-245): disabled and blank; a random one that does, with a fresh value.
@@ -283,7 +290,7 @@ function formDialog(title, intro, fields, values = {}, okLabel = "OK", removeLab
       return `<input type="text" name="${f.key}" value="${esc(v ?? "")}">`;
     };
     d.innerHTML = `<div class="dialog form"><h2>${esc(title)}</h2>${intro ? `<div class="muted form-intro">${esc(withSettings(intro, fields, values))}</div>` : ""}
-      <div class="fields">${fields.map((f) => `<label ${settingActive(f, now, fields) ? "" : "hidden"}><span>${esc(f.label ?? f.key)}</span>${input(f)}${f.hints ? `<small class="field-hint" data-hint="${f.key}">${esc(hintFor(f, now[f.key] ?? f.default))}</small>` : ""}</label>`).join("") || `<div class="faint">${state?.game ? "Nothing to set for this game." : "Pick a game to choose how it plays."}</div>`}</div>
+      <div class="fields">${fields.map((f) => `<label ${settingActive(f, now, fields) ? "" : "hidden"}><span>${esc(f.label ?? f.key)}</span>${input(f)}${f.hints && !inIntro.has(f.key) ? `<small class="field-hint" data-hint="${f.key}">${esc(hintFor(f, now[f.key] ?? f.default))}</small>` : ""}</label>`).join("") || `<div class="faint">${state?.game ? "Nothing to set for this game." : "Pick a game to choose how it plays."}</div>`}</div>
       ${note ? `<div class="faint form-note">${linkified(note)}</div>` : ""}
       <div class="actions">${removeLabel ? `<button class="danger" data-x="remove" style="margin-right:auto">${esc(removeLabel)}</button>` : ""}<button data-x="no">Cancel</button><button class="primary" data-x="yes">${esc(okLabel)}</button></div></div>`;
     // The description follows the settings while they change (D-238): "first to 8 points" as 8 is typed.
@@ -900,7 +907,9 @@ function openSettings() {
     const gameSettings = fields.length
       ? `<div class="group game-rules ${editable ? "" : "locked"}"><div class="eyebrow">${esc(state.game.name)} · game settings${editable ? "" : ` <span class="lock" aria-label="locked">🔒 locked during the game</span>`}</div>
           ${fields.filter((f) => settingActive(f, cur, fields)).map((f) => {
-            const hint = hintFor(f, cur[f.key] ?? f.default); // what the choice means (D-246)
+            // What the choice means (D-246); during a game the game's own items say what it means now (D-249), so the
+            // locked row doesn't repeat it.
+            const hint = editable ? hintFor(f, cur[f.key] ?? f.default) : "";
             return `<div class="row ${hint ? "with-hint" : ""}"><span>${esc(f.label ?? f.key)}${hint ? `<small class="row-hint">${esc(hint)}</small>` : ""}</span>${setting(f)}</div>`;
           }).join("")}
           ${editable ? "" : `<div class="faint" style="font-size:.7em;margin-top:6px">These can be changed before the game starts.</div>`}</div>`
@@ -931,7 +940,7 @@ function openSettings() {
       ${tableRules}
       ${items.length ? `<div class="group game-settings"><div class="eyebrow">${esc(state.game.name)}</div>${items.map((it, k) => {
         // A choice option's `hint` says what the chosen one means (D-246).
-        const hint = it.type === "choice" ? it.options?.find((op) => op.value === it.value)?.hint ?? "" : "";
+        const hint = it.type === "choice" ? it.options?.find((op) => op.value === it.value)?.hint ?? "" : it.hint ?? ""; // any item's `hint` (D-249)
         return `<div class="row ${hint ? "with-hint" : ""}"><span>${esc(it.label)}${hint ? `<small class="row-hint">${esc(hint)}</small>` : ""}</span>${control(it, k)}</div>`;
       }).join("")}</div>` : ""}
       <div class="actions settings-actions"><button class="primary" data-close-overlay>Done</button></div></div>`);
@@ -1376,7 +1385,7 @@ let gamePage = 0;
 const viewOnly = () => REMOTE && !state.remote?.boardControl;
 // A remote board without board control (a watcher, or control switched off) shows the games, not as buttons (D-170).
 const tileHtml = (g) => `<button class="tile ${g.selectable ? "selectable" : ""} ${viewOnly() ? "view-only" : ""}" data-game="${g.id}" ${g.selectable && !viewOnly() ? "" : viewOnly() ? 'tabindex="-1" aria-disabled="true"' : "disabled"}>
-          <span class="title">${esc(g.name)}</span><span class="desc">${esc(withSettings(g.description, g.settings))}</span>
+          <span class="title">${esc(g.name)}</span><span class="desc">${esc(withSettings(g.description, g.settings, {}, { hints: false }))}</span>
           <span class="faint" style="font-size:.66em">${playersLabel(g.players)}${g.ai ? " · AI" : ""}${g.extra ? ` · <span style="color:var(--brass)">extra</span>` : ""}</span>
           ${g.selectable ? `<span class="hint">${esc(tileHint(g))}</span>` : `<span class="why">${esc(g.reasons[0])}</span>`}</button>`;
 function gameTiles() {

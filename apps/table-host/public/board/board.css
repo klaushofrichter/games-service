@@ -148,6 +148,8 @@ pre.raw { font-family: var(--mono); font-size: 0.7em; color: var(--ink-soft); ba
 #game-layer { position: absolute; inset: 0; z-index: 2; }
 
 .dialog.form { max-width: 640px; }
+/* A description's paragraphs (D-249: a board's description after the game's). */
+.dialog.form .form-intro { white-space: pre-line; }
 .dialog .fields { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 20px; margin-top: 18px; }
 .dialog .fields label { display: flex; flex-direction: column; gap: 6px; font-size: 0.85em; color: var(--ink-soft); }
 .dialog .fields input, .dialog .fields select { font: inherit; color: var(--ink); background: var(--felt-deep); border: 1px solid var(--felt-line); border-radius: 10px; padding: 8px 12px; }
