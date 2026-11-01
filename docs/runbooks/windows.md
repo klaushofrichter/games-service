@@ -84,7 +84,8 @@ auth logout`.
   and the GitHub CLI itself, start the table, and list games from games-service and extra-games.
 - Then again from the installed starter with `-NoUpdate`.
 
-It runs on changes to the script, and every Monday against the current `production` branches.
+It runs only on request, apart from the usual checks: Actions › *windows-table* › *Run workflow*. It always
+tests against the current `production` branches.
 
 ## Troubleshooting
 

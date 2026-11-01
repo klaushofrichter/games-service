@@ -3,16 +3,10 @@
 # the production branches of games-service and extra-games, starts the table without the service and checks that it
 # answers and lists games from both; then starts it again without downloading (-NoUpdate).
 # GitHub-hosted only: our own runners (CI_RUNNER=self) are Linux and macOS.
+# Only on request (Actions > windows-table > Run workflow), apart from the usual checks (D-255).
 name: windows-table
 
 on:
-  push:
-    branches-ignore: [main, production]
-    paths: ["scripts/windows/**", ".github/workflows/windows-table.yml"]
-  pull_request:
-    paths: ["scripts/windows/**", ".github/workflows/windows-table.yml"]
-  schedule:
-    - cron: "17 9 * * 1" # Mondays: production moves on, the script must still start it
   workflow_dispatch:
 
 permissions:

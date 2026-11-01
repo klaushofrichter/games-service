@@ -1857,4 +1857,4 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
       and copies the newest script from games-service.
     - `.github/workflows/windows-table.yml` runs it on `windows-11-arm` and `windows-latest` with node, gh and git
       taken off the PATH (`-SignIn` with the workflow's token takes the GitHub CLI path without a browser), then
-      again with `-NoUpdate`. It runs on changes to the script and weekly.
+      again with `-NoUpdate`. It runs only on request (`workflow_dispatch`), apart from the usual checks.
