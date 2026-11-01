@@ -103,6 +103,13 @@
         "board": "random"
       },
       "random": true
+    },
+    {
+      "key": "motto",
+      "type": "string",
+      "max": 20,
+      "default": "Good luck",
+      "label": "Table motto"
     }
   ],
   "facing": "any"
