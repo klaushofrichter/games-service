@@ -1798,3 +1798,16 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   - The window that chooses a game opens the number pad for a wide-range whole number (more than 1000 values, a
     seed), as the settings window does.
   - A future pad (letters and digits for a game's text setting) builds its keys in the same shell.
+
+- **D-252 · 2026-11-01 · Klaus** — Every number and every text field on the board is typed on the board's pads, which
+  turn with the board: the board is a touchscreen without a keyboard.
+  - Numbers (`int`, `number`) open the number pad, in the window that chooses a game, an AI player's window and the
+    simulation (Advanced). It shows the range, takes nothing out of range, and has a decimal point for `number` and a
+    minus for a negative `min`.
+  - Text (`string`) opens the board's keyboard (the name pad), with the setting's `max` (48 by default) and no name
+    rules.
+  - A real keyboard types into either pad. The fields themselves take no typing.
+  - Open dialogs now turn with the board as the pads do, so a pad and the window it came from always face the same
+    way.
+  - All the games' settings (built-in, extra-games, Loopy, Starforge, Traders) are whole numbers; no game draws an
+    input of its own on the board. The settings window keeps − and + for narrow ranges and the pad for wide ones.
