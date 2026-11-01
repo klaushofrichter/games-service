@@ -7,8 +7,6 @@
 name: local-table-packages
 
 on:
-  push: # TEMPORARY: testing from the branch before the workflow is on main; removed before merging
-    branches: [local-table-packages]
   workflow_dispatch:
     inputs:
       ref:
