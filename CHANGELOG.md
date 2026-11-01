@@ -8,6 +8,7 @@ history.
 
 ## [Unreleased]
 
+- `{key.hint}` in a game's description: a paragraph on the chosen setting's meaning when choosing the game (D-249).
 - Pulldowns on the board turn with their window; a setting that doesn't apply is hidden when choosing a game; `labels` for how values read (D-248).
 - `scripts/local-table.sh --offline --all-games` plays every game checked out beside games-service at a table without the service or console (D-247).
 - A choice can describe its options (`hints`, a choice item's `hint`): the chosen one's text shows under the setting (D-246).
