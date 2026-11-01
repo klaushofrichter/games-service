@@ -1,44 +1,68 @@
-# Handover (2026-10-29)
+# Handover (2026-11-01)
 
-Where games-service and extra-games stand as one coding session hands over to the next. Read
-[`AGENTS.md`](../AGENTS.md) first; this note covers what isn't written down elsewhere.
+Where games-service and extra-games stand as the combined Games cloud session hands over to its replacement (a child
+of the "Cluster - Linux" session again). Read [`AGENTS.md`](../AGENTS.md) first; this note covers what isn't written
+down elsewhere.
 
 ## Deployed now
 
 | Repository | Production | Notes |
 | --- | --- | --- |
-| games-service | **2026.10.29.2** (`/health`), production = main at `47adefb` | includes D-224 to D-233 |
-| extra-games | production = main at `e113f17` (release #92) | Chess 2026.10.27.3, Backgammon 2026.10.27.5 |
+| games-service | **2026.10.31.1** (`/health`), production at `d888c4a` | includes D-234 to D-244 |
+| extra-games | production = main at `e113f17` (release #92) | unchanged since 2026-10-27 |
 
 Tables pick up extra-games' `production` through the console's *Refresh* for a repository, or the hourly refresh.
 
-## Open work
+## In flight
 
-- **No pull requests are open** in games-service or extra-games, and main equals production in both.
-- **Awards:** D-231 recommends that games offer 12 or more awards. The guide says so, but no cap is enforced. Klaus
-  will pick which games get more later. Counts today: Roulette 15, Last Card 10, Chess 8, Hold'em 7, Backgammon 6,
-  Mexican Train 5, Coin Flip 4, Pachisi 0, Liar's Dice 0. The platform owns the Awards and Results window
-  (`apps/table-host/public/board/stats.js`); each game owns its award definitions.
-- **Possible follow-up to D-233:** a tap beside Awards and Results still counts as *Done*, which leads to the
-  results (D-216). Someone who came from the last screen might expect it to go back to the game instead. Ask Klaus
-  before changing it.
-- **Housekeeping:** merged feature branches were never deleted on either remote, and
-  `dependabot/pip/scripts/e2e/playwright-1.64.1` in extra-games has no pull request. Ask before deleting any of
-  them.
+- **games-service #291 "Release to production" (main → production) is open**, head `main` at `6259f4e`. It carries
+  D-245 to D-254 (#281 to #290). D-245 (#281) was merged into production before, but its *Deploy production* run
+  (41215502297) was cancelled in the 2026-10-31 outage, so production still runs 2026.10.31.1.
+  - GitHub reports it `behind`: production has a merge commit main doesn't. Update the branch from `production`
+    (a merge, no force), wait for test, codeql and e2e on the new head, then merge with a **merge commit**.
+  - Afterwards poll `https://games.skylar.technology/health` until it shows a `2026.11.01.N` version.
+  - **Don't merge anything else into main** until #291 is merged.
+- **After the deploy:** run every game repository's tests against the new `main` (the private game repos too).
+  Before #291 they were all green against `main`, except one Loopy host test that failed once under load and passed
+  three times alone.
+- **No other pull requests are open** in games-service, extra-games or the private game repositories. A private game
+  repository has a release waiting on main; its own `docs/handover.md` says what.
 
-## Requests from Klaus, and their status
+## Waiting on the node agent (the "Cluster - Linux" session)
 
-- **Console *Refresh* for a repository:** done in D-232 (#256), and deployed. The button is disabled while the
-  repository is fetched. After 30 s without an answer it shows a message and works again. `scripts/e2e/extra.py`
-  covers this with a fake GitHub that hangs.
-- **Console tooltips on every label:** done, D-225.
-- **Lobby tiles of equal height:** done, D-228.
-- **Awards and Results:** done and deployed. Its scrollbar stays inside the rounded corners (D-229), and the window
-  has *Back to game* (D-233).
-- **Chess engines on the internet:** done in extra-games E-040 to E-043. The engines are stockfish.online, the
-  Lichess cloud and the Lichess tablebase. Stockfish's depth is the lower of what the Elo asks and what the time
-  allows. Every AI move is tagged with where it came from.
-- **Backgammon:** the Auto-Roll label (E-044) and picking any checker on the bar (E-045) are done.
+- Its environment was rebuilt after the 2026-10-31 outage. While the network was down,
+  `claude-kube-setup.service` (a user unit that starts `claude remote-control` in tmux) restarted about 2,146 times,
+  until 12:42 CST. It has been active since. The unit runs on the **default tmux server**, but the vault's rule is a
+  separate tmux server for each unit. That is the Cluster session's to fix.
+- **Actions variable `CI_RUNNER`:** Klaus set one private game repository back to `hosted` on 2026-11-01 (the free
+  minutes renewed). `loopy-game` and `starforge-game` still say `self`; ask the Cluster session or Klaus whether to
+  switch them. kube-setup's ci-budget job does this from the billing report.
+- Repository settings, Actions variables, the cluster and the runners belong to the Cluster session or to Klaus.
+- Klaus's Obsidian vault now uses Obsidian Sync. The copy in Google Drive may be out of date.
+
+## Requests from Klaus since 2026-10-29, and their status
+
+All of these are merged into main. Those after D-244 wait for #291 to reach production.
+
+- **Table rules:** an away player can be replaced by an AI player (D-236). AI players get different play styles
+  (D-237).
+- **Lobby and deck:** an AI player's style shows on its seat plate (D-234). A board never shows a join code the
+  table may no longer take (D-241). Someone joining without a name starts as "Player N" (D-244). The deck's *At the
+  table* list shows names in the players' colours, with places like "South" (D-254).
+- **Settings:**
+  - `{key}` in a description shows the setting's value (D-238), and `{key.hint}` its hint (D-249).
+  - Settings can depend on others (`when`) and can take random seeds (D-245). Each choice can carry a hint (D-246).
+  - Pulldowns turn with their window, and options can have labels (D-248).
+- **Pads:** all the board's pads share one shell (D-250). Every number and text field on the board, the simulation
+  dialog included, opens a pad that follows the board's facing. The number pad takes keyboard input, decimals and a
+  minus (D-252).
+- **Local play:** `scripts/local-table.sh` is checked end to end (D-243) and has `--offline` and `--all-games [DIR]`
+  (D-247). A local table shows a one-time notice listing the game checkouts and their branches (D-251).
+- **Awards and Results:** holders' names and the result tables use the players' colours (D-239, D-242, D-253).
+- **Badges** on seat plates are an idea for games (D-235); no game uses them yet.
+- From the 2026-10-29 note, still open: Klaus will choose which games get 12 or more awards (D-231). Also open: a
+  tap beside Awards and Results counts as *Done* (D-233 follow-up); ask Klaus before changing it. Merged branches
+  were never deleted; ask before deleting any.
 
 ## Release process and conventions
 
@@ -94,8 +118,12 @@ What it can't do: change the cluster, its runners or its secrets. Those belong t
   - D-227: `facing: "any"`.
   - D-228 to D-233: lobby tiles, scrolling windows, deselecting a player, 12+ awards, the console's *Refresh*, *Back
     to game*.
+  - D-234 to D-244: AI styles on seat plates, badges, the two table rules, `{key}` in descriptions, colours in
+    Awards and Results, join codes, `local-table.sh`'s e2e, "Player N".
+  - D-245 to D-254: conditional settings and hints, pulldowns that turn, the pads, local-table notices, names in
+    players' colours (in #291).
 - **Security and privacy:** D-200, D-202.
 - **The console's host:** D-204, D-205.
 - **Relays:** D-209, D-211.
-- **extra-games:** E-034 to E-045 cover the recent Backgammon and Chess work. E-039 is wildbg, and E-040 to E-043
+- **extra-games:** E-034 to E-045 (the latest) cover the recent Backgammon and Chess work. E-039 is wildbg, and E-040 to E-043
   are the online engines.
