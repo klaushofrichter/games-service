@@ -557,7 +557,8 @@ Tests use Vitest and run against the real host code.
   for any screen on the same network, D-190). A table in Docker instead:
   [`docs/runbooks/local-docker.md`](../runbooks/local-docker.md). On Windows 11, for playing rather than developing:
   `scripts/windows/game-table.ps1` downloads the released games and starts a table without the service
-  ([`docs/runbooks/windows.md`](../runbooks/windows.md), D-255).
+  ([`docs/runbooks/windows.md`](../runbooks/windows.md), D-255). Packages for Windows, macOS and Linux, for players
+  rather than developers: [`docs/install/`](../install/) (D-256).
 
   ```
   scripts/local-table.sh                                   # latest main, against the live service

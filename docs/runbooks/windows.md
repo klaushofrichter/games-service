@@ -5,7 +5,8 @@ private game repositories you can read on GitHub. It runs **without the Game Tab
 with their phones on the same WiFi by the QR code on the board, as many as a game takes. Remote players, watchers and
 invites need the service, so there are none here.
 
-For running only. To develop games, use `scripts/local-table.sh` on macOS or Linux (developer guide, section 14) or
+The installer is simpler for most people: [`docs/install/windows.md`](../install/windows.md) (D-256). This
+script is the way without an installer. For running only. To develop games, use `scripts/local-table.sh` on macOS or Linux (developer guide, section 14) or
 Docker ([`local-docker.md`](local-docker.md)).
 
 ## Install and start
@@ -80,8 +81,9 @@ auth logout`.
 
 `.github/workflows/windows-table.yml` runs the script on GitHub's Windows 11 (arm64) and Windows Server (x64) hosts:
 
-- First with Node, the GitHub CLI and git taken off the PATH, as on a clean computer. The script must install Node
-  and the GitHub CLI itself, start the table, and list games from games-service and extra-games.
+- First with Node, the GitHub CLI and git taken off the PATH, as on a clean computer. The script must install Node,
+  start the table and list games from games-service and extra-games. It starts once without GitHub sign-in, then
+  once with it: the GitHub CLI's path.
 - Then again from the installed starter with `-NoUpdate`.
 
 It runs only on request, apart from the usual checks: Actions › *windows-table* › *Run workflow*. It always

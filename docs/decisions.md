@@ -1858,3 +1858,51 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
     - `.github/workflows/windows-table.yml` runs it on `windows-11-arm` and `windows-latest` with node, gh and git
       taken off the PATH (`-SignIn` with the workflow's token takes the GitHub CLI path without a browser), then
       again with `-NoUpdate`. It runs only on request (`workflow_dispatch`), apart from the usual checks.
+
+- **D-256 · 2026-11-01 · Klaus** — Game Table comes as a package for one computer: a Windows installer, a macOS
+  `.pkg` and a Linux `.tar.gz`. Each brings the table host and its own Node.js, and downloads extra-games and the
+  private game repositories the user names. It runs without the service and can join it later.
+  - **Unsigned for now.** Windows shows SmartScreen's *More info › Run anyway*, and macOS needs *Open Anyway* in
+    Privacy & Security. Klaus is an Apple developer, so the macOS package can be signed and notarized later through
+    Actions secrets.
+  - **Published** as the files of one GitHub release, `local-table`: one package per platform, each build replacing
+    the last, no history.
+  - **Install guides** for each system: [`docs/install/`](install/) (windows, macos, linux).
+  - **Tests of the packages** are separate from the usual CI and run only on request. They install each package on
+    a clean GitHub host and start it without the service.
+  - **Versions (Klaus, 2026-11-01):** each package holds a manifest, `MANIFEST.json`. It lists the package's version
+    and build time, the games-service commit, Node.js, and every built-in game with its version. The release also
+    publishes it as `game-table-<os>.manifest.json`, and the release notes list the built-in games. Games downloaded at
+    start are listed at each start in `games.json` in the user's folder, and `--version` prints them. Each entry gives
+    the game's version, repository, branch, commit and download time. Public repositories appear as GitHub links,
+    private ones by name only.
+  - **Joining the service:** an installed table joins the Game Table service with `--service`, and needs no
+    reinstall. The board shows a pairing code for the console, or `--code ABCD-EFGH` uses an access code (D-113).
+    The table keeps its approval in its data folder.
+  - *Implementation (Claude):*
+    - **Launcher:** one launcher for all three systems, `scripts/package/launch.ts`, runs on the package's own Node:
+      - On each new version it copies the package's runtime into the user's folder: `%LOCALAPPDATA%\GameTable`,
+        `~/Library/Application Support/Game Table`, or `$XDG_DATA_HOME/game-table`. The package may be read-only, and
+        the built-in games reach the SDK by a relative path.
+      - It asks for the private repositories, and installs the GitHub CLI for them if needed, checked against its
+        checksums.
+      - It downloads each repository's `games/` from the branch's tarball (`readTarGz`), needing no git.
+      - It starts the host with `LOCAL_TABLE=1`, the default route's address in `PUBLIC_URL`, and `APP_VERSION` set
+        to the package's version.
+    - **Build:** `scripts/package/build.ts` builds a platform's folder: the runtime from `npm ci --omit=dev` (pure
+      JavaScript, the same everywhere) and Node.js 26 for x64 and arm64 from nodejs.org, checksums checked.
+    - **Wrapping:**
+      - Windows: Inno Setup (`scripts/package/windows.iss`), per user, with no administrator rights.
+      - macOS: `pkgbuild`, with "Game Table.app" opening a Terminal for the table's log.
+      - Linux: `tar`.
+    - **Workflow:** `.github/workflows/local-table-packages.yml` (`workflow_dispatch`: ref, systems, publish) builds
+      the packages and installs each on clean hosts:
+      - Windows 11 arm64 and Windows Server, with node, gh and git off the PATH.
+      - macOS on Apple silicon and Intel, with only the system's PATH.
+      - Ubuntu x64 and arm64 in a bare `ubuntu:24.04` container. Node.js needs libatomic, which a bare system
+        lacks: the Linux starter checks for it and says what to install, and the test checks that message before
+        installing it.
+
+      The smoke test runs on each, then again with `--no-update`. Only when all pass does it replace the release's
+      files.
+    - **The PowerShell script stays** for a Windows table without an installer (D-255).

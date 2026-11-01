@@ -202,16 +202,22 @@ function Initialize-Gh {
   $ghArch = "amd64"
   if ($isArm) { $ghArch = "arm64" }
   Say "Installing the GitHub CLI into $(Join-Path $Tools 'gh') ..."
-  $rel = Get-Json "https://api.github.com/repos/cli/cli/releases/latest"
-  $asset = $rel.assets | Where-Object { $_.name -like "gh_*_windows_$ghArch.zip" } | Select-Object -First 1
-  $sumAsset = $rel.assets | Where-Object { $_.name -like "gh_*_checksums.txt" } | Select-Object -First 1
-  if (-not $asset -or -not $sumAsset) { Fail "The GitHub CLI's latest release has no Windows $ghArch zip." }
-  $zip = Join-Path $InstallDir $asset.name
-  $sums = Join-Path $InstallDir $sumAsset.name
-  Get-Url $asset.browser_download_url $zip
-  Get-Url $sumAsset.browser_download_url $sums
-  $line = Get-Content $sums | Where-Object { $_ -match "^([0-9a-f]{64})\s+$([regex]::Escape($asset.name))$" } | Select-Object -First 1
-  if (-not $line) { Fail "The GitHub CLI's checksums have no line for $($asset.name)." }
+  # The newest version from the release page's redirect, not the API: anonymous API calls are limited per address.
+  $req = [Net.HttpWebRequest]::Create("https://github.com/cli/cli/releases/latest")
+  $req.AllowAutoRedirect = $false
+  $req.UserAgent = "game-table-windows"
+  $resp = $req.GetResponse()
+  $location = $resp.Headers["Location"]
+  $resp.Close()
+  if ("$location" -notmatch "/tag/v(\d+\.\d+\.\d+)$") { Fail "The GitHub CLI's latest release can't be found." }
+  $tag = $Matches[1]
+  $assetName = "gh_${tag}_windows_$ghArch.zip"
+  $zip = Join-Path $InstallDir $assetName
+  $sums = Join-Path $InstallDir "gh_${tag}_checksums.txt"
+  Get-Url "https://github.com/cli/cli/releases/download/v$tag/$assetName" $zip
+  Get-Url "https://github.com/cli/cli/releases/download/v$tag/gh_${tag}_checksums.txt" $sums
+  $line = Get-Content $sums | Where-Object { $_ -match "^([0-9a-f]{64})\s+$([regex]::Escape($assetName))$" } | Select-Object -First 1
+  if (-not $line) { Fail "The GitHub CLI's checksums have no line for $assetName." }
   Test-Sha256 $zip ($line.Substring(0, 64))
   $dir = Join-Path $Tools "gh"
   if (Test-Path $Tmp) { Remove-Item -Recurse -Force $Tmp }
@@ -304,13 +310,17 @@ foreach ($r in $all) {
   }
   $zip = Join-Path $InstallDir "$name.zip"
   try {
-    # The zipball's one folder is named owner-name-commit.
-    $h = @{ "Accept" = "application/vnd.github+json" }
-    if ($token) { $h["Authorization"] = "Bearer $token" }
-    Get-Url "https://api.github.com/repos/$r/zipball/$Branch" $zip $h
+    # With a token through the API (the folder is owner-name-commit); without one from codeload (name-branch), which
+    # anonymous API limits don't count.
+    if ($token) {
+      Get-Url "https://api.github.com/repos/$r/zipball/$Branch" $zip @{ "Accept" = "application/vnd.github+json"; "Authorization" = "Bearer $token" }
+    } else {
+      Get-Url "https://codeload.github.com/$r/zip/refs/heads/$Branch" $zip
+    }
     $top = Expand-Single $zip $target
     Remove-Item -Force $zip
-    $commit = ($top -split "-")[-1]
+    $commit = "latest"
+    if ($token) { $commit = ($top -split "-")[-1] }
     Set-Content -Path "$target.commit" -Value $commit -Encoding ASCII
     Say "$r ($Branch) at $commit"
     $have += $r
