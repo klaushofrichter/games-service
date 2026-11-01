@@ -38,6 +38,7 @@ try:
         if "No Game Table service" not in text or "Remote players" not in text:
             problems.append(f"the local table's notice doesn't say there is no service: {text!r}")
         branch = subprocess.run(["git", "-C", REPO, "rev-parse", "--abbrev-ref", "HEAD"], capture_output=True, text=True).stdout.strip()
+        branch = "detached" if branch == "HEAD" else branch  # CI checks out a commit, not a branch
         if os.path.basename(REPO) not in text or branch not in text:
             problems.append(f"the notice doesn't name this checkout ({os.path.basename(REPO)}, branch {branch}): {text!r}")
         board.screenshot(path=os.path.join(OUT, "local-table-notice.png"))
