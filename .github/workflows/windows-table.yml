@@ -35,6 +35,8 @@ jobs:
           $env:PATH = ($env:PATH -split ';' | Where-Object { $_ -and -not (Test-Path (Join-Path $_ 'node.exe')) -and -not (Test-Path (Join-Path $_ 'gh.exe')) -and -not (Test-Path (Join-Path $_ 'git.exe')) }) -join ';'
           foreach ($t in 'node', 'gh', 'git') { if (Get-Command $t -ErrorAction SilentlyContinue) { throw "$t is still on the PATH" } }
           Copy-Item scripts\windows\game-table.ps1 $env:TEMP\game-table.ps1
+          powershell -NoProfile -ExecutionPolicy Bypass -File $env:TEMP\game-table.ps1 -Repos none -NoShortcut -SmokeTest -ExpectGames holdem,coin-flip,backgammon,chess
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           powershell -NoProfile -ExecutionPolicy Bypass -File $env:TEMP\game-table.ps1 -Repos none -SignIn -SmokeTest -ExpectGames holdem,coin-flip,backgammon,chess
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 

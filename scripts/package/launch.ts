@@ -147,16 +147,15 @@ async function ensureGh(tools: string): Promise<string> {
   const exe = join(tools, "gh", "bin", isWin ? "gh.exe" : "gh");
   if (existsSync(exe)) return exe;
   const cpu = osArch() === "arm64" ? "arm64" : "amd64";
-  const suffix = isWin ? `_windows_${cpu}.zip` : isMac ? `_macOS_${cpu}.zip` : `_linux_${cpu}.tar.gz`;
   say(`Installing the GitHub CLI into ${join(tools, "gh")} ...`);
-  const rel = JSON.parse((await get("https://api.github.com/repos/cli/cli/releases/latest", { Accept: "application/vnd.github+json" })).toString("utf8")) as {
-    assets: { name: string; browser_download_url: string }[];
-  };
-  const asset = rel.assets.find((a) => a.name.startsWith("gh_") && a.name.endsWith(suffix));
-  const sums = rel.assets.find((a) => /^gh_.*_checksums\.txt$/.test(a.name));
-  if (!asset || !sums) fail(`The GitHub CLI's latest release has no ${suffix.slice(1)}.`);
-  const archive = await get(asset.browser_download_url);
-  const line = (await get(sums.browser_download_url)).toString("utf8").split("\n").find((l) => l.trim().endsWith(` ${asset.name}`) || l.trim().endsWith(`*${asset.name}`));
+  // The newest version from the release page's redirect, not the API: anonymous API calls are limited per address.
+  const latest = await fetch("https://github.com/cli/cli/releases/latest", { headers: UA, redirect: "manual" });
+  const tag = (latest.headers.get("location") ?? "").match(/\/tag\/v(\d+\.\d+\.\d+)$/)?.[1];
+  if (!tag) throw new Error(`no latest release found (HTTP ${latest.status})`);
+  const asset = { name: `gh_${tag}${isWin ? `_windows_${cpu}.zip` : isMac ? `_macOS_${cpu}.zip` : `_linux_${cpu}.tar.gz`}` };
+  const base = `https://github.com/cli/cli/releases/download/v${tag}`;
+  const archive = await get(`${base}/${asset.name}`);
+  const line = (await get(`${base}/gh_${tag}_checksums.txt`)).toString("utf8").split("\n").find((l) => l.trim().endsWith(` ${asset.name}`) || l.trim().endsWith(`*${asset.name}`));
   if (!line || line.slice(0, 64).toLowerCase() !== sha256(archive)) fail(`Checksum mismatch for ${asset.name}: the download is damaged or not the published file.`);
   // The archives hold one top folder (gh_<v>_<os>_<cpu>/bin/gh) or bin/ at their top (Windows): keep what is under it.
   const files = new Map<string, { data: Buffer; exec: boolean }>();
@@ -241,9 +240,10 @@ async function choosePrivate(o: Options, savedFile: string): Promise<string[]> {
 // --- Game repositories -------------------------------------------------------------------------------------------
 /** Downloads a repository's branch and keeps its games/ folder: <reposDir>/<name>/games, and <name>.commit. */
 async function fetchGames(repo: string, branch: string, reposDir: string, token: string | null) {
-  const headers: Record<string, string> = { Accept: "application/vnd.github+json" };
-  if (token) headers.Authorization = `Bearer ${token}`;
-  const gz = await get(`https://api.github.com/repos/${repo}/tarball/${encodeURIComponent(branch)}`, headers);
+  // With a token through the API; without one from codeload, which anonymous API limits don't count.
+  const gz = token
+    ? await get(`https://api.github.com/repos/${repo}/tarball/${encodeURIComponent(branch)}`, { Accept: "application/vnd.github+json", Authorization: `Bearer ${token}` })
+    : await get(`https://codeload.github.com/${repo}/tar.gz/refs/heads/${encodeURIComponent(branch)}`);
   const entries = readTarGz(gz, 2 * 1024 * 1024 * 1024);
   const name = repo.split("/")[1];
   const staging = join(reposDir, `${name}.new`);
@@ -267,7 +267,8 @@ async function fetchGames(repo: string, branch: string, reposDir: string, token:
   const target = join(reposDir, name);
   await rm(target, { recursive: true, force: true });
   await rename(staging, target);
-  const commit = top.split("-").at(-1) ?? "";
+  // The API names the folder <owner>-<name>-<sha>; codeload <name>-<branch>, and keeps the commit in the global header.
+  const commit = token ? (top.split("-").at(-1) ?? "") : "latest";
   await writeFile(join(reposDir, `${name}.commit`), commit + "\n");
   return commit;
 }

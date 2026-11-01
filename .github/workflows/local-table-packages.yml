@@ -1,7 +1,7 @@
 # Packages of Game Table for one computer (D-256): a Windows installer, a macOS .pkg and a Linux .tar.gz, each with
 # Node.js 26, games-service's runtime and the launcher (scripts/package/). Every package is installed on clean GitHub
 # hosts and started without the Game Table service (a smoke test: the board answers, the games of games-service and
-# extra-games are on the table; then again with --no-update). With "publish", the packages replace the files of the
+# extra-games are on the table): without GitHub sign-in, with it (the GitHub CLI's path), then with --no-update. With "publish", the packages replace the files of the
 # release "local-table": one package per platform, no history.
 # Only on request: Actions > local-table-packages > Run workflow. Unsigned for now (Klaus, 2026-11-01).
 name: local-table-packages
@@ -114,6 +114,8 @@ jobs:
           $app = Join-Path $env:LOCALAPPDATA 'Programs\Game Table'
           if (-not (Test-Path "$app\game-table.cmd")) { throw 'not installed' }
           if (-not (Test-Path (Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Game Table.lnk'))) { throw 'no Start menu entry' }
+          & "$app\game-table.cmd" --repos none --smoke-test --expect-games $env:EXPECT
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
           & "$app\game-table.cmd" --repos none --sign-in --smoke-test --expect-games $env:EXPECT
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           & "$app\game-table.cmd" --no-update --smoke-test --expect-games $env:EXPECT
@@ -141,6 +143,7 @@ jobs:
           test -x "$app/Contents/MacOS/game-table"
           export PATH=/usr/bin:/bin:/usr/sbin:/sbin # no Homebrew: no node, no gh
           if command -v node || command -v gh; then echo "node or gh is still on the PATH"; exit 1; fi
+          "$app/Contents/Resources/game-table.command" --repos none --smoke-test --expect-games "$EXPECT"
           "$app/Contents/Resources/game-table.command" --repos none --sign-in --smoke-test --expect-games "$EXPECT"
           "$app/Contents/Resources/game-table.command" --no-update --smoke-test --expect-games "$EXPECT"
           test -x "$HOME/Library/Application Support/Game Table/tools/gh/bin/gh"
@@ -169,6 +172,7 @@ jobs:
           cat err.txt
           grep -q "apt install libatomic1" err.txt
           apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq libatomic1 >/dev/null
+          "$HOME/apps/game-table/game-table" --repos none --smoke-test --expect-games "$EXPECT"
           "$HOME/apps/game-table/game-table" --repos none --sign-in --smoke-test --expect-games "$EXPECT"
           "$HOME/apps/game-table/game-table" --no-update --smoke-test --expect-games "$EXPECT"
           test -x "${XDG_DATA_HOME:-$HOME/.local/share}/game-table/tools/gh/bin/gh"
