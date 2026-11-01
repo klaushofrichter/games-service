@@ -68,9 +68,22 @@ try:
         assert hint.inner_text() == "A new board from a seed.", hint.inner_text()
         assert field.is_visible(), "the seed should show for a random board"
         assert not field.is_disabled() and field.input_value().isdigit(), f"no fresh seed: {field.input_value()!r}"
-        field.fill("")
-        field.type("1e-2.3--4567890")
+        # The seed is typed on the board's number pad, opened from the field (D-250); a keyboard types into the pad too:
+        # digits only, at most six, Backspace and Delete take one off, Enter answers.
+        field.click()
+        npad = board.locator(".overlay.number-pad")
+        npad.wait_for()
+        npad.locator("[data-clear]").click()
+        board.keyboard.type("1e-2.3--4567890")
+        assert npad.locator("input").input_value() == "123456", npad.locator("input").input_value()
+        board.keyboard.press("Backspace")
+        board.keyboard.press("Delete")
+        assert npad.locator("input").input_value() == "1234", npad.locator("input").input_value()
+        board.keyboard.type("56")
+        board.keyboard.press("Enter")
+        npad.wait_for(state="detached")
         assert field.input_value() == "123456", field.input_value()
+        assert board.locator(".overlay.number-pad").count() == 0, "Enter on the pad opened it again"
         board.select_option(".dialog.form select[name=board]", "fixed")
         assert field.is_disabled() and field.input_value() == ""
         board.click(".dialog.form [data-x=no]")

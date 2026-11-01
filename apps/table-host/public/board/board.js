@@ -225,6 +225,8 @@ const randomFor = (f) => {
   const hi = f.max ?? 999999;
   return lo + Math.floor(Math.random() * (hi - lo + 1));
 };
+/** A whole number with a wide range (a seed): typed on the board's number pad, not stepped or typed in a field (D-245, D-250). */
+const onPad = (f) => f.type === "int" && (f.max ?? Infinity) - (f.min ?? -Infinity) > 1000;
 /** Digits an int field takes at most (D-245): those of its largest value, plus a minus sign when it may be negative. */
 const intDigits = (f) => (f.max !== undefined ? String(Math.trunc(Math.abs(f.max))).length : 9) + ((f.min ?? 0) < 0 ? 1 : 0);
 /** A whole number as typed: digits only (a leading minus where negatives are allowed), at most intDigits (D-245). */
@@ -281,8 +283,10 @@ function formDialog(title, intro, fields, values = {}, okLabel = "OK", removeLab
     const input = (f) => {
       let v = values[f.key] ?? f.default;
       // A setting that doesn't apply now (D-245): disabled and blank; a random one that does, with a fresh value.
-      if (!settingActive(f, now, fields)) return `<input type="text" name="${f.key}" value="" disabled>`;
+      if (!settingActive(f, now, fields)) return `<input type="text" name="${f.key}" value="" disabled ${onPad(f) ? `readonly inputmode="none" data-pad` : ""}>`;
       if (f.random && (v === undefined || v === f.default)) v = now[f.key] = randomFor(f);
+      // On the number pad (D-250): the field opens it, as the settings window's value does.
+      if (onPad(f)) return `<input type="text" readonly inputmode="none" data-pad autocomplete="off" name="${f.key}" value="${esc(v)}" aria-label="${esc(f.label ?? f.key)}: tap to type">`;
       if (f.type === "int") return `<input type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off" maxlength="${intDigits(f)}" name="${f.key}" value="${esc(v)}">`;
       if (f.type === "enum") return pickWrap(`<select name="${f.key}">${f.values.map((x) => `<option value="${esc(x)}" ${String(v) === x ? "selected" : ""}>${esc(labelFor(f, x))}</option>`).join("")}</select>`);
       if (f.type === "bool") return `<input type="checkbox" name="${f.key}" ${v ? "checked" : ""}>`;
@@ -320,7 +324,7 @@ function formDialog(title, intro, fields, values = {}, okLabel = "OK", removeLab
         if (!on) el.value = "";
         else {
           el.value = String(f.random ? randomFor(f) : f.default ?? "");
-          if (f.type === "int") Object.assign(el, { inputMode: "numeric", maxLength: intDigits(f) });
+          if (f.type === "int" && !onPad(f)) Object.assign(el, { inputMode: "numeric", maxLength: intDigits(f) });
         }
       }
     };
@@ -332,7 +336,20 @@ function formDialog(title, intro, fields, values = {}, okLabel = "OK", removeLab
     const follow = (e) => (e && digitsOnly(e), whens(), hints(), introEl() && (introEl().textContent = withSettings(intro, fields, current())));
     d.addEventListener("input", follow);
     d.addEventListener("change", follow);
+    // A wide-range number opens the number pad (D-250), by a tap or Enter on its field.
+    const openPad = (el) => {
+      const f = fields.find((x) => x.key === el.name);
+      if (!f || el.disabled) return;
+      openNumberPad(f.label ?? f.key, el.value, f, (n) => {
+        el.value = String(n);
+        el.dispatchEvent(new Event("input", { bubbles: true }));
+      });
+    };
+    d.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && e.target.matches?.("input[data-pad]")) (e.preventDefault(), openPad(e.target));
+    });
     d.addEventListener("click", (e) => {
+      if (e.target.matches?.("input[data-pad]")) return openPad(e.target);
       const x = e.target.closest("button")?.dataset.x;
       if (!x && e.target !== d) return;
       let out = x === "remove" ? "remove" : null;
@@ -864,7 +881,7 @@ function openSettings() {
       const v = cur[f.key] ?? f.default;
       if (!editable) return `<span class="value">${esc(f.type === "bool" ? (v ? "On" : "Off") : f.type === "enum" ? labelFor(f, v) : v)}</span>`;
       // A whole number with a wide range (a seed) is typed on the board's number pad, not stepped (D-245).
-      if (f.type === "int" && (f.max ?? Infinity) - (f.min ?? -Infinity) > 1000) return `<button class="pad-value" data-setting-pad="${esc(f.key)}">${esc(v)}</button>`;
+      if (onPad(f)) return `<button class="pad-value" data-setting-pad="${esc(f.key)}">${esc(v)}</button>`;
       if (f.type === "int" || f.type === "number")
         return `<span class="stepper"><button data-setting="${esc(f.key)}" data-delta="-1" ${f.min !== undefined && v <= f.min ? "disabled" : ""} aria-label="Less">−</button>
           <span class="value">${esc(v)}</span><button data-setting="${esc(f.key)}" data-delta="1" ${f.max !== undefined && v >= f.max ? "disabled" : ""} aria-label="More">+</button></span>`;
@@ -1102,14 +1119,38 @@ function serviceSettings() {
 }
 
 /**
+ * The board's pads for typing without a keyboard (D-250): a name (letters, digits by a switch, D-148), a whole number
+ * (digits, D-245, e.g. a board's seed) and the access code. One shell for all of them: one pad of a kind at a time, it
+ * faces the front edge and turns with the board while open (render()), a tap beside it or Escape cancels, and a real
+ * keyboard types into it too: `onKey(e)` gets the keys pressed while it is open. A new pad (letters and digits for a
+ * game's text setting) builds its keys in `o` the same way. Returns null while one of that kind is open.
+ */
+const keyPads = {};
+function keyPad(kind, cls, onKey = null) {
+  if (keyPads[kind]) return null;
+  const o = document.createElement("div");
+  o.className = `overlay key-pad ${cls}`;
+  // Only while it is the topmost layer: a pad opened over a dialog takes the keys, the dialog behind doesn't.
+  const keydown = (e) => onKey && overlayRoot.lastElementChild === o && onKey(e);
+  const close = () => {
+    document.removeEventListener("keydown", keydown, true);
+    o.remove();
+    delete keyPads[kind];
+  };
+  keyPads[kind] = { o, close };
+  document.addEventListener("keydown", keydown, true);
+  overlayRoot.appendChild(o);
+  return { o, close };
+}
+
+/**
  * A keypad for the code: the board is a touchscreen without a keyboard. A keyboard works too, and so does pasting
  * (Ctrl/⌘+V or the Paste button), with or without the dash the console shows.
  */
-let codePad = null;
 function openCodePad() {
-  if (codePad) return;
-  const o = (codePad = document.createElement("div"));
-  o.className = "overlay code-pad";
+  const pad = keyPad("code", "code-pad", (e) => onKey(e));
+  if (!pad) return;
+  const { o } = pad;
   let typed = "";
   const fromBoard = state.cloud.code?.source === "board";
   const draw = () => {
@@ -1124,10 +1165,8 @@ function openCodePad() {
     faceFront(o.querySelector(".panel"));
   };
   const close = () => {
-    document.removeEventListener("keydown", onKey, true);
     document.removeEventListener("paste", onPaste, true);
-    o.remove();
-    codePad = null;
+    pad.close();
   };
   const save = async (code) => {
     try {
@@ -1179,10 +1218,8 @@ function openCodePad() {
     else if (b.dataset.save !== undefined) save(typed);
     else if (b.dataset.remove !== undefined) save("");
   });
-  document.addEventListener("keydown", onKey, true);
   document.addEventListener("paste", onPaste, true);
   draw();
-  overlayRoot.appendChild(o);
 }
 
 /**
@@ -1201,7 +1238,7 @@ function render() {
   if (!state) return;
   overlayRoot.querySelector(".overlay.statistics")?.recolor?.(); // a colour changed while Awards and Results is open (D-239)
   // The pads turn with the board, also while open (D-245).
-  for (const p of overlayRoot.querySelectorAll(".overlay.name-pad > .panel")) faceFront(p);
+  for (const p of overlayRoot.querySelectorAll(".overlay.key-pad > .panel")) faceFront(p);
   gameEdge(); // keeps the last north/south facing current, so a game starts facing the way the lobby last did
   renderSeats();
   if (REMOTE) fit();
@@ -2159,11 +2196,10 @@ const NAME_ROWS = [[..."QWERTYUIOP"], [..."ASDFGHJKL"], [..."ZXCVBNM"], [..."Ä�
  * ⇧ for the other case), common accented letters, digits by a switch, space and delete. A real keyboard, an input
  * method for any script, and pasting work in the field too. Calls done(name) with the cleaned name ("" for none).
  */
-let namePad = null;
 function openNamePad(initial, done, title = "Player's name") {
-  if (namePad) return;
-  const o = (namePad = document.createElement("div"));
-  o.className = "overlay name-pad";
+  const pad = keyPad("name", "name-pad");
+  if (!pad) return;
+  const { o } = pad;
   let shift = false;
   let digits = false;
   o.innerHTML = `<div class="panel"><h2>${esc(title)}</h2>
@@ -2194,7 +2230,7 @@ function openNamePad(initial, done, title = "Player's name") {
   };
   // Keys don't take the focus from the field, so a real keyboard can carry on where the keys left off.
   o.addEventListener("mousedown", (e) => e.target.closest(".keys button") && e.preventDefault());
-  const close = () => (o.remove(), (namePad = null));
+  const close = pad.close;
   const save = () => (done(cleanName(input.value)), close());
   input.addEventListener("input", () => {
     const v = cleanName(input.value, false);
@@ -2216,19 +2252,18 @@ function openNamePad(initial, done, title = "Player's name") {
     else if (b.dataset.save !== undefined) save();
   });
   drawKeys();
-  overlayRoot.appendChild(o);
   faceFront(o.querySelector(".panel"));
 }
 
 /**
  * The board's number pad (D-245): digits, Clear and Enter, for a whole number such as a board's seed, without a
- * keyboard. Turns with the board, also while it is open. `f` gives min and max; Enter answers with a number in range.
+ * keyboard. Turns with the board, also while it is open. `f` gives min and max, and with them the most digits it takes
+ * (intDigits); Enter answers with a number in range. A keyboard works too (D-250): digits, Backspace or Delete, Enter.
  */
-let numberPad = null;
 function openNumberPad(title, initial, f, done) {
-  if (numberPad) return;
-  const o = (numberPad = document.createElement("div"));
-  o.className = "overlay name-pad number-pad";
+  const pad = keyPad("number", "name-pad number-pad", (e) => onKey(e));
+  if (!pad) return;
+  const { o } = pad;
   let value = String(initial ?? "").replace(/\D/g, "");
   const max = intDigits(f);
   const ok = () => value !== "" && Number(value) >= (f.min ?? 0) && (f.max === undefined || Number(value) <= f.max);
@@ -2240,19 +2275,32 @@ function openNumberPad(title, initial, f, done) {
       <div class="actions"><span style="flex:1"></span><button data-cancel>Cancel</button><button class="primary" data-enter ${ok() ? "" : "disabled"}>Enter</button></div></div>`;
     faceFront(o.querySelector(".panel"));
   };
-  const close = () => (o.remove(), (numberPad = null));
+  const close = pad.close;
+  const press = (k) => {
+    if (k === "enter") return void (ok() && (done(Number(value)), close()));
+    if (k === "back") value = value.slice(0, -1);
+    else if (k === "clear") value = "";
+    else if (value.length < max) value = (value === "0" ? "" : value) + k;
+    draw();
+  };
+  const onKey = (e) => {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    const k = /^[0-9]$/.test(e.key) ? e.key : { Backspace: "back", Delete: "back", Enter: "enter" }[e.key];
+    if (!k) return;
+    e.preventDefault();
+    e.stopPropagation(); // Enter here is not also Enter on the field that opened the pad
+    press(k);
+  };
   o.addEventListener("click", (e) => {
     const b = e.target.closest("button");
     if (e.target === o || b?.dataset.cancel !== undefined) return close();
     if (!b || b.disabled) return;
-    if (b.dataset.key !== undefined) value = (value === "0" ? "" : value) + b.dataset.key;
-    else if (b.dataset.back !== undefined) value = value.slice(0, -1);
-    else if (b.dataset.clear !== undefined) value = "";
-    else if (b.dataset.enter !== undefined) return void (done(Number(value)), close());
-    draw();
+    if (b.dataset.key !== undefined) press(b.dataset.key);
+    else if (b.dataset.back !== undefined) press("back");
+    else if (b.dataset.clear !== undefined) press("clear");
+    else if (b.dataset.enter !== undefined) press("enter");
   });
   draw();
-  overlayRoot.appendChild(o);
 }
 
 // ---------- remote invites (phase 1c) ----------
@@ -2312,7 +2360,7 @@ async function openInvite(watch = false) {
     // The invited player has joined (D-164): the link is used up, so the dialog closes by itself.
     const joined = r.joined?.find((j) => j.invite === inv.token);
     if (joined) {
-      if (namePad) namePad.remove(), (namePad = null);
+      keyPads.name?.close();
       close();
       return toast(watch ? `${joined.name} is watching` : `${joined.name} joined through the invite`);
     }
