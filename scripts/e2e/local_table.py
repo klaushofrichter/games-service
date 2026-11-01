@@ -31,6 +31,22 @@ try:
         board = b.new_page(viewport={"width": 1280, "height": 800})
         watch(board, "board")
         board.goto(f"http://localhost:{PORT}/board/")
+        # A local table says so once (D-251): no service, so no remote players; the games' checkouts with their branches.
+        note = board.locator(".local-notice")
+        note.wait_for(timeout=10000)
+        text = note.inner_text()
+        if "No Game Table service" not in text or "Remote players" not in text:
+            problems.append(f"the local table's notice doesn't say there is no service: {text!r}")
+        branch = subprocess.run(["git", "-C", REPO, "rev-parse", "--abbrev-ref", "HEAD"], capture_output=True, text=True).stdout.strip()
+        if os.path.basename(REPO) not in text or branch not in text:
+            problems.append(f"the notice doesn't name this checkout ({os.path.basename(REPO)}, branch {branch}): {text!r}")
+        board.screenshot(path=os.path.join(OUT, "local-table-notice.png"))
+        note.locator("[data-x=ok]").click()
+        board.reload()
+        board.locator("aside.join img").wait_for()
+        time.sleep(1)
+        if board.locator(".local-notice").count():
+            problems.append("the local table's notice came back after Got it")
         board.locator("aside.join img").wait_for()
         url = board.locator("aside.join .url").inner_text().strip()
         if not re.match(rf"^http://\d+\.\d+\.\d+\.\d+:{PORT}/j/[A-Z0-9]+$", url):

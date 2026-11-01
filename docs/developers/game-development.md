@@ -561,7 +561,8 @@ Tests use Vitest and run against the real host code.
   scripts/local-table.sh                                   # latest main, against the live service
   scripts/local-table.sh --branch my-feature               # a branch
   CLOUD_URL= scripts/local-table.sh --extra ../my-games    # your own games, no service
-  scripts/local-table.sh --offline --all-games             # every checked-out game beside this one, no service
+  scripts/local-table.sh --offline --all-games             # every checked-out game beside this one, no service;
+                                                           # the board says once which checkouts and branches (D-251)
   ```
 
 - **By hand, without a phone:** *Developer settings › Play from the board* on the board (the tools button) (or `BOARD_DECK=1`) puts one

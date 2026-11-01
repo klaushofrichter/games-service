@@ -8,6 +8,7 @@ history.
 
 ## [Unreleased]
 
+- A local table says once that it is local: no remote players without the service, and the checkouts and branches its games run from (D-251).
 - One shell for the board's pads; the number pad takes a keyboard and opens from the window that chooses a game too (D-250).
 - `{key.hint}` in a game's description: a paragraph on the chosen setting's meaning when choosing the game (D-249).
 - Pulldowns on the board turn with their window; a setting that doesn't apply is hidden when choosing a game; `labels` for how values read (D-248).

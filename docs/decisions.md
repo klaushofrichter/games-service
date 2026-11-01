@@ -1798,3 +1798,14 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   - The window that chooses a game opens the number pad for a wide-range whole number (more than 1000 values, a
     seed), as the settings window does.
   - A future pad (letters and digits for a game's text setting) builds its keys in the same shell.
+
+- **D-251 · 2026-11-01 · Klaus** — A table of `scripts/local-table.sh` says so on the board, once, after it starts
+  (`LOCAL_TABLE=1`):
+  - Without the service: only people here can join, by the QR code on this network. No remote players or watchers,
+    no invites.
+  - Games from git checkouts on this computer: their clones run as they are, not what GitHub or the service has.
+    Each checkout is named with its branch, commit and whether it has changes not committed, and with its games.
+  - *Got it* dismisses it for good on that browser. It comes back only when what it says changes (another branch or
+    commit, the service back).
+  - The table host finds the checkouts with git at start (`checkouts.ts`); games the service delivered don't count.
+    Not on a remote board, and not on tables started otherwise (the tests).

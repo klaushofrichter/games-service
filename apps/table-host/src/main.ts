@@ -34,6 +34,7 @@ const host = await startHost({
   logSnapshotEvery: num(env.LOG_SNAPSHOT_EVERY),
   allowNoLocalPlayer: env.ALLOW_NO_LOCAL_PLAYER === "1",
   boardDeck: env.BOARD_DECK === "1",
+  localTable: env.LOCAL_TABLE === "1",
   accessCode,
 });
 
