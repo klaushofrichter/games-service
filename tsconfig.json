@@ -16,5 +16,5 @@
       "@game-table/sdk/cards": ["./packages/sdk/src/cards.ts"]
     }
   },
-  "include": ["packages/*/src/**/*.ts", "apps/*/src/**/*.ts", "games/*/*.ts", "tests/**/*.ts"]
+  "include": ["packages/*/src/**/*.ts", "apps/*/src/**/*.ts", "games/*/*.ts", "tests/**/*.ts", "scripts/package/*.ts"]
 }

@@ -1,0 +1,202 @@
+# Packages of Game Table for one computer (D-256): a Windows installer, a macOS .pkg and a Linux .tar.gz, each with
+# Node.js 26, games-service's runtime and the launcher (scripts/package/). Every package is installed on clean GitHub
+# hosts and started without the Game Table service (a smoke test: the board answers, the games of games-service and
+# extra-games are on the table; then again with --no-update). With "publish", the packages replace the files of the
+# release "local-table": one package per platform, no history.
+# Only on request: Actions > local-table-packages > Run workflow. Unsigned for now (Klaus, 2026-11-01).
+name: local-table-packages
+
+on:
+  push: # TEMPORARY: testing from the branch before the workflow is on main; removed before merging
+    branches: [local-table-packages]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: games-service branch, tag or commit to package
+        default: production
+      os:
+        description: which packages
+        type: choice
+        options: [all, windows, macos, linux]
+        default: all
+      publish:
+        description: publish the tested packages on the release "local-table"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: local-table-packages
+  cancel-in-progress: false
+
+env:
+  EXPECT: holdem,coin-flip,backgammon,chess
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: windows, runner: windows-latest }
+          - { os: macos, runner: macos-latest }
+          - { os: linux, runner: ubuntu-latest }
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    steps:
+      - name: Skip
+        if: (inputs.os || 'all') != 'all' && inputs.os != matrix.os
+        run: echo "not asked for"
+      - uses: actions/checkout@v7
+        if: (inputs.os || 'all') == 'all' || inputs.os == matrix.os
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+      - uses: actions/setup-node@v7
+        if: (inputs.os || 'all') == 'all' || inputs.os == matrix.os
+        with:
+          node-version: 26
+      - name: Build the package folder
+        if: (inputs.os || 'all') == 'all' || inputs.os == matrix.os
+        shell: bash
+        run: |
+          npm ci --no-audit --no-fund --loglevel=error
+          node scripts/package/build.ts --os ${{ matrix.os }} --out dist
+      - name: Windows installer (Inno Setup)
+        if: matrix.os == 'windows' && ((inputs.os || 'all') == 'all' || inputs.os == 'windows')
+        shell: pwsh
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress; if ($LASTEXITCODE) { exit 1 } }
+          & $iscc /Qp "/DSource=$PWD\dist\windows" "/DVersion=$(Get-Date -Format yyyy.MM.dd)" "/DOutputDir=$PWD\dist" scripts\package\windows.iss
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - name: macOS package (pkgbuild)
+        if: matrix.os == 'macos' && ((inputs.os || 'all') == 'all' || inputs.os == 'macos')
+        run: |
+          mkdir -p pkgroot
+          mv "dist/macos/Game Table.app" pkgroot/
+          pkgbuild --analyze --root pkgroot component.plist
+          plutil -replace 0.BundleIsRelocatable -bool false component.plist
+          pkgbuild --root pkgroot --component-plist component.plist --install-location /Applications \
+            --identifier technology.skylar.game-table --version "$(date +%Y.%m.%d)" dist/game-table-macos.pkg
+      - name: Linux archive
+        if: matrix.os == 'linux' && ((inputs.os || 'all') == 'all' || inputs.os == 'linux')
+        run: tar -C dist/linux -czf dist/game-table-linux.tar.gz game-table
+      - uses: actions/upload-artifact@v7
+        if: (inputs.os || 'all') == 'all' || inputs.os == matrix.os
+        with:
+          name: package-${{ matrix.os }}
+          path: dist/game-table-*
+          if-no-files-found: error
+          retention-days: 7
+
+  test-windows:
+    needs: build
+    if: (inputs.os || 'all') == 'all' || inputs.os == 'windows'
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [windows-11-arm, windows-latest]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/download-artifact@v7
+        with: { name: package-windows }
+      - name: Install and start, as on a clean computer
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ github.token }} # --sign-in takes the GitHub CLI path without a browser
+        run: |
+          $env:PATH = ($env:PATH -split ';' | Where-Object { $_ -and -not (Test-Path (Join-Path $_ 'node.exe')) -and -not (Test-Path (Join-Path $_ 'gh.exe')) -and -not (Test-Path (Join-Path $_ 'git.exe')) }) -join ';'
+          foreach ($t in 'node', 'gh', 'git') { if (Get-Command $t -ErrorAction SilentlyContinue) { throw "$t is still on the PATH" } }
+          Start-Process -Wait -FilePath .\game-table-windows.exe -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/CURRENTUSER'
+          $app = Join-Path $env:LOCALAPPDATA 'Programs\Game Table'
+          if (-not (Test-Path "$app\game-table.cmd")) { throw 'not installed' }
+          if (-not (Test-Path (Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Game Table.lnk'))) { throw 'no Start menu entry' }
+          & "$app\game-table.cmd" --repos none --sign-in --smoke-test --expect-games $env:EXPECT
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          & "$app\game-table.cmd" --no-update --smoke-test --expect-games $env:EXPECT
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          if (-not (Test-Path (Join-Path $env:LOCALAPPDATA 'GameTable\tools\gh\bin\gh.exe'))) { throw 'the GitHub CLI was not installed' }
+
+  test-macos:
+    needs: build
+    if: (inputs.os || 'all') == 'all' || inputs.os == 'macos'
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [macos-latest, macos-15-intel] # Apple silicon and Intel
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/download-artifact@v7
+        with: { name: package-macos }
+      - name: Install and start, as on a clean computer
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          sudo installer -pkg game-table-macos.pkg -target /
+          app="/Applications/Game Table.app"
+          test -x "$app/Contents/MacOS/game-table"
+          export PATH=/usr/bin:/bin:/usr/sbin:/sbin # no Homebrew: no node, no gh
+          if command -v node || command -v gh; then echo "node or gh is still on the PATH"; exit 1; fi
+          "$app/Contents/Resources/game-table.command" --repos none --sign-in --smoke-test --expect-games "$EXPECT"
+          "$app/Contents/Resources/game-table.command" --no-update --smoke-test --expect-games "$EXPECT"
+          test -x "$HOME/Library/Application Support/Game Table/tools/gh/bin/gh"
+
+  test-linux:
+    needs: build
+    if: (inputs.os || 'all') == 'all' || inputs.os == 'linux'
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-latest, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
+    container: ubuntu:24.04 # a clean system: no node, no gh, no git, no CA certificates
+    timeout-minutes: 20
+    steps:
+      - uses: actions/download-artifact@v7
+        with: { name: package-linux }
+      - name: Install and start, as on a clean computer
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if command -v node || command -v gh || command -v git; then echo "node, gh or git is in the container"; exit 1; fi
+          mkdir -p "$HOME/apps" && tar -xzf game-table-linux.tar.gz -C "$HOME/apps"
+          "$HOME/apps/game-table/game-table" --repos none --sign-in --smoke-test --expect-games "$EXPECT"
+          "$HOME/apps/game-table/game-table" --no-update --smoke-test --expect-games "$EXPECT"
+          test -x "${XDG_DATA_HOME:-$HOME/.local/share}/game-table/tools/gh/bin/gh"
+
+  publish:
+    needs: [build, test-windows, test-macos, test-linux]
+    if: inputs.publish && !cancelled() && needs.build.result == 'success' && !contains(needs.*.result, 'failure')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v7
+        with: { pattern: package-*, merge-multiple: true }
+      - name: Replace the packages on the release "local-table"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          REF: ${{ inputs.ref }}
+        run: |
+          sha=$(gh api "repos/$GH_REPO/commits/$REF" --jq .sha)
+          notes="Game Table for one computer, without the Game Table service: players here join with their phones on the same WiFi.
+          Built from games-service $REF ($(echo "$sha" | cut -c1-7)) on $(date -u +%Y-%m-%d). Unsigned (D-256).
+
+          - Windows 11: game-table-windows.exe (docs/install/windows.md)
+          - macOS: game-table-macos.pkg (docs/install/macos.md)
+          - Linux: game-table-linux.tar.gz (docs/install/linux.md)
+
+          Each start downloads extra-games and the private game repositories you name; your GitHub sign-in is needed only for those."
+          if gh release view local-table >/dev/null 2>&1; then
+            gh api -X PATCH "repos/$GH_REPO/git/refs/tags/local-table" -f sha="$sha" -F force=true >/dev/null
+            gh release edit local-table --title "Game Table for your computer" --notes "$notes" --latest
+          else
+            gh release create local-table --target "$sha" --title "Game Table for your computer" --notes "$notes" --latest
+          fi
+          gh release upload local-table game-table-* --clobber
+          gh release view local-table --json assets --jq '.assets[] | "\(.name)  \(.size)"'
