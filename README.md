@@ -86,6 +86,7 @@ board moves there; the table's own window says "The board moved to another scree
 | `scripts/site-screenshots.py` | Takes the game screenshots for the public website (`apps/cloud/public/site/`) from a host running every public game |
 | `scripts/soak.ts` | AI-only soak run over every game and player count |
 | `scripts/local-table.sh` | A Table Host on this computer against the live service, from any branch (see above) |
+| `scripts/windows/game-table.ps1` | Windows 11: downloads the games (private ones by name) and the tools it needs, and starts a table without the service ([runbook](docs/runbooks/windows.md), D-255) |
 | `docs/` | Decision log; the glossary, the cookbook and the architecture overview; `developers/` (the game developer guide); `runbooks/` for running a table locally with Docker and for resetting and restoring the service's state |
 | `tests/` | Vitest suites that drive a real host through the board control API and fake decks |
 | `deploy/` | Dockerfiles, docker-compose, the local Docker setup (`local/`), the table PC kit |
