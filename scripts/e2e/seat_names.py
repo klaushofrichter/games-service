@@ -62,8 +62,21 @@ def check(tag, board, phones, in_game=False):
                 problems.append(f"{tag}: board says {got.all_inner_texts()} for {p['name']}, expected {want}")
         for ph in phones:
             rows = [r for r in ph.locator(".list .row").all_inner_texts() if r.split("\n")[0].strip() == p["name"]]
-            if not rows or f"{want} seat" not in rows[0]:
-                problems.append(f"{tag}: {ph.label}'s list says {rows} for {p['name']}, expected '{want} seat'")
+            place = want[0].upper() + want[1:]  # "South", "Southwest" (D-254)
+            if not rows or place not in rows[0] or " seat" in rows[0]:
+                problems.append(f"{tag}: {ph.label}'s list says {rows} for {p['name']}, expected '{place}'")
+        # Names in the players' colours, one's own in bold (D-254).
+        for ph in phones:
+            for row in ph.locator(".list .row").all():
+                name_el = row.locator(":scope > span").first
+                dot = name_el.locator(".pdot").evaluate("e => getComputedStyle(e).backgroundColor")
+                ink = name_el.evaluate("e => getComputedStyle(e).color")
+                if "none" not in (name_el.locator(".pdot").get_attribute("class") or "") and ink != dot:
+                    problems.append(f"{tag}: {ph.label}'s list shows {name_el.inner_text()!r} in {ink}, its dot in {dot}")
+                weight = name_el.evaluate("e => getComputedStyle(e).fontWeight")
+                mine = name_el.inner_text().strip() == ph.label
+                if mine != (int(weight) >= 600):
+                    problems.append(f"{tag}: {ph.label}'s list shows {name_el.inner_text()!r} at weight {weight}")
     for ph in phones:
         me = next(p for p in seated if p["name"] == ph.label)
         want = badge(expected(edges, me["seat"]))

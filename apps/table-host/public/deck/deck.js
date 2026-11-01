@@ -562,12 +562,23 @@ async function leave(inGame) {
   if (await confirmSheet("Leave the game?", text, "Leave the game")) send("lobby", "leave", {});
 }
 
-/** Everyone at the table with their colour and seat (D-104). */
+/** "south" → "South", "southwest" → "Southwest": a seat's place at the table, as the list shows it (D-254). */
+const placeName = (edges, seat) => {
+  const n = seatName(edges, seat);
+  return n ? n[0].toUpperCase() + n.slice(1) : "";
+};
+
+/**
+ * Everyone at the table with their colour and place (D-104, D-254): a dot and the name in that player's colour, the
+ * colour of their plate on the board (no seat, no colour); one's own name in bold; the place as "South".
+ */
 function playersHtml() {
   return state.players
-    // Each name with a dot in that player's colour (D-104), the colour of their plate on the board; no seat, no colour.
-    .map((x) => `<div class="row"><span class="${x.id === me ? "me" : ""}"><span class="pdot${x.seat == null ? " none" : ""}"${x.seat == null ? "" : ` style="background:${colorOf(x.seat)}"`} aria-hidden="true"></span>${esc(x.name)}</span>
-      <span class="muted">${x.seat == null ? "no seat" : `${esc(seatName(state.seatEdges, x.seat))} seat`}${state.phase === "ready" ? (x.ready ? " · ready" : " · not ready") : ""}${x.connected ? "" : " · away"}</span></div>`)
+    .map((x) => {
+      const c = x.seat == null ? "" : colorOf(x.seat);
+      return `<div class="row"><span class="${x.id === me ? "me" : ""}"${c ? ` style="color:${c}"` : ""}><span class="pdot${x.seat == null ? " none" : ""}"${c ? ` style="background:${c}"` : ""} aria-hidden="true"></span>${esc(x.name)}</span>
+      <span class="muted">${x.seat == null ? "No seat" : esc(placeName(state.seatEdges, x.seat))}${state.phase === "ready" ? (x.ready ? " · ready" : " · not ready") : ""}${x.connected ? "" : " · away"}</span></div>`;
+    })
     .join("");
 }
 
