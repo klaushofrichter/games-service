@@ -1786,4 +1786,5 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
 - **D-249 · 2026-11-01 · Klaus** — A game's description can carry what a chosen setting means: `{key.hint}` shows the
   chosen value's `hints` text, so the window that chooses the game adds a paragraph about the board chosen, following
   the choice, and doesn't repeat it under the field. The tile leaves it out. The settings window shows the same text
-  under the setting, as before (D-246).
+  under the setting before the game; during it, the locked row leaves it out, so a game's own item can say what its
+  value means now (any item takes a `hint`) without the text showing twice.

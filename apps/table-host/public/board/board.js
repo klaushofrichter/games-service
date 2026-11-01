@@ -907,7 +907,9 @@ function openSettings() {
     const gameSettings = fields.length
       ? `<div class="group game-rules ${editable ? "" : "locked"}"><div class="eyebrow">${esc(state.game.name)} · game settings${editable ? "" : ` <span class="lock" aria-label="locked">🔒 locked during the game</span>`}</div>
           ${fields.filter((f) => settingActive(f, cur, fields)).map((f) => {
-            const hint = hintFor(f, cur[f.key] ?? f.default); // what the choice means (D-246)
+            // What the choice means (D-246); during a game the game's own items say what it means now (D-249), so the
+            // locked row doesn't repeat it.
+            const hint = editable ? hintFor(f, cur[f.key] ?? f.default) : "";
             return `<div class="row ${hint ? "with-hint" : ""}"><span>${esc(f.label ?? f.key)}${hint ? `<small class="row-hint">${esc(hint)}</small>` : ""}</span>${setting(f)}</div>`;
           }).join("")}
           ${editable ? "" : `<div class="faint" style="font-size:.7em;margin-top:6px">These can be changed before the game starts.</div>`}</div>`
@@ -938,7 +940,7 @@ function openSettings() {
       ${tableRules}
       ${items.length ? `<div class="group game-settings"><div class="eyebrow">${esc(state.game.name)}</div>${items.map((it, k) => {
         // A choice option's `hint` says what the chosen one means (D-246).
-        const hint = it.type === "choice" ? it.options?.find((op) => op.value === it.value)?.hint ?? "" : "";
+        const hint = it.type === "choice" ? it.options?.find((op) => op.value === it.value)?.hint ?? "" : it.hint ?? ""; // any item's `hint` (D-249)
         return `<div class="row ${hint ? "with-hint" : ""}"><span>${esc(it.label)}${hint ? `<small class="row-hint">${esc(hint)}</small>` : ""}</span>${control(it, k)}</div>`;
       }).join("")}</div>` : ""}
       <div class="actions settings-actions"><button class="primary" data-close-overlay>Done</button></div></div>`);

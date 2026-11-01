@@ -379,7 +379,7 @@ export function settings({ info, setPrefs }) { return []; } // optional: items f
   "text", label, value, options, onChange }`: a `choice` takes `options: [{ value, label, hint? }]` (a pulldown above three; the chosen option's `hint` shows under it),
   `swatches` takes `options: ["#rrggbb", …]`, a `button` shows `action` (or `label`) and calls `onChange()`, a
   `text` only shows its `value` (e.g. a board's seed), and a `number` shows its `value` and opens the board's number pad
-  (digits, Clear, Enter; `min`, `max`), calling `onChange(n)`. `setPrefs(patch)` stores display choices for this game (`info.prefs`), never
+  (digits, Clear, Enter; `min`, `max`), calling `onChange(n)`. Any other item may carry a `hint`, shown under its label. During a game the manifest's locked settings show no `hints`: the game's items say what a value means now. `setPrefs(patch)` stores display choices for this game (`info.prefs`), never
   rules.
 - **Sound:** `playSound(info, name, make)` from the board kit plays only when the table's sound is on (`info.sound`).
   A browser other than the table's kiosk plays it only after the board has been touched; the platform wakes it on the
