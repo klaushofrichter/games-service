@@ -97,6 +97,8 @@ try:
         before = board.locator(".overlay.settings .panel").evaluate("e => e.style.transform")
         a("POST", "/rotate", {"degrees": 180})
         wait(lambda: board.locator(".overlay.settings .panel").evaluate("e => e.style.transform") != before, 5, "the window to turn")
+        # The window turns with a transition: measure once it has come to rest.
+        wait(lambda: board.locator(".overlay.settings .panel").evaluate("e => e.getAnimations().length === 0"), 5, "the window to stop turning")
         board.click(".game-rules .pick:has(select[data-setting-select=pace]) .pick-cover")
         menu = board.locator(".game-rules .pick-menu")
         menu.wait_for()
