@@ -64,6 +64,11 @@ const settingSchema = z.object({
   when: z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.array(z.union([z.string(), z.number(), z.boolean()]))])).optional(),
   /** An int that gets a fresh random value, from max(min, 1) to max, whenever it comes to apply (D-245): a seed. */
   random: z.boolean().optional(),
+  /** What each value means, shown under the setting for the one chosen (D-246), e.g. a board's description. */
+  hints: z.record(z.string(), z.string()).optional(),
+  /** How each value reads in forms and the settings window (D-248), e.g. `{ "beginner": "Beginner" }`; the value is
+   *  what the game gets. */
+  labels: z.record(z.string(), z.string()).optional(),
 });
 
 /** An AI player's option (play style, level): a setting that may also be picked at random (D-226). */
@@ -332,6 +337,13 @@ export interface LobbyState {
   noSeat: string | null;
   /** "Player N" for someone joining without a name (D-244): the deck's name field and the invite start with it. */
   suggestedName: string;
+  /**
+   * The git checkouts on this computer the games run from (D-251): a table of scripts/local-table.sh plays local
+   * clones at their branches, not what the service delivers. Empty on a table whose games aren't in a checkout.
+   */
+  checkouts: { name: string; branch: string; commit: string; changed: boolean; games: string[] }[];
+  /** A table of scripts/local-table.sh (LOCAL_TABLE=1, D-251): the board says once that it is local. */
+  localTable: boolean;
 }
 
 export interface CloudStatus {

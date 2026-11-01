@@ -3,7 +3,7 @@
 import { renderRules } from "/shared/markdown.js";
 import { ROT, W, H, SEAT_COLORS, audio, copyText, esc, seatName, seatPositions, claimServiceWorkerPage, openTableSocket } from "/shared/board-kit.js";
 import { openViewer } from "/board/viewer.js";
-import { hasStatistics, openStatistics } from "/board/stats.js";
+import { hasStatistics, openStatistics, seatsByName, table as statsTable } from "/board/stats.js";
 
 const KEY = window.TABLE_KEY;
 // A remote player's copy of the board (phase 1c): it runs inside the cloud's invite page, which carries
@@ -153,6 +153,49 @@ function noticeDialog(title, text, okLabel = "OK") {
 }
 
 /**
+ * A local table, said once (D-251): without the Game Table service (CLOUD_URL empty, `local-table.sh --offline`) only
+ * people here can join, by the QR code on this network; games from git checkouts on this computer (local-table.sh
+ * --all-games or --extra) run those clones at their branches, not what GitHub has. Shown after the board starts, until
+ * dismissed; it comes back only when what it says changes (another branch, the service back). Not on a remote board.
+ */
+const LOCAL_NOTICE_KEY = "gametable.localNotice";
+let localNoticeShown = false;
+function showLocalNotice() {
+  if (localNoticeShown || REMOTE || !state?.localTable) return;
+  const noService = state.cloud?.status === "disabled";
+  const checkouts = state.checkouts ?? [];
+  if (!noService && !checkouts.length) return;
+  localNoticeShown = true;
+  const key = JSON.stringify([noService, checkouts.map((c) => [c.name, c.branch, c.commit, c.changed])]);
+  try {
+    if (localStorage.getItem(LOCAL_NOTICE_KEY) === key) return;
+  } catch {}
+  const name = (id) => games.find((g) => g.id === id)?.name ?? id; // only the games the board lists (no test games)
+  const service = noService
+    ? `<p><b>No Game Table service.</b> This table runs on its own, without the service and its console: only people here can join,
+        by the QR code on this network. Remote players and watchers can't join, and there are no invites.</p>`
+    : "";
+  const clones = checkouts.length
+    ? `<p><b>Games from the clones on this computer</b>, not from GitHub: each runs as its checkout is now.</p>
+       <ul class="local-checkouts">${checkouts.map((c) => `<li><b>${esc(c.name)}</b> · branch <code>${esc(c.branch)}</code> (${esc(c.commit)})${c.changed ? ", with changes not committed" : ""}<br><span class="faint">${c.games.filter((id) => games.some((g) => g.id === id)).map((id) => esc(name(id))).join(", ")}</span></li>`).join("")}</ul>`
+    : "";
+  const d = document.createElement("div");
+  d.className = "dialog-backdrop notice local-notice";
+  d.innerHTML = `<div class="dialog" role="alertdialog" aria-modal="true"><h2>A local table</h2><div class="muted">${service}${clones}</div>
+    <div class="actions"><button class="primary" data-x="ok">Got it</button></div></div>`;
+  // "Got it" (or Escape, or a tap beside it) dismisses it for good, until what it says changes.
+  d.addEventListener("click", (e) => {
+    if (e.target.dataset?.x !== "ok" && e.target !== d) return;
+    try {
+      localStorage.setItem(LOCAL_NOTICE_KEY, key);
+    } catch {}
+    d.remove();
+  });
+  faceFront(d.querySelector(".dialog"));
+  overlayRoot.appendChild(d);
+}
+
+/**
  * Why a number typed into a form field is not allowed, in the field's own words, or null when it is (D-146). The table
  * checks again, but its refusal would come only after the form has closed.
  */
@@ -179,12 +222,88 @@ function settingActive(f, values, fields = []) {
     return [].concat(want).map(String).includes(String(v));
   });
 }
+/** What a choice means (D-246): a setting's `hints` for its value, e.g. a board's description; "" without one. */
+const hintFor = (f, v) => (f.hints && f.hints[String(v)]) || "";
+/** How a setting's value reads (D-248): its `labels` entry ("Beginner" for "beginner"), else the value itself. */
+const labelFor = (f, v) => (f.labels && f.labels[String(v)]) || String(v);
+
+/**
+ * A pulldown that turns with its window (D-248). A native <select> opens its list upright on the screen, so on a board
+ * facing another edge the list read sideways or upside down. The select stays (keyboards and tests use it), with a
+ * cover over it: a tap opens the options as buttons under it, inside the window, and picking one changes the select as
+ * a choice there would (input and change events).
+ */
+const pickWrap = (select) => `<span class="pick"><span class="pick-face">${select}<button type="button" class="pick-cover" tabindex="-1" aria-hidden="true"></button></span></span>`;
+document.addEventListener("click", (e) => {
+  const t = e.target;
+  const cover = t.closest?.(".pick-cover");
+  const opt = t.closest?.(".pick-menu button");
+  for (const m of document.querySelectorAll(".pick-menu")) if (!m.contains(t) && m.parentElement !== cover?.closest(".pick")) m.remove();
+  if (opt) {
+    const pick = opt.closest(".pick");
+    const sel = pick.querySelector("select");
+    pick.querySelector(".pick-menu").remove();
+    if (sel && sel.value !== opt.dataset.val) {
+      sel.value = opt.dataset.val;
+      sel.dispatchEvent(new Event("input", { bubbles: true }));
+      sel.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    return;
+  }
+  if (!cover) return;
+  const pick = cover.closest(".pick");
+  const open = pick.querySelector(".pick-menu");
+  if (open) return void open.remove();
+  const sel = pick.querySelector("select");
+  if (!sel || sel.disabled) return;
+  const m = document.createElement("span");
+  m.className = "pick-menu";
+  m.setAttribute("role", "listbox");
+  m.innerHTML = [...sel.options].map((o) => `<button type="button" role="option" class="${o.selected ? "on" : ""}" aria-selected="${o.selected}" data-val="${esc(o.value)}">${esc(o.textContent)}</button>`).join("");
+  pick.appendChild(m);
+});
 /** A fresh value for an int setting with `random: true` (D-245), e.g. a board's seed: from max(min, 1) to max. */
 const randomFor = (f) => {
   const lo = Math.max(f.min ?? 1, 1);
   const hi = f.max ?? 999999;
   return lo + Math.floor(Math.random() * (hi - lo + 1));
 };
+/**
+ * A field the board's pads fill (D-252): a number opens the number pad, text the board's keyboard, by a tap or Enter,
+ * in any window (the one that chooses a game, an AI player's, the simulation). The field itself takes no typing: the
+ * board is a touchscreen without a keyboard, and a real keyboard types into the pad. Its range, type and label ride on
+ * data- attributes; a value picked fires input and change, as typing did.
+ */
+function padInput(f, v, off = false) {
+  const text = f.type === "string";
+  const attrs = text
+    ? `data-textpad data-max="${esc(f.max ?? 48)}"`
+    : `data-pad data-type="${f.type === "number" ? "number" : "int"}" ${f.min !== undefined ? `data-min="${esc(f.min)}"` : ""} ${f.max !== undefined ? `data-max="${esc(f.max)}"` : ""}`;
+  return `<input type="text" readonly inputmode="none" autocomplete="off" ${attrs} data-label="${esc(f.label ?? f.key)}" name="${esc(f.key)}" value="${off ? "" : esc(v ?? "")}" ${off ? "disabled" : ""} aria-label="${esc(f.label ?? f.key)}: tap to type">`;
+}
+function openPadFor(el) {
+  if (el.disabled) return;
+  const set = (v) => {
+    el.value = String(v);
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+    el.dispatchEvent(new Event("change", { bubbles: true }));
+  };
+  const num = (k) => (el.dataset[k] === undefined || el.dataset[k] === "" ? undefined : Number(el.dataset[k]));
+  if (el.dataset.textpad !== undefined) return openNamePad(el.value, set, el.dataset.label, { max: num("max") ?? 48, text: true, saveLabel: "OK" });
+  openNumberPad(el.dataset.label ?? "", el.value, { type: el.dataset.type, min: num("min"), max: num("max") }, set);
+}
+document.addEventListener("click", (e) => {
+  const el = e.target.closest?.("input[data-pad], input[data-textpad]");
+  if (el) openPadFor(el);
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Enter" || !e.target.matches?.("input[data-pad], input[data-textpad]")) return;
+  e.preventDefault();
+  openPadFor(e.target);
+});
+
+/** A whole number with a wide range (a seed): typed on the board's number pad, not stepped or typed in a field (D-245, D-250). */
+const onPad = (f) => f.type === "int" && (f.max ?? Infinity) - (f.min ?? -Infinity) > 1000;
 /** Digits an int field takes at most (D-245): those of its largest value, plus a minus sign when it may be negative. */
 const intDigits = (f) => (f.max !== undefined ? String(Math.trunc(Math.abs(f.max))).length : 9) + ((f.min ?? 0) < 0 ? 1 : 0);
 /** A whole number as typed: digits only (a leading minus where negatives are allowed), at most intDigits (D-245). */
@@ -215,35 +334,42 @@ const linkified = (text) => esc(text).replace(/https:\/\/[^\s<]+[^\s<.,;:!?)]/g,
 /** A form for settings or options; `note`: a game's text under the fields (an AI engine's licence, D-224). */
 /**
  * A game's description with its settings filled in (D-238): `{key}` names a setting and shows its value, as chosen or
- * the manifest's default ("first to {target} points"). Anything else in braces stays as it is.
+ * the manifest's default ("first to {target} points"). `{key.hint}` shows what the chosen value means, its `hints`
+ * text (D-249): in the window that chooses the game, a paragraph about the board chosen; on the tile (`hints: false`)
+ * nothing. Anything else in braces stays as it is.
  */
-function withSettings(text, fields = [], values = {}) {
-  return String(text ?? "").replace(/\{(\w+)\}/g, (m, key) => {
+function withSettings(text, fields = [], values = {}, { hints = true } = {}) {
+  const out = String(text ?? "").replace(/\{(\w+)(\.hint)?\}/g, (m, key, hint) => {
     const f = fields.find((x) => x.key === key);
     if (!f) return m;
     const v = values[key] ?? f.default;
-    return f.type === "bool" ? (v ? "on" : "off") : String(v);
+    if (hint) return hints ? hintFor(f, v) : "";
+    return f.type === "bool" ? (v ? "on" : "off") : f.type === "enum" ? labelFor(f, v) : String(v);
   });
+  return out.trim();
 }
+/** Settings whose meaning the description shows as `{key.hint}` (D-249): no second copy under the field. */
+const hintsInText = (text) => new Set([...String(text ?? "").matchAll(/\{(\w+)\.hint\}/g)].map((m) => m[1]));
 
 function formDialog(title, intro, fields, values = {}, okLabel = "OK", removeLabel = null, note = "") {
   return new Promise((resolve) => {
     const d = document.createElement("div");
     d.className = "dialog-backdrop";
     const now = { ...values };
+    const inIntro = hintsInText(intro);
     const input = (f) => {
       let v = values[f.key] ?? f.default;
       // A setting that doesn't apply now (D-245): disabled and blank; a random one that does, with a fresh value.
-      if (!settingActive(f, now, fields)) return `<input type="text" name="${f.key}" value="" disabled>`;
+      if (!settingActive(f, now, fields)) return padInput(f, "", true);
       if (f.random && (v === undefined || v === f.default)) v = now[f.key] = randomFor(f);
-      if (f.type === "int") return `<input type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off" maxlength="${intDigits(f)}" name="${f.key}" value="${esc(v)}">`;
-      if (f.type === "enum") return `<select name="${f.key}">${f.values.map((x) => `<option ${String(v) === x ? "selected" : ""}>${esc(x)}</option>`).join("")}</select>`;
+      // Numbers on the number pad, text on the board's keyboard (D-250, D-252): the board has no keyboard of its own.
+      if (f.type === "int" || f.type === "number" || f.type === "string") return padInput(f, v);
+      if (f.type === "enum") return pickWrap(`<select name="${f.key}">${f.values.map((x) => `<option value="${esc(x)}" ${String(v) === x ? "selected" : ""}>${esc(labelFor(f, x))}</option>`).join("")}</select>`);
       if (f.type === "bool") return `<input type="checkbox" name="${f.key}" ${v ? "checked" : ""}>`;
-      if (f.type === "int" || f.type === "number") return `<input type="number" name="${f.key}" value="${esc(v)}" ${f.min !== undefined ? `min="${f.min}"` : ""} ${f.max !== undefined ? `max="${f.max}"` : ""}>`;
       return `<input type="text" name="${f.key}" value="${esc(v ?? "")}">`;
     };
     d.innerHTML = `<div class="dialog form"><h2>${esc(title)}</h2>${intro ? `<div class="muted form-intro">${esc(withSettings(intro, fields, values))}</div>` : ""}
-      <div class="fields">${fields.map((f) => `<label><span>${esc(f.label ?? f.key)}</span>${input(f)}</label>`).join("") || `<div class="faint">${state?.game ? "Nothing to set for this game." : "Pick a game to choose how it plays."}</div>`}</div>
+      <div class="fields">${fields.map((f) => `<label ${settingActive(f, now, fields) ? "" : "hidden"}><span>${esc(f.label ?? f.key)}</span>${input(f)}${f.hints && !inIntro.has(f.key) ? `<small class="field-hint" data-hint="${f.key}">${esc(hintFor(f, now[f.key] ?? f.default))}</small>` : ""}</label>`).join("") || `<div class="faint">${state?.game ? "Nothing to set for this game." : "Pick a game to choose how it plays."}</div>`}</div>
       ${note ? `<div class="faint form-note">${linkified(note)}</div>` : ""}
       <div class="actions">${removeLabel ? `<button class="danger" data-x="remove" style="margin-right:auto">${esc(removeLabel)}</button>` : ""}<button data-x="no">Cancel</button><button class="primary" data-x="yes">${esc(okLabel)}</button></div></div>`;
     // The description follows the settings while they change (D-238): "first to 8 points" as 8 is typed.
@@ -259,7 +385,8 @@ function formDialog(title, intro, fields, values = {}, okLabel = "OK", removeLab
       const v = intTyped(f, e.target.value);
       if (v !== e.target.value) e.target.value = v;
     };
-    // Settings that apply only with others (D-245) follow them: disabled and blank, or back with a fresh random value.
+    // Settings that apply only with others (D-245) follow them: hidden (D-248), disabled and blank, or back with a fresh
+    // random value.
     const whens = () => {
       const vals = current();
       for (const f of fields) {
@@ -268,14 +395,19 @@ function formDialog(title, intro, fields, values = {}, okLabel = "OK", removeLab
         const on = settingActive(f, vals, fields);
         if (on === !el.disabled) continue;
         el.disabled = !on;
+        el.closest("label").hidden = !on;
         if (!on) el.value = "";
         else {
           el.value = String(f.random ? randomFor(f) : f.default ?? "");
-          if (f.type === "int") Object.assign(el, { inputMode: "numeric", maxLength: intDigits(f) });
         }
       }
     };
-    const follow = (e) => (e && digitsOnly(e), whens(), introEl() && (introEl().textContent = withSettings(intro, fields, current())));
+    // A choice's description follows the choice (D-246).
+    const hints = () => {
+      const vals = current();
+      for (const el of d.querySelectorAll("[data-hint]")) el.textContent = hintFor(fields.find((f) => f.key === el.dataset.hint), vals[el.dataset.hint]);
+    };
+    const follow = (e) => (e && digitsOnly(e), whens(), hints(), introEl() && (introEl().textContent = withSettings(intro, fields, current())));
     d.addEventListener("input", follow);
     d.addEventListener("change", follow);
     d.addEventListener("click", (e) => {
@@ -764,7 +896,7 @@ let settingsOverlay = null;
  */
 const SEG_MAX = 3;
 const pulldown = (attr, options, label) =>
-  `<select class="pulldown" ${attr} aria-label="${esc(label)}">${options.map((op) => `<option value="${esc(op.value)}" ${op.on ? "selected" : ""}>${esc(op.label)}</option>`).join("")}</select>`;
+  pickWrap(`<select class="pulldown" ${attr} aria-label="${esc(label)}">${options.map((op) => `<option value="${esc(op.value)}" ${op.on ? "selected" : ""}>${esc(op.label)}</option>`).join("")}</select>`);
 /** The chosen game's settings fields from its manifest (D-090), or none. */
 const gameFields = () => (state.game && games.find((x) => x.id === state.game.id)?.settings) || [];
 function openSettings() {
@@ -808,17 +940,17 @@ function openSettings() {
     const cur = state.game?.settings ?? {};
     const setting = (f) => {
       const v = cur[f.key] ?? f.default;
-      if (!editable) return `<span class="value">${esc(f.type === "bool" ? (v ? "On" : "Off") : v)}</span>`;
+      if (!editable) return `<span class="value">${esc(f.type === "bool" ? (v ? "On" : "Off") : f.type === "enum" ? labelFor(f, v) : v)}</span>`;
       // A whole number with a wide range (a seed) is typed on the board's number pad, not stepped (D-245).
-      if (f.type === "int" && (f.max ?? Infinity) - (f.min ?? -Infinity) > 1000) return `<button class="pad-value" data-setting-pad="${esc(f.key)}">${esc(v)}</button>`;
+      if (onPad(f)) return `<button class="pad-value" data-setting-pad="${esc(f.key)}">${esc(v)}</button>`;
       if (f.type === "int" || f.type === "number")
         return `<span class="stepper"><button data-setting="${esc(f.key)}" data-delta="-1" ${f.min !== undefined && v <= f.min ? "disabled" : ""} aria-label="Less">−</button>
           <span class="value">${esc(v)}</span><button data-setting="${esc(f.key)}" data-delta="1" ${f.max !== undefined && v >= f.max ? "disabled" : ""} aria-label="More">+</button></span>`;
       if (f.type === "bool") return `<button data-setting="${esc(f.key)}" data-toggle class="${v ? "on" : ""}" role="switch" aria-checked="${!!v}">${v ? "On" : "Off"}</button>`;
       if (f.type === "enum")
         return f.values.length > SEG_MAX
-          ? pulldown(`data-setting-select="${esc(f.key)}"`, f.values.map((x) => ({ value: x, label: x, on: String(v) === x })), f.label ?? f.key)
-          : `<span class="seg">${f.values.map((x) => `<button class="${String(v) === x ? "on" : ""}" data-setting="${esc(f.key)}" data-value="${esc(x)}">${esc(x)}</button>`).join("")}</span>`;
+          ? pulldown(`data-setting-select="${esc(f.key)}"`, f.values.map((x) => ({ value: x, label: labelFor(f, x), on: String(v) === x })), f.label ?? f.key)
+          : `<span class="seg">${f.values.map((x) => `<button class="${String(v) === x ? "on" : ""}" data-setting="${esc(f.key)}" data-value="${esc(x)}">${esc(labelFor(f, x))}</button>`).join("")}</span>`;
       return `<span class="value">${esc(v)}</span>`;
     };
     // Player colours (D-106): a table setting for every seated player, used in the lobby and by every game. During a
@@ -852,7 +984,12 @@ function openSettings() {
     };
     const gameSettings = fields.length
       ? `<div class="group game-rules ${editable ? "" : "locked"}"><div class="eyebrow">${esc(state.game.name)} · game settings${editable ? "" : ` <span class="lock" aria-label="locked">🔒 locked during the game</span>`}</div>
-          ${fields.filter((f) => settingActive(f, cur, fields)).map((f) => `<div class="row"><span>${esc(f.label ?? f.key)}</span>${setting(f)}</div>`).join("")}
+          ${fields.filter((f) => settingActive(f, cur, fields)).map((f) => {
+            // What the choice means (D-246); during a game the game's own items say what it means now (D-249), so the
+            // locked row doesn't repeat it.
+            const hint = editable ? hintFor(f, cur[f.key] ?? f.default) : "";
+            return `<div class="row ${hint ? "with-hint" : ""}"><span>${esc(f.label ?? f.key)}${hint ? `<small class="row-hint">${esc(hint)}</small>` : ""}</span>${setting(f)}</div>`;
+          }).join("")}
           ${editable ? "" : `<div class="faint" style="font-size:.7em;margin-top:6px">These can be changed before the game starts.</div>`}</div>`
       : "";
     // The table's rules for games with AI players (D-236, D-237): outside a game only, like the game settings.
@@ -879,7 +1016,11 @@ function openSettings() {
       ${(state.watchers ?? []).length ? `<div class="group player-colors watchers-group"><div class="eyebrow">Watching</div>${watcherRows()}<div class="faint group-note">${WATCHER_NOTE}</div></div>` : ""}
       ${gameSettings}
       ${tableRules}
-      ${items.length ? `<div class="group game-settings"><div class="eyebrow">${esc(state.game.name)}</div>${items.map((it, k) => `<div class="row"><span>${esc(it.label)}</span>${control(it, k)}</div>`).join("")}</div>` : ""}
+      ${items.length ? `<div class="group game-settings"><div class="eyebrow">${esc(state.game.name)}</div>${items.map((it, k) => {
+        // A choice option's `hint` says what the chosen one means (D-246).
+        const hint = it.type === "choice" ? it.options?.find((op) => op.value === it.value)?.hint ?? "" : it.hint ?? ""; // any item's `hint` (D-249)
+        return `<div class="row ${hint ? "with-hint" : ""}"><span>${esc(it.label)}${hint ? `<small class="row-hint">${esc(hint)}</small>` : ""}</span>${control(it, k)}</div>`;
+      }).join("")}</div>` : ""}
       <div class="actions settings-actions"><button class="primary" data-close-overlay>Done</button></div></div>`);
   };
   const close = () => {
@@ -1039,14 +1180,38 @@ function serviceSettings() {
 }
 
 /**
+ * The board's pads for typing without a keyboard (D-250): a name (letters, digits by a switch, D-148), a whole number
+ * (digits, D-245, e.g. a board's seed) and the access code. One shell for all of them: one pad of a kind at a time, it
+ * faces the front edge and turns with the board while open (render()), a tap beside it or Escape cancels, and a real
+ * keyboard types into it too: `onKey(e)` gets the keys pressed while it is open. A new pad (letters and digits for a
+ * game's text setting) builds its keys in `o` the same way. Returns null while one of that kind is open.
+ */
+const keyPads = {};
+function keyPad(kind, cls, onKey = null) {
+  if (keyPads[kind]) return null;
+  const o = document.createElement("div");
+  o.className = `overlay key-pad ${cls}`;
+  // Only while it is the topmost layer: a pad opened over a dialog takes the keys, the dialog behind doesn't.
+  const keydown = (e) => onKey && overlayRoot.lastElementChild === o && onKey(e);
+  const close = () => {
+    document.removeEventListener("keydown", keydown, true);
+    o.remove();
+    delete keyPads[kind];
+  };
+  keyPads[kind] = { o, close };
+  document.addEventListener("keydown", keydown, true);
+  overlayRoot.appendChild(o);
+  return { o, close };
+}
+
+/**
  * A keypad for the code: the board is a touchscreen without a keyboard. A keyboard works too, and so does pasting
  * (Ctrl/⌘+V or the Paste button), with or without the dash the console shows.
  */
-let codePad = null;
 function openCodePad() {
-  if (codePad) return;
-  const o = (codePad = document.createElement("div"));
-  o.className = "overlay code-pad";
+  const pad = keyPad("code", "code-pad", (e) => onKey(e));
+  if (!pad) return;
+  const { o } = pad;
   let typed = "";
   const fromBoard = state.cloud.code?.source === "board";
   const draw = () => {
@@ -1061,10 +1226,8 @@ function openCodePad() {
     faceFront(o.querySelector(".panel"));
   };
   const close = () => {
-    document.removeEventListener("keydown", onKey, true);
     document.removeEventListener("paste", onPaste, true);
-    o.remove();
-    codePad = null;
+    pad.close();
   };
   const save = async (code) => {
     try {
@@ -1116,10 +1279,8 @@ function openCodePad() {
     else if (b.dataset.save !== undefined) save(typed);
     else if (b.dataset.remove !== undefined) save("");
   });
-  document.addEventListener("keydown", onKey, true);
   document.addEventListener("paste", onPaste, true);
   draw();
-  overlayRoot.appendChild(o);
 }
 
 /**
@@ -1138,7 +1299,9 @@ function render() {
   if (!state) return;
   overlayRoot.querySelector(".overlay.statistics")?.recolor?.(); // a colour changed while Awards and Results is open (D-239)
   // The pads turn with the board, also while open (D-245).
-  for (const p of overlayRoot.querySelectorAll(".overlay.name-pad > .panel")) faceFront(p);
+  for (const p of overlayRoot.querySelectorAll(".overlay.key-pad > .panel")) faceFront(p);
+  // Dialogs too (D-252): a pad opened from one turns with the board, and the window behind it must turn with it.
+  for (const d of overlayRoot.querySelectorAll(".dialog-backdrop > .dialog")) faceFront(d);
   gameEdge(); // keeps the last north/south facing current, so a game starts facing the way the lobby last did
   renderSeats();
   if (REMOTE) fit();
@@ -1322,7 +1485,7 @@ let gamePage = 0;
 const viewOnly = () => REMOTE && !state.remote?.boardControl;
 // A remote board without board control (a watcher, or control switched off) shows the games, not as buttons (D-170).
 const tileHtml = (g) => `<button class="tile ${g.selectable ? "selectable" : ""} ${viewOnly() ? "view-only" : ""}" data-game="${g.id}" ${g.selectable && !viewOnly() ? "" : viewOnly() ? 'tabindex="-1" aria-disabled="true"' : "disabled"}>
-          <span class="title">${esc(g.name)}</span><span class="desc">${esc(withSettings(g.description, g.settings))}</span>
+          <span class="title">${esc(g.name)}</span><span class="desc">${esc(withSettings(g.description, g.settings, {}, { hints: false }))}</span>
           <span class="faint" style="font-size:.66em">${playersLabel(g.players)}${g.ai ? " · AI" : ""}${g.extra ? ` · <span style="color:var(--brass)">extra</span>` : ""}</span>
           ${g.selectable ? `<span class="hint">${esc(tileHint(g))}</span>` : `<span class="why">${esc(g.reasons[0])}</span>`}</button>`;
 function gameTiles() {
@@ -1415,10 +1578,16 @@ function renderReady() {
     </section>${joinPanel()}`;
 }
 
-/** A game's statistics from its summary (D-091): the first column left-aligned, numbers centred. */
-function summaryTable(t) {
-  return `<table class="summary-table"><tr>${t.columns.map((c) => `<th>${esc(c)}</th>`).join("")}</tr>
-    ${t.rows.map((r) => `<tr>${r.map((c) => `<td>${esc(c)}</td>`).join("")}</tr>`).join("")}</table>`;
+/**
+ * A game's statistics from its summary (D-091): the first column left-aligned, numbers centred; a player's name in
+ * their colour, as everywhere else (D-253).
+ */
+function summaryTable(t, summary) {
+  const html = statsTable(t, "summary-table", seatsByName(summary));
+  return html.replace(/<span class="player-name" data-seat="(\d+)">/g, (m, seat) => {
+    const c = state?.players?.find((p) => p.seat === Number(seat))?.color;
+    return c ? `<span class="player-name" data-seat="${seat}" style="color:${esc(c)}">` : m;
+  });
 }
 
 function renderFinished() {
@@ -1426,7 +1595,7 @@ function renderFinished() {
   center.innerHTML = `<section class="main finished">
       <div class="summary"><div class="eyebrow">${esc(state.game?.name ?? "Game")} · finished</div>
       <div class="big">${esc(s?.text ?? "Game over")}</div>
-      ${s?.table ? `<div class="summary-scroll">${summaryTable(s.table)}</div>` : ""}
+      ${s?.table ? `<div class="summary-scroll">${summaryTable(s.table, s)}</div>` : ""}
       <div class="toolbar"><button class="primary" data-again>Play again</button>${hasStatistics(s) ? `<button data-stats>Awards and Results</button>` : ""}<button data-close>Back to lobby</button></div></div>
     </section>${joinPanel()}`;
 }
@@ -2051,9 +2220,9 @@ function openSimulation() {
     <p class="muted" style="font-size:.85em">Runs games with AI players only, without the board, and stores a replayable log for AI training.</p>
     <div class="group" style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
       <label>Game<select name="game" style="font:inherit;padding:8px;border-radius:10px;background:var(--felt-deep);color:var(--ink)">${sims.map((g) => `<option value="${g.id}">${esc(g.name)}</option>`).join("")}</select></label>
-      <label>AI players<input name="players" type="number" min="1" max="8" value="4"></label>
-      <label>Games<input name="games" type="number" min="1" max="1000" value="10"></label>
-      <label>Seed<input name="seed" type="number" value="${Math.floor(Math.random() * 1e6)}"></label>
+      <label>AI players${padInput({ key: "players", type: "int", min: 1, max: 8, label: "AI players" }, 4)}</label>
+      <label>Games${padInput({ key: "games", type: "int", min: 1, max: 1000, label: "Games" }, 10)}</label>
+      <label>Seed${padInput({ key: "seed", type: "int", min: 0, max: 999999, label: "Seed" }, Math.floor(Math.random() * 1e6))}</label>
     </div><div class="out muted" style="font-size:.85em"></div>
     <div class="actions" style="display:flex;justify-content:flex-end;gap:12px"><button data-x="close">Close</button><button class="primary" data-x="run">Run…</button></div></div>`;
   faceFront(o.querySelector(".panel"));
@@ -2096,24 +2265,31 @@ const NAME_ROWS = [[..."QWERTYUIOP"], [..."ASDFGHJKL"], [..."ZXCVBNM"], [..."Ä�
  * ⇧ for the other case), common accented letters, digits by a switch, space and delete. A real keyboard, an input
  * method for any script, and pasting work in the field too. Calls done(name) with the cleaned name ("" for none).
  */
-let namePad = null;
-function openNamePad(initial, done, title = "Player's name") {
-  if (namePad) return;
-  const o = (namePad = document.createElement("div"));
-  o.className = "overlay name-pad";
+function openNamePad(initial, done, title = "Player's name", opts = {}) {
+  // A game's text setting uses the same keyboard (D-252): its own length, kept as typed (no name rules), "OK".
+  const limit = opts.max ?? MAX_NAME;
+  const clean = opts.text
+    ? (raw, trim = true) => {
+        const t = Array.from(String(raw ?? "").normalize("NFC").replace(/[\u0000-\u001f\u007f-\u009f]/g, "")).slice(0, limit).join("");
+        return trim ? t.trim() : t;
+      }
+    : cleanName;
+  const pad = keyPad("name", "name-pad");
+  if (!pad) return;
+  const { o } = pad;
   let shift = false;
   let digits = false;
   o.innerHTML = `<div class="panel"><h2>${esc(title)}</h2>
-    <div class="name-field"><input maxlength="48" autocomplete="off" spellcheck="false" aria-label="Name"><span class="count"></span></div>
+    <div class="name-field"><input maxlength="${Math.max(limit, 48)}" autocomplete="off" spellcheck="false" aria-label="${esc(title)}"><span class="count"></span></div>
     <div class="keys"></div>
-    <div class="actions"><button data-clear>Clear</button><span style="flex:1"></span><button data-cancel>Cancel</button><button class="primary" data-save>Use this name</button></div></div>`;
+    <div class="actions"><button data-clear>Clear</button><span style="flex:1"></span><button data-cancel>Cancel</button><button class="primary" data-save>${esc(opts.saveLabel ?? "Use this name")}</button></div></div>`;
   const input = o.querySelector("input");
-  input.value = cleanName(initial);
+  input.value = clean(initial);
   const length = () => Array.from(input.value).length;
   const capital = () => shift !== (input.value === "" || input.value.endsWith(" "));
   const drawKeys = () => {
     const up = capital();
-    const full = length() >= MAX_NAME;
+    const full = length() >= limit;
     const rows = digits ? [[..."1234567890"], [..."-'.&!?"]] : NAME_ROWS.map((r) => (up ? r : r.map((c) => c.toLowerCase())));
     const key = (k, cls = "") => `<button class="${cls}" data-key="${esc(k)}" ${full ? "disabled" : ""}>${k === " " ? "space" : esc(k)}</button>`;
     o.querySelector(".keys").innerHTML =
@@ -2121,20 +2297,20 @@ function openNamePad(initial, done, title = "Player's name") {
       `<div class="row"><button class="wide" data-shift aria-pressed="${shift}" ${digits ? "disabled" : ""}>⇧</button>` +
       `<button class="wide" data-digits>${digits ? "ABC" : "123"}</button>${digits ? "" : key("ß")}${key(" ", "space")}` +
       `<button class="wide" data-back aria-label="Delete the last character" ${input.value ? "" : "disabled"}>⌫</button></div>`;
-    o.querySelector(".count").textContent = `${length()}/${MAX_NAME}`;
+    o.querySelector(".count").textContent = `${length()}/${limit}`;
   };
   const set = (v) => {
-    input.value = cleanName(v, false);
+    input.value = clean(v, false);
     input.setSelectionRange(input.value.length, input.value.length); // keys type at the end
     shift = false;
     drawKeys();
   };
   // Keys don't take the focus from the field, so a real keyboard can carry on where the keys left off.
   o.addEventListener("mousedown", (e) => e.target.closest(".keys button") && e.preventDefault());
-  const close = () => (o.remove(), (namePad = null));
-  const save = () => (done(cleanName(input.value)), close());
+  const close = pad.close;
+  const save = () => (done(clean(input.value)), close());
   input.addEventListener("input", () => {
-    const v = cleanName(input.value, false);
+    const v = clean(input.value, false);
     if (v !== input.value) input.value = v;
     drawKeys();
   });
@@ -2153,43 +2329,62 @@ function openNamePad(initial, done, title = "Player's name") {
     else if (b.dataset.save !== undefined) save();
   });
   drawKeys();
-  overlayRoot.appendChild(o);
   faceFront(o.querySelector(".panel"));
 }
 
 /**
  * The board's number pad (D-245): digits, Clear and Enter, for a whole number such as a board's seed, without a
- * keyboard. Turns with the board, also while it is open. `f` gives min and max; Enter answers with a number in range.
+ * keyboard. Turns with the board, also while it is open. `f` gives min and max, and with them the most digits it takes
+ * (intDigits); Enter answers with a number in range. A keyboard works too (D-250): digits, Backspace or Delete, Enter.
  */
-let numberPad = null;
 function openNumberPad(title, initial, f, done) {
-  if (numberPad) return;
-  const o = (numberPad = document.createElement("div"));
-  o.className = "overlay name-pad number-pad";
-  let value = String(initial ?? "").replace(/\D/g, "");
-  const max = intDigits(f);
-  const ok = () => value !== "" && Number(value) >= (f.min ?? 0) && (f.max === undefined || Number(value) <= f.max);
+  const pad = keyPad("number", "name-pad number-pad", (e) => onKey(e));
+  if (!pad) return;
+  const { o } = pad;
+  const decimal = f.type === "number"; // a number with a fraction (D-252): a decimal point
+  const negative = (f.min ?? 0) < 0;
+  let value = String(initial ?? "").replace(decimal ? /[^\d.-]/g : /[^\d-]/g, "");
+  if (!negative) value = value.replace(/-/g, "");
+  const max = decimal ? 12 : intDigits(f);
+  const digits = () => value.replace(/[^\d]/g, "").length;
+  const ok = () => value !== "" && value !== "-" && Number.isFinite(Number(value)) && Number(value) >= (f.min ?? (negative ? -Infinity : 0)) && (f.max === undefined || Number(value) <= f.max);
   const draw = () => {
     o.innerHTML = `<div class="panel"><h2>${esc(title)}</h2>
       <div class="name-field"><input readonly value="${esc(value)}" aria-label="${esc(title)}"><span class="count">${f.max !== undefined ? `${f.min ?? 0} to ${f.max}` : ""}</span></div>
-      <div class="keys">${[[..."123"], [..."456"], [..."789"]].map((r) => `<div class="row">${r.map((k) => `<button data-key="${k}" ${value.length >= max ? "disabled" : ""}>${k}</button>`).join("")}</div>`).join("")}
-        <div class="row"><button data-clear>Clear</button><button data-key="0" ${value.length >= max ? "disabled" : ""}>0</button><button data-back aria-label="Delete the last digit" ${value ? "" : "disabled"}>⌫</button></div></div>
+      <div class="keys">${[[..."123"], [..."456"], [..."789"]].map((r) => `<div class="row">${r.map((k) => `<button data-key="${k}" ${digits() >= max ? "disabled" : ""}>${k}</button>`).join("")}</div>`).join("")}
+        <div class="row"><button data-clear>Clear</button><button data-key="0" ${digits() >= max ? "disabled" : ""}>0</button><button data-back aria-label="Delete the last digit" ${value ? "" : "disabled"}>⌫</button></div>
+        ${negative || decimal ? `<div class="row">${negative ? `<button data-key="-" aria-label="Minus">−</button>` : ""}${decimal ? `<button data-key="." aria-label="Decimal point" ${value.includes(".") ? "disabled" : ""}>.</button>` : ""}</div>` : ""}</div>
       <div class="actions"><span style="flex:1"></span><button data-cancel>Cancel</button><button class="primary" data-enter ${ok() ? "" : "disabled"}>Enter</button></div></div>`;
     faceFront(o.querySelector(".panel"));
   };
-  const close = () => (o.remove(), (numberPad = null));
+  const close = pad.close;
+  const press = (k) => {
+    if (k === "enter") return void (ok() && (done(Number(value)), close()));
+    if (k === "back") value = value.slice(0, -1);
+    else if (k === "clear") value = "";
+    else if (k === "-") value = value.startsWith("-") ? value.slice(1) : "-" + value; // the sign, wherever typed
+    else if (k === ".") value.includes(".") || (value = (value === "" || value === "-" ? value + "0" : value) + ".");
+    else if (digits() < max) value = (value === "0" ? "" : value === "-0" ? "-" : value) + k;
+    draw();
+  };
+  const onKey = (e) => {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    const k = /^[0-9]$/.test(e.key) || (e.key === "-" && negative) || (e.key === "." && decimal) ? e.key : { Backspace: "back", Delete: "back", Enter: "enter" }[e.key];
+    if (!k) return;
+    e.preventDefault();
+    e.stopPropagation(); // Enter here is not also Enter on the field that opened the pad
+    press(k);
+  };
   o.addEventListener("click", (e) => {
     const b = e.target.closest("button");
     if (e.target === o || b?.dataset.cancel !== undefined) return close();
     if (!b || b.disabled) return;
-    if (b.dataset.key !== undefined) value = (value === "0" ? "" : value) + b.dataset.key;
-    else if (b.dataset.back !== undefined) value = value.slice(0, -1);
-    else if (b.dataset.clear !== undefined) value = "";
-    else if (b.dataset.enter !== undefined) return void (done(Number(value)), close());
-    draw();
+    if (b.dataset.key !== undefined) press(b.dataset.key);
+    else if (b.dataset.back !== undefined) press("back");
+    else if (b.dataset.clear !== undefined) press("clear");
+    else if (b.dataset.enter !== undefined) press("enter");
   });
   draw();
-  overlayRoot.appendChild(o);
 }
 
 // ---------- remote invites (phase 1c) ----------
@@ -2249,7 +2444,7 @@ async function openInvite(watch = false) {
     // The invited player has joined (D-164): the link is used up, so the dialog closes by itself.
     const joined = r.joined?.find((j) => j.invite === inv.token);
     if (joined) {
-      if (namePad) namePad.remove(), (namePad = null);
+      keyPads.name?.close();
       close();
       return toast(watch ? `${joined.name} is watching` : `${joined.name} joined through the invite`);
     }
@@ -2425,6 +2620,7 @@ function connect() {
       if (state.phase !== "active" && state.phase !== "paused" && state.phase !== "terminating") await refreshGames();
       render();
       showSoundHint();
+      showLocalNotice();
       stateListeners.forEach((f) => f());
       // The invite page shows the deck only to a player or to one let in to play; else it is a watcher's (D-168).
       if (REMOTE) tellPage({ type: "gt-seat", mayJoin: state.remote?.mayJoin !== false, watching: !!state.remote?.watching });

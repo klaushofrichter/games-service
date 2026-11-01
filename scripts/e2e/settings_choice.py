@@ -5,7 +5,8 @@ list (Chess's eight time controls) never runs out of the window.
 
 A Table Host of its own (port 8105). Duel chosen, the settings window opened: "Pace of play" (five choices) is a
 pulldown listing all five, inside the window; "Side" (two) is buttons. Picking from the pulldown and tapping a button
-both change the table's settings, and the pulldown shows the new choice. Before that, Duel's description names a setting
+both change the table's settings, and the pulldown shows the new choice; its list opens inside the window and turns with
+it (D-248). Before that, Duel's description names a setting
 (D-238): the tile shows its default ("Pace: no limit"), and the window that chooses the game follows the pulldown.
 """
 import os, sys
@@ -40,18 +41,66 @@ try:
         assert "Pace: no limit (" in intro.inner_text(), intro.inner_text()
         board.select_option(".dialog.form select[name=pace]", "quick")
         assert "Pace: quick (" in intro.inner_text(), intro.inner_text()
+        # A setting's meaning as a paragraph of the description (D-249): the chosen side's, following the choice, and
+        # not again under the field; the tile leaves it out.
+        assert "Left: the first move is yours" in intro.inner_text(), intro.inner_text()
+        assert board.locator(".dialog.form [data-hint=side]").count() == 0, "the side's meaning shows twice"
+        assert "first move" not in tile.inner_text(), tile.inner_text()
+        board.select_option(".dialog.form select[name=side]", "right")
+        assert "Right: the other player moves first" in intro.inner_text(), intro.inner_text()
         # The window that chooses the game: the seed disabled and blank for a fixed board, a fresh one for random; only
         # digits typed (no "e", ".", "-"), at most six.
         field = board.locator(".dialog.form input[name=seed]")
-        field.wait_for()
+        field.wait_for(state="attached")
         assert field.is_disabled() and field.input_value() == "", "the seed should be disabled and blank for a fixed board"
-        board.select_option(".dialog.form select[name=board]", "random")
+        assert not field.is_visible(), "the seed and its title should be hidden for a fixed board (D-248)"
+        # What the chosen board means, under the setting, following the choice (D-246).
+        hint = board.locator(".dialog.form [data-hint=board]")
+        assert hint.inner_text() == "The same board every game.", hint.inner_text()
+        # The pulldown opens its options inside the window, which turns with the board (D-248), and reads the labels.
+        board.click(".dialog.form .pick:has(select[name=board]) .pick-cover")
+        menu = board.locator(".dialog.form .pick-menu")
+        menu.wait_for()
+        assert menu.locator("button").all_inner_texts() == ["Fixed", "Random"], menu.locator("button").all_inner_texts()
+        menu.locator("button", has_text="Random").click()
+        assert board.locator(".dialog.form .pick-menu").count() == 0, "the list should close once a board is picked"
+        assert board.locator(".dialog.form select[name=board]").input_value() == "random"
+        assert hint.inner_text() == "A new board from a seed.", hint.inner_text()
+        assert field.is_visible(), "the seed should show for a random board"
         assert not field.is_disabled() and field.input_value().isdigit(), f"no fresh seed: {field.input_value()!r}"
-        field.fill("")
-        field.type("1e-2.3--4567890")
+        # The seed is typed on the board's number pad, opened from the field (D-250); a keyboard types into the pad too:
+        # digits only, at most six, Backspace and Delete take one off, Enter answers.
+        field.click()
+        npad = board.locator(".overlay.number-pad")
+        npad.wait_for()
+        npad.locator("[data-clear]").click()
+        board.keyboard.type("1e-2.3--4567890")
+        assert npad.locator("input").input_value() == "123456", npad.locator("input").input_value()
+        board.keyboard.press("Backspace")
+        board.keyboard.press("Delete")
+        assert npad.locator("input").input_value() == "1234", npad.locator("input").input_value()
+        board.keyboard.type("56")
+        board.keyboard.press("Enter")
+        npad.wait_for(state="detached")
         assert field.input_value() == "123456", field.input_value()
+        assert board.locator(".overlay.number-pad").count() == 0, "Enter on the pad opened it again"
         board.select_option(".dialog.form select[name=board]", "fixed")
         assert field.is_disabled() and field.input_value() == ""
+        # Text on the board's keyboard (D-252), which faces the way its window does on every edge, also while open.
+        board.click(".dialog.form input[name=motto]")
+        kb = board.locator(".overlay.name-pad:not(.number-pad)")
+        kb.wait_for()
+        assert kb.locator("input").input_value() == "Good luck", kb.locator("input").input_value()
+        assert kb.locator(".count").inner_text() == "9/20", kb.locator(".count").inner_text()
+        for deg in (90, 90, 90, 90):
+            a("POST", "/rotate", {"degrees": deg}) if deg != 180 else None
+            wait(lambda: kb.locator(".panel").evaluate("e => e.style.transform") == board.locator(".dialog.form").evaluate("e => e.style.transform"), 5, "the keyboard to face as its window")
+        board.click(".overlay.name-pad [data-clear]")
+        for k in "Go":
+            board.click(f".overlay.name-pad .keys button[data-key='{k}']")
+        board.click(".overlay.name-pad [data-save]")
+        kb.wait_for(state="detached")
+        assert board.input_value(".dialog.form input[name=motto]") == "Go", board.input_value(".dialog.form input[name=motto]")
         board.click(".dialog.form [data-x=no]")
         a("POST", "/game/select", {"gameId": "duel"})
         board.click("#settings-button")
@@ -71,8 +120,23 @@ try:
         assert out == 0, f"{out} game settings controls stick out of the settings window"
         board.screenshot(path=os.path.join(OUT, "settings-choice.png"))
         # Choosing from the pulldown and from the buttons both reach the table.
-        pace.select_option("quick")
+        # The pulldown's list turns with the window (D-248): on a board facing the other edge it opens under the select in
+        # the window's own frame, which is above it on the screen.
+        before = board.locator(".overlay.settings .panel").evaluate("e => e.style.transform")
+        a("POST", "/rotate", {"degrees": 180})
+        wait(lambda: board.locator(".overlay.settings .panel").evaluate("e => e.style.transform") != before, 5, "the window to turn")
+        # The window turns with a transition: measure once it has come to rest.
+        wait(lambda: board.locator(".overlay.settings .panel").evaluate("e => e.getAnimations().length === 0"), 5, "the window to stop turning")
+        board.click(".game-rules .pick:has(select[data-setting-select=pace]) .pick-cover")
+        menu = board.locator(".game-rules .pick-menu")
+        menu.wait_for()
+        assert menu.locator("button").all_inner_texts() == PACE, menu.locator("button").all_inner_texts()
+        sel_box, menu_box = pace.bounding_box(), menu.bounding_box()
+        assert menu_box["y"] + menu_box["height"] <= sel_box["y"] + 1, f"the list should turn with the window: {menu_box} vs {sel_box}"
+        board.screenshot(path=os.path.join(OUT, "settings-pulldown-turned.png"))
+        menu.locator("button[data-val=quick]").click()
         wait(lambda: a("GET", "/state")["game"]["settings"]["pace"] == "quick", 5, "pace to become quick")
+        a("POST", "/rotate", {"degrees": 180})
         wait(lambda: board.locator(".game-rules select[data-setting-select=pace]").input_value() == "quick", 5, "the pulldown to show quick")
         board.locator(".game-rules [data-setting=side][data-value=right]").click()
         wait(lambda: a("GET", "/state")["game"]["settings"]["side"] == "right", 5, "side to become right")
@@ -81,8 +145,10 @@ try:
         # A setting that applies only with another (D-245): no seed row for a fixed board; choosing random draws one,
         # which the number pad changes (digits, Clear, Enter), turning with the board.
         assert board.locator(".game-rules .row", has_text="Board's seed").count() == 0, "a seed row for a fixed board"
+        assert "The same board every game." in board.locator(".game-rules .row", has_text="Board").first.inner_text(), "no description under the board setting (D-246)"
         board.locator(".game-rules [data-setting=board][data-value=random]").click()
         wait(lambda: a("GET", "/state")["game"]["settings"]["seed"] >= 1, 5, "a random seed")
+        wait(lambda: "A new board from a seed." in board.locator(".game-rules .row", has_text="Board").first.inner_text(), 5, "the description to follow the choice")
         seed = board.locator(".game-rules [data-setting-pad=seed]")
         seed.wait_for(timeout=5000)
         assert seed.inner_text().strip() == str(a("GET", "/state")["game"]["settings"]["seed"])

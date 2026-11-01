@@ -48,8 +48,14 @@ try:
         board.click("#tools-button")
         board.click("button[data-adv=sim]")
         board.select_option("select[name=game]", "coin-flip")
-        board.fill("input[name=players]", "2")
-        board.fill("input[name=games]", "3")
+        # Numbers on the board's number pad (D-252).
+        for name, value in [("players", "2"), ("games", "3")]:
+            board.click(f"input[name={name}]")
+            board.locator(".overlay.number-pad [data-clear]").click()
+            board.keyboard.type(value)
+            board.keyboard.press("Enter")
+            board.wait_for_selector(".overlay.number-pad", state="detached")
+            assert board.input_value(f"input[name={name}]") == value
         board.click("button[data-x=run]")
         board.click(".dialog button[data-x=yes]")
         board.wait_for_selector(".out:has-text('3 finished')")

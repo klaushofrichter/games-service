@@ -15,9 +15,24 @@ const EDGES = [
   ["east", "E"],
 ];
 
-function table(t, cls) {
-  return `<table class="stats-table ${cls}"><tr>${t.columns.map((c) => `<th>${esc(c)}</th>`).join("")}</tr>
-    ${t.rows.map((r) => `<tr>${r.map((c) => `<td>${esc(c)}</td>`).join("")}</tr>`).join("")}</table>`;
+/**
+ * A summary's seats by the names its tables use (D-253): each seat's player at the end, also with the * of a seat
+ * another player took over. A table's first cell that is one of these names shows in that player's colour.
+ */
+export function seatsByName(summary) {
+  const m = new Map();
+  for (const p of summary?.players ?? []) {
+    m.set(String(p.name), p.seat);
+    m.set(`${p.name} *`, p.seat);
+  }
+  return m;
+}
+
+/** A table of the summary; a row's first cell that names a player is marked with its seat, for its colour (D-253). */
+export function table(t, cls, seats = new Map()) {
+  const cell = (c, i) => (i === 0 && seats.has(String(c)) ? `<td><span class="player-name" data-seat="${seats.get(String(c))}">${esc(c)}</span></td>` : `<td>${esc(c)}</td>`);
+  return `<table class="${cls}"><tr>${t.columns.map((c) => `<th>${esc(c)}</th>`).join("")}</tr>
+    ${t.rows.map((r) => `<tr>${r.map(cell).join("")}</tr>`).join("")}</table>`;
 }
 
 /**
@@ -37,6 +52,7 @@ export function openStatistics({ summary, gameName, overlayRoot, edge = "south",
     return n.length < 2 ? (n[0] ?? "") : `${n.slice(0, -1).join(", ")} and ${n.at(-1)}`;
   };
   const awards = summary.awards ?? [];
+  const seats = seatsByName(summary); // the results' names in the players' colours (D-253)
   const awardsHtml = awards.length
     ? `<div class="awards">${awards
         .map(
@@ -52,8 +68,8 @@ export function openStatistics({ summary, gameName, overlayRoot, edge = "south",
     <div class="stats-head"><h2>${esc(gameName ?? "Game")} · Awards and Results</h2>${turn}${backToGame ? `<button type="button" data-back-stats>Back to game</button>` : ""}<button type="button" class="primary" data-close-stats>Done</button></div>
     <div class="stats-body"><p class="stats-result">${esc(summary.text ?? "")}</p>
     <h4>Awards</h4>${awardsHtml}
-    ${summary.table ? `<h4>Results</h4>${table(summary.table, "game")}` : ""}
-    ${summary.play ? `<h4>Statistics</h4>${table(summary.play, "play")}` : ""}
+    ${summary.table ? `<h4>Results</h4>${table(summary.table, "stats-table game", seats)}` : ""}
+    ${summary.play ? `<h4>Statistics</h4>${table(summary.play, "stats-table play", seats)}` : ""}
     ${changed ? `<p class="stats-note">* Another player took over this seat during the game.</p>` : ""}</div>
   </div>`;
   const panel = o.querySelector(".panel");
@@ -65,7 +81,7 @@ export function openStatistics({ summary, gameName, overlayRoot, edge = "south",
   };
   face(edge);
   o.recolor = () => {
-    for (const el of o.querySelectorAll(".award-name")) el.style.color = (colorOf && colorOf(Number(el.dataset.seat))) || "";
+    for (const el of o.querySelectorAll(".award-name, .player-name")) el.style.color = (colorOf && colorOf(Number(el.dataset.seat))) || "";
   };
   o.recolor();
   const close = () => {

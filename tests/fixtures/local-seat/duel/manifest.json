@@ -3,7 +3,7 @@
   "name": "Duel",
   "version": "1.0.0",
   "sdk": "^0.1",
-  "description": "Test game for localSeat (D-128b) and the board's settings window (D-129b): two players, the one at the table sits south; a setting with five choices and one with two. AI options with long labels, like Chess's, for the settings' players rows (D-226). Played from all four edges (facing: any, D-227). Pace: {pace} (a setting in the description, D-238). A seed that applies only to a random board (D-245).",
+  "description": "Test game for localSeat (D-128b) and the board's settings window (D-129b): two players, the one at the table sits south; a setting with five choices and one with two. AI options with long labels, like Chess's, for the settings' players rows (D-226). Played from all four edges (facing: any, D-227). Pace: {pace} (a setting in the description, D-238). A seed that applies only to a random board (D-245).\n\n{side.hint}",
   "players": [
     2
   ],
@@ -68,7 +68,11 @@
         "right"
       ],
       "default": "left",
-      "label": "Side"
+      "label": "Side",
+      "hints": {
+        "left": "Left: the first move is yours (D-249).",
+        "right": "Right: the other player moves first (D-249)."
+      }
     },
     {
       "key": "board",
@@ -78,7 +82,15 @@
         "random"
       ],
       "default": "fixed",
-      "label": "Board"
+      "label": "Board",
+      "hints": {
+        "fixed": "The same board every game.",
+        "random": "A new board from a seed."
+      },
+      "labels": {
+        "fixed": "Fixed",
+        "random": "Random"
+      }
     },
     {
       "key": "seed",
@@ -91,6 +103,13 @@
         "board": "random"
       },
       "random": true
+    },
+    {
+      "key": "motto",
+      "type": "string",
+      "max": 20,
+      "default": "Good luck",
+      "label": "Table motto"
     }
   ],
   "facing": "any"

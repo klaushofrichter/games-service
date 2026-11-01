@@ -125,7 +125,7 @@ the SDK by path (`../../packages/sdk/src/index.ts`); games in other repositories
 | `edges` | Edges seats may be on; must include `north` and `south`. |
 | `localSeat` | Optional edge for a single person at the table when everyone else is remote or AI (they are moved there at the start). For games whose board has a front, like chess. |
 | `dynamicPlayers` | `true`: people who join during a game get a free seat and `onSeatJoined` is called. Default `false`: newcomers wait for the next game. |
-| `settings` | Game options set on the board before the start: `{ key, type: "int" \| "number" \| "string" \| "bool" \| "enum", min?, max?, step?, values?, default?, label?, when?, random? }`. `when: { other: value \| [values] }` makes a setting apply only with those values of others (disabled and blank otherwise, kept at its default); `random: true` gives an int a fresh value from max(min, 1) to max whenever it comes to apply (a board's seed). Whole numbers take digits only; one with a wide range is typed on the board's number pad. The rules get them in `setup`. |
+| `settings` | Game options set on the board before the start: `{ key, type: "int" \| "number" \| "string" \| "bool" \| "enum", min?, max?, step?, values?, default?, label?, when?, random?, hints?, labels? }`. `when: { other: value \| [values] }` makes a setting apply only with those values of others (hidden otherwise, kept at its default); `random: true` gives an int a fresh value from max(min, 1) to max whenever it comes to apply (a board's seed). `hints: { value: text }` says what each value means; the text for the one chosen shows under the setting (a board's description). In the description, `{key.hint}` adds that text as a paragraph when choosing the game (`\n\n{board.hint}`). `labels: { value: text }` says how each value reads ("Beginner" for `beginner`); the rules still get the value. On the board every number is typed on its number pad and every text on its keyboard (D-252), by touch or a keyboard: a whole number takes at most the digits of `max` and stays in range, a `number` has a decimal point, a `string` takes up to `max` characters (48 by default). The settings window steps a narrow whole number with − and +. The rules get them in `setup`. |
 | `ai` | `{ supported, options, timeoutSeconds = 20 (1–600), worker = false, hostConfig = [], notice? }`. `options` uses the settings format (e.g. a play style), plus `random: true` on an enum to give each new AI player a random value (D-226); each AI player has its own values, shown beside its name in the board's settings. `notice` (up to 600 characters, plain text, `https://` links become links) shows under the AI player's options on the board: credit and licence for an engine the AI uses (D-224). Section 7. |
 | `simulation` | `{ supported, headless }`: AI-only games for testing, without a board. |
 | `boardIntents` | Intent names players may also send by touching the board (section 9). |
@@ -376,10 +376,10 @@ export function settings({ info, setPrefs }) { return []; } // optional: items f
 - **Skipping a wait:** list timer ids in `skipTimers`; `ctx.skipTimer(id)` fires it now when `info.boardControl` is
   true (not while the game is paused) and resolves with `{ ok, reason }`. Use it for a pause on a result ("Next hand").
 - **Settings:** `settings({ info, setPrefs })` returns items `{ type: "toggle" | "choice" | "swatches" | "button" |
-  "text", label, value, options, onChange }`: a `choice` takes `options: [{ value, label }]` (a pulldown above three),
+  "text", label, value, options, onChange }`: a `choice` takes `options: [{ value, label, hint? }]` (a pulldown above three; the chosen option's `hint` shows under it),
   `swatches` takes `options: ["#rrggbb", …]`, a `button` shows `action` (or `label`) and calls `onChange()`, a
   `text` only shows its `value` (e.g. a board's seed), and a `number` shows its `value` and opens the board's number pad
-  (digits, Clear, Enter; `min`, `max`), calling `onChange(n)`. `setPrefs(patch)` stores display choices for this game (`info.prefs`), never
+  (digits, Clear, Enter; `min`, `max`), calling `onChange(n)`. Any other item may carry a `hint`, shown under its label. During a game the manifest's locked settings show no `hints`: the game's items say what a value means now. `setPrefs(patch)` stores display choices for this game (`info.prefs`), never
   rules.
 - **Sound:** `playSound(info, name, make)` from the board kit plays only when the table's sound is on (`info.sound`).
   A browser other than the table's kiosk plays it only after the board has been touched; the platform wakes it on the
@@ -549,7 +549,9 @@ Tests use Vitest and run against the real host code.
   brings the checkout up to the latest `main`; `--branch NAME` runs another branch (`production`, a feature branch),
   `--no-pull` runs the checkout as it is. `--extra ../my-games` adds the games of another checkout, so you can play a
   game from your own repository before it is released; start it with `CLOUD_URL=` to leave the live service out (it
-  would otherwise also install its own extra games). `--code ABCD-EFGH` connects the table to a game service with an
+  would otherwise also install its own extra games). `--all-games` adds every checkout with games beside this one
+  (updated like it unless `--no-pull`), and `--offline` leaves the service and its console out: `--offline --all-games`
+  plays every game you have checked out at a table of its own (D-247). `--code ABCD-EFGH` connects the table to a game service with an
   access code. The table keeps its identity and key in `~/.gametable-local`. To see the board on an iPad or a TV
   while the table runs on your computer, use the board's settings › *Board on another screen…* (a QR code and link
   for any screen on the same network, D-190). A table in Docker instead:
@@ -559,6 +561,8 @@ Tests use Vitest and run against the real host code.
   scripts/local-table.sh                                   # latest main, against the live service
   scripts/local-table.sh --branch my-feature               # a branch
   CLOUD_URL= scripts/local-table.sh --extra ../my-games    # your own games, no service
+  scripts/local-table.sh --offline --all-games             # every checked-out game beside this one, no service;
+                                                           # the board says once which checkouts and branches (D-251)
   ```
 
 - **By hand, without a phone:** *Developer settings › Play from the board* on the board (the tools button) (or `BOARD_DECK=1`) puts one

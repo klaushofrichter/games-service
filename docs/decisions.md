@@ -1766,3 +1766,68 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   and its field's frame shows whole; before a game is chosen *Leave* sits beside it; the deck beside the board starts
   with "Player N" too. "Another screen on this LAN" (was WiFi).
 
+- **D-246 · 2026-10-31 · Klaus** — A choice can say what its options mean: a setting's `hints` (`{ value: text }`) show
+  the chosen value's text under it, in the window that chooses the game (following the choice as it changes) and in the
+  settings window; a game's own `choice` item takes a `hint` per option the same way. For boards with a name, e.g.
+  "Six forests on strong numbers: wood in plenty."
+
+- **D-247 · 2026-10-31 · Klaus** — Local play without the console, with every game at hand: `scripts/local-table.sh
+  --offline` leaves the live service out (as `CLOUD_URL=`), and `--all-games [DIR]` adds every git checkout in DIR (by
+  default the folder that holds games-service) with a games/ folder, each brought up to its branch's latest on GitHub
+  unless `--no-pull` (one with changes of its own, or that can't fast-forward, is used as it is). Private game
+  repositories stay unnamed here: the script finds them where they are checked out.
+
+- **D-248 · 2026-10-31 · Klaus** — The board's pulldowns turn with their window: a native list opened upright on the
+  screen, sideways or upside down on a board facing another edge. A cover over the select opens the options as buttons
+  under it, inside the window (the select stays for keyboards). A setting that doesn't apply now (`when`) is hidden in
+  the window that chooses the game, title and all, as in the settings window. A setting's `labels` (`{ value: text }`)
+  say how its values read ("Beginner" for "beginner"); the game still gets the value.
+
+- **D-249 · 2026-11-01 · Klaus** — A game's description can carry what a chosen setting means: `{key.hint}` shows the
+  chosen value's `hints` text, so the window that chooses the game adds a paragraph about the board chosen, following
+  the choice, and doesn't repeat it under the field. The tile leaves it out. The settings window shows the same text
+  under the setting before the game; during it, the locked row leaves it out, so a game's own item can say what its
+  value means now (any item takes a `hint`) without the text showing twice.
+
+- **D-250 · 2026-11-01 · Klaus** — The board's pads for typing without a keyboard share one shell:
+  - The pads are the name pad (letters, digits by a switch), the number pad (a seed) and the access-code pad.
+  - The shell keeps one pad of a kind at a time, faces the front edge and turns with the board while open, and lies
+    above the window it was opened from.
+  - A tap beside a pad or Escape cancels it. A real keyboard types into it too: the number pad takes digits,
+    Backspace or Delete and Enter; it takes at most the digits of the setting's maximum and answers only in range.
+  - The window that chooses a game opens the number pad for a wide-range whole number (more than 1000 values, a
+    seed), as the settings window does.
+  - A future pad (letters and digits for a game's text setting) builds its keys in the same shell.
+
+- **D-251 · 2026-11-01 · Klaus** — A table of `scripts/local-table.sh` says so on the board, once, after it starts
+  (`LOCAL_TABLE=1`):
+  - Without the service: only people here can join, by the QR code on this network. No remote players or watchers,
+    no invites.
+  - Games from git checkouts on this computer: their clones run as they are, not what GitHub or the service has.
+    Each checkout is named with its branch, commit and whether it has changes not committed, and with its games.
+  - *Got it* dismisses it for good on that browser. It comes back only when what it says changes (another branch or
+    commit, the service back).
+  - The table host finds the checkouts with git at start (`checkouts.ts`); games the service delivered don't count.
+    Not on a remote board, and not on tables started otherwise (the tests).
+
+- **D-252 · 2026-11-01 · Klaus** — Every number and every text field on the board is typed on the board's pads, which
+  turn with the board: the board is a touchscreen without a keyboard.
+  - Numbers (`int`, `number`) open the number pad, in the window that chooses a game, an AI player's window and the
+    simulation (Advanced). It shows the range, takes nothing out of range, and has a decimal point for `number` and a
+    minus for a negative `min`.
+  - Text (`string`) opens the board's keyboard (the name pad), with the setting's `max` (48 by default) and no name
+    rules.
+  - A real keyboard types into either pad. The fields themselves take no typing.
+  - Open dialogs now turn with the board as the pads do, so a pad and the window it came from always face the same
+    way.
+  - All the games' settings (built-in, extra-games, Loopy, Starforge, Traders) are whole numbers; no game draws an
+    input of its own on the board. The settings window keeps − and + for narrow ranges and the pad for wide ones.
+
+- **D-253 · 2026-11-01 · Klaus** — Players' names in the result tables show in their colours, as everywhere else: in
+  Awards and Results (the game's Results and the Statistics), and on the finished-game screen. A row's first cell that
+  is a seated player's name (from the summary's `players`, also with the * of a seat taken over) takes that seat's
+  colour, and follows a colour changed while the window is open. The Game Viewer keeps no colours (D-239).
+
+- **D-254 · 2026-11-01 · Klaus** — The deck's *At the table* list shows each name in that player's colour, with the
+  coloured dot before it (a player without a seat stays plain), one's own name in bold, and the place as "South",
+  "Southwest", "No seat" (no longer "south seat").

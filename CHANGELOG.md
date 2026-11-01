@@ -8,6 +8,15 @@ history.
 
 ## [Unreleased]
 
+- The deck's At the table list: names in the players' colours, one's own in bold, places as "South" (D-254).
+- Players' names in the result tables in their colours (D-253).
+- A local table says once that it is local: no remote players without the service, and the checkouts and branches its games run from (D-251).
+- Every number and text field on the board opens the board's pads; dialogs turn with the board while open (D-252).
+- One shell for the board's pads; the number pad takes a keyboard and opens from the window that chooses a game too (D-250).
+- `{key.hint}` in a game's description: a paragraph on the chosen setting's meaning when choosing the game (D-249).
+- Pulldowns on the board turn with their window; a setting that doesn't apply is hidden when choosing a game; `labels` for how values read (D-248).
+- `scripts/local-table.sh --offline --all-games` plays every game checked out beside games-service at a table without the service or console (D-247).
+- A choice can describe its options (`hints`, a choice item's `hint`): the chosen one's text shows under the setting (D-246).
 - Game settings can depend on others (`when`) and draw a fresh value (`random`, a seed); whole numbers take digits only, and a wide one is typed on the board's number pad, also a game's own `number` setting. Deck: Change name at the top, Leave beside it, a default name beside the board (D-245).
 - A phone joining by QR code, and a player's invite, start with the name "Player N", which they can change; a game's settings may show a line of text (D-244).
 - `scripts/local-table.sh` says phones must be on the computer's WiFi and warns when the QR code's address does not answer; a new e2e check opens that address on a phone page (D-243).

@@ -3,26 +3,51 @@ browser, no cloud service), the board's QR code carries an address of this compu
 phone that opens it gets the name form. It also may not warn that the address does not answer.
   python3 scripts/e2e/local_table.py out/
 """
-import os, re, subprocess, sys, tempfile, time, urllib.request
+import os, re, shutil, subprocess, sys, tempfile, time, urllib.request
 from playwright.sync_api import sync_playwright
-from common import REPO, wait, wait_http, watch, errors
+from common import REPO, call, wait, wait_http, watch, errors
 
 OUT = sys.argv[1] if len(sys.argv) > 1 else "e2e-out"
 os.makedirs(OUT, exist_ok=True)
 PORT = 8145
 problems = []
 log_path = os.path.join(OUT, "local-table.log")
-env = dict(os.environ, PORT=str(PORT), CLOUD_URL="", DATA_DIR=tempfile.mkdtemp(prefix="e2e-local-table-"), TABLE_NAME="E2E Table")
+# --offline --all-games (D-247): a folder beside it with another checkout of games, here a copy of the test game Duel.
+others = tempfile.mkdtemp(prefix="e2e-checkouts-")
+shutil.copytree(os.path.join(REPO, "tests", "fixtures", "local-seat", "duel"), os.path.join(others, "more-games", "games", "duel"))
+env = dict(os.environ, PORT=str(PORT), DATA_DIR=tempfile.mkdtemp(prefix="e2e-local-table-"), TABLE_NAME="E2E Table", SHOW_TEST_GAMES="1")
+env.pop("CLOUD_URL", None)  # --offline does it
 env.pop("PUBLIC_URL", None)  # the script finds it, as on a developer's computer
 with open(log_path, "w") as log:
-    proc = subprocess.Popen(["bash", "scripts/local-table.sh", "--no-pull", "--no-open"], cwd=REPO, env=env, stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
+    proc = subprocess.Popen(["bash", "scripts/local-table.sh", "--no-pull", "--no-open", "--offline", "--all-games", others], cwd=REPO, env=env, stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
 try:
     wait_http(f"http://127.0.0.1:{PORT}/health", 300)  # it may install the dependencies first
+    # The other checkout's game is on the table; no live service (D-247).
+    games = call(f"http://127.0.0.1:{PORT}", "GET", "/api/v1/games", headers={"x-table-key": open(os.path.join(env["DATA_DIR"], "table-key")).read().strip()})
+    if not any(g["id"] == "duel" for g in games):
+        problems.append(f"--all-games: the other checkout's game is missing: {[g['id'] for g in games]}")
     with sync_playwright() as p:
         b = p.chromium.launch()
         board = b.new_page(viewport={"width": 1280, "height": 800})
         watch(board, "board")
         board.goto(f"http://localhost:{PORT}/board/")
+        # A local table says so once (D-251): no service, so no remote players; the games' checkouts with their branches.
+        note = board.locator(".local-notice")
+        note.wait_for(timeout=10000)
+        text = note.inner_text()
+        if "No Game Table service" not in text or "Remote players" not in text:
+            problems.append(f"the local table's notice doesn't say there is no service: {text!r}")
+        branch = subprocess.run(["git", "-C", REPO, "rev-parse", "--abbrev-ref", "HEAD"], capture_output=True, text=True).stdout.strip()
+        branch = "detached" if branch == "HEAD" else branch  # CI checks out a commit, not a branch
+        if os.path.basename(REPO) not in text or branch not in text:
+            problems.append(f"the notice doesn't name this checkout ({os.path.basename(REPO)}, branch {branch}): {text!r}")
+        board.screenshot(path=os.path.join(OUT, "local-table-notice.png"))
+        note.locator("[data-x=ok]").click()
+        board.reload()
+        board.locator("aside.join img").wait_for()
+        time.sleep(1)
+        if board.locator(".local-notice").count():
+            problems.append("the local table's notice came back after Got it")
         board.locator("aside.join img").wait_for()
         url = board.locator("aside.join .url").inner_text().strip()
         if not re.match(rf"^http://\d+\.\d+\.\d+\.\d+:{PORT}/j/[A-Z0-9]+$", url):
@@ -50,6 +75,8 @@ finally:
     proc.wait()
 
 out = open(log_path).read()
+if "service:   none" not in out:
+    problems.append("--offline: the table still uses the live service")
 if "does not answer on this computer" in out:
     problems.append("the script warned that the QR code's address does not answer")
 problems += errors

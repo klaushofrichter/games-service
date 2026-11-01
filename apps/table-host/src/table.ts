@@ -137,6 +137,10 @@ export class Table extends EventEmitter {
   /** The table's identity at the service, set by the cloud link; null without the service. */
   tableId: string | null = null;
   cloud: CloudStatus = { status: "disabled" };
+  /** The git checkouts the games run from (D-251), found once at start (host.ts). */
+  checkouts: LobbyState["checkouts"] = [];
+  /** A table of scripts/local-table.sh (D-251): the board tells it is local, once. */
+  localTable = false;
   readonly metrics = { gamesPlayed: 0, gamesTerminated: 0, totalGameMs: 0, simulations: 0 };
 
   readonly config: TableConfig;
@@ -239,6 +243,8 @@ export class Table extends EventEmitter {
       developer: { allowNoLocalPlayer: this.allowNoLocalPlayer, boardDeck: this.boardDeck, protectedPlayer: this.protectedPlayer()?.id ?? null },
       noSeat: this.noFreeSeat(),
       suggestedName: this.suggestedName(),
+      localTable: this.localTable,
+      checkouts: this.checkouts,
       remote: {
         boardControl: this.remoteBoardControl,
         maxPlayers: this.config.maxRemotePlayers,

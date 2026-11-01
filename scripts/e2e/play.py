@@ -421,6 +421,13 @@ def endings(browser, board):
         new = next(c for c in ["#9d6bf0", "#f08a3c", "#ef8fcf"] if c not in {pl["color"] for pl in by_seat.values()})
         api("POST", f"/players/{by_seat[seat]['id']}/color", {"color": new})
         wait(lambda: all(c == hex_rgb(new) for s, c in board.evaluate(COLOURS) if s == seat), 5, "the award holder's new colour")
+    # The players' names in the tables in their colours too (D-253), following a colour changed while open.
+    NAMES = """() => [...document.querySelectorAll('.overlay.statistics .stats-table .player-name')].map((e) => [Number(e.dataset.seat), getComputedStyle(e).color])"""
+    names = board.evaluate(NAMES)
+    assert len(names) >= 2, f"no player names marked in the tables: {names}"
+    by_seat = {pl["seat"]: pl for pl in api("GET", "/state")["players"] if pl["seat"] is not None}
+    for seat, colour in names:
+        assert colour == hex_rgb(by_seat[seat]["color"]), ("table name", seat, colour, by_seat[seat]["color"])
     board.screenshot(path=os.path.join(OUT, "statistics-south.png"))
     board.click(".overlay.statistics [data-face=east]")
     board.wait_for_timeout(500)  # the turn animates
@@ -435,6 +442,10 @@ def endings(browser, board):
     board.wait_for_selector("[data-stats]")
     assert board.locator("#stats-button").is_hidden() and board.locator("#result-button").is_hidden()
     # and from the result screen; Escape closes it
+    # The result screen's table names the players in their colours (D-253).
+    if summary.get("table"):
+        marked = board.evaluate("() => [...document.querySelectorAll('.summary-table .player-name')].map((e) => e.style.color)")
+        assert marked and all(marked), f"the result table's names have no colour: {marked}"
     board.click("[data-stats]")
     board.wait_for_selector(".overlay.statistics .stats-panel")
     board.keyboard.press("Escape")
@@ -509,24 +520,24 @@ def dialogs(browser, board):
     board.wait_for_selector(".overlay.settings", state="detached")
     pick_game(board, "roulette")
     board.wait_for_selector(".dialog.form")
-    # D-146: a number out of range says so in a message to acknowledge, before the form closes; a tap beside the
-    # message does not close it, OK does, and the form is still open with the field to correct.
-    board.fill(".dialog [name=rounds]", "51")
-    board.click(".dialog.form [data-x=yes]")
-    note = board.locator(".dialog-backdrop.notice .dialog")
-    note.wait_for(timeout=5000)
-    text = note.inner_text()
-    assert "Spins" in text and "1 to 50" in text and "too high" in text, text
+    # D-252: a number in the window that chooses a game is typed on the board's number pad, which faces the way the
+    # window does; it takes no number out of range (D-146 told so only after OK), and a keyboard types into it too.
+    board.click(".dialog [name=rounds]")
+    pad = board.locator(".overlay.number-pad")
+    pad.wait_for()
+    turned = (pad.locator(".panel").evaluate("e => e.style.transform"), board.locator(".dialog.form").evaluate("e => e.style.transform"))
+    assert turned[0] == turned[1], f"the pad faces another way than its window: {turned}"
+    assert "1 to 50" in pad.inner_text(), pad.inner_text()
+    pad.locator("[data-clear]").click()
+    board.keyboard.type("51")
+    assert pad.locator("[data-enter]").is_disabled(), "Enter with 51 of at most 50"
     shot(board, "settings-out-of-range")
-    board.mouse.click(30, 30)  # beside the message
-    time.sleep(0.3)
-    assert note.count() == 1, "a tap beside the message closed it"
-    note.locator("[data-x=ok]").click()
-    board.wait_for_selector(".dialog-backdrop.notice", state="detached")
-    assert board.locator(".dialog.form").count() == 1, "the form closed after the message"
-    assert board.evaluate("document.activeElement?.name") == "rounds", "the field to correct is not focused"
-    assert api("GET", "/state")["phase"] != "ready", "a game was chosen with the setting out of range"
-    board.fill(".dialog [name=rounds]", "4")
+    pad.locator("[data-clear]").click()
+    for k in "4":
+        pad.locator(f"[data-key='{k}']").click()
+    pad.locator("[data-enter]").click()
+    pad.wait_for(state="detached")
+    assert board.input_value(".dialog [name=rounds]") == "4", board.input_value(".dialog [name=rounds]")
     shot(board, "settings-dialog")
     board.click(".dialog [data-x=yes]")
     time.sleep(0.5)

@@ -711,7 +711,8 @@ describe("the deploy-time repository list", () => {
     let out = "";
     child.stdout.on("data", (d) => (out += d));
     child.stderr.on("data", (d) => (out += d));
-    const exited = new Promise<number | null>((ok) => child.on("exit", (c) => ok(c)));
+    // "close", not "exit": exit can come before the last of the output is read, which left `out` empty on CI.
+    const exited = new Promise<number | null>((ok) => child.on("close", (c) => ok(c)));
     try {
       const up = await Promise.race([
         exited.then(() => false),
