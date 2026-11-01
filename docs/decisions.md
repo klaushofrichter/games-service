@@ -1822,3 +1822,7 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
     way.
   - All the games' settings (built-in, extra-games, Loopy, Starforge, Traders) are whole numbers; no game draws an
     input of its own on the board. The settings window keeps − and + for narrow ranges and the pad for wide ones.
+
+- **D-254 · 2026-11-01 · Klaus** — The deck's *At the table* list shows each name in that player's colour, with the
+  coloured dot before it (a player without a seat stays plain), one's own name in bold, and the place as "South",
+  "Southwest", "No seat" (no longer "south seat").
