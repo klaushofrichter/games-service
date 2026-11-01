@@ -15,7 +15,7 @@ Tables pick up extra-games' `production` through the console's *Refresh* for a r
 
 ## In flight
 
-- **games-service #291 "Release to production" (main → production) is open**, head `main` at `6259f4e`. It carries
+- **games-service #291 "Release to production" (main → production) is open**, head `main` (`6259f4e` plus this note). It carries
   D-245 to D-254 (#281 to #290). D-245 (#281) was merged into production before, but its *Deploy production* run
   (41215502297) was cancelled in the 2026-10-31 outage, so production still runs 2026.10.31.1.
   - GitHub reports it `behind`: production has a merge commit main doesn't. Update the branch from `production`
