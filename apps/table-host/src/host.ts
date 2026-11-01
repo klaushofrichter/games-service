@@ -4,6 +4,7 @@ import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { randomBytes } from "node:crypto";
 import { loadGames } from "./games.ts";
+import { checkoutsOf } from "./checkouts.ts";
 import { LogStore } from "./logs.ts";
 import { startServer } from "./server.ts";
 import { Table, type TableConfig } from "./table.ts";
@@ -33,6 +34,9 @@ export interface HostOptions extends Partial<TableConfig> {
   cloudHeartbeatMs?: number;
   /** A pre-approved access code (TABLE_CODE or --code, D-113); it wins over one typed on the board. */
   accessCode?: string;
+  /** A table of scripts/local-table.sh (LOCAL_TABLE=1, D-251): the board says once that it is local, and which
+   *  checkouts its games come from. */
+  localTable?: boolean;
 }
 
 function lanAddress(): string {
@@ -65,6 +69,8 @@ export async function startHost(o: HostOptions = {}) {
     boardDeck: o.boardDeck ?? false,
   };
   const table = new Table(config, games, logs);
+  table.localTable = o.localTable ?? false;
+  if (table.localTable) table.checkouts = await checkoutsOf(games); // games from local clones (D-251): the board says which branches
   const server = await startServer(table, logs, {
     port: o.port ?? 8080,
     host: o.host,

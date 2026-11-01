@@ -164,6 +164,7 @@ export TABLE_KEY="$(cat "$KEY_FILE")"
 export TABLE_NAME="${TABLE_NAME:-$default_name}"
 export CLOUD_URL="${CLOUD_URL-https://games.skylar.technology}"
 export SHOW_TEST_GAMES="${SHOW_TEST_GAMES:-0}"
+export LOCAL_TABLE=1 # the board says once that it is a local table, and where its games come from (D-251)
 [ -n "${PUBLIC_URL:-}" ] && export PUBLIC_URL
 [ -n "${TABLE_CODE:-}" ] && export TABLE_CODE
 

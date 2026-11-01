@@ -148,6 +148,11 @@ pre.raw { font-family: var(--mono); font-size: 0.7em; color: var(--ink-soft); ba
 #game-layer { position: absolute; inset: 0; z-index: 2; }
 
 .dialog.form { max-width: 640px; }
+/* A local table's notice (D-251): the checkouts the games run from. */
+.local-notice .dialog { max-width: 640px; }
+.local-notice .local-checkouts { margin: 6px 0 0; padding-left: 1.2em; line-height: 1.45; }
+.local-notice .local-checkouts li { margin-bottom: 6px; }
+.local-notice code { font-family: var(--mono); color: var(--ink); }
 /* A description's paragraphs (D-249: a board's description after the game's). */
 .dialog.form .form-intro { white-space: pre-line; }
 .dialog .fields { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 20px; margin-top: 18px; }

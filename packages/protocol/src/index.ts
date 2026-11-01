@@ -337,6 +337,13 @@ export interface LobbyState {
   noSeat: string | null;
   /** "Player N" for someone joining without a name (D-244): the deck's name field and the invite start with it. */
   suggestedName: string;
+  /**
+   * The git checkouts on this computer the games run from (D-251): a table of scripts/local-table.sh plays local
+   * clones at their branches, not what the service delivers. Empty on a table whose games aren't in a checkout.
+   */
+  checkouts: { name: string; branch: string; commit: string; changed: boolean; games: string[] }[];
+  /** A table of scripts/local-table.sh (LOCAL_TABLE=1, D-251): the board says once that it is local. */
+  localTable: boolean;
 }
 
 export interface CloudStatus {

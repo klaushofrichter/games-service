@@ -153,6 +153,49 @@ function noticeDialog(title, text, okLabel = "OK") {
 }
 
 /**
+ * A local table, said once (D-251): without the Game Table service (CLOUD_URL empty, `local-table.sh --offline`) only
+ * people here can join, by the QR code on this network; games from git checkouts on this computer (local-table.sh
+ * --all-games or --extra) run those clones at their branches, not what GitHub has. Shown after the board starts, until
+ * dismissed; it comes back only when what it says changes (another branch, the service back). Not on a remote board.
+ */
+const LOCAL_NOTICE_KEY = "gametable.localNotice";
+let localNoticeShown = false;
+function showLocalNotice() {
+  if (localNoticeShown || REMOTE || !state?.localTable) return;
+  const noService = state.cloud?.status === "disabled";
+  const checkouts = state.checkouts ?? [];
+  if (!noService && !checkouts.length) return;
+  localNoticeShown = true;
+  const key = JSON.stringify([noService, checkouts.map((c) => [c.name, c.branch, c.commit, c.changed])]);
+  try {
+    if (localStorage.getItem(LOCAL_NOTICE_KEY) === key) return;
+  } catch {}
+  const name = (id) => games.find((g) => g.id === id)?.name ?? id; // only the games the board lists (no test games)
+  const service = noService
+    ? `<p><b>No Game Table service.</b> This table runs on its own, without the service and its console: only people here can join,
+        by the QR code on this network. Remote players and watchers can't join, and there are no invites.</p>`
+    : "";
+  const clones = checkouts.length
+    ? `<p><b>Games from the clones on this computer</b>, not from GitHub: each runs as its checkout is now.</p>
+       <ul class="local-checkouts">${checkouts.map((c) => `<li><b>${esc(c.name)}</b> · branch <code>${esc(c.branch)}</code> (${esc(c.commit)})${c.changed ? ", with changes not committed" : ""}<br><span class="faint">${c.games.filter((id) => games.some((g) => g.id === id)).map((id) => esc(name(id))).join(", ")}</span></li>`).join("")}</ul>`
+    : "";
+  const d = document.createElement("div");
+  d.className = "dialog-backdrop notice local-notice";
+  d.innerHTML = `<div class="dialog" role="alertdialog" aria-modal="true"><h2>A local table</h2><div class="muted">${service}${clones}</div>
+    <div class="actions"><button class="primary" data-x="ok">Got it</button></div></div>`;
+  // "Got it" (or Escape, or a tap beside it) dismisses it for good, until what it says changes.
+  d.addEventListener("click", (e) => {
+    if (e.target.dataset?.x !== "ok" && e.target !== d) return;
+    try {
+      localStorage.setItem(LOCAL_NOTICE_KEY, key);
+    } catch {}
+    d.remove();
+  });
+  faceFront(d.querySelector(".dialog"));
+  overlayRoot.appendChild(d);
+}
+
+/**
  * Why a number typed into a form field is not allowed, in the field's own words, or null when it is (D-146). The table
  * checks again, but its refusal would come only after the form has closed.
  */
@@ -2571,6 +2614,7 @@ function connect() {
       if (state.phase !== "active" && state.phase !== "paused" && state.phase !== "terminating") await refreshGames();
       render();
       showSoundHint();
+      showLocalNotice();
       stateListeners.forEach((f) => f());
       // The invite page shows the deck only to a player or to one let in to play; else it is a watcher's (D-168).
       if (REMOTE) tellPage({ type: "gt-seat", mayJoin: state.remote?.mayJoin !== false, watching: !!state.remote?.watching });
