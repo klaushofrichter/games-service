@@ -1823,6 +1823,11 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   - All the games' settings (built-in, extra-games, Loopy, Starforge, Traders) are whole numbers; no game draws an
     input of its own on the board. The settings window keeps − and + for narrow ranges and the pad for wide ones.
 
+- **D-253 · 2026-11-01 · Klaus** — Players' names in the result tables show in their colours, as everywhere else: in
+  Awards and Results (the game's Results and the Statistics), and on the finished-game screen. A row's first cell that
+  is a seated player's name (from the summary's `players`, also with the * of a seat taken over) takes that seat's
+  colour, and follows a colour changed while the window is open. The Game Viewer keeps no colours (D-239).
+
 - **D-254 · 2026-11-01 · Klaus** — The deck's *At the table* list shows each name in that player's colour, with the
   coloured dot before it (a player without a seat stays plain), one's own name in bold, and the place as "South",
   "Southwest", "No seat" (no longer "south seat").

@@ -9,6 +9,7 @@ history.
 ## [Unreleased]
 
 - The deck's At the table list: names in the players' colours, one's own in bold, places as "South" (D-254).
+- Players' names in the result tables in their colours (D-253).
 - A local table says once that it is local: no remote players without the service, and the checkouts and branches its games run from (D-251).
 - Every number and text field on the board opens the board's pads; dialogs turn with the board while open (D-252).
 - One shell for the board's pads; the number pad takes a keyboard and opens from the window that chooses a game too (D-250).

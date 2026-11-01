@@ -421,6 +421,13 @@ def endings(browser, board):
         new = next(c for c in ["#9d6bf0", "#f08a3c", "#ef8fcf"] if c not in {pl["color"] for pl in by_seat.values()})
         api("POST", f"/players/{by_seat[seat]['id']}/color", {"color": new})
         wait(lambda: all(c == hex_rgb(new) for s, c in board.evaluate(COLOURS) if s == seat), 5, "the award holder's new colour")
+    # The players' names in the tables in their colours too (D-253), following a colour changed while open.
+    NAMES = """() => [...document.querySelectorAll('.overlay.statistics .stats-table .player-name')].map((e) => [Number(e.dataset.seat), getComputedStyle(e).color])"""
+    names = board.evaluate(NAMES)
+    assert len(names) >= 2, f"no player names marked in the tables: {names}"
+    by_seat = {pl["seat"]: pl for pl in api("GET", "/state")["players"] if pl["seat"] is not None}
+    for seat, colour in names:
+        assert colour == hex_rgb(by_seat[seat]["color"]), ("table name", seat, colour, by_seat[seat]["color"])
     board.screenshot(path=os.path.join(OUT, "statistics-south.png"))
     board.click(".overlay.statistics [data-face=east]")
     board.wait_for_timeout(500)  # the turn animates
@@ -435,6 +442,10 @@ def endings(browser, board):
     board.wait_for_selector("[data-stats]")
     assert board.locator("#stats-button").is_hidden() and board.locator("#result-button").is_hidden()
     # and from the result screen; Escape closes it
+    # The result screen's table names the players in their colours (D-253).
+    if summary.get("table"):
+        marked = board.evaluate("() => [...document.querySelectorAll('.summary-table .player-name')].map((e) => e.style.color)")
+        assert marked and all(marked), f"the result table's names have no colour: {marked}"
     board.click("[data-stats]")
     board.wait_for_selector(".overlay.statistics .stats-panel")
     board.keyboard.press("Escape")

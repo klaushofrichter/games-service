@@ -3,7 +3,7 @@
 import { renderRules } from "/shared/markdown.js";
 import { ROT, W, H, SEAT_COLORS, audio, copyText, esc, seatName, seatPositions, claimServiceWorkerPage, openTableSocket } from "/shared/board-kit.js";
 import { openViewer } from "/board/viewer.js";
-import { hasStatistics, openStatistics } from "/board/stats.js";
+import { hasStatistics, openStatistics, seatsByName, table as statsTable } from "/board/stats.js";
 
 const KEY = window.TABLE_KEY;
 // A remote player's copy of the board (phase 1c): it runs inside the cloud's invite page, which carries
@@ -1578,10 +1578,16 @@ function renderReady() {
     </section>${joinPanel()}`;
 }
 
-/** A game's statistics from its summary (D-091): the first column left-aligned, numbers centred. */
-function summaryTable(t) {
-  return `<table class="summary-table"><tr>${t.columns.map((c) => `<th>${esc(c)}</th>`).join("")}</tr>
-    ${t.rows.map((r) => `<tr>${r.map((c) => `<td>${esc(c)}</td>`).join("")}</tr>`).join("")}</table>`;
+/**
+ * A game's statistics from its summary (D-091): the first column left-aligned, numbers centred; a player's name in
+ * their colour, as everywhere else (D-253).
+ */
+function summaryTable(t, summary) {
+  const html = statsTable(t, "summary-table", seatsByName(summary));
+  return html.replace(/<span class="player-name" data-seat="(\d+)">/g, (m, seat) => {
+    const c = state?.players?.find((p) => p.seat === Number(seat))?.color;
+    return c ? `<span class="player-name" data-seat="${seat}" style="color:${esc(c)}">` : m;
+  });
 }
 
 function renderFinished() {
@@ -1589,7 +1595,7 @@ function renderFinished() {
   center.innerHTML = `<section class="main finished">
       <div class="summary"><div class="eyebrow">${esc(state.game?.name ?? "Game")} · finished</div>
       <div class="big">${esc(s?.text ?? "Game over")}</div>
-      ${s?.table ? `<div class="summary-scroll">${summaryTable(s.table)}</div>` : ""}
+      ${s?.table ? `<div class="summary-scroll">${summaryTable(s.table, s)}</div>` : ""}
       <div class="toolbar"><button class="primary" data-again>Play again</button>${hasStatistics(s) ? `<button data-stats>Awards and Results</button>` : ""}<button data-close>Back to lobby</button></div></div>
     </section>${joinPanel()}`;
 }
