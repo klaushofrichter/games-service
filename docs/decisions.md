@@ -1991,5 +1991,5 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   - *Implementation (Claude):* a review of the whole page against the code: every game's players, AI styles, awards
     and settings match their manifests and rules in games-service and extra-games; the Coin Flip manifest excerpt
     shows its current version; links to the guides, `llms.txt`, `llms-full.txt`, `/terms`, the release, the repositories
-    and each game's folder answer. The company link points to `https://www.skylar.technology`, which answers; the bare
-    domain couldn't be reached from the session's network to check it. The page names no private game repository.
+    and each game's folder answer. The company link stays `https://skylar.technology` (`tests/website.test.ts` pins it);
+    the session's network couldn't reach it to check, while `www.skylar.technology` answers. The page names no private game repository.
