@@ -8,6 +8,8 @@ history.
 
 ## [Unreleased]
 
+- Packages for one computer: a Windows installer, a macOS .pkg and a Linux .tar.gz with their own Node.js, published on the release local-table, with install guides in docs/install/; they can join the service later with --service (D-256).
+- Windows 11: one script downloads the games (the private ones by name), installs Node.js 26 and the GitHub CLI if needed, and starts a table without the service; checked on GitHub's Windows hosts (D-255).
 - The deck's At the table list: names in the players' colours, one's own in bold, places as "South" (D-254).
 - Players' names in the result tables in their colours (D-253).
 - A local table says once that it is local: no remote players without the service, and the checkouts and branches its games run from (D-251).

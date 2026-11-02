@@ -1,0 +1,53 @@
+# The Windows script (scripts/windows/game-table.ps1, D-255) on GitHub's Windows hosts, as on a clean computer: Node,
+# the GitHub CLI and git are taken off the PATH first, so the script has to fetch what it needs itself. It downloads
+# the production branches of games-service and extra-games, starts the table without the service and checks that it
+# answers and lists games from both; then starts it again without downloading (-NoUpdate).
+# GitHub-hosted only: our own runners (CI_RUNNER=self) are Linux and macOS.
+# Only on request (Actions > windows-table > Run workflow), apart from the usual checks (D-255).
+name: windows-table
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-table-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-11-arm, windows-latest] # Windows 11 on arm64; Windows Server on x64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install and start, as on a clean computer (Windows PowerShell 5.1)
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ github.token }} # for -SignIn: the GitHub CLI path, without a browser
+        run: |
+          $env:PATH = ($env:PATH -split ';' | Where-Object { $_ -and -not (Test-Path (Join-Path $_ 'node.exe')) -and -not (Test-Path (Join-Path $_ 'gh.exe')) -and -not (Test-Path (Join-Path $_ 'git.exe')) }) -join ';'
+          foreach ($t in 'node', 'gh', 'git') { if (Get-Command $t -ErrorAction SilentlyContinue) { throw "$t is still on the PATH" } }
+          Copy-Item scripts\windows\game-table.ps1 $env:TEMP\game-table.ps1
+          powershell -NoProfile -ExecutionPolicy Bypass -File $env:TEMP\game-table.ps1 -Repos none -NoShortcut -SmokeTest -ExpectGames holdem,coin-flip,backgammon,chess
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          powershell -NoProfile -ExecutionPolicy Bypass -File $env:TEMP\game-table.ps1 -Repos none -SignIn -SmokeTest -ExpectGames holdem,coin-flip,backgammon,chess
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Start again without downloading, from the installed starter
+        shell: powershell
+        run: |
+          $env:PATH = ($env:PATH -split ';' | Where-Object { $_ -and -not (Test-Path (Join-Path $_ 'node.exe')) -and -not (Test-Path (Join-Path $_ 'gh.exe')) -and -not (Test-Path (Join-Path $_ 'git.exe')) }) -join ';'
+          $dir = Join-Path $env:LOCALAPPDATA 'GameTable'
+          Get-ChildItem $dir | Format-Table Name, Length
+          if (-not (Test-Path (Join-Path $dir 'tools\node\node.exe'))) { throw 'Node.js was not installed into the install folder' }
+          if (-not (Test-Path (Join-Path $dir 'tools\gh\bin\gh.exe'))) { throw 'the GitHub CLI was not installed into the install folder' }
+          if (-not (Test-Path (Join-Path ([Environment]::GetFolderPath('Desktop')) 'Game Table.lnk'))) { throw 'no desktop shortcut' }
+          & (Join-Path $dir 'game-table.cmd') -NoUpdate -SmokeTest -ExpectGames holdem,backgammon
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
