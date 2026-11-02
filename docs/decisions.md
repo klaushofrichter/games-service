@@ -1975,3 +1975,21 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
     nothing went to `/Applications`.
   - Still to see on a real Mac: whether *Open Anyway* for the unsigned package asks a standard (non-admin) user for
     anything. Signing and notarizing (Klaus has an Apple developer account) would remove that step.
+- **D-259 · 2026-11-02 · Klaus** — Landing page review.
+  - *About* (*Human players first*) moves up, right after the three paths, as the introduction before *Made for the
+    room*.
+  - *Start here* moves from the game developers' card to the gamers' card, with the card's highlight.
+  - Last Card is "a game in extra-games", no longer "the newest".
+  - *Download it, start it, play* says that the packages have no remote players out of the box, because they connect
+    to no game service with a public DNS name like games.skylar.technology; an access code (`--code`) or one's own
+    game service (*Every table, one console*) adds them.
+  - *Every table, one console* says that games.skylar.technology can host third-party tables: on request it issues an
+    access code, with no guarantee of service. Requests go to a GitHub issue.
+  - *Try it with your own AI agent* is gone: it repeated *For game developers*.
+  - *Fork everything* counts again: 250+ decision records (258), 520+ automated tests (526 unit and integration tests,
+    plus 34 browser checks).
+  - *Implementation (Claude):* a review of the whole page against the code: every game's players, AI styles, awards
+    and settings match their manifests and rules in games-service and extra-games; the Coin Flip manifest excerpt
+    shows its current version; links to the guides, `llms.txt`, `llms-full.txt`, `/terms`, the release, the repositories
+    and each game's folder answer. The company link points to `https://www.skylar.technology`, which answers; the bare
+    domain couldn't be reached from the session's network to check it. The page names no private game repository.
