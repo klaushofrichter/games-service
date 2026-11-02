@@ -116,7 +116,7 @@ jobs:
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 20
     steps:
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@v8
         with: { name: package-windows }
       - name: The guide's checksum check (docs/install/windows.md), on a sums file like the release's
         shell: powershell
@@ -158,7 +158,7 @@ jobs:
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 20
     steps:
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@v8
         with: { name: package-macos }
       - name: Install and start, as on a clean computer
         env:
@@ -188,7 +188,7 @@ jobs:
     container: ubuntu:24.04 # a clean system: no node, no gh, no git, no CA certificates
     timeout-minutes: 20
     steps:
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@v8
         with: { name: package-linux }
       - name: Install and start, as on a clean computer
         env:
@@ -213,7 +213,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@v8
         with: { pattern: package-*, merge-multiple: true }
       - name: Replace the packages on the release "local-table"
         env:
