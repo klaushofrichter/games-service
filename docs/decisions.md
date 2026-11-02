@@ -2092,3 +2092,21 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
       on the website, and the packages stay unsigned for now. They catch a damaged download, not a changed release.
     - `local-table` stays one moving release with one package per platform (D-256): no older builds to pin or go back
       to.
+- **D-267 · 2026-11-02 · Klaus** — The third Linux review (Ubuntu 24.04 in a headless container, build 8049713, in
+  #games-application) is taken in. Install, checksum and `--smoke-test` passed. *Implementation (Claude):*
+  - **No desktop, no crash.** A plain start without `xdg-open` ended the starter with `spawn xdg-open ENOENT`: spawn
+    reports a missing program as an `error` event, which nothing handled. The starter now handles it, and on Linux
+    without `DISPLAY` or `WAYLAND_DISPLAY` doesn't try at all; either way it says where the board is and the table keeps
+    running. Checked here, where there is no `xdg-open`, with and without `DISPLAY`.
+  - **The starter's lines:** the phones line points to the `[table-host] join:` line, which has the address the QR code
+    holds (`…/j/<code>`); *Games from …* leaves out the test games the board hides; `--help` has no decision number.
+  - **The package's version names its release:** the build reads the release tag of its commit (`v2026.11.02.8`), so
+    `--version` and the website's release link match; without a tag it keeps the build date. The Linux archive's files
+    belong to root (`--owner=0 --group=0`), not to the build machine's user.
+  - **Guides:** links that worked on GitHub but not on the website (`../runbooks/…`) point to the website's Docker
+    runbook and to GitHub; the developer guide is linked; no decision numbers; `--expect-games` in *Options*; the
+    agent reports the `[table-host] join:` line, tells the person that their first plain start asks for the private
+    repositories, and (Linux) starts with `--no-open` on a computer without a desktop.
+  - **Not changed:** a phone's WebSocket in the test container was refused by the container's own network, not by the
+    table (curl with the same headers got `101`); the *Board on another screen* link from the network address wasn't
+    verified there and needs a real network.

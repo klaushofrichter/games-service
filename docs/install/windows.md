@@ -19,7 +19,8 @@ computer."* For the agent:
   is the person's: the starter shows a code and opens the browser, and the person enters it there.
 - Leave the firewall question and network settings to the person: tell them what to allow (below) rather than
   changing settings yourself.
-- At the end, report the board's address, the address in the QR code (the starter prints both), and how to start the
+- At the end, report the board's address (the starter's `board:` line), the address in the QR code (the
+  `[table-host] join:` line, like `http://192.168.1.20:8080/j/ABCD`), and how to start the
   table again. Leave the table for the person to start; it runs until its window is closed.
 
 In PowerShell, as the person's own user (not as administrator):
@@ -49,6 +50,8 @@ game service (for remote players) runs on a server with Docker, a DNS name and H
   `klaushofrichter/name`; see *Repositories of another organization*). If there are any, run the check with
   `--repos "owner/name1 owner/name2"` while the person is there to sign in to GitHub in the browser. Then `--version`
   lists every game with its version.
+- **The person's first start:** checks with `--repos` don't save the list, so the first plain start asks for the
+  private repositories. Tell the person, and which names to type (or Enter for none).
 
 ## Install
 
@@ -125,7 +128,7 @@ of what to do.
 
 The board can also show on another screen on the same network: a TV, a tablet or another computer. The board's own
 address, `http://<address>:<port>/board/`, opens only on this computer; from anywhere else it answers 403. Use the
-board's settings › *Board on another screen…*: it shows a QR code and the link (D-190). The link is
+board's settings › *Board on another screen…*: it shows a QR code and the link. The link is
 `http://<address>:<port>/board/screen?key=<table key>`, with the key from `%LOCALAPPDATA%\GameTable\data\table-key`. It works only from the same
 network, and anyone with the key controls the table: give it only to your own screens.
 
@@ -135,7 +138,7 @@ network, and anyone with the key controls the table: give it only to your own sc
   Private. The table warns when it's set to Public.
 - Node.js must be allowed through the firewall for Private networks: Windows Security › Firewall & network
   protection › *Allow an app through firewall*.
-- The QR code holds the computer's address on the network (WiFi or Ethernet) and the table's port, like `http://192.168.1.20:8080`. Open
+- The QR code holds the computer's address on the network (WiFi or Ethernet) and the table's port, like `http://192.168.1.20:8080/j/ABCD`. Open
   that address in the phone's browser to check.
 - Open the address exactly as the QR code has it. `/board/` answers 403 from another device, because the board is for
   this computer ([another screen](#the-board-on-another-screen) needs its own link).
@@ -159,6 +162,7 @@ Add them to the starter in a terminal: `"%LOCALAPPDATA%\Programs\Game Table\game
 | `--service`, `--code ABCD-EFGH` | Join the Game Table service, see below |
 | `--version` | The package's version, and every game on the table with its version and source |
 | `--smoke-test` | Check the installation: start, check that the board answers and the games are there, stop; fails if a named repository is missing |
+| `--expect-games a,b` | With `--smoke-test`: these games (their ids, as `--version` lists them) must be on the table |
 | `--help` | All the options |
 
 ## Remote players: the Game Table service
@@ -196,4 +200,4 @@ The table keeps its approval, so later starts need only `--service`. Without `--
 
 Disk space: about 450 MB with the public games; private games add their own size.
 
-Without the installer, one PowerShell script does the same: [`docs/runbooks/windows.md`](../runbooks/windows.md).
+Without the installer, one PowerShell script does the same: [`docs/runbooks/windows.md`](https://github.com/klaushofrichter/games-service/blob/main/docs/runbooks/windows.md).

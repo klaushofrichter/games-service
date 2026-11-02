@@ -20,7 +20,8 @@ Mac."* For the agent:
   is the person's: the starter shows a code and opens the browser, and the person enters it there.
 - Leave the firewall question and network settings to the person: tell them what to allow (below) rather than
   changing settings yourself.
-- At the end, report the board's address, the address in the QR code (the starter prints both), and how to start the
+- At the end, report the board's address (the starter's `board:` line), the address in the QR code (the
+  `[table-host] join:` line, like `http://192.168.1.20:8080/j/ABCD`), and how to start the
   table again. Leave the table for the person to start; it runs until its window is closed.
 
 In Terminal:
@@ -47,6 +48,8 @@ The package isn't signed yet, so the checksum is its only check. A package insta
   `klaushofrichter/name`; see *Repositories of another organization*). If there are any, run the check with
   `--repos "owner/name1 owner/name2"` while the person is there to sign in to GitHub in the browser. Then `--version`
   lists every game with its version.
+- **The person's first start:** checks with `--repos` don't save the list, so the first plain start asks for the
+  private repositories. Tell the person, and which names to type (or Enter for none).
 - **Don't open the app or script Terminal** to check: the app's window waits for the person's answers, and scripting
   Terminal needs a permission from the person. `--smoke-test` checks the same.
 
@@ -138,7 +141,7 @@ of what to do.
 
 The board can also show on another screen on the same network: a TV, an iPad or another computer. The board's own
 address, `http://<address>:<port>/board/`, opens only on this Mac; from anywhere else it answers 403. Use the board's
-settings › *Board on another screen…*: it shows a QR code and the link (D-190). The link is
+settings › *Board on another screen…*: it shows a QR code and the link. The link is
 `http://<address>:<port>/board/screen?key=<table key>`, with the key from `~/Library/Application Support/Game Table/data/table-key`. It works only from the
 same network, and anyone with the key controls the table: give it only to your own screens.
 
@@ -146,7 +149,7 @@ same network, and anyone with the key controls the table: give it only to your o
 
 - If the macOS firewall is on, it must let `node` in: System Settings › Network › Firewall › Options. Set `node` to
   *Allow incoming connections*. Changing that may need an administrator.
-- The QR code holds the Mac's address on the network (WiFi or Ethernet) and the table's port, like `http://192.168.1.20:8080`. Open that address in the phone's
+- The QR code holds the Mac's address on the network (WiFi or Ethernet) and the table's port, like `http://192.168.1.20:8080/j/ABCD`. Open that address in the phone's
   browser to check.
 - Open the address exactly as the QR code has it. `/board/` answers 403 from another device, because the board is for
   this computer ([another screen](#the-board-on-another-screen) needs its own link).
@@ -174,6 +177,7 @@ Run the starter in Terminal with options:
 | `--service`, `--code ABCD-EFGH` | Join the Game Table service, see below |
 | `--version` | The package's version, and every game on the table with its version and source |
 | `--smoke-test` | Check the installation: start, check that the board answers and the games are there, stop; fails if a named repository is missing |
+| `--expect-games a,b` | With `--smoke-test`: these games (their ids, as `--version` lists them) must be on the table |
 | `--help` | All the options |
 
 ## Remote players: the Game Table service
@@ -215,5 +219,5 @@ The table keeps its approval, so later starts need only `--service`. Without `--
 
 Disk space: about 400 MB with the public games; private games add their own size.
 
-To develop games on a Mac, use `scripts/local-table.sh` from a clone of games-service instead (developer guide,
+To develop games on a Mac, use `scripts/local-table.sh` from a clone of games-service instead ([developer guide](https://github.com/klaushofrichter/games-service/blob/main/docs/developers/game-development.md),
 section 14).

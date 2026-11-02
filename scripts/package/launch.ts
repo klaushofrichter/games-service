@@ -98,7 +98,7 @@ function parseArgs(argv: string[]): Options {
 
 function readmeText() {
   return [
-    "Game Table on this computer (D-256)",
+    "Game Table on this computer",
     "  --repos \"a b\"     the private game repositories (owner/name or name) for this start, without asking;",
     "                    --repos none: none. The saved list (the answer to the question) stays as it is",
     "  --no-update       start what was downloaded last time",
@@ -368,12 +368,20 @@ async function health(port: number): Promise<boolean> {
   }
 }
 
+/**
+ * Opens the board in the browser. Without a desktop (no xdg-open, no display: a server, Raspberry Pi OS Lite) it says
+ * where the board is and the table keeps running (Linux review, 2026-11-02: a missing xdg-open ended the starter).
+ */
 function openBrowser(url: string) {
+  const manual = () => note(`Couldn't open a browser here: open ${url} in a browser on this computer, or show the board on another screen.`);
+  if (!isWin && !isMac && !process.env.DISPLAY && !process.env.WAYLAND_DISPLAY) return manual();
   const [cmd, args] = isWin ? ["cmd", ["/c", "start", "", url]] : isMac ? ["open", [url]] : ["xdg-open", [url]];
   try {
-    spawn(cmd, args as string[], { stdio: "ignore", detached: true }).unref();
+    const child = spawn(cmd, args as string[], { stdio: "ignore", detached: true });
+    child.on("error", manual); // spawn reports a missing program as an event, not by throwing
+    child.unref();
   } catch {
-    note(`Open ${url} in a browser.`);
+    manual();
   }
 }
 
@@ -506,7 +514,8 @@ async function main() {
       await rm(join(gamesDir, e.name), { recursive: true, force: true });
       await cp(join(dir, e.name), join(gamesDir, e.name), { recursive: true });
       from.set(e.name, label);
-      ids.push(e.name);
+      // Test games stay for the checks, but aren't named here: the board hides them (Linux review, 2026-11-02).
+      if (!(await readJson<{ test?: boolean }>(join(dir, e.name, "manifest.json")))?.test) ids.push(e.name);
     }
     say(`Games from ${label}: ${ids.join(", ") || "(none)"}`);
   }
@@ -539,7 +548,7 @@ async function main() {
   say("");
   say(`Game Table ${version} on this computer`);
   say(`  board:   http://localhost:${o.port}/board/`);
-  if (env.PUBLIC_URL) say(`  phones:  scan the QR code on the board (${env.PUBLIC_URL}), on the same network as this computer (its WiFi, or a WiFi on the same router), not mobile data or a guest WiFi`);
+  if (env.PUBLIC_URL) say(`  phones:  scan the QR code on the board (${env.PUBLIC_URL}/j/…, the "[table-host] join:" line below), on the same network as this computer (its WiFi, or a WiFi on the same router), not mobile data or a guest WiFi`);
   if (o.service) {
     say(`  service: ${SERVICE_URL}: remote players can join once the table is approved`);
     if (!o.code) say(`           If the board shows a pairing code, approve it in the console at ${CONSOLE_URL}.`);
