@@ -38,9 +38,10 @@ the browser. Then `~/apps/game-table/game-table --version` lists every game with
 
 ## Install
 
-Download **`game-table-linux.tar.gz`** from the release
-[Game Table for your computer](https://github.com/klaushofrichter/games-service/releases/tag/local-table) and unpack
-it, for example into `~/apps`:
+Download **[`game-table-linux.tar.gz`](https://github.com/klaushofrichter/games-service/releases/download/local-table/game-table-linux.tar.gz)** (from the release
+[Game Table for your computer](https://github.com/klaushofrichter/games-service/releases/tag/local-table)). To check
+the download, compare `sha256sum ~/Downloads/game-table-linux.tar.gz` with the SHA-256 in the release notes. Unpack it,
+for example into `~/apps`:
 
 ```sh
 mkdir -p ~/apps
@@ -55,6 +56,16 @@ sudo apt install libatomic1     # Debian, Ubuntu, Raspberry Pi OS
 sudo dnf install libatomic      # Fedora, RHEL
 ```
 
+### Check that it works
+
+Optional: this starts a table for a moment on port 8080, checks it, and stops. Another table must not be running.
+
+```sh
+~/apps/game-table/game-table --smoke-test
+```
+
+It ends with `SMOKE TEST PASSED`.
+
 ## Start
 
 ```sh
@@ -62,7 +73,8 @@ sudo dnf install libatomic      # Fedora, RHEL
 ```
 
 1. The first time, it asks for the **private game repositories**: type their names, like `my-game` or
-   `owner/my-game`, separated by spaces. Press Enter alone if you have none. Next time Enter keeps the same list,
+   `owner/my-game`, separated by spaces. A name alone means `klaushofrichter/my-game`; anyone else's repository needs
+   `owner/name`. Press Enter alone if you have none. Next time Enter keeps the same list,
    and `-` clears it.
 2. For private repositories it needs a **GitHub sign-in**:
    - If the GitHub CLI (`gh`) is already installed and signed in, the starter uses that account without asking. Check
@@ -75,8 +87,8 @@ A private game repository must have a **`production` branch** with a **`games/` 
 starter downloads. One without them is left out with a note. `--branch main` takes another branch, for every
 repository.
 
-The players scan the QR code on the board with their phones. Their phones must be on the same WiFi, not on mobile
-data.
+The players scan the QR code on the board with their phones. Their phones must be on the same network as this
+computer: its WiFi, or a WiFi on the same router if the computer is wired. Not mobile data, and not a guest WiFi.
 
 Stop the table with Ctrl+C.
 
@@ -142,6 +154,11 @@ screens.
 - A firewall must let the table's port in (8080 unless you chose another), for example `sudo ufw allow 8080/tcp`.
 - The QR code holds the computer's address on the WiFi and the port, like `http://192.168.1.20:8080`. Open that
   address in the phone's browser to check.
+- Open the address exactly as the QR code has it. `/board/` answers 403 from another device, because the board is for
+  this computer ([another screen](#the-board-on-another-screen) needs its own link).
+- A VPN on this computer can change which address the QR code holds. Turn it off, or start with the address phones
+  reach: `PUBLIC_URL=http://192.168.1.20:8080` in the environment.
+- "Port 8080 is in use": another table is probably still running. Close it, or start with `--port 8081`.
 
 ## Options
 
@@ -164,8 +181,8 @@ screens.
 The same installation can join the Game Table service at games.skylar.technology. The service lets players and
 watchers join from elsewhere, and it can deliver games to the table. The table needs approval once:
 
-- Start with an **access code** from the console: `game-table --code ABCD-EFGH`, or
-- start with `game-table --service`. The board then shows a pairing code, which the service's admin approves in the
+- Start with an **access code** from the console: `~/apps/game-table/game-table --code ABCD-EFGH`, or
+- start with `~/apps/game-table/game-table --service`. The board then shows a pairing code, which the service's admin approves in the
   console.
 
 The table keeps its approval, so later starts need only `--service`. Without `--service` it plays on its own again.

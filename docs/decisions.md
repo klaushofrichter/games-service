@@ -1939,3 +1939,23 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
     - *Where things are* lists `private-repos.txt`, `runtime` and the disk space (about 450 MB).
     - The guides list every option.
     - The launcher now checks the port before it downloads anything.
+  - **First macOS test (Mac mini, Apple silicon, macOS 27.2, 2026-11-01, interim, in #games-application):** an unpacked
+    copy passed `--smoke-test`, but the installer wasn't run yet. From its eleven points:
+    - **Launcher and host fixes:**
+      - The port check now tries both `0.0.0.0` and `::`. On macOS a listener on `::` can share a port held on
+        `0.0.0.0`, so the start used to crash.
+      - The table host turns `EADDRINUSE` into a plain message instead of a stack trace.
+      - The launcher passes SIGHUP on to the table host, and stops the host when the launcher itself exits, so
+        closing the Terminal window stops the table.
+      - A local table's log says *players here only* instead of *development mode*.
+      - The phones line says *the same network* rather than *WiFi*.
+      - A `PUBLIC_URL` the user sets is kept, for a computer with a VPN.
+    - **Release:** the notes give each package's SHA-256.
+    - **Guides:**
+      - The macOS install needs an administrator, which the guide now says, with the password prompts and `pkgutil
+        --forget`.
+      - Spotlight instead of Launchpad, and the firewall prompt only when the firewall is on.
+      - A bare repository name means `klaushofrichter/…`.
+      - Full paths in the service section, a direct download link with a checksum, and an optional *Check that it
+        works*.
+    - **Open:** an install without an administrator (a per-user package, or a zipped app) is Klaus's decision.

@@ -38,19 +38,32 @@ GitHub in the browser. Then `& $gt --version` lists every game with its version.
 
 ## Install
 
-1. Download **`game-table-windows.exe`** from the release
-   [Game Table for your computer](https://github.com/klaushofrichter/games-service/releases/tag/local-table).
+1. Download **[`game-table-windows.exe`](https://github.com/klaushofrichter/games-service/releases/download/local-table/game-table-windows.exe)** (from the release
+   [Game Table for your computer](https://github.com/klaushofrichter/games-service/releases/tag/local-table)).
+   To check the download, compare `Get-FileHash $env:USERPROFILE\Downloads\game-table-windows.exe` in PowerShell with
+   the SHA-256 in the release notes.
 2. Open it. The installer isn't signed yet, so Windows shows *Windows protected your PC*. Click **More info › Run
    anyway**.
 3. Click through the installer. It installs for your user only, so it needs no administrator rights, and it brings
    its own Node.js.
+
+### Check that it works
+
+Optional: this starts a table for a moment on port 8080, checks it, and stops. Another table must not be running.
+
+```
+"%LOCALAPPDATA%\Programs\Game Table\game-table.cmd" --smoke-test
+```
+
+It ends with `SMOKE TEST PASSED`.
 
 ## Start
 
 Start **Game Table** from the Start menu or the desktop. A window opens and shows the table's messages:
 
 1. The first time, it asks for the **private game repositories**: type their names, like `my-game` or
-   `owner/my-game`, separated by spaces. Press Enter alone if you have none. Next time Enter keeps the same list,
+   `owner/my-game`, separated by spaces. A name alone means `klaushofrichter/my-game`; anyone else's repository needs
+   `owner/name`. Press Enter alone if you have none. Next time Enter keeps the same list,
    and `-` clears it.
 2. For private repositories it needs a **GitHub sign-in**:
    - If the GitHub CLI (`gh`) is already installed and signed in, the starter uses that account without asking. Check
@@ -60,8 +73,8 @@ Start **Game Table** from the Start menu or the desktop. A window opens and show
 3. It downloads the games and opens the board in the browser.
 4. When Windows asks whether *Node.js JavaScript Runtime* may communicate on networks, allow **Private networks**.
 
-The players scan the QR code on the board with their phones. Their phones must be on the same WiFi, not on mobile
-data.
+The players scan the QR code on the board with their phones. Their phones must be on the same network as this
+computer: its WiFi, or a WiFi on the same router if the computer is wired. Not mobile data, and not a guest WiFi.
 
 Stop the table by closing the window, or with Ctrl+C.
 
@@ -88,6 +101,11 @@ network, and anyone with the key controls the table: give it only to your own sc
   protection › *Allow an app through firewall*.
 - The QR code holds the computer's address on the WiFi and the table's port, like `http://192.168.1.20:8080`. Open
   that address in the phone's browser to check.
+- Open the address exactly as the QR code has it. `/board/` answers 403 from another device, because the board is for
+  this computer ([another screen](#the-board-on-another-screen) needs its own link).
+- A VPN on this computer can change which address the QR code holds. Turn it off, or start with the address phones
+  reach: `PUBLIC_URL=http://192.168.1.20:8080` in the environment.
+- "Port 8080 is in use": another table is probably still running. Close it, or start with `--port 8081`.
 
 ## Options
 
@@ -112,8 +130,8 @@ Add them to the starter in a terminal: `"%LOCALAPPDATA%\Programs\Game Table\game
 The same installation can join the Game Table service at games.skylar.technology. The service lets players and
 watchers join from elsewhere, and it can deliver games to the table. The table needs approval once:
 
-- Start with an **access code** from the console: `game-table.cmd --code ABCD-EFGH`, or
-- start with `game-table.cmd --service`. The board then shows a pairing code, which the service's admin approves in
+- Start with an **access code** from the console: `"%LOCALAPPDATA%\Programs\Game Table\game-table.cmd" --code ABCD-EFGH`, or
+- start with `"%LOCALAPPDATA%\Programs\Game Table\game-table.cmd" --service`. The board then shows a pairing code, which the service's admin approves in
   the console.
 
 The table keeps its approval, so later starts need only `--service`. Without `--service` it plays on its own again.

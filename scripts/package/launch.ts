@@ -313,12 +313,16 @@ function routeAddress(): Promise<string | null> {
   });
 }
 
+/** Whether the table host can listen on the port: the same address it binds (0.0.0.0) and the default one (::). On
+ *  macOS a listener on :: can share the port with one on 0.0.0.0, so checking only one misses a running table. */
 function portFree(port: number): Promise<boolean> {
-  return new Promise((done) => {
-    const srv = createServer();
-    srv.once("error", () => done(false));
-    srv.listen(port, () => srv.close(() => done(true)));
-  });
+  const tryOn = (host?: string) =>
+    new Promise<boolean>((done) => {
+      const srv = createServer();
+      srv.once("error", (e: NodeJS.ErrnoException) => done(e.code === "EAFNOSUPPORT" || e.code === "EADDRNOTAVAIL")); // no IPv6: fine
+      srv.listen({ port, host, exclusive: true }, () => srv.close(() => done(true)));
+    });
+  return tryOn("0.0.0.0").then((ok) => ok && tryOn("::"));
 }
 
 async function health(port: number): Promise<boolean> {
@@ -489,13 +493,15 @@ async function main() {
   delete env.TABLE_CODE;
   if (o.service) env.CLOUD_URL = SERVICE_URL;
   if (o.code) env.TABLE_CODE = o.code;
-  if (ip) env.PUBLIC_URL = `http://${ip}:${o.port}`;
+  // PUBLIC_URL set by the user wins (a VPN can make the default route's address the wrong one for phones).
+  if (process.env.PUBLIC_URL) env.PUBLIC_URL = process.env.PUBLIC_URL;
+  else if (ip) env.PUBLIC_URL = `http://${ip}:${o.port}`;
   else delete env.PUBLIC_URL;
 
   say("");
   say(`Game Table ${version} on this computer`);
   say(`  board:   http://localhost:${o.port}/board/`);
-  if (ip) say(`  phones:  scan the QR code on the board (http://${ip}:${o.port}), on this computer's WiFi, not mobile data`);
+  if (env.PUBLIC_URL) say(`  phones:  scan the QR code on the board (${env.PUBLIC_URL}), on the same network as this computer (its WiFi, or a WiFi on the same router), not mobile data or a guest WiFi`);
   if (o.service) {
     say(`  service: ${SERVICE_URL}: remote players can join once the table is approved`);
     if (!o.code) say(`           If the board shows a pairing code, approve it in the console at ${CONSOLE_URL}.`);
@@ -518,7 +524,11 @@ async function main() {
   child.stderr?.on("data", (d) => (output += d));
   let exited = false;
   child.on("exit", () => (exited = true));
-  for (const sig of ["SIGINT", "SIGTERM"] as const) process.on(sig, () => child.kill(sig));
+  // Closing the Terminal window sends SIGHUP: the table host stops with the launcher, whichever signal ends it.
+  for (const sig of ["SIGINT", "SIGTERM", "SIGHUP"] as const) process.on(sig, () => child.kill(sig === "SIGHUP" ? "SIGTERM" : sig));
+  process.on("exit", () => {
+    if (!exited) child.kill("SIGTERM");
+  });
 
   let up = false;
   for (let i = 0; i < 120 && !exited && !up; i++) {
