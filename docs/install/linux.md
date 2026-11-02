@@ -9,6 +9,33 @@ You get the built-in games, the games of
 [extra-games](https://github.com/klaushofrichter/extra-games), and the private game repositories your GitHub
 account can read.
 
+## With an AI agent
+
+Tell your agent: *"Read https://games.skylar.technology/docs/install/linux.md and install Game Table on this
+computer."* For the agent:
+
+- Do the steps in order and run each check. When one fails, stop and report it with its output instead of working
+  around it.
+- Never ask for a GitHub token or password, and never handle one. Signing in to GitHub, for private game repositories,
+  is the person's: the starter shows a code and opens the browser, and the person enters it there.
+- Leave the firewall question and network settings to the person: tell them what to allow (below) rather than
+  changing settings yourself.
+- At the end, report the board's address, the address in the QR code (the starter prints both), and how to start the
+  table again. Leave the table for the person to start; it runs until its window is closed.
+
+In a shell, as the person's own user:
+
+```sh
+mkdir -p ~/apps
+curl -fL https://github.com/klaushofrichter/games-service/releases/download/local-table/game-table-linux.tar.gz | tar -xz -C ~/apps
+~/apps/game-table/game-table --repos none --smoke-test      # check: ends with SMOKE TEST PASSED
+```
+
+If the check says libatomic is missing, it names the command for the system (it needs `sudo`, so ask the person).
+Then ask the person which private game repositories they want (names only). If there are any, start
+`~/apps/game-table/game-table --repos "name1 name2" --smoke-test` while the person is there to sign in to GitHub in
+the browser. Then `~/apps/game-table/game-table --version` lists every game with its version.
+
 ## Install
 
 Download **`game-table-linux.tar.gz`** from the release
@@ -73,6 +100,7 @@ Categories=Game;
 | `--no-open` | Don't open the browser, e.g. on a computer without a screen; open the board from another one |
 | `--service`, `--code ABCD-EFGH` | Join the Game Table service, see below |
 | `--version` | The package's version, and every game on the table with its version and source |
+| `--smoke-test` | Check the installation: start, check that the board answers and the games are there, stop |
 
 ## Remote players: the Game Table service
 

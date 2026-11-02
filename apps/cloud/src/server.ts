@@ -23,6 +23,10 @@ const LLMS_TXT = fileURLToPath(new URL("../../../llms.txt", import.meta.url));
 const GAME_GUIDE = fileURLToPath(new URL("../../../docs/developers/game-development.md", import.meta.url));
 // The runbook for a local installation, which llms.txt points to (D-174).
 const LOCAL_RUNBOOK = fileURLToPath(new URL("../../../docs/runbooks/local-docker.md", import.meta.url));
+// The install guides of the packages for one computer, which the website and llms.txt point to (D-256, D-257).
+const INSTALL_GUIDES: Record<string, string> = Object.fromEntries(
+  ["windows", "macos", "linux"].map((os) => [`/docs/install/${os}.md`, fileURLToPath(new URL(`../../../docs/install/${os}.md`, import.meta.url))]),
+);
 const REMOTE_SW = fileURLToPath(new URL("../public/remote-sw.js", import.meta.url));
 const FAVICON = fileURLToPath(new URL("../public/favicon.svg", import.meta.url));
 /** The icon for browsers without SVG favicons (Safari) and for iOS home screens (D-212). */
@@ -571,11 +575,12 @@ export function startCloud(o: CloudOptions) {
         res.writeHead(200, { "content-type": ICONS[p], "cache-control": "public, max-age=86400" });
         return res.end(await readFile(PUBLIC_DIR + p.slice(1)));
       }
-      if (m === "GET" && (p === "/llms.txt" || p === "/llms-full.txt" || p === "/docs/game-development.md" || p === "/docs/local-docker.md")) {
+      if (m === "GET" && (p === "/llms.txt" || p === "/llms-full.txt" || p === "/docs/game-development.md" || p === "/docs/local-docker.md" || INSTALL_GUIDES[p])) {
         // Public: what anyone (a person or a language model) needs to write a game for Game Table (D-160) or to install
-        // it locally (D-174).
+        // it locally (D-174, the packages D-257).
         const text =
-          p === "/llms.txt" ? await readFile(LLMS_TXT, "utf8")
+          INSTALL_GUIDES[p] ? await readFile(INSTALL_GUIDES[p], "utf8")
+          : p === "/llms.txt" ? await readFile(LLMS_TXT, "utf8")
           : p === "/docs/game-development.md" ? await readFile(GAME_GUIDE, "utf8")
           : p === "/docs/local-docker.md" ? await readFile(LOCAL_RUNBOOK, "utf8")
           : [await readFile(LLMS_TXT, "utf8"), await readFile(GAME_GUIDE, "utf8"), await readFile(LOCAL_RUNBOOK, "utf8")].join("\n\n---\n\n");
