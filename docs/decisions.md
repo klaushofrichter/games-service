@@ -1959,3 +1959,19 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
       - Full paths in the service section, a direct download link with a checksum, and an optional *Check that it
         works*.
     - **Open:** an install without an administrator (a per-user package, or a zipped app) is Klaus's decision.
+      Decided in D-258.
+- **D-258 · 2026-11-02 · Klaus** — The macOS package installs without administrator rights: "Ideally we do not need
+  admin right for installation". *Implementation (Claude):*
+  - The `.pkg` stays the one macOS package, now a product archive (`productbuild`) whose distribution allows only the
+    current user's home (`enable_currentUserHome`). The app lands in `~/Applications/Game Table.app`; the starter
+    already found everything relative to itself and keeps its data in `~/Library/Application Support/Game Table`, so
+    nothing else changed. Opened in Finder, the installer asks for no password; `installer -pkg … -target
+    CurrentUserHomeDirectory` needs no `sudo`, which the agent section uses.
+  - A zipped app was the other choice. It would need the app moved by hand and, unsigned, the same *Open Anyway* step,
+    so the package stays: one download, one familiar installer, the same receipt (`pkgutil --volume ~`).
+  - Each user of a Mac installs it for themselves. Packages before this one installed into `/Applications`; the guide
+    says to install the new one and drop the old copy (which needs an administrator once).
+  - Checks: the package test installs on both macOS hosts without `sudo`, into `~/Applications`, and checks that
+    nothing went to `/Applications`.
+  - Still to see on a real Mac: whether *Open Anyway* for the unsigned package asks a standard (non-admin) user for
+    anything. Signing and notarizing (Klaus has an Apple developer account) would remove that step.
