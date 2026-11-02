@@ -8,6 +8,7 @@ history.
 
 ## [Unreleased]
 
+- A local table without the service shows no invite button; links on the board wrap between their parts; two e2e checks no longer race the coin or hide why the AI wasn't ready (D-264).
 - Packages: --smoke-test fails on a missing named repository and keeps the saved private repositories; build times in the package versions; install guides take in the second macOS and Linux reviews (D-263).
 - The website: a game's close-up no longer shows another game's phone (Chess, Backgammon, Pachisi), those three have phone screenshots taken from the same game as their board, and every screenshot is taken again from the current release (D-261, D-262).
 - Packages and the Windows script: game repositories of other organizations (owner/name) are explained in the install guides and kept apart from same-named ones (D-260).

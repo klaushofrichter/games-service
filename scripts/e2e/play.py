@@ -275,10 +275,18 @@ def holdem(browser, board):
 def coinflip(browser, board):
     decks = [join(browser, n) for n in ["Klaus", "Mira"]]
     api("POST", "/ai", {})
-    api("POST", "/game/select", {"gameId": "coin-flip", "settings": {"rounds": 2, "roundSeconds": 30}})
-    time.sleep(0.4)
-    # D-089: the AI shows Ready on the board; the phone says what is true now and what the button switches to
-    board.wait_for_selector(".seat.ai >> text=Ready")
+    # The AI's seat plate is on the board before the game is chosen (#311: once, on the Docker runbook's fresh host, the
+    # AI never showed Ready; the plate's text below says what the board showed instead).
+    try:
+        board.wait_for_selector(".seat.ai")
+        api("POST", "/game/select", {"gameId": "coin-flip", "settings": {"rounds": 2, "roundSeconds": 30}})
+        time.sleep(0.4)
+        # D-089: the AI shows Ready on the board; the phone says what is true now and what the button switches to
+        board.wait_for_selector(".seat.ai >> text=Ready")
+    except Exception:
+        plates = board.evaluate("() => [...document.querySelectorAll('.seat')].map((s) => s.className + ': ' + s.innerText.replace(/\\s+/g, ' '))")
+        players = [(p["name"], p["kind"], p.get("seat"), p.get("ready")) for p in api("GET", "/state")["players"]]
+        raise AssertionError(f"the AI never showed Ready; seat plates {plates}; players {players}; phase {api('GET', '/state')['phase']}")
     decks[0].wait_for_selector("text=You are not ready yet")
     assert decks[0].inner_text("#ready") == "Switch to ready"
     for d in decks:
@@ -386,7 +394,10 @@ def endings(browser, board):
         d.click(f"[data-guess={g}]")
     # The game is over at once, but the way on waits until the board has shown the end: the coin lands first (D-134).
     wait(lambda: api("GET", "/state")["phase"] == "finished", 5, "the game to end")
-    assert board.locator("#stats-button:not([hidden])").count() == 0, "Awards and Results appeared while the coin was still spinning"
+    # One look inside the page, so the coin can't land between two checks (#311): while it spins, no Awards and Results.
+    early = board.evaluate("""() => document.querySelector('.cf-coin')?.getAnimations().some((a) => a.playState === 'running')
+        && !!document.querySelector('#stats-button:not([hidden])')""")
+    assert not early, "Awards and Results appeared while the coin was still spinning"
     board.wait_for_selector("#stats-button:not([hidden])")  # held, as a game that ended by itself
     assert not board.evaluate("() => document.querySelector('.cf-coin')?.getAnimations().some((a) => a.playState === 'running')"), "Awards and Results appeared before the coin landed"
     time.sleep(1.4)

@@ -2055,3 +2055,18 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
       on the computer; the check's behaviour in *Check that it works* and in *Options*.
   - **Not changed:** the greyed-out *Invite remote player…* on a local table, and the join address wrapping in a
     narrow board window, are board details for a later change.
+- **D-264 · 2026-11-02 · Klaus** — "Fix all fixable issues" after the install reviews and the website screenshots.
+  - **A local table without the service has no invite button.** On a table started with `LOCAL_TABLE=1` (the
+    packages, `scripts/local-table.sh`) and no Game Table service, the lobby leaves out *Invite remote player…* and
+    Settings › Joining says remote players aren't on this table, instead of a greyed-out button right after the notice
+    that there are no invites (macOS review, 2026-11-02). A host started without the service for development keeps the
+    greyed-out button with its reason (D-169). `scripts/e2e/local_table.py` checks it.
+  - **Links wrap between their parts.** The board's join and invite links break after `//`, before the port and
+    before each `/` (`<wbr>`, `overflow-wrap: anywhere` instead of `word-break: break-all`), so a narrow window no
+    longer splits the port number.
+  - **Two e2e flakes (#311):** `play.py endings` checks in one look inside the page that Awards and Results are hidden
+    while the coin is still spinning, instead of two checks the coin could land between. `play.py coinflip` waits for
+    the AI's seat plate before choosing the game, and if the AI never shows Ready it fails with the seat plates, the
+    players and the phase, so the cause can be read from the log. The cause of the one failure (a fresh Docker host)
+    is not known yet; #311 stays open for it.
+  - **Mexican Train** (extra-games E-046): the active player's seat plate reads *Now playing* instead of *Their turn*.
