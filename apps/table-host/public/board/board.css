@@ -545,7 +545,8 @@ button.pad-value { min-width: 120px; font: 600 1em var(--mono); letter-spacing: 
 .tile.view-only { pointer-events: none; }
 
 /* Sound on, but this browser has not allowed it yet (D-195): any tap on the board turns it on. */
-#sound-hint { position: absolute; left: 50%; top: 14px; transform: translateX(-50%); z-index: 30; padding: 8px 18px;
+/* Below the north seat plates, not over them (mini PC review, 2026-11-02: it covered North's "Open seat" at 1440×813). */
+#sound-hint { position: absolute; left: 50%; top: 15.5%; transform: translateX(-50%); z-index: 30; padding: 8px 18px;
   border-radius: 999px; font-size: 20px; background: rgba(10, 29, 25, 0.9); border: 1px solid var(--brass-deep);
   color: var(--brass); }
 #sound-hint[hidden] { display: none; }

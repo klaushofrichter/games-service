@@ -14,7 +14,7 @@ import { createSocket } from "node:dgram";
 import { existsSync } from "node:fs";
 import { chmod, cp, mkdir, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:net";
-import { homedir, platform as osPlatform, arch as osArch } from "node:os";
+import { homedir, userInfo, platform as osPlatform, arch as osArch } from "node:os";
 import { delimiter, dirname, join, resolve } from "node:path";
 import { createInterface } from "node:readline/promises";
 import { fileURLToPath } from "node:url";
@@ -98,7 +98,7 @@ function parseArgs(argv: string[]): Options {
 
 function readmeText() {
   return [
-    "Game Table on this computer (D-256)",
+    "Game Table on this computer",
     "  --repos \"a b\"     the private game repositories (owner/name or name) for this start, without asking;",
     "                    --repos none: none. The saved list (the answer to the question) stays as it is",
     "  --no-update       start what was downloaded last time",
@@ -368,12 +368,55 @@ async function health(port: number): Promise<boolean> {
   }
 }
 
+/**
+ * Opens the board in the browser. Without a desktop (no xdg-open, no display: a server, Raspberry Pi OS Lite) it says
+ * where the board is and the table keeps running (Linux review, 2026-11-02: a missing xdg-open ended the starter).
+ */
 function openBrowser(url: string) {
+  const manual = () => note(`Couldn't open a browser here: open ${url} in a browser on this computer, or show the board on another screen.`);
+  if (!isWin && !isMac && !process.env.DISPLAY && !process.env.WAYLAND_DISPLAY) return manual();
+  // A locked or inactive desktop (a start from another session, SSH or an agent): opening a browser there took over
+  // the running Chrome's profile and the old Chrome went down (mini PC review, 2026-11-02). Only an active one.
+  if (!isWin && !isMac && !desktopActive()) {
+    note(`The desktop isn't active (locked, or this start comes from another session), so no browser is opened.`);
+    return manual();
+  }
   const [cmd, args] = isWin ? ["cmd", ["/c", "start", "", url]] : isMac ? ["open", [url]] : ["xdg-open", [url]];
   try {
-    spawn(cmd, args as string[], { stdio: "ignore", detached: true }).unref();
+    const child = spawn(cmd, args as string[], { stdio: "ignore", detached: true });
+    child.on("error", manual); // spawn reports a missing program as an event, not by throwing
+    child.unref();
   } catch {
-    note(`Open ${url} in a browser.`);
+    manual();
+  }
+}
+
+/**
+ * Linux: whether one of this user's graphical sessions (x11, wayland) is the active one on its seat. Without loginctl
+ * (no systemd) there's no way to tell, and the browser is opened as before.
+ */
+function desktopActive(): boolean {
+  const list = spawnSync("loginctl", ["list-sessions", "--no-legend"], { encoding: "utf8" });
+  if (list.error || list.status !== 0) return true;
+  const me = userInfo().username;
+  for (const line of list.stdout.split("\n")) {
+    const [id, , user] = line.trim().split(/\s+/);
+    if (!id || user !== me) continue;
+    const p = spawnSync("loginctl", ["show-session", id, "-p", "Type", "-p", "Active", "-p", "LockedHint"], { encoding: "utf8" });
+    const v = Object.fromEntries(p.stdout.split("\n").filter(Boolean).map((l) => l.split("=")));
+    if ((v.Type === "x11" || v.Type === "wayland") && v.Active === "yes" && v.LockedHint !== "yes") return true;
+  }
+  return false;
+}
+
+/** What holds a port: another Game Table (its /health names the platform's protocol), or some other program. */
+async function portHolder(port: number): Promise<"table" | "other"> {
+  try {
+    const r = await fetch(`http://127.0.0.1:${port}/health`, { signal: AbortSignal.timeout(2000) });
+    const j = (await r.json()) as { protocol?: unknown };
+    return r.ok && j.protocol !== undefined ? "table" : "other";
+  } catch {
+    return "other";
   }
 }
 
@@ -448,7 +491,11 @@ async function main() {
   const dataDir = join(home, "data");
   for (const d of [home, tools, reposDir, dataDir]) await mkdir(d, { recursive: true });
   // Before any download: a taken port would only stop the start after all of it (feedback, 2026-11-01).
-  if (!(await portFree(o.port))) fail(`Port ${o.port} is in use (another table still running?). Close it, or start with --port ${o.port + 1}.`);
+  if (!(await portFree(o.port))) {
+    fail((await portHolder(o.port)) === "table"
+      ? `Port ${o.port} is in use by another Game Table that is still running. Close it (its window, or Ctrl+C), or start with --port ${o.port + 1}.`
+      : `Port ${o.port} is in use by another program (not a Game Table). Start with another port, like --port ${o.port + 1}, and give it at every start.`);
+  }
 
   // The runtime, copied into the user's folder once per package version: the package may be read-only
   // (an app bundle), and the built-in games reach the SDK by a relative path, so all games sit inside this copy.
@@ -506,7 +553,8 @@ async function main() {
       await rm(join(gamesDir, e.name), { recursive: true, force: true });
       await cp(join(dir, e.name), join(gamesDir, e.name), { recursive: true });
       from.set(e.name, label);
-      ids.push(e.name);
+      // Test games stay for the checks, but aren't named here: the board hides them (Linux review, 2026-11-02).
+      if (!(await readJson<{ test?: boolean }>(join(dir, e.name, "manifest.json")))?.test) ids.push(e.name);
     }
     say(`Games from ${label}: ${ids.join(", ") || "(none)"}`);
   }
@@ -539,7 +587,7 @@ async function main() {
   say("");
   say(`Game Table ${version} on this computer`);
   say(`  board:   http://localhost:${o.port}/board/`);
-  if (env.PUBLIC_URL) say(`  phones:  scan the QR code on the board (${env.PUBLIC_URL}), on the same network as this computer (its WiFi, or a WiFi on the same router), not mobile data or a guest WiFi`);
+  if (env.PUBLIC_URL) say(`  phones:  scan the QR code on the board (${env.PUBLIC_URL}/j/…, the "[table-host] join:" line below), on the same network as this computer (its WiFi, or a WiFi on the same router), not mobile data or a guest WiFi`);
   if (o.service) {
     say(`  service: ${SERVICE_URL}: remote players can join once the table is approved`);
     if (!o.code) say(`           If the board shows a pairing code, approve it in the console at ${CONSOLE_URL}.`);
@@ -549,7 +597,7 @@ async function main() {
   say(`  data:    ${home}`);
   if (isWin) say("If Windows asks whether Node.js may communicate on networks, allow Private networks, or phones cannot join.");
   if (isMac) say("If macOS asks whether \"node\" may accept incoming connections, allow it, or phones cannot join.");
-  say("Stop with Ctrl+C or by closing this window.");
+  if (!o.smokeTest) say("Stop with Ctrl+C or by closing this window.");
   say("");
 
   const child: ChildProcess = spawn(process.execPath, [join(runtime, "apps", "table-host", "src", "main.ts")], {
@@ -615,6 +663,7 @@ async function main() {
     note(`The table host does not answer yet; open http://localhost:${o.port}/board/ yourself when it does.`);
   } else if (o.open) {
     openBrowser(`http://localhost:${o.port}/board/`);
+    say(`No board window? Open http://localhost:${o.port}/board/ in a browser on this computer.`);
   }
   child.on("exit", (code) => process.exit(code ?? 0));
 }

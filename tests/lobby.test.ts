@@ -258,11 +258,11 @@ describe("game selection gating", () => {
   it("a game can be chosen before anyone joins; what it still needs is listed, and start waits for it", async () => {
     const g = await avail("roulette");
     expect(g.selectable).toBe(true);
-    expect(g.needs).toEqual(["needs 1 more player", "needs at least one player at the table (or, under Developer settings, games without one)"]);
+    expect(g.needs).toEqual(["needs 1 more player", "needs at least one player at the table (or games without one: the board's tools button › Advanced › Developer settings)"]);
     await t.ok("POST", "/ai", {});
     const s = await t.ok("POST", "/game/select", { gameId: "roulette" });
     expect(s.phase).toBe("ready");
-    expect(s.game.needs).toEqual(["needs at least one player at the table (or, under Developer settings, games without one)"]);
+    expect(s.game.needs).toEqual(["needs at least one player at the table (or games without one: the board's tools button › Advanced › Developer settings)"]);
     expect((await t.api("POST", "/game/start")).body.error).toMatch(/at least one player at the table/);
   });
 
