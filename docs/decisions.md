@@ -1906,3 +1906,56 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
       The smoke test runs on each, then again with `--no-update`. Only when all pass does it replace the release's
       files.
     - **The PowerShell script stays** for a Windows table without an installer (D-255).
+
+- **D-257 · 2026-11-02 · Klaus** — The website's landing page shows the three packages for one computer, and suggests
+  letting an AI agent do the installation by following the install guides.
+  - **The section:** *Download it, start it, play* (`#download`), before the Docker section. It has a card for each
+    system, linking to that system's install guide, a button to the release `local-table`, and a prompt to copy for
+    an agent: *"Read https://games.skylar.technology/llms.txt and install the Game Table package on this computer by
+    following the install guide for its system."*
+  - **Other links:** the hero's *Play at home*, the gamers' path and the navigation now lead to it. The Docker
+    section stays below it, as *Or with Docker*.
+  - **For agents:** each install guide has a section *With an AI agent*: the commands to download and install, with a
+    silent install where the system allows it, a check with `--smoke-test`, and the rules:
+    - Stop and report when a check fails.
+    - Never ask for or handle a GitHub token: the person signs in to GitHub in the browser.
+    - Leave firewall and network settings to the person.
+    - Report the board and phone addresses at the end.
+  - *Implementation (Claude):*
+    - The service serves the guides at `/docs/install/{windows,macos,linux}.md`, like the Docker runbook (D-174), and
+      the cloud image copies `docs/install/`.
+    - `llms.txt` names the packages and the three guides, ahead of the Docker runbook.
+    - `tests/cloud.test.ts` checks the routes, the links from `llms.txt` and the page, and the agent section of each
+      guide, and that the guides name no private repository (D-200).
+  - **First real install (Linux, Debian x86_64, 2026-11-01, Klaus in #games-application):** it worked on the first
+    start, with three private games. Its ten points are taken into all three guides where they apply:
+    - The board on another screen needs `/board/screen?key=…`, because `/board/` from the network answers 403.
+    - A private repository needs a `production` branch with `games/` in it, and `--branch` changes that.
+    - Linux gets a `systemd --user` service.
+    - The port isn't remembered, so it goes in menu entries and services.
+    - Firewall examples now refer to the table's own port.
+    - An existing `gh` sign-in is used silently; `gh auth status` shows which account.
+    - `gh auth logout` ends the sign-in on removal.
+    - *Where things are* lists `private-repos.txt`, `runtime` and the disk space (about 450 MB).
+    - The guides list every option.
+    - The launcher now checks the port before it downloads anything.
+  - **First macOS test (Mac mini, Apple silicon, macOS 27.2, 2026-11-01, interim, in #games-application):** an unpacked
+    copy passed `--smoke-test`, but the installer wasn't run yet. From its eleven points:
+    - **Launcher and host fixes:**
+      - The port check now tries both `0.0.0.0` and `::`. On macOS a listener on `::` can share a port held on
+        `0.0.0.0`, so the start used to crash.
+      - The table host turns `EADDRINUSE` into a plain message instead of a stack trace.
+      - The launcher passes SIGHUP on to the table host, and stops the host when the launcher itself exits, so
+        closing the Terminal window stops the table.
+      - A local table's log says *players here only* instead of *development mode*.
+      - The phones line says *the same network* rather than *WiFi*.
+      - A `PUBLIC_URL` the user sets is kept, for a computer with a VPN.
+    - **Release:** the notes give each package's SHA-256.
+    - **Guides:**
+      - The macOS install needs an administrator, which the guide now says, with the password prompts and `pkgutil
+        --forget`.
+      - Spotlight instead of Launchpad, and the firewall prompt only when the firewall is on.
+      - A bare repository name means `klaushofrichter/…`.
+      - Full paths in the service section, a direct download link with a checksum, and an optional *Check that it
+        works*.
+    - **Open:** an install without an administrator (a per-user package, or a zipped app) is Klaus's decision.

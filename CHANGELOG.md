@@ -8,6 +8,7 @@ history.
 
 ## [Unreleased]
 
+- The website: a Download section for the Windows, macOS and Linux packages, with the install guides served at /docs/install/ and a prompt for an AI agent; each guide has a section for agents (D-257).
 - Packages for one computer: a Windows installer, a macOS .pkg and a Linux .tar.gz with their own Node.js, published on the release local-table, with install guides in docs/install/; they can join the service later with --service (D-256).
 - Windows 11: one script downloads the games (the private ones by name), installs Node.js 26 and the GitHub CLI if needed, and starts a table without the service; checked on GitHub's Windows hosts (D-255).
 - The deck's At the table list: names in the players' colours, one's own in bold, places as "South" (D-254).

@@ -40,8 +40,26 @@ describe("cloud service", () => {
     expect((await fetch(`${base}/docs/cloud-state-reset.md`)).status).toBe(404); // the cluster runbooks stay unpublished
     const full = await (await fetch(`${base}/llms-full.txt`)).text();
     expect(full.startsWith(text) && full.includes(guide) && full.includes(local)).toBe(true);
+    // The install guides of the packages for one computer (D-257): served, linked from llms.txt and the website, each
+    // with a section for an agent.
+    const guides: string[] = [];
+    for (const os of ["windows", "macos", "linux"]) {
+      expect(text).toContain(`https://games.skylar.technology/docs/install/${os}.md`);
+      const r = await fetch(`${base}/docs/install/${os}.md`);
+      expect(r.status, os).toBe(200);
+      expect(r.headers.get("content-type")).toMatch(/^text\/markdown/);
+      const g = await r.text();
+      expect(g).toMatch(/^# How to install Game Table on /);
+      expect(g).toContain("## With an AI agent");
+      expect(g).toContain("https://github.com/klaushofrichter/games-service/releases/");
+      guides.push(g);
+    }
+    expect((await fetch(`${base}/docs/install/other.md`)).status).toBe(404);
+    const home = await (await fetch(`${base}/`)).text();
+    for (const os of ["windows", "macos", "linux"]) expect(home).toContain(`href="/docs/install/${os}.md"`);
+    expect(home).toContain('id="download-prompt"');
     // Only public repositories: no private game repository is named as a source.
-    for (const t of [text, guide, local]) expect(t).not.toMatch(/loopy-game|starforge-game/);
+    for (const t of [text, guide, local, ...guides]) expect(t).not.toMatch(/loopy-game|starforge-game|traders-game/);
     expect(await (await fetch(`${base}/`)).text()).toContain('href="/llms.txt"');
   });
 

@@ -2,7 +2,9 @@
 
 > Game Table is a platform for multiplayer board and card games at a real table: a touchscreen board lying flat, each player's phone as their private deck, AI players, and remote players who join through an invite. A game is a folder with a manifest, pure deterministic rules in TypeScript, and optional plain-JavaScript UI modules for the board and the phones; the platform does everything else (lobby, seats, players joining, leaving and being exchanged, AI scheduling, pauses, logs, replay, statistics, remote play).
 
-**Installing it locally** (a table on one machine, phones on the same network): follow the runbook https://games.skylar.technology/docs/local-docker.md step by step. Docker is all it needs: no cloud service or console, no DNS entry, no HTTPS, nothing from games.skylar.technology. Games from other repositories, private ones included, are added by cloning them (runbook Part B); no token or console is involved.
+**Installing it on one computer to play** (Windows 11, macOS or Linux, phones on the same WiFi): download the package for the system from https://github.com/klaushofrichter/games-service/releases/tag/local-table and follow its install guide: https://games.skylar.technology/docs/install/windows.md, https://games.skylar.technology/docs/install/macos.md or https://games.skylar.technology/docs/install/linux.md. Each package brings its own Node.js, needs no Docker and no service, and asks for the private game repositories the user can read; each guide has a section for an AI agent doing the installation.
+
+**Installing it locally with Docker** (a table on one machine, phones on the same network): follow the runbook https://games.skylar.technology/docs/local-docker.md step by step. Docker is all it needs: no cloud service or console, no DNS entry, no HTTPS, nothing from games.skylar.technology. Games from other repositories, private ones included, are added by cloning them (runbook Part B); no token or console is involved.
 
 Read the developer guide before writing or changing a game. It is the contract between games and the platform, written for language models as much as for people. The platform's code is the final word: `packages/sdk/src/index.ts` (the rules API) and `packages/protocol/src/index.ts` (the manifest schema and lobby types) in the public repository https://github.com/klaushofrichter/games-service. For a complete game repository of its own to copy (five games, tests against the platform, CI), see the public example https://github.com/klaushofrichter/extra-games.
 
@@ -32,6 +34,7 @@ Key rules for every game: rules are pure and deterministic (randomness only from
 
 ## Running it
 
+- Packages for one computer, for players: [Windows](https://games.skylar.technology/docs/install/windows.md), [macOS](https://games.skylar.technology/docs/install/macos.md), [Linux](https://games.skylar.technology/docs/install/linux.md): install guides for the packages on https://github.com/klaushofrichter/games-service/releases/tag/local-table (installer, `.pkg`, `.tar.gz`; Node.js included, no Docker, no service)
 - [Run Game Table locally with Docker](https://games.skylar.technology/docs/local-docker.md): the runbook for a local installation, written for agents: the Table Host with the built-in games on one machine, phones on the LAN, no cloud service, DNS or HTTPS; games from other repositories, private ones by cloning; optionally a local cloud service (the same file in the repository: https://raw.githubusercontent.com/klaushofrichter/games-service/main/docs/runbooks/local-docker.md)
 
 - **Without Docker:** `scripts/local-table.sh` (macOS or Linux, Node 26) runs a table from the latest `main` or any `--branch`, with `--extra ../other-repo` for games not released yet (developer guide, section 14).
