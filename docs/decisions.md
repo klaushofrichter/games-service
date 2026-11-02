@@ -1975,3 +1975,29 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
     nothing went to `/Applications`.
   - Still to see on a real Mac: whether *Open Anyway* for the unsigned package asks a standard (non-admin) user for
     anything. Signing and notarizing (Klaus has an Apple developer account) would remove that step.
+
+## The website's game close-ups and screenshots, checked pair by pair (2 Nov 2026)
+
+- **D-259 · 2026-11-02 · Klaus** — A game's close-up on the website shows a phone only for a game that has a phone
+  screenshot, and never the phone of another game. *Why:* Klaus, with a screenshot of Chess on the website: "the
+  Deck/Phone screenshot does not match Chess". *Implementation (Claude):* the close-up hides its phone image with
+  `[hidden]`, but the page's `img { display: block }` outranks the browser's `[hidden]` rule, so for a game with no
+  `phone` entry (Chess, Backgammon, Pachisi) the image kept the last phone shown, here Roulette's. `img[hidden] {
+  display: none }` now comes right after it. `tests/website.test.ts` checks that the rule is there; a global rule
+  that sets `display` on an element must not be allowed to undo `[hidden]` for it.
+- **D-260 · 2026-11-02 · Klaus** — The website's board and phone screenshots of a game come from one game at one
+  moment, and every game with a phone screen shows it. *Why:* Klaus: "Review all screenshots of the board and the
+  associated Deck/Phone for accuracy. Perhaps renew screenshots the ensure that it follows the current release", then
+  "regenerate everything". *Implementation (Claude):*
+  - Every game has a phone screen (`deck.js`), but `scripts/site-screenshots.py` played Chess, Backgammon and Pachisi
+    with AI players only, so they had no phone picture. A new `PHONE_ONLY` pass plays each of them once with Klaus at
+    the table and takes the board and the phone from that game (the game waits at Klaus's first turn), so the names,
+    seats, position, dice and timer in the two pictures agree. Chess plays four opening moves first by tapping on the
+    board (e4, Nf3, Bc4, d3), so the position and the move list show something. The three phone screenshots are new
+    (`chess-phone.webp`, `backgammon-phone.webp`, `pachisi-phone.webp`) and are in the close-up.
+  - The first try took the phone of a fresh game next to the board of a finished AI game (different players, "No
+    moves yet" beside a checkmate); that is what this decision rules out.
+  - Every other screenshot was taken again from the current release and checked pair by pair: Hold'em, Roulette,
+    Liar's Dice, Coin Flip, Mexican Train, Last Card, the lobby and the Last Card sling agree.
+  - Open: in Mexican Train the board's seat plate for Klaus reads "Their turn" while his phone says "Now tap a train",
+    probably the board's wording for the seat that is up; not changed.

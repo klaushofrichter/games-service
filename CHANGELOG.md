@@ -8,6 +8,7 @@ history.
 
 ## [Unreleased]
 
+- The website: a game's close-up no longer shows another game's phone (Chess, Backgammon, Pachisi), those three have phone screenshots taken from the same game as their board, and every screenshot is taken again from the current release (D-259, D-260).
 - The website: the Docker section's agent prompt is about creating new games.
 - The macOS package installs for the current user, into ~/Applications, without administrator rights (D-258).
 - The website: a Download section for the Windows, macOS and Linux packages, with the install guides served at /docs/install/ and a prompt for an AI agent; each guide has a section for agents (D-257).
