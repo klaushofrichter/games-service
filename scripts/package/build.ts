@@ -172,7 +172,7 @@ exec "$DIR/node/$N/node" "$DIR/runtime/scripts/package/launch.ts" "$@"
   <key>CFBundleName</key><string>Game Table</string>
   <key>CFBundleDisplayName</key><string>Game Table</string>
   <key>CFBundleIdentifier</key><string>technology.skylar.game-table</string>
-  <key>CFBundleVersion</key><string>${date.replace(/-/g, ".")}</string>
+  <key>CFBundleVersion</key><string>${built.slice(0, 10).replace(/-/g, "")}.${built.slice(11, 16).replace(":", "")}</string>
   <key>CFBundleShortVersionString</key><string>${date.replace(/-/g, ".")}</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleExecutable</key><string>game-table</string>

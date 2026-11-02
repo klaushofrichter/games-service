@@ -2005,3 +2005,53 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
     it, and moves a copy from the old `repos/<name>` once, so `--no-update` keeps working after an update. The Windows
     script keeps `repos\<name>` for klaushofrichter's repositories (games-service must stay at
     `repos\games-service`) and uses `repos\<owner>\<name>` for anyone else's.
+
+## The website's game close-ups and screenshots, checked pair by pair (2 Nov 2026)
+
+- **D-261 · 2026-11-02 · Klaus** — A game's close-up on the website shows a phone only for a game that has a phone
+  screenshot, and never the phone of another game. *Why:* Klaus, with a screenshot of Chess on the website: "the
+  Deck/Phone screenshot does not match Chess". *Implementation (Claude):* the close-up hides its phone image with
+  `[hidden]`, but the page's `img { display: block }` outranks the browser's `[hidden]` rule, so for a game with no
+  `phone` entry (Chess, Backgammon, Pachisi) the image kept the last phone shown, here Roulette's. `img[hidden] {
+  display: none }` now comes right after it. `tests/website.test.ts` checks that the rule is there; a global rule
+  that sets `display` on an element must not be allowed to undo `[hidden]` for it.
+- **D-262 · 2026-11-02 · Klaus** — The website's board and phone screenshots of a game come from one game at one
+  moment, and every game with a phone screen shows it. *Why:* Klaus: "Review all screenshots of the board and the
+  associated Deck/Phone for accuracy. Perhaps renew screenshots the ensure that it follows the current release", then
+  "regenerate everything". *Implementation (Claude):*
+  - Every game has a phone screen (`deck.js`), but `scripts/site-screenshots.py` played Chess, Backgammon and Pachisi
+    with AI players only, so they had no phone picture. A new `PHONE_ONLY` pass plays each of them once with Klaus at
+    the table and takes the board and the phone from that game (the game waits at Klaus's first turn), so the names,
+    seats, position, dice and timer in the two pictures agree. Chess plays four opening moves first by tapping on the
+    board (e4, Nf3, Bc4, d3), so the position and the move list show something. The three phone screenshots are new
+    (`chess-phone.webp`, `backgammon-phone.webp`, `pachisi-phone.webp`) and are in the close-up.
+  - The first try took the phone of a fresh game next to the board of a finished AI game (different players, "No
+    moves yet" beside a checkmate); that is what this decision rules out.
+  - Every other screenshot was taken again from the current release and checked pair by pair: Hold'em, Roulette,
+    Liar's Dice, Coin Flip, Mexican Train, Last Card, the lobby and the Last Card sling agree.
+  - Open: in Mexican Train the board's seat plate for Klaus reads "Their turn" while his phone says "Now tap a train",
+    probably the board's wording for the seat that is up; not changed.
+- **D-263 · 2026-11-02 · Klaus** — The second install reviews (macOS and Linux, 2026-11-02, in #games-application)
+  are taken in. Both installs worked, and every earlier point was confirmed fixed; the macOS package installed into
+  `~/Applications` without `sudo` or a password. *Implementation (Claude):*
+  - **Starter** (`scripts/package/launch.ts`):
+    - `--smoke-test` fails when a named repository couldn't be downloaded (and isn't there from before), so an agent
+      can't report success with a game missing.
+    - `--smoke-test` never asks for the private repositories and never writes `private-repos.txt`: it uses the saved
+      list, so the guides' check doesn't stop at a prompt and doesn't clear the person's list.
+    - `--help` lists every option (`--smoke-test`, `--expect-games`, `--help`).
+    - Output cut short (`--version | head -1`) ends quietly instead of with an `EPIPE` stack trace.
+  - **Package versions:** the macOS receipt (`pkgutil`), the app's `CFBundleVersion` and the Windows installer carry
+    the build time (`2026.11.02.1204`), and the release notes give the build time in UTC, so two builds on one day
+    can be told apart.
+  - **Guides:**
+    - The agent sections download into a `mktemp -d` folder (macOS, Linux), print the SHA-256 to compare with the
+      release notes before installing, say what to do when another program holds port 8080 (`--port` at every start),
+      and what the check does. macOS: don't open the app or script Terminal to check.
+    - macOS: the installer needs no administrator, but *Open Anyway* may still ask on a Standard account, with the
+      Terminal route as the way around it; "Install for me only" is gone (the package offers only the home folder);
+      Spotlight may need a moment; about 400 MB.
+    - All: stop the table before removing it; the network rather than WiFi (Ethernet works); opening the board twice
+      on the computer; the check's behaviour in *Check that it works* and in *Options*.
+  - **Not changed:** the greyed-out *Invite remote player…* on a local table, and the join address wrapping in a
+    narrow board window, are board details for a later change.

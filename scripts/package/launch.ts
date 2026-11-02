@@ -109,6 +109,10 @@ function readmeText() {
     "  --code ABCD-EFGH  join the service with an access code from the console",
     "  --home DIR        another folder for downloads and data",
     "  --version         the package's version and the games on the table (MANIFEST.json, games.json)",
+    "  --smoke-test      check the installation: start, check the board and the games, stop; fails if a named",
+    "                    repository is missing. Uses the saved private repositories without asking or changing them",
+    "  --expect-games a,b  with --smoke-test: these games must be on the table",
+    "  --help            these options",
   ].join("\n");
 }
 
@@ -233,7 +237,7 @@ async function choosePrivate(o: Options, savedFile: string): Promise<string[]> {
   const known = existsSync(savedFile) ? (await readFile(savedFile, "utf8")).split(/\s+/).filter(Boolean) : [];
   let answer: string;
   if (o.repos !== undefined) answer = o.repos;
-  else if (o.noUpdate || !process.stdin.isTTY) answer = known.join(" ");
+  else if (o.noUpdate || o.smokeTest || !process.stdin.isTTY) answer = known.join(" ");
   else {
     say("");
     say(`Private game repositories: type the names of those your GitHub account can read, separated by spaces or`);
@@ -250,7 +254,8 @@ async function choosePrivate(o: Options, savedFile: string): Promise<string[]> {
     const r = repoName(p);
     if (!PUBLIC_REPOS.includes(r) && !list.includes(r)) list.push(r);
   }
-  await writeFile(savedFile, list.join("\n") + (list.length ? "\n" : ""));
+  // A check changes nothing: --repos none --smoke-test on an existing install keeps its list (review, 2026-11-02).
+  if (!o.smokeTest) await writeFile(savedFile, list.join("\n") + (list.length ? "\n" : ""));
   return list;
 }
 
@@ -419,6 +424,8 @@ async function showVersion(home: string) {
 }
 
 async function main() {
+  // Output cut short (--version | head -1) ends quietly instead of with an EPIPE stack trace.
+  for (const s of [process.stdout, process.stderr]) s.on("error", (e: NodeJS.ErrnoException) => (e.code === "EPIPE" ? process.exit(0) : undefined));
   const o = parseArgs(process.argv.slice(2));
   const major = Number(process.versions.node.split(".")[0]);
   if (major < 26) fail(`Node.js 26 is needed (this is ${process.versions.node}).`);
@@ -451,12 +458,13 @@ async function main() {
   let token: string | null = null;
   if ((priv.length || o.signIn) && !o.noUpdate) token = await githubToken(tools);
   const have: string[] = [];
+  const missing: string[] = [];
   for (const r of repos) {
     await moveOldLayout(reposDir, r);
     const present = existsSync(join(repoDir(reposDir, r).dir, "games"));
     if (o.noUpdate) {
       if (present) have.push(r);
-      else note(`${r} was never downloaded; start without --no-update.`);
+      else (missing.push(r), note(`${r} was never downloaded; start without --no-update.`));
       continue;
     }
     try {
@@ -469,6 +477,7 @@ async function main() {
         note(`${r} could not be downloaded (${why}); using the copy from last time.`);
         have.push(r);
       } else {
+        missing.push(r);
         note(`${r} could not be downloaded (${why}): no access with this GitHub account, no branch ${o.branch}, or no network. Its games are left out.`);
       }
     }
@@ -581,6 +590,8 @@ async function main() {
         if (!entry || !entry.version || !("commit" in entry) || !entry.commit) problems.push(`games.json has no version and commit for ${g}`);
       }
       if (!existsSync(join(bundled, "MANIFEST.json"))) problems.push("the package has no MANIFEST.json");
+      // A named repository that is not on the table fails the check, so an agent can't report success without it.
+      for (const r of missing) problems.push(`${r} could not be downloaded, so its games are not on the table`);
     }
     child.kill();
     say("--- table host output ---");

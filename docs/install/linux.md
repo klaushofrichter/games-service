@@ -1,7 +1,7 @@
 # How to install Game Table on Linux
 
 Game Table on your own Linux computer (x64 or arm64, such as a Raspberry Pi 4 or 5 with a 64-bit system): the board
-in the browser, and the players join with their phones on the same WiFi. It runs **without the Game Table
+in the browser, and the players join with their phones on the same network. It runs **without the Game Table
 service**, so there are no remote players, and as many players here as a game takes. You can
 [connect it to the service](#remote-players-the-game-table-service) later.
 
@@ -26,16 +26,26 @@ computer."* For the agent:
 In a shell, as the person's own user:
 
 ```sh
-mkdir -p ~/apps
-curl -fL https://github.com/klaushofrichter/games-service/releases/download/local-table/game-table-linux.tar.gz | tar -xz -C ~/apps
+dir="$(mktemp -d)"
+curl -fL -o "$dir/game-table-linux.tar.gz" https://github.com/klaushofrichter/games-service/releases/download/local-table/game-table-linux.tar.gz
+sha256sum "$dir/game-table-linux.tar.gz"     # must match the SHA-256 in the release notes; stop if it doesn't
+mkdir -p ~/apps && tar -xzf "$dir/game-table-linux.tar.gz" -C ~/apps
 ~/apps/game-table/game-table --repos none --smoke-test      # check: ends with SMOKE TEST PASSED
 ```
 
-If the check says libatomic is missing, it names the command for the system (it needs `sudo`, so ask the person).
-Then ask the person which private game repositories they want, as `owner/name`
-(a name alone means `klaushofrichter/name`; see *Repositories of another organization*). If there are any, start
-`~/apps/game-table/game-table --repos "owner/name1 owner/name2" --smoke-test` while the person is there to sign in to GitHub in
-the browser. Then `~/apps/game-table/game-table --version` lists every game with its version.
+The release notes are at https://github.com/klaushofrichter/games-service/releases/tag/local-table. If the check says libatomic is missing, it names the
+command for the system (it needs `sudo`, so ask the person).
+
+- **The check:** `--smoke-test` starts the table for a moment, checks it and stops. It fails if a named repository
+  couldn't be downloaded, so a missing game can't pass. It never asks a question and doesn't change the saved list of
+  private repositories.
+- **Port 8080 taken:** if the check says *Port 8080 is in use* and no other table is running, another program holds
+  it. Add `--port 8081` (or another free port) to every command, and tell the person to start with it too: the port
+  isn't remembered.
+- **Private repositories:** ask the person which ones they want, as `owner/name` (a name alone means
+  `klaushofrichter/name`; see *Repositories of another organization*). If there are any, run the check with
+  `--repos "owner/name1 owner/name2"` while the person is there to sign in to GitHub in the browser. Then `--version`
+  lists every game with its version.
 
 ## Install
 
@@ -60,6 +70,7 @@ sudo dnf install libatomic      # Fedora, RHEL
 ### Check that it works
 
 Optional: this starts a table for a moment on port 8080, checks it, and stops. Another table must not be running.
+It asks nothing, uses the private repositories you named before, and fails if one of them can't be downloaded.
 
 ```sh
 ~/apps/game-table/game-table --smoke-test
@@ -152,6 +163,9 @@ journalctl --user -u game-table -f    # its log
 
 ### The board on another screen
 
+Opening the board a second time on this computer shows *The board is open in another window*, with a choice
+of what to do.
+
 With `--no-open`, or on a computer without a screen, show the board on another screen on the same network: a TV, a
 tablet or another computer. The board itself, `http://<address>:<port>/board/`, opens only on this computer; from
 anywhere else it answers 403. Another screen needs the board's own link, which carries the table's key:
@@ -166,7 +180,7 @@ screens.
 ## If phones can't join
 
 - A firewall must let the table's port in (8080 unless you chose another), for example `sudo ufw allow 8080/tcp`.
-- The QR code holds the computer's address on the WiFi and the port, like `http://192.168.1.20:8080`. Open that
+- The QR code holds the computer's address on the network (WiFi or Ethernet) and the port, like `http://192.168.1.20:8080`. Open that
   address in the phone's browser to check.
 - Open the address exactly as the QR code has it. `/board/` answers 403 from another device, because the board is for
   this computer ([another screen](#the-board-on-another-screen) needs its own link).
@@ -187,7 +201,7 @@ screens.
 | `--home DIR` | Another folder for downloads and the table's data |
 | `--service`, `--code ABCD-EFGH` | Join the Game Table service, see below |
 | `--version` | The package's version, and every game on the table with its version and source |
-| `--smoke-test` | Check the installation: start, check that the board answers and the games are there, stop |
+| `--smoke-test` | Check the installation: start, check that the board answers and the games are there, stop; fails if a named repository is missing |
 | `--help` | All the options |
 
 ## Remote players: the Game Table service
@@ -205,7 +219,7 @@ The table keeps its approval, so later starts need only `--service`. Without `--
 
 - **Update the games:** every start brings the games up to date.
 - **Update Game Table itself:** unpack the newest `game-table-linux.tar.gz` over the old folder.
-- **Remove:** delete `~/apps/game-table`, plus `~/.local/share/game-table` (downloads and the table's data). With a
+- **Remove:** stop the table first (close its window, or Ctrl+C). Then delete `~/apps/game-table`, plus `~/.local/share/game-table` (downloads and the table's data). With a
   service, first `systemctl --user disable --now game-table` and delete its file.
 - **GitHub sign-in:** removing Game Table leaves it behind. The GitHub CLI keeps its sign-in in `~/.config/gh`;
   `gh auth logout` (or `~/.local/share/game-table/tools/gh/bin/gh auth logout`) ends it.
