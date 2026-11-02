@@ -17,6 +17,12 @@ async function start(extra: { previewBanner?: boolean } = {}) {
 const get = (path: string) => fetch(base + path, { redirect: "manual" });
 
 describe("the public website (D-176)", () => {
+  it("hides the close-up's phone image for a game without one (img[hidden] must stay display: none)", async () => {
+    await start();
+    const html = await (await get("/")).text();
+    expect(html).toMatch(/img\[hidden\]\s*\{\s*display:\s*none;?\s*\}/); // a global img { display: block } would keep the last game's phone
+  });
+
   it("serves the page with its sections, the admin link, the version and no unfilled placeholders", async () => {
     await start();
     const r = await get("/");
