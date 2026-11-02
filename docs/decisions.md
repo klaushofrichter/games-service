@@ -2087,8 +2087,8 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
     lines on a sums file, with a right and a wrong sum.
   - **Guides:** a GitHub CLI that is installed but not signed in is used and signed in; the Windows agent section says
     the package installs a table, not a game service.
-  - **Not changed, for Klaus to decide:**
-    - The checksums sit in the same release as the packages, so they catch a damaged download, not a changed
-      release. Publishing them on the website too, or signing the packages, would cover that.
-    - `local-table` stays one moving release with one package per platform (D-256, Klaus: "no package history"); a
-      build can't be pinned or gone back to.
+  - **Decided by Klaus** ("Checksums are good. Just one package per platform"):
+    - The checksums stay in the release beside the packages (`game-table-SHA256SUMS.txt` and the release notes); not
+      on the website, and the packages stay unsigned for now. They catch a damaged download, not a changed release.
+    - `local-table` stays one moving release with one package per platform (D-256): no older builds to pin or go back
+      to.
