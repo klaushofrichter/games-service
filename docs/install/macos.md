@@ -1,6 +1,6 @@
 # How to install Game Table on a Mac
 
-Game Table on your own Mac: the board on the screen, and the players join with their phones on the same WiFi. It
+Game Table on your own Mac: the board on the screen, and the players join with their phones on the same network. It
 runs **without the Game Table service**, so there are no remote players, and as many players here as a game takes.
 You can [connect it to the service](#remote-players-the-game-table-service) later. It runs on Apple silicon and
 Intel Macs with macOS 13.5 or later.
@@ -26,23 +26,39 @@ Mac."* For the agent:
 In Terminal:
 
 ```sh
-curl -fL -o /tmp/game-table-macos.pkg https://github.com/klaushofrichter/games-service/releases/download/local-table/game-table-macos.pkg
-installer -pkg /tmp/game-table-macos.pkg -target CurrentUserHomeDirectory     # no sudo: installs for this user
+dir="$(mktemp -d)"
+curl -fL -o "$dir/game-table-macos.pkg" https://github.com/klaushofrichter/games-service/releases/download/local-table/game-table-macos.pkg
+shasum -a 256 "$dir/game-table-macos.pkg"     # must match the SHA-256 in the release notes; stop if it doesn't
+installer -pkg "$dir/game-table-macos.pkg" -target CurrentUserHomeDirectory     # no sudo: installs for this user
 gt="$HOME/Applications/Game Table.app/Contents/Resources/game-table.command"
 "$gt" --repos none --smoke-test      # check: ends with SMOKE TEST PASSED
 ```
 
-A package downloaded with `curl` and installed with `installer` gets no Gatekeeper warning, and it needs no
-administrator. Then ask the person which private
-game repositories they want, as `owner/name`
-(a name alone means `klaushofrichter/name`; see *Repositories of another organization*). If there are any, start `"$gt" --repos "owner/name1 owner/name2" --smoke-test` while
-the person is there to sign in to GitHub in the browser. Then `"$gt" --version` lists every game with its version.
+The release notes are at https://github.com/klaushofrichter/games-service/releases/tag/local-table. The package isn't signed yet, so the checksum is
+its only check. A package installed this way gets no Gatekeeper warning and needs no administrator.
+
+- **The check:** `--smoke-test` starts the table for a moment, checks it and stops. It fails if a named repository
+  couldn't be downloaded, so a missing game can't pass. It never asks a question and doesn't change the saved list of
+  private repositories.
+- **Port 8080 taken:** if the check says *Port 8080 is in use* and no other table is running, another program holds
+  it. Add `--port 8081` (or another free port) to every command, and tell the person to start with it too: the port
+  isn't remembered.
+- **Private repositories:** ask the person which ones they want, as `owner/name` (a name alone means
+  `klaushofrichter/name`; see *Repositories of another organization*). If there are any, run the check with
+  `--repos "owner/name1 owner/name2"` while the person is there to sign in to GitHub in the browser. Then `--version`
+  lists every game with its version.
+- **Don't open the app or script Terminal** to check: the app's window waits for the person's answers, and scripting
+  Terminal needs a permission from the person. `--smoke-test` checks the same.
 
 ## Install
 
 Game Table installs **for your user only**, into the *Applications* folder in your home folder
-(`~/Applications`), so it needs no administrator. It keeps its downloads and data in your own folder too. Another
-user of the Mac installs it for themselves.
+(`~/Applications`), so the installer needs no administrator. It keeps its downloads and data in your own folder too.
+Another user of the Mac installs it for themselves.
+
+On a Mac account that isn't an administrator (a *Standard* account), *Open Anyway* in step 2 may still ask for an
+administrator's name and password. If it does, and no administrator is around, install in Terminal instead, which
+skips that step: the commands in *With an AI agent* above.
 
 1. Download **[`game-table-macos.pkg`](https://github.com/klaushofrichter/games-service/releases/download/local-table/game-table-macos.pkg)** (from the release
    [Game Table for your computer](https://github.com/klaushofrichter/games-service/releases/tag/local-table)).
@@ -52,11 +68,12 @@ user of the Mac installs it for themselves.
    Open **System Settings › Privacy & Security**, scroll down to the message about `game-table-macos.pkg`, and click
    **Open Anyway**.
 3. Click through the installer. It puts **Game Table** in the Applications folder of your home folder, with its own
-   Node.js. If it asks where to install, choose *Install for me only*.
+   Node.js.
 
 ### Check that it works
 
 Optional: this starts a table for a moment on port 8080, checks it, and stops. Another table must not be running.
+It asks nothing, uses the private repositories you named before, and fails if one of them can't be downloaded.
 
 ```sh
 ~/Applications/"Game Table.app"/Contents/Resources/game-table.command --smoke-test
@@ -67,7 +84,8 @@ It ends with `SMOKE TEST PASSED`.
 ## Start
 
 Open **Game Table** with Spotlight (Cmd+Space, then type *Game Table*), or from the Applications folder of your home
-folder (Finder › Go › Home › Applications). You can drag it to the Dock. A Terminal window opens and
+folder (Finder › Go › Home › Applications). Spotlight may need a moment to find it after the installation. You can
+drag it to the Dock. A Terminal window opens and
 shows the table's messages:
 
 1. The first time, it asks for the **private game repositories**: type their names, like `my-game` or
@@ -110,6 +128,9 @@ Game repositories can belong to any GitHub account or organization. Give their f
 
 ### The board on another screen
 
+Opening the board a second time on this computer shows *The board is open in another window*, with a choice
+of what to do.
+
 The board can also show on another screen on the same network: a TV, an iPad or another computer. The board's own
 address, `http://<address>:<port>/board/`, opens only on this Mac; from anywhere else it answers 403. Use the board's
 settings › *Board on another screen…*: it shows a QR code and the link (D-190). The link is
@@ -120,7 +141,7 @@ same network, and anyone with the key controls the table: give it only to your o
 
 - If the macOS firewall is on, it must let `node` in: System Settings › Network › Firewall › Options. Set `node` to
   *Allow incoming connections*. Changing that may need an administrator.
-- The QR code holds the Mac's address on the WiFi and the table's port, like `http://192.168.1.20:8080`. Open that address in the phone's
+- The QR code holds the Mac's address on the network (WiFi or Ethernet) and the table's port, like `http://192.168.1.20:8080`. Open that address in the phone's
   browser to check.
 - Open the address exactly as the QR code has it. `/board/` answers 403 from another device, because the board is for
   this computer ([another screen](#the-board-on-another-screen) needs its own link).
@@ -147,7 +168,7 @@ Run the starter in Terminal with options:
 | `--home DIR` | Another folder for downloads and the table's data |
 | `--service`, `--code ABCD-EFGH` | Join the Game Table service, see below |
 | `--version` | The package's version, and every game on the table with its version and source |
-| `--smoke-test` | Check the installation: start, check that the board answers and the games are there, stop |
+| `--smoke-test` | Check the installation: start, check that the board answers and the games are there, stop; fails if a named repository is missing |
 | `--help` | All the options |
 
 ## Remote players: the Game Table service
@@ -168,7 +189,7 @@ The table keeps its approval, so later starts need only `--service`. Without `--
 - **An older Game Table in `/Applications`:** packages before November 2, 2026 installed for all users. Install the new
   one, then drag the old *Game Table* from `/Applications` to the Trash (that one asks for an administrator), so
   Spotlight finds only the new one.
-- **Remove:** drag *Game Table* from `~/Applications` to the Trash. macOS keeps a record of the installed package;
+- **Remove:** stop the table first (close its window, or Ctrl+C). Then drag *Game Table* from `~/Applications` to the Trash. macOS keeps a record of the installed package;
   `pkgutil --volume ~ --forget technology.skylar.game-table` removes that too. Downloads and the table's data are in
   `~/Library/Application Support/Game Table`; delete that folder too to remove everything.
 - **GitHub sign-in:** removing Game Table leaves it behind. The GitHub CLI keeps its sign-in in `~/.config/gh`;
@@ -187,7 +208,7 @@ The table keeps its approval, so later starts need only `--service`. Without `--
 | `~/Library/Application Support/Game Table/data` | The table's key, logs and saved games |
 | `~/Library/Application Support/Game Table/tools/gh` | The GitHub CLI, if the starter installed it |
 
-Disk space: about 450 MB with the public games; private games add their own size.
+Disk space: about 400 MB with the public games; private games add their own size.
 
 To develop games on a Mac, use `scripts/local-table.sh` from a clone of games-service instead (developer guide,
 section 14).

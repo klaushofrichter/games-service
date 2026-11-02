@@ -69,7 +69,7 @@ jobs:
         run: |
           $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
           if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress; if ($LASTEXITCODE) { exit 1 } }
-          & $iscc /Qp "/DSource=$PWD\dist\windows" "/DVersion=$(Get-Date -Format yyyy.MM.dd)" "/DOutputDir=$PWD\dist" scripts\package\windows.iss
+          & $iscc /Qp "/DSource=$PWD\dist\windows" "/DVersion=$((Get-Date).ToUniversalTime().ToString('yyyy.MM.dd.HHmm'))" "/DOutputDir=$PWD\dist" scripts\package\windows.iss
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
       - name: macOS package (pkgbuild, productbuild)
         if: matrix.os == 'macos' && ((inputs.os || 'all') == 'all' || inputs.os == 'macos')
@@ -78,7 +78,7 @@ jobs:
           mv "dist/macos/Game Table.app" pkgroot/
           pkgbuild --analyze --root pkgroot component.plist
           plutil -replace 0.BundleIsRelocatable -bool false component.plist
-          v="$(date +%Y.%m.%d)"
+          v="$(date -u +%Y.%m.%d.%H%M)" # the build time: two builds on one day can be told apart (receipt, pkgutil)
           pkgbuild --root pkgroot --component-plist component.plist --install-location /Applications \
             --identifier technology.skylar.game-table --version "$v" game-table-component.pkg
           # Installs for the current user only, into ~/Applications: no administrator (D-258).
@@ -211,8 +211,8 @@ jobs:
           REF: ${{ inputs.ref }}
         run: |
           sha=$(gh api "repos/$GH_REPO/commits/$REF" --jq .sha)
-          notes="Game Table for one computer, without the Game Table service: players here join with their phones on the same WiFi.
-          Built from games-service $REF ($(echo "$sha" | cut -c1-7)) on $(date -u +%Y-%m-%d). Unsigned (D-256).
+          notes="Game Table for one computer, without the Game Table service: players here join with their phones on the same network.
+          Built from games-service $REF ($(echo "$sha" | cut -c1-7)) on $(date -u '+%Y-%m-%d %H:%M UTC'). Unsigned (D-256).
 
           - Windows 11: game-table-windows.exe (docs/install/windows.md)
           - macOS: game-table-macos.pkg (docs/install/macos.md)

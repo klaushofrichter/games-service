@@ -1,7 +1,7 @@
 # How to install Game Table on Windows
 
 Game Table on your own Windows 11 computer: the board on the screen, and the players join with their phones on the
-same WiFi. It runs **without the Game Table service**, so there are no remote players, and as many players here as
+same network. It runs **without the Game Table service**, so there are no remote players, and as many players here as
 a game takes. You can [connect it to the service](#remote-players-the-game-table-service) later.
 
 You get the built-in games, the games of
@@ -27,14 +27,24 @@ In PowerShell, as the person's own user (not as administrator):
 ```powershell
 $f = Join-Path $env:TEMP "game-table-windows.exe"
 Invoke-WebRequest -UseBasicParsing https://github.com/klaushofrichter/games-service/releases/download/local-table/game-table-windows.exe -OutFile $f
+(Get-FileHash $f).Hash     # must match the SHA-256 in the release notes; stop if it doesn't
 Start-Process -Wait -FilePath $f -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/CURRENTUSER"
 $gt = Join-Path $env:LOCALAPPDATA "Programs\Game Table\game-table.cmd"
 & $gt --repos none --smoke-test      # check: ends with SMOKE TEST PASSED
 ```
 
-A silent install shows no SmartScreen warning. Then ask the person which private game repositories they want, as `owner/name`
-(a name alone means `klaushofrichter/name`; see *Repositories of another organization*). If there are any, start `& $gt --repos "owner/name1 owner/name2" --smoke-test` while the person is there to sign in to
-GitHub in the browser. Then `& $gt --version` lists every game with its version.
+The release notes are at https://github.com/klaushofrichter/games-service/releases/tag/local-table. A silent install shows no SmartScreen warning.
+
+- **The check:** `--smoke-test` starts the table for a moment, checks it and stops. It fails if a named repository
+  couldn't be downloaded, so a missing game can't pass. It never asks a question and doesn't change the saved list of
+  private repositories.
+- **Port 8080 taken:** if the check says *Port 8080 is in use* and no other table is running, another program holds
+  it. Add `--port 8081` (or another free port) to every command, and tell the person to start with it too: the port
+  isn't remembered.
+- **Private repositories:** ask the person which ones they want, as `owner/name` (a name alone means
+  `klaushofrichter/name`; see *Repositories of another organization*). If there are any, run the check with
+  `--repos "owner/name1 owner/name2"` while the person is there to sign in to GitHub in the browser. Then `--version`
+  lists every game with its version.
 
 ## Install
 
@@ -50,6 +60,7 @@ GitHub in the browser. Then `& $gt --version` lists every game with its version.
 ### Check that it works
 
 Optional: this starts a table for a moment on port 8080, checks it, and stops. Another table must not be running.
+It asks nothing, uses the private repositories you named before, and fails if one of them can't be downloaded.
 
 ```
 "%LOCALAPPDATA%\Programs\Game Table\game-table.cmd" --smoke-test
@@ -100,6 +111,9 @@ Game repositories can belong to any GitHub account or organization. Give their f
 
 ### The board on another screen
 
+Opening the board a second time on this computer shows *The board is open in another window*, with a choice
+of what to do.
+
 The board can also show on another screen on the same network: a TV, a tablet or another computer. The board's own
 address, `http://<address>:<port>/board/`, opens only on this computer; from anywhere else it answers 403. Use the
 board's settings › *Board on another screen…*: it shows a QR code and the link (D-190). The link is
@@ -112,7 +126,7 @@ network, and anyone with the key controls the table: give it only to your own sc
   Private. The table warns when it's set to Public.
 - Node.js must be allowed through the firewall for Private networks: Windows Security › Firewall & network
   protection › *Allow an app through firewall*.
-- The QR code holds the computer's address on the WiFi and the table's port, like `http://192.168.1.20:8080`. Open
+- The QR code holds the computer's address on the network (WiFi or Ethernet) and the table's port, like `http://192.168.1.20:8080`. Open
   that address in the phone's browser to check.
 - Open the address exactly as the QR code has it. `/board/` answers 403 from another device, because the board is for
   this computer ([another screen](#the-board-on-another-screen) needs its own link).
@@ -135,7 +149,7 @@ Add them to the starter in a terminal: `"%LOCALAPPDATA%\Programs\Game Table\game
 | `--home DIR` | Another folder for downloads and the table's data |
 | `--service`, `--code ABCD-EFGH` | Join the Game Table service, see below |
 | `--version` | The package's version, and every game on the table with its version and source |
-| `--smoke-test` | Check the installation: start, check that the board answers and the games are there, stop |
+| `--smoke-test` | Check the installation: start, check that the board answers and the games are there, stop; fails if a named repository is missing |
 | `--help` | All the options |
 
 ## Remote players: the Game Table service
@@ -153,7 +167,7 @@ The table keeps its approval, so later starts need only `--service`. Without `--
 
 - **Update the games:** every start brings the games up to date.
 - **Update Game Table itself:** install the newest `game-table-windows.exe` over the old one.
-- **Remove:** Settings › Apps › Installed apps › *Game Table* › Uninstall. Downloads and the table's data stay in
+- **Remove:** stop the table first (close its window, or Ctrl+C). Then Settings › Apps › Installed apps › *Game Table* › Uninstall. Downloads and the table's data stay in
   `%LOCALAPPDATA%\GameTable`; delete that folder too to remove everything.
 - **GitHub sign-in:** removing Game Table leaves it behind. The GitHub CLI keeps its sign-in in its own settings;
   `gh auth logout` (or `%LOCALAPPDATA%\GameTable\tools\gh\bin\gh.exe auth logout`) ends it.
