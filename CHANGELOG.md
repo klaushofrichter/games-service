@@ -8,6 +8,7 @@ history.
 
 ## [Unreleased]
 
+- Packages: a program on 127.0.0.1 counts as holding the port; macOS: close the window and click Terminate; guides say to stop before updating, which package they describe, and that --service sends earlier logs (D-268).
 - Packages: a start without a desktop, or on a locked one, no longer crashes or opens a browser; a taken port says what holds it; the version names its release; clearer starter lines and guide links; the sound pill clears the north seat (D-267).
 - Packages: a failed GitHub sign-in starts the table with the public games; the sign-in's Enter step is explained; --repos no longer changes the saved list; the release has a checksum file the guides check against (D-265).
 - A local table without the service shows no invite button; links on the board wrap between their parts; two e2e checks no longer race the coin or hide why the AI wasn't ready (D-264).

@@ -13,7 +13,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { createSocket } from "node:dgram";
 import { existsSync } from "node:fs";
 import { chmod, cp, mkdir, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
-import { createServer } from "node:net";
+import { createServer, connect } from "node:net";
 import { homedir, userInfo, platform as osPlatform, arch as osArch } from "node:os";
 import { delimiter, dirname, join, resolve } from "node:path";
 import { createInterface } from "node:readline/promises";
@@ -356,7 +356,16 @@ function portFree(port: number): Promise<boolean> {
       srv.once("error", (e: NodeJS.ErrnoException) => done(e.code === "EAFNOSUPPORT" || e.code === "EADDRNOTAVAIL")); // no IPv6: fine
       srv.listen({ port, host, exclusive: true }, () => srv.close(() => done(true)));
     });
-  return tryOn("0.0.0.0").then((ok) => ok && tryOn("::"));
+  // A program listening only on 127.0.0.1 lets a listen on 0.0.0.0 succeed (macOS), yet takes the table's local
+  // address: so a connection that is answered counts as taken too (macOS review 3, 2026-11-02).
+  const answers = () =>
+    new Promise<boolean>((done) => {
+      const s = connect({ port, host: "127.0.0.1" });
+      s.setTimeout(1000, () => (s.destroy(), done(false)));
+      s.once("connect", () => (s.destroy(), done(true)));
+      s.once("error", () => done(false));
+    });
+  return tryOn("0.0.0.0").then((ok) => ok && tryOn("::")).then(async (ok) => ok && !(await answers()));
 }
 
 async function health(port: number): Promise<boolean> {
@@ -597,7 +606,8 @@ async function main() {
   say(`  data:    ${home}`);
   if (isWin) say("If Windows asks whether Node.js may communicate on networks, allow Private networks, or phones cannot join.");
   if (isMac) say("If macOS asks whether \"node\" may accept incoming connections, allow it, or phones cannot join.");
-  if (!o.smokeTest) say("Stop with Ctrl+C or by closing this window.");
+  // Terminal asks before it closes a window with a running program: the table runs on until Terminate (macOS review 3).
+  if (!o.smokeTest) say(isMac ? "Stop with Ctrl+C, or close this window and click Terminate when Terminal asks." : "Stop with Ctrl+C or by closing this window.");
   say("");
 
   const child: ChildProcess = spawn(process.execPath, [join(runtime, "apps", "table-host", "src", "main.ts")], {

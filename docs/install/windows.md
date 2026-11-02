@@ -8,6 +8,9 @@ You get the built-in games, the games of
 [extra-games](https://github.com/klaushofrichter/extra-games), and the private game repositories your GitHub
 account can read.
 
+This guide describes the newest package on the release page. An older installation can behave differently: compare
+the version that `--version` shows with the release notes' *Built from …* line, and install the newest first.
+
 ## With an AI agent
 
 Tell your agent: *"Read https://games.skylar.technology/docs/install/windows.md and install Game Table on this
@@ -177,11 +180,15 @@ watchers join from elsewhere, and it can deliver games to the table. The table n
   the console.
 
 The table keeps its approval, so later starts need only `--service`. Without `--service` it plays on its own again.
+Every game's log is kept on the table, also without the service, and sent to the service once the table is
+connected: the first start with `--service` also sends the logs of games played before. Delete the folder
+`logs` in the table's `data` folder first if you don't want that.
 
 ## Update and remove
 
 - **Update the games:** every start brings the games up to date.
-- **Update Game Table itself:** install the newest `game-table-windows.exe` over the old one.
+- **Update Game Table itself:** stop the table, then install the newest `game-table-windows.exe` over the old one.
+  Your games, the table's key and its logs stay.
 - **Remove:** stop the table first (close its window, or Ctrl+C). Then Settings › Apps › Installed apps › *Game Table* › Uninstall. Downloads and the table's data stay in
   `%LOCALAPPDATA%\GameTable`; delete that folder too to remove everything.
 - **GitHub sign-in:** removing Game Table leaves it behind. The GitHub CLI keeps its sign-in in its own settings;
