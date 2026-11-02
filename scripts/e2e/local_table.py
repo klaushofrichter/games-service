@@ -54,6 +54,9 @@ try:
             problems.append(f"the QR code carries {url!r}, not this computer's network address and port {PORT}")
         elif url.startswith("http://127.") or "localhost" in url:
             problems.append(f"the QR code carries a local-only address: {url}")
+        # No invites on a table without the service (D-264): the lobby has no invite button at all, not a greyed-out one.
+        if board.locator("button[data-invite]").count():
+            problems.append("a local table without the service shows an invite button")
         # Encoded in the QR image as shown.
         src = board.locator("aside.join img").get_attribute("src") or ""
         if urllib.request.unquote(src.split("u=", 1)[-1]) != url:
