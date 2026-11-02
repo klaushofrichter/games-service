@@ -8,6 +8,7 @@ history.
 
 ## [Unreleased]
 
+- Packages: --smoke-test fails on a missing named repository and keeps the saved private repositories; build times in the package versions; install guides take in the second macOS and Linux reviews (D-261).
 - Packages and the Windows script: game repositories of other organizations (owner/name) are explained in the install guides and kept apart from same-named ones (D-260).
 - The website: About comes first, Start here on the Gamers card, the packages' missing remote players and the public host on request explained, current counts, and one agent prompt fewer (D-259).
 - The website: the Docker section's agent prompt is about creating new games.

@@ -2005,3 +2005,27 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
     it, and moves a copy from the old `repos/<name>` once, so `--no-update` keeps working after an update. The Windows
     script keeps `repos\<name>` for klaushofrichter's repositories (games-service must stay at
     `repos\games-service`) and uses `repos\<owner>\<name>` for anyone else's.
+- **D-261 · 2026-11-02 · Klaus** — The second install reviews (macOS and Linux, 2026-11-02, in #games-application)
+  are taken in. Both installs worked, and every earlier point was confirmed fixed; the macOS package installed into
+  `~/Applications` without `sudo` or a password. *Implementation (Claude):*
+  - **Starter** (`scripts/package/launch.ts`):
+    - `--smoke-test` fails when a named repository couldn't be downloaded (and isn't there from before), so an agent
+      can't report success with a game missing.
+    - `--smoke-test` never asks for the private repositories and never writes `private-repos.txt`: it uses the saved
+      list, so the guides' check doesn't stop at a prompt and doesn't clear the person's list.
+    - `--help` lists every option (`--smoke-test`, `--expect-games`, `--help`).
+    - Output cut short (`--version | head -1`) ends quietly instead of with an `EPIPE` stack trace.
+  - **Package versions:** the macOS receipt (`pkgutil`), the app's `CFBundleVersion` and the Windows installer carry
+    the build time (`2026.11.02.1204`), and the release notes give the build time in UTC, so two builds on one day
+    can be told apart.
+  - **Guides:**
+    - The agent sections download into a `mktemp -d` folder (macOS, Linux), print the SHA-256 to compare with the
+      release notes before installing, say what to do when another program holds port 8080 (`--port` at every start),
+      and what the check does. macOS: don't open the app or script Terminal to check.
+    - macOS: the installer needs no administrator, but *Open Anyway* may still ask on a Standard account, with the
+      Terminal route as the way around it; "Install for me only" is gone (the package offers only the home folder);
+      Spotlight may need a moment; about 400 MB.
+    - All: stop the table before removing it; the network rather than WiFi (Ethernet works); opening the board twice
+      on the computer; the check's behaviour in *Check that it works* and in *Options*.
+  - **Not changed:** the greyed-out *Invite remote player…* on a local table, and the join address wrapping in a
+    narrow board window, are board details for a later change.
