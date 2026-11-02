@@ -2070,3 +2070,25 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
     players and the phase, so the cause can be read from the log. The cause of the one failure (a fresh Docker host)
     is not known yet; #311 stays open for it.
   - **Mexican Train** (extra-games E-046): the active player's seat plate reads *Now playing* instead of *Their turn*.
+- **D-265 · 2026-11-02 · Klaus** — The first Windows test of the package (Windows 11 Pro, 2026-11-02, two reports in
+  #games-application) is taken in. Install, checksum and `--smoke-test` passed; the first start with a private
+  repository stopped at the GitHub sign-in. *Implementation (Claude):*
+  - **A failed sign-in no longer blocks the table.** If the GitHub CLI can't be installed, doesn't start, or the
+    sign-in doesn't finish, the starter says so and starts the table with the public games; the private repositories
+    are reported as left out.
+  - **The sign-in needs Enter.** `gh auth login --web` shows the code and waits for Enter before it opens the browser
+    and checks for the approval; the starter's text and the guides now say to press Enter in the starter's window,
+    also when the code is entered on another device.
+  - **`--repos` is for one start.** Only the answer to the starter's question is saved in `private-repos.txt`;
+    `--repos` (including `--repos none`) and `--smoke-test` leave it as it is.
+  - **A checksum file on the release.** The publish step adds `game-table-SHA256SUMS.txt`, and the guides' agent
+    sections check the download against it with one command that stops on a mismatch (`sha256sum -c`,
+    `shasum -a 256 -c`, PowerShell `-ne`, which ignores the case of the hex digits). The package test runs the Windows
+    lines on a sums file, with a right and a wrong sum.
+  - **Guides:** a GitHub CLI that is installed but not signed in is used and signed in; the Windows agent section says
+    the package installs a table, not a game service.
+  - **Not changed, for Klaus to decide:**
+    - The checksums sit in the same release as the packages, so they catch a damaged download, not a changed
+      release. Publishing them on the website too, or signing the packages, would cover that.
+    - `local-table` stays one moving release with one package per platform (D-256, Klaus: "no package history"); a
+      build can't be pinned or gone back to.

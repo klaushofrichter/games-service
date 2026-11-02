@@ -99,7 +99,8 @@ function parseArgs(argv: string[]): Options {
 function readmeText() {
   return [
     "Game Table on this computer (D-256)",
-    "  --repos \"a b\"     the private game repositories (owner/name or name), without asking; --repos none: none",
+    "  --repos \"a b\"     the private game repositories (owner/name or name) for this start, without asking;",
+    "                    --repos none: none. The saved list (the answer to the question) stays as it is",
     "  --no-update       start what was downloaded last time",
     "  --port 8081       another port (default 8080)",
     "  --no-open         don't open the board in the browser",
@@ -201,27 +202,34 @@ async function ensureGh(tools: string): Promise<string> {
   return exe;
 }
 
-async function githubToken(tools: string): Promise<string> {
+/**
+ * A token for the private repositories, or null when there is none: then the table starts with the public games and
+ * the private repositories are reported as left out (Windows review, 2026-11-02, D-265: a failed sign-in kept the whole table
+ * from starting).
+ */
+async function githubToken(tools: string): Promise<string | null> {
+  const skip = (why: string) => (note(`${why} The table starts without the private repositories; start again to retry.`), null);
   let gh: string;
   try {
     gh = await ensureGh(tools);
   } catch (e) {
-    fail(`The GitHub CLI, needed for private repositories, could not be installed: ${(e as Error).message}. Check the network, or answer '-' for no private repositories.`);
+    return skip(`The GitHub CLI, needed for private repositories, could not be installed: ${(e as Error).message}.`);
   }
   const version = spawnSync(gh, ["--version"], { encoding: "utf8" });
-  if (version.status !== 0) fail(`The GitHub CLI (${gh}) does not start.`);
+  if (version.status !== 0) return skip(`The GitHub CLI (${gh}) does not start.`);
   say(version.stdout.split("\n")[0]);
   if (process.env.GH_TOKEN) return process.env.GH_TOKEN; // the automated test: no browser
   if (spawnSync(gh, ["auth", "status", "--hostname", "github.com"], { stdio: "ignore" }).status !== 0) {
     say("");
-    say("Sign in to GitHub, so the private repositories can be downloaded. The GitHub CLI shows a code and opens");
-    say("the browser; enter the code there.");
+    say("Sign in to GitHub, so the private repositories can be downloaded. The GitHub CLI shows a code, then asks you");
+    say("to press Enter: press Enter here (it opens the browser and then waits for you), and enter the code in the");
+    say("browser, on this computer or another device. Without pressing Enter here, the sign-in never finishes.");
     // ssh without a key: nothing here runs git, so gh does not set up git's credentials (git isn't needed).
     const login = spawnSync(gh, ["auth", "login", "--hostname", "github.com", "--git-protocol", "ssh", "--skip-ssh-key", "--web"], { stdio: "inherit" });
-    if (login.status !== 0) fail("GitHub sign-in did not finish. Start again to retry, or answer '-' for no private repositories.");
+    if (login.status !== 0) return skip("GitHub sign-in did not finish.");
   }
   const t = spawnSync(gh, ["auth", "token", "--hostname", "github.com"], { encoding: "utf8" });
-  if (t.status !== 0 || !t.stdout.trim()) fail("The GitHub CLI is signed in but gives no token.");
+  if (t.status !== 0 || !t.stdout.trim()) return skip("The GitHub CLI is signed in but gives no token.");
   return t.stdout.trim();
 }
 
@@ -254,8 +262,9 @@ async function choosePrivate(o: Options, savedFile: string): Promise<string[]> {
     const r = repoName(p);
     if (!PUBLIC_REPOS.includes(r) && !list.includes(r)) list.push(r);
   }
-  // A check changes nothing: --repos none --smoke-test on an existing install keeps its list (review, 2026-11-02).
-  if (!o.smokeTest) await writeFile(savedFile, list.join("\n") + (list.length ? "\n" : ""));
+  // Only the answer to the question is saved. --repos is for this start, and a check changes nothing: --repos none on
+  // an existing install keeps its list (Linux and Windows reviews, 2026-11-02).
+  if (!o.smokeTest && o.repos === undefined) await writeFile(savedFile, list.join("\n") + (list.length ? "\n" : ""));
   return list;
 }
 
