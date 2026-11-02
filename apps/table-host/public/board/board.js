@@ -1774,7 +1774,7 @@ function openExchange(playerId) {
     if (last) {
       const what = kind === "ai" ? "an AI player" : kind === "watcher" ? "a watcher" : "a remote player";
       const then = REMOTE
-        ? "Without a player at the table, the next game can start only once the table's board allows games without one (Developer settings)."
+        ? "Without a player at the table, the next game can start only once the table's board allows games without one (the tools button › Advanced › Developer settings)."
         : "Without a player at the table, the next game needs the developer setting “Games without a player at the table”, so it is switched on now (Developer settings).";
       if (!(await confirmDialog(`Exchange ${cur.name}, the last player at the table, for ${what}?`, `${kind === "ai" ? `An AI player takes over ${cur.name}'s seat for the rest of this game. ` : ""}${then}`, "Exchange"))) return;
     } else if (kind === "ai" && !(await confirmDialog(`Exchange ${cur.name} for an AI player?`, `An AI player takes over ${cur.name}'s seat for the rest of this game.`, "Exchange"))) return;

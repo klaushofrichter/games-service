@@ -51,6 +51,7 @@ jobs:
         if: (inputs.os || 'all') == 'all' || inputs.os == matrix.os
         with:
           ref: ${{ inputs.ref || github.sha }}
+          fetch-tags: true # the release tag (vYYYY.MM.DD.N) names the package's version
       - uses: actions/setup-node@v7
         if: (inputs.os || 'all') == 'all' || inputs.os == matrix.os
         with:
@@ -97,7 +98,7 @@ jobs:
           productbuild --distribution distribution.xml --package-path . dist/game-table-macos.pkg
       - name: Linux archive
         if: matrix.os == 'linux' && ((inputs.os || 'all') == 'all' || inputs.os == 'linux')
-        run: tar -C dist/linux -czf dist/game-table-linux.tar.gz game-table
+        run: tar -C dist/linux --owner=0 --group=0 -czf dist/game-table-linux.tar.gz game-table # no build user's uid
       - uses: actions/upload-artifact@v7
         if: (inputs.os || 'all') == 'all' || inputs.os == matrix.os
         with:

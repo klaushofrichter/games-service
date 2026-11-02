@@ -1279,7 +1279,7 @@ export class Table extends EventEmitter {
         needs.push(counts.length === 1 ? `needs exactly ${counts[0]} players, ${more} more` : `needs ${more} more player${more === 1 ? "" : "s"}`);
       }
     }
-    if (!this.allowNoLocalPlayer && !seated.some((p) => p.kind === "human" && p.location === "local")) needs.push("needs at least one player at the table (or, under Developer settings, games without one)");
+    if (!this.allowNoLocalPlayer && !seated.some((p) => p.kind === "human" && p.location === "local")) needs.push("needs at least one player at the table (or games without one: the board's tools button › Advanced › Developer settings)");
     return needs;
   }
 
