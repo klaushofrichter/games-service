@@ -1993,3 +1993,15 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
     shows its current version; links to the guides, `llms.txt`, `llms-full.txt`, `/terms`, the release, the repositories
     and each game's folder answer. The company link stays `https://skylar.technology` (`tests/website.test.ts` pins it);
     the session's network couldn't reach it to check, while `www.skylar.technology` answers. The page names no private game repository.
+- **D-260 · 2026-11-02 · Klaus** — Game repositories of other GitHub accounts and organizations work in the packages
+  and the Windows script, and the install guides say how: a developer's organization, like `MyGameCompany/myGame`.
+  *Implementation (Claude):*
+  - Names were already `owner/name`, with a name alone meaning `klaushofrichter/…`; the starter's question now says
+    so in its first line, and each install guide has a section *Repositories of another organization*: the full name,
+    read access for the signed-in account, and an organization's approval of the GitHub CLI (OAuth app policy) or its
+    single sign-on authorization. The agent sections ask for `owner/name`.
+  - Downloads are kept by owner and name, so two owners' repositories with the same name no longer overwrite each
+    other: the packages' starter (`scripts/package/launch.ts`) keeps `repos/<owner>/<name>` and `<name>.json` beside
+    it, and moves a copy from the old `repos/<name>` once, so `--no-update` keeps working after an update. The Windows
+    script keeps `repos\<name>` for klaushofrichter's repositories (games-service must stay at
+    `repos\games-service`) and uses `repos\<owner>\<name>` for anyone else's.

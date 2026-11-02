@@ -32,8 +32,8 @@ $gt = Join-Path $env:LOCALAPPDATA "Programs\Game Table\game-table.cmd"
 & $gt --repos none --smoke-test      # check: ends with SMOKE TEST PASSED
 ```
 
-A silent install shows no SmartScreen warning. Then ask the person which private game repositories they want (names
-only). If there are any, start `& $gt --repos "name1 name2" --smoke-test` while the person is there to sign in to
+A silent install shows no SmartScreen warning. Then ask the person which private game repositories they want, as `owner/name`
+(a name alone means `klaushofrichter/name`; see *Repositories of another organization*). If there are any, start `& $gt --repos "owner/name1 owner/name2" --smoke-test` while the person is there to sign in to
 GitHub in the browser. Then `& $gt --version` lists every game with its version.
 
 ## Install
@@ -84,6 +84,19 @@ repository.
 
 The starter remembers the private repositories, but **not the port**: if 8080 is taken on this computer, give
 `--port` at every start.
+
+### Repositories of another organization
+
+Game repositories can belong to any GitHub account or organization. Give their full name, `owner/name`, for example
+`my-game-company/my-game`; a name alone always means `klaushofrichter/…`. Names from different owners can be mixed:
+`my-game my-game-company/my-game`. Two repositories with the same name from different owners are kept apart.
+
+- The GitHub account you sign in with must be able to read the repository.
+- Many organizations let outside apps read their private repositories only after an owner approves them. If such a
+  repository is left out with *no access*, ask an owner of the organization to approve the **GitHub CLI** (the
+  organization's settings › *Third-party access* › *OAuth app policy*), or, if the organization uses single sign-on,
+  authorize it at github.com › Settings › Applications › *Authorized OAuth Apps* › GitHub CLI.
+- `gh auth status` shows which account the starter uses.
 
 ### The board on another screen
 

@@ -113,6 +113,14 @@ function Test-Sha256([string]$File, [string]$Expected) {
 }
 
 # Unpacks a zip that holds one top folder into $Target (replacing it); returns the top folder's name.
+# A repository's folder: repos\<name> for klaushofrichter's (games-service must stay at repos\games-service), and
+# repos\<owner>\<name> for anyone else's, so two owners' repositories of the same name don't overwrite each other.
+function Get-RepoFolder([string]$Repo) {
+  $parts = $Repo.Split("/")
+  if ($parts[0] -eq $Owner) { return (Join-Path $RepoRoot $parts[1]) }
+  return (Join-Path (Join-Path $RepoRoot $parts[0]) $parts[1])
+}
+
 function Expand-Single([string]$Zip, [string]$Target) {
   if (Test-Path $Tmp) { Remove-Item -Recurse -Force $Tmp }
   New-Item -ItemType Directory -Force -Path $Tmp | Out-Null
@@ -120,6 +128,7 @@ function Expand-Single([string]$Zip, [string]$Target) {
   $top = @(Get-ChildItem -Path $Tmp -Directory)
   if ($top.Count -ne 1) { Fail "Unexpected archive layout in $(Split-Path -Leaf $Zip)." }
   if (Test-Path $Target) { Remove-Item -Recurse -Force $Target }
+  New-Item -ItemType Directory -Force -Path (Split-Path -Parent $Target) | Out-Null
   Move-Item -Path $top[0].FullName -Destination $Target
   Remove-Item -Recurse -Force $Tmp
   return $top[0].Name
@@ -303,7 +312,7 @@ $all = @($PublicRepos + $private)
 $have = @()
 foreach ($r in $all) {
   $name = $r.Split("/")[1]
-  $target = Join-Path $RepoRoot $name
+  $target = Get-RepoFolder $r
   if ($NoUpdate) {
     if (Test-Path $target) { $have += $r } else { Note "$r was never downloaded; start without -NoUpdate." }
     continue
@@ -385,7 +394,7 @@ if (Test-Path $gamesDir) { Remove-Item -Recurse -Force $gamesDir }
 New-Item -ItemType Directory -Force -Path $gamesDir | Out-Null
 $from = @{}
 foreach ($r in $have) {
-  $src = Join-Path (Join-Path $RepoRoot $r.Split("/")[1]) "games"
+  $src = Join-Path (Get-RepoFolder $r) "games"
   if (-not (Test-Path $src)) { Note "$r has no games folder."; continue }
   $ids = @()
   foreach ($g in Get-ChildItem -Path $src -Directory) {
