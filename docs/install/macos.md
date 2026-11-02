@@ -27,23 +27,21 @@ In Terminal:
 
 ```sh
 curl -fL -o /tmp/game-table-macos.pkg https://github.com/klaushofrichter/games-service/releases/download/local-table/game-table-macos.pkg
-sudo installer -pkg /tmp/game-table-macos.pkg -target /     # asks for the person's password: let them type it
-gt="/Applications/Game Table.app/Contents/Resources/game-table.command"
+installer -pkg /tmp/game-table-macos.pkg -target CurrentUserHomeDirectory     # no sudo: installs for this user
+gt="$HOME/Applications/Game Table.app/Contents/Resources/game-table.command"
 "$gt" --repos none --smoke-test      # check: ends with SMOKE TEST PASSED
 ```
 
-A package downloaded with `curl` and installed with `installer` gets no Gatekeeper warning. If `sudo` isn't
-possible, ask the person to open the package from Finder instead (see *Install*). Then ask the person which private
+A package downloaded with `curl` and installed with `installer` gets no Gatekeeper warning, and it needs no
+administrator. Then ask the person which private
 game repositories they want (names only). If there are any, start `"$gt" --repos "name1 name2" --smoke-test` while
 the person is there to sign in to GitHub in the browser. Then `"$gt" --version` lists every game with its version.
 
 ## Install
 
-**You need an administrator of this Mac for the installation.** The installer puts Game Table in Applications for all
-users of the Mac, so macOS asks for an administrator's name and password, and *Open Anyway* may ask too. If your
-account isn't an administrator, ask someone who is to enter theirs. You need this only to install, update or remove
-the program. Playing doesn't: Game Table runs as your own user and keeps its downloads and data in your own folder,
-so each user of the Mac has their own games and data.
+Game Table installs **for your user only**, into the *Applications* folder in your home folder
+(`~/Applications`), so it needs no administrator. It keeps its downloads and data in your own folder too. Another
+user of the Mac installs it for themselves.
 
 1. Download **[`game-table-macos.pkg`](https://github.com/klaushofrichter/games-service/releases/download/local-table/game-table-macos.pkg)** (from the release
    [Game Table for your computer](https://github.com/klaushofrichter/games-service/releases/tag/local-table)).
@@ -52,22 +50,23 @@ so each user of the Mac has their own games and data.
 2. Open it. The package isn't signed yet, so when it was downloaded in the browser, macOS says it can't be opened.
    Open **System Settings › Privacy & Security**, scroll down to the message about `game-table-macos.pkg`, and click
    **Open Anyway**.
-3. Click through the installer and enter the administrator's password when asked. It puts **Game Table** in
-   Applications, with its own Node.js.
+3. Click through the installer. It puts **Game Table** in the Applications folder of your home folder, with its own
+   Node.js. If it asks where to install, choose *Install for me only*.
 
 ### Check that it works
 
 Optional: this starts a table for a moment on port 8080, checks it, and stops. Another table must not be running.
 
 ```sh
-"/Applications/Game Table.app/Contents/Resources/game-table.command" --smoke-test
+~/Applications/"Game Table.app"/Contents/Resources/game-table.command --smoke-test
 ```
 
 It ends with `SMOKE TEST PASSED`.
 
 ## Start
 
-Open **Game Table** from the Applications folder, or find it with Spotlight (Cmd+Space). A Terminal window opens and
+Open **Game Table** with Spotlight (Cmd+Space, then type *Game Table*), or from the Applications folder of your home
+folder (Finder › Go › Home › Applications). You can drag it to the Dock. A Terminal window opens and
 shows the table's messages:
 
 1. The first time, it asks for the **private game repositories**: type their names, like `my-game` or
@@ -120,7 +119,7 @@ same network, and anyone with the key controls the table: give it only to your o
 Run the starter in Terminal with options:
 
 ```sh
-"/Applications/Game Table.app/Contents/Resources/game-table.command" --no-update
+~/Applications/"Game Table.app"/Contents/Resources/game-table.command --no-update
 ```
 
 | Option | |
@@ -142,8 +141,8 @@ Run the starter in Terminal with options:
 The same installation can join the Game Table service at games.skylar.technology. The service lets players and
 watchers join from elsewhere, and it can deliver games to the table. The table needs approval once:
 
-- Start with an **access code** from the console: `"/Applications/Game Table.app/Contents/Resources/game-table.command" --code ABCD-EFGH`, or
-- start with `"/Applications/Game Table.app/Contents/Resources/game-table.command" --service`. The board then shows a pairing code, which the service's admin approves in the
+- Start with an **access code** from the console: `~/Applications/"Game Table.app"/Contents/Resources/game-table.command --code ABCD-EFGH`, or
+- start with `~/Applications/"Game Table.app"/Contents/Resources/game-table.command --service`. The board then shows a pairing code, which the service's admin approves in the
   console.
 
 The table keeps its approval, so later starts need only `--service`. Without `--service` it plays on its own again.
@@ -151,9 +150,12 @@ The table keeps its approval, so later starts need only `--service`. Without `--
 ## Update and remove
 
 - **Update the games:** every start brings the games up to date.
-- **Update Game Table itself:** install the newest `game-table-macos.pkg`; it asks for an administrator again.
-- **Remove:** drag *Game Table* from Applications to the Trash (it may ask for an administrator). macOS keeps a record
-  of the installed package; `sudo pkgutil --forget technology.skylar.game-table` removes that too. Downloads and the table's data are in
+- **Update Game Table itself:** install the newest `game-table-macos.pkg`.
+- **An older Game Table in `/Applications`:** packages before November 2, 2026 installed for all users. Install the new
+  one, then drag the old *Game Table* from `/Applications` to the Trash (that one asks for an administrator), so
+  Spotlight finds only the new one.
+- **Remove:** drag *Game Table* from `~/Applications` to the Trash. macOS keeps a record of the installed package;
+  `pkgutil --volume ~ --forget technology.skylar.game-table` removes that too. Downloads and the table's data are in
   `~/Library/Application Support/Game Table`; delete that folder too to remove everything.
 - **GitHub sign-in:** removing Game Table leaves it behind. The GitHub CLI keeps its sign-in in `~/.config/gh`;
   `gh auth logout` (or `~/Library/Application Support/Game Table/tools/gh/bin/gh auth logout`) ends it.
@@ -162,8 +164,8 @@ The table keeps its approval, so later starts need only `--service`. Without `--
 
 | | |
 | --- | --- |
-| `/Applications/Game Table.app` | The program: Node.js, the table host, the built-in games |
-| `/Applications/Game Table.app/Contents/Resources/MANIFEST.json` | The package: its version and build time, Node.js, and the built-in games with their versions |
+| `~/Applications/Game Table.app` | The program: Node.js, the table host, the built-in games |
+| `~/Applications/Game Table.app/Contents/Resources/MANIFEST.json` | The package: its version and build time, Node.js, and the built-in games with their versions |
 | `~/Library/Application Support/Game Table/games.json` | Every game on the table at the last start: version, repository, commit, download time |
 | `~/Library/Application Support/Game Table/private-repos.txt` | The private repositories you named |
 | `~/Library/Application Support/Game Table/runtime` | A copy of the program the table runs from, with all games in `table-games` |

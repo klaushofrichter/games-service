@@ -415,7 +415,7 @@ async function main() {
   if (!(await portFree(o.port))) fail(`Port ${o.port} is in use (another table still running?). Close it, or start with --port ${o.port + 1}.`);
 
   // The runtime, copied into the user's folder once per package version: the package may be read-only
-  // (/Applications), and the built-in games reach the SDK by a relative path, so all games sit inside this copy.
+  // (an app bundle), and the built-in games reach the SDK by a relative path, so all games sit inside this copy.
   const version = (await readFile(join(bundled, "VERSION"), "utf8").catch(() => "dev")).trim();
   const runtime = join(home, "runtime");
   const stamp = join(runtime, ".package-version");
