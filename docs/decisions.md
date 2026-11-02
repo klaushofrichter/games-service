@@ -1975,17 +1975,47 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
     nothing went to `/Applications`.
   - Still to see on a real Mac: whether *Open Anyway* for the unsigned package asks a standard (non-admin) user for
     anything. Signing and notarizing (Klaus has an Apple developer account) would remove that step.
+- **D-259 · 2026-11-02 · Klaus** — Landing page review.
+  - *About* (*Human players first*) moves up, right after the three paths, as the introduction before *Made for the
+    room*.
+  - *Start here* moves from the game developers' card to the gamers' card, with the card's highlight.
+  - Last Card is "a game in extra-games", no longer "the newest".
+  - *Download it, start it, play* says that the packages have no remote players out of the box, because they connect
+    to no game service with a public DNS name like games.skylar.technology; an access code (`--code`) or one's own
+    game service (*Every table, one console*) adds them.
+  - *Every table, one console* says that games.skylar.technology can host third-party tables: on request it issues an
+    access code, with no guarantee of service. Requests go to a GitHub issue.
+  - *Try it with your own AI agent* is gone: it repeated *For game developers*.
+  - *Fork everything* counts again: 250+ decision records (258), 520+ automated tests (526 unit and integration tests,
+    plus 34 browser checks).
+  - *Implementation (Claude):* a review of the whole page against the code: every game's players, AI styles, awards
+    and settings match their manifests and rules in games-service and extra-games; the Coin Flip manifest excerpt
+    shows its current version; links to the guides, `llms.txt`, `llms-full.txt`, `/terms`, the release, the repositories
+    and each game's folder answer. The company link stays `https://skylar.technology` (`tests/website.test.ts` pins it);
+    the session's network couldn't reach it to check, while `www.skylar.technology` answers. The page names no private game repository.
+- **D-260 · 2026-11-02 · Klaus** — Game repositories of other GitHub accounts and organizations work in the packages
+  and the Windows script, and the install guides say how: a developer's organization, like `MyGameCompany/myGame`.
+  *Implementation (Claude):*
+  - Names were already `owner/name`, with a name alone meaning `klaushofrichter/…`; the starter's question now says
+    so in its first line, and each install guide has a section *Repositories of another organization*: the full name,
+    read access for the signed-in account, and an organization's approval of the GitHub CLI (OAuth app policy) or its
+    single sign-on authorization. The agent sections ask for `owner/name`.
+  - Downloads are kept by owner and name, so two owners' repositories with the same name no longer overwrite each
+    other: the packages' starter (`scripts/package/launch.ts`) keeps `repos/<owner>/<name>` and `<name>.json` beside
+    it, and moves a copy from the old `repos/<name>` once, so `--no-update` keeps working after an update. The Windows
+    script keeps `repos\<name>` for klaushofrichter's repositories (games-service must stay at
+    `repos\games-service`) and uses `repos\<owner>\<name>` for anyone else's.
 
 ## The website's game close-ups and screenshots, checked pair by pair (2 Nov 2026)
 
-- **D-259 · 2026-11-02 · Klaus** — A game's close-up on the website shows a phone only for a game that has a phone
+- **D-261 · 2026-11-02 · Klaus** — A game's close-up on the website shows a phone only for a game that has a phone
   screenshot, and never the phone of another game. *Why:* Klaus, with a screenshot of Chess on the website: "the
   Deck/Phone screenshot does not match Chess". *Implementation (Claude):* the close-up hides its phone image with
   `[hidden]`, but the page's `img { display: block }` outranks the browser's `[hidden]` rule, so for a game with no
   `phone` entry (Chess, Backgammon, Pachisi) the image kept the last phone shown, here Roulette's. `img[hidden] {
   display: none }` now comes right after it. `tests/website.test.ts` checks that the rule is there; a global rule
   that sets `display` on an element must not be allowed to undo `[hidden]` for it.
-- **D-260 · 2026-11-02 · Klaus** — The website's board and phone screenshots of a game come from one game at one
+- **D-262 · 2026-11-02 · Klaus** — The website's board and phone screenshots of a game come from one game at one
   moment, and every game with a phone screen shows it. *Why:* Klaus: "Review all screenshots of the board and the
   associated Deck/Phone for accuracy. Perhaps renew screenshots the ensure that it follows the current release", then
   "regenerate everything". *Implementation (Claude):*
