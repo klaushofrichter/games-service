@@ -13,6 +13,7 @@ COPY deploy/game-repos.json ./deploy/game-repos.json
 COPY llms.txt ./llms.txt
 COPY docs/developers ./docs/developers
 COPY docs/runbooks/local-docker.md ./docs/runbooks/local-docker.md
+COPY docs/install ./docs/install
 # Calendar version (YYYY.MM.DD.N), stamped by the deploy workflow; any other build reports "dev".
 ARG APP_VERSION=dev
 ENV APP_VERSION=$APP_VERSION
