@@ -52,8 +52,11 @@ Start **Game Table** from the Start menu or the desktop. A window opens and show
 1. The first time, it asks for the **private game repositories**: type their names, like `my-game` or
    `owner/my-game`, separated by spaces. Press Enter alone if you have none. Next time Enter keeps the same list,
    and `-` clears it.
-2. For private repositories it installs the GitHub CLI and lets you **sign in to GitHub**: it shows a code and opens
-   the browser, where you enter it. You do this only once.
+2. For private repositories it needs a **GitHub sign-in**:
+   - If the GitHub CLI (`gh`) is already installed and signed in, the starter uses that account without asking. Check
+     which one with `gh auth status`.
+   - Otherwise it installs the GitHub CLI into its own folder and signs you in: it shows a code and opens the browser,
+     where you enter it. You do this only once.
 3. It downloads the games and opens the board in the browser.
 4. When Windows asks whether *Node.js JavaScript Runtime* may communicate on networks, allow **Private networks**.
 
@@ -62,14 +65,29 @@ data.
 
 Stop the table by closing the window, or with Ctrl+C.
 
+A private game repository must have a **`production` branch** with a **`games/` folder** in it; that is what the
+starter downloads. One without them is left out with a note. `--branch main` takes another branch, for every
+repository.
+
+The starter remembers the private repositories, but **not the port**: if 8080 is taken on this computer, give
+`--port` at every start.
+
+### The board on another screen
+
+The board can also show on another screen on the same network: a TV, a tablet or another computer. The board's own
+address, `http://<address>:<port>/board/`, opens only on this computer; from anywhere else it answers 403. Use the
+board's settings › *Board on another screen…*: it shows a QR code and the link (D-190). The link is
+`http://<address>:<port>/board/screen?key=<table key>`, with the key from `%LOCALAPPDATA%\GameTable\data\table-key`. It works only from the same
+network, and anyone with the key controls the table: give it only to your own screens.
+
 ## If phones can't join
 
 - Windows must treat your WiFi as **Private**: Settings › Network & internet › your WiFi › *Network profile type* ›
   Private. The table warns when it's set to Public.
 - Node.js must be allowed through the firewall for Private networks: Windows Security › Firewall & network
   protection › *Allow an app through firewall*.
-- The QR code holds the computer's address on the WiFi, like `http://192.168.1.20:8080`. Open that address in the
-  phone's browser to check.
+- The QR code holds the computer's address on the WiFi and the table's port, like `http://192.168.1.20:8080`. Open
+  that address in the phone's browser to check.
 
 ## Options
 
@@ -79,11 +97,15 @@ Add them to the starter in a terminal: `"%LOCALAPPDATA%\Programs\Game Table\game
 | --- | --- |
 | `--no-update` | Start with the games downloaded last time (offline) |
 | `--repos "a b"` | The private repositories, without asking (`--repos none`: none) |
-| `--port 8081` | Another port, if 8080 is taken |
+| `--port 8081` | Another port, if 8080 is taken (not remembered: give it at every start) |
 | `--no-open` | Don't open the browser |
+| `--branch main` | Another branch of the game repositories (default `production`) |
+| `--sign-in` | Download the public repositories with your GitHub sign-in too |
+| `--home DIR` | Another folder for downloads and the table's data |
 | `--service`, `--code ABCD-EFGH` | Join the Game Table service, see below |
 | `--version` | The package's version, and every game on the table with its version and source |
 | `--smoke-test` | Check the installation: start, check that the board answers and the games are there, stop |
+| `--help` | All the options |
 
 ## Remote players: the Game Table service
 
@@ -102,6 +124,8 @@ The table keeps its approval, so later starts need only `--service`. Without `--
 - **Update Game Table itself:** install the newest `game-table-windows.exe` over the old one.
 - **Remove:** Settings › Apps › Installed apps › *Game Table* › Uninstall. Downloads and the table's data stay in
   `%LOCALAPPDATA%\GameTable`; delete that folder too to remove everything.
+- **GitHub sign-in:** removing Game Table leaves it behind. The GitHub CLI keeps its sign-in in its own settings;
+  `gh auth logout` (or `%LOCALAPPDATA%\GameTable\tools\gh\bin\gh.exe auth logout`) ends it.
 
 ## Where things are
 
@@ -110,8 +134,12 @@ The table keeps its approval, so later starts need only `--service`. Without `--
 | `%LOCALAPPDATA%\Programs\Game Table` | The program: Node.js, the table host, the built-in games |
 | `%LOCALAPPDATA%\Programs\Game Table\MANIFEST.json` | The package: its version and build time, Node.js, and the built-in games with their versions |
 | `%LOCALAPPDATA%\GameTable\games.json` | Every game on the table at the last start: version, repository, commit, download time |
+| `%LOCALAPPDATA%\GameTable\private-repos.txt` | The private repositories you named |
+| `%LOCALAPPDATA%\GameTable\runtime` | A copy of the program the table runs from, with all games in `table-games` |
 | `%LOCALAPPDATA%\GameTable\repos` | The downloaded games |
 | `%LOCALAPPDATA%\GameTable\data` | The table's key, logs and saved games |
-| `%LOCALAPPDATA%\GameTable\tools\gh` | The GitHub CLI, if it was needed |
+| `%LOCALAPPDATA%\GameTable\tools\gh` | The GitHub CLI, if the starter installed it |
+
+Disk space: about 450 MB with the public games; private games add their own size.
 
 Without the installer, one PowerShell script does the same: [`docs/runbooks/windows.md`](../runbooks/windows.md).

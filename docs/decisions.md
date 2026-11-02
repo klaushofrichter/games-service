@@ -1927,3 +1927,15 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
     - `llms.txt` names the packages and the three guides, ahead of the Docker runbook.
     - `tests/cloud.test.ts` checks the routes, the links from `llms.txt` and the page, and the agent section of each
       guide, and that the guides name no private repository (D-200).
+  - **First real install (Linux, Debian x86_64, 2026-11-01, Klaus in #games-application):** it worked on the first
+    start, with three private games. Its ten points are taken into all three guides where they apply:
+    - The board on another screen needs `/board/screen?key=…`, because `/board/` from the network answers 403.
+    - A private repository needs a `production` branch with `games/` in it, and `--branch` changes that.
+    - Linux gets a `systemd --user` service.
+    - The port isn't remembered, so it goes in menu entries and services.
+    - Firewall examples now refer to the table's own port.
+    - An existing `gh` sign-in is used silently; `gh auth status` shows which account.
+    - `gh auth logout` ends the sign-in on removal.
+    - *Where things are* lists `private-repos.txt`, `runtime` and the disk space (about 450 MB).
+    - The guides list every option.
+    - The launcher now checks the port before it downloads anything.
