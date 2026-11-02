@@ -203,6 +203,11 @@ jobs:
           Each start downloads extra-games and the private game repositories you name; your GitHub sign-in is needed only for those.
           Each package holds MANIFEST.json (also here as game-table-<os>.manifest.json): its version, build time, Node.js and built-in games.
           After a start, games.json in the table's folder lists every game on the table with its version, repository and commit (game-table --version)."
+          sums=$(sha256sum game-table-windows.exe game-table-macos.pkg game-table-linux.tar.gz 2>/dev/null | awk '{print "- " $2 ": " $1}')
+          notes="$notes
+
+          SHA-256 of the packages in this build:
+          $sums"
           m=$(ls game-table-*.manifest.json | head -1)
           notes="$notes
 

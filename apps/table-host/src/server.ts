@@ -781,8 +781,15 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
     }
   }, 10_000);
 
-  return new Promise<{ port: number; close: () => Promise<void>; handler: typeof handler; attachSocket: typeof onConnection }>((resolve) => {
+  return new Promise<{ port: number; close: () => Promise<void>; handler: typeof handler; attachSocket: typeof onConnection }>((resolve, reject) => {
+    // A port in use (EADDRINUSE) fails the start, so main.ts can say so; the WebSocket server re-emits the same error.
+    const failed = (e: Error) => reject(e);
+    const echo = () => {};
+    server.once("error", failed);
+    wss.once("error", echo);
     server.listen(opts.port, opts.host ?? "0.0.0.0", () => {
+      server.off("error", failed);
+      wss.off("error", echo);
       const addr = server.address();
       const port = typeof addr === "object" && addr ? addr.port : opts.port;
       resolve({

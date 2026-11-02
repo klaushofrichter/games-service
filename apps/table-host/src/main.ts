@@ -36,6 +36,13 @@ const host = await startHost({
   boardDeck: env.BOARD_DECK === "1",
   localTable: env.LOCAL_TABLE === "1",
   accessCode,
+}).catch((e: NodeJS.ErrnoException) => {
+  // Another table (or program) on the port: say so instead of a stack trace.
+  if (e.code === "EADDRINUSE") {
+    console.error(`[table-host] port ${env.PORT || 8080} is in use: another table may still be running. Close it, or choose another port (PORT, or --port with the packages).`);
+    process.exit(1);
+  }
+  throw e;
 });
 
 console.log(`[table-host] ${host.table.config.tableName} on port ${host.port}`);
@@ -49,7 +56,10 @@ console.log(`[table-host] join:   ${host.table.currentJoin().url}`);
   const hidden = all.filter((m) => m.test && env.SHOW_TEST_GAMES !== "1").map((m) => m.id);
   console.log(`[table-host] games:  ${shown.join(", ") || "(none)"}${hidden.length ? `   (test games hidden: ${hidden.join(", ")}; SHOW_TEST_GAMES=1 shows them)` : ""}`);
 }
-if (!env.CLOUD_URL) console.log("[table-host] CLOUD_URL not set: running without the cloud service (development mode)");
+if (!env.CLOUD_URL) {
+  // A local table (D-251) runs without the service on purpose: no "development mode" to worry its players.
+  console.log(env.LOCAL_TABLE === "1" ? "[table-host] without the Game Table service: players here only" : "[table-host] CLOUD_URL not set: running without the cloud service (development mode)");
+}
 let lastCloud = "";
 host.table.on("state", (s) => {
   const c = s.cloud;
