@@ -71,15 +71,30 @@ jobs:
           if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress; if ($LASTEXITCODE) { exit 1 } }
           & $iscc /Qp "/DSource=$PWD\dist\windows" "/DVersion=$(Get-Date -Format yyyy.MM.dd)" "/DOutputDir=$PWD\dist" scripts\package\windows.iss
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
-      - name: macOS package (pkgbuild)
+      - name: macOS package (pkgbuild, productbuild)
         if: matrix.os == 'macos' && ((inputs.os || 'all') == 'all' || inputs.os == 'macos')
         run: |
           mkdir -p pkgroot
           mv "dist/macos/Game Table.app" pkgroot/
           pkgbuild --analyze --root pkgroot component.plist
           plutil -replace 0.BundleIsRelocatable -bool false component.plist
+          v="$(date +%Y.%m.%d)"
           pkgbuild --root pkgroot --component-plist component.plist --install-location /Applications \
-            --identifier technology.skylar.game-table --version "$(date +%Y.%m.%d)" dist/game-table-macos.pkg
+            --identifier technology.skylar.game-table --version "$v" game-table-component.pkg
+          # Installs for the current user only, into ~/Applications: no administrator (D-258).
+          cat > distribution.xml <<XML
+          <?xml version="1.0" encoding="utf-8"?>
+          <installer-gui-script minSpecVersion="2">
+            <title>Game Table</title>
+            <domains enable_anywhere="false" enable_currentUserHome="true" enable_localSystem="false"/>
+            <options customize="never" require-scripts="false" hostArchitectures="arm64,x86_64"/>
+            <os-version min="13.5"/>
+            <choices-outline><line choice="game-table"/></choices-outline>
+            <choice id="game-table" title="Game Table"><pkg-ref id="technology.skylar.game-table"/></choice>
+            <pkg-ref id="technology.skylar.game-table" version="$v">game-table-component.pkg</pkg-ref>
+          </installer-gui-script>
+          XML
+          productbuild --distribution distribution.xml --package-path . dist/game-table-macos.pkg
       - name: Linux archive
         if: matrix.os == 'linux' && ((inputs.os || 'all') == 'all' || inputs.os == 'linux')
         run: tar -C dist/linux -czf dist/game-table-linux.tar.gz game-table
@@ -138,8 +153,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          sudo installer -pkg game-table-macos.pkg -target /
-          app="/Applications/Game Table.app"
+          # Without sudo: the package installs for this user only (D-258).
+          installer -pkg game-table-macos.pkg -target CurrentUserHomeDirectory
+          app="$HOME/Applications/Game Table.app"
+          test ! -e "/Applications/Game Table.app"
+          pkgutil --volume "$HOME" --pkg-info technology.skylar.game-table # the receipt the guide's --forget removes
           test -x "$app/Contents/MacOS/game-table"
           export PATH=/usr/bin:/bin:/usr/sbin:/sbin # no Homebrew: no node, no gh
           if command -v node || command -v gh; then echo "node or gh is still on the PATH"; exit 1; fi
