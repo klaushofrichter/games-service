@@ -9,6 +9,34 @@ You get the built-in games, the games of
 [extra-games](https://github.com/klaushofrichter/extra-games), and the private game repositories your GitHub
 account can read.
 
+## With an AI agent
+
+Tell your agent: *"Read https://games.skylar.technology/docs/install/macos.md and install Game Table on this
+Mac."* For the agent:
+
+- Do the steps in order and run each check. When one fails, stop and report it with its output instead of working
+  around it.
+- Never ask for a GitHub token or password, and never handle one. Signing in to GitHub, for private game repositories,
+  is the person's: the starter shows a code and opens the browser, and the person enters it there.
+- Leave the firewall question and network settings to the person: tell them what to allow (below) rather than
+  changing settings yourself.
+- At the end, report the board's address, the address in the QR code (the starter prints both), and how to start the
+  table again. Leave the table for the person to start; it runs until its window is closed.
+
+In Terminal:
+
+```sh
+curl -fL -o /tmp/game-table-macos.pkg https://github.com/klaushofrichter/games-service/releases/download/local-table/game-table-macos.pkg
+sudo installer -pkg /tmp/game-table-macos.pkg -target /     # asks for the person's password: let them type it
+gt="/Applications/Game Table.app/Contents/Resources/game-table.command"
+"$gt" --repos none --smoke-test      # check: ends with SMOKE TEST PASSED
+```
+
+A package downloaded with `curl` and installed with `installer` gets no Gatekeeper warning. If `sudo` isn't
+possible, ask the person to open the package from Finder instead (see *Install*). Then ask the person which private
+game repositories they want (names only). If there are any, start `"$gt" --repos "name1 name2" --smoke-test` while
+the person is there to sign in to GitHub in the browser. Then `"$gt" --version` lists every game with its version.
+
 ## Install
 
 1. Download **`game-table-macos.pkg`** from the release
@@ -24,8 +52,11 @@ Open **Game Table** from Applications or Launchpad. A Terminal window opens and 
 1. The first time, it asks for the **private game repositories**: type their names, like `my-game` or
    `owner/my-game`, separated by spaces. Press Enter alone if you have none. Next time Enter keeps the same list,
    and `-` clears it.
-2. For private repositories it installs the GitHub CLI and lets you **sign in to GitHub**: it shows a code and opens
-   the browser, where you enter it. You do this only once.
+2. For private repositories it needs a **GitHub sign-in**:
+   - If the GitHub CLI (`gh`) is already installed and signed in, the starter uses that account without asking. Check
+     which one with `gh auth status`.
+   - Otherwise it installs the GitHub CLI into its own folder and signs you in: it shows a code and opens the browser,
+     where you enter it. You do this only once.
 3. It downloads the games and opens the board in the browser.
 4. When macOS asks whether `node` may accept incoming network connections, click **Allow**.
 
@@ -34,11 +65,26 @@ data.
 
 Stop the table by closing the Terminal window, or with Ctrl+C.
 
+A private game repository must have a **`production` branch** with a **`games/` folder** in it; that is what the
+starter downloads. One without them is left out with a note. `--branch main` takes another branch, for every
+repository.
+
+The starter remembers the private repositories, but **not the port**: if 8080 is taken on this Mac, give `--port` at
+every start.
+
+### The board on another screen
+
+The board can also show on another screen on the same network: a TV, an iPad or another computer. The board's own
+address, `http://<address>:<port>/board/`, opens only on this Mac; from anywhere else it answers 403. Use the board's
+settings › *Board on another screen…*: it shows a QR code and the link (D-190). The link is
+`http://<address>:<port>/board/screen?key=<table key>`, with the key from `~/Library/Application Support/Game Table/data/table-key`. It works only from the
+same network, and anyone with the key controls the table: give it only to your own screens.
+
 ## If phones can't join
 
 - The firewall must let `node` in: System Settings › Network › Firewall › Options. Set `node` to *Allow incoming
   connections*.
-- The QR code holds the Mac's address on the WiFi, like `http://192.168.1.20:8080`. Open that address in the phone's
+- The QR code holds the Mac's address on the WiFi and the table's port, like `http://192.168.1.20:8080`. Open that address in the phone's
   browser to check.
 
 ## Options
@@ -53,10 +99,15 @@ Run the starter in Terminal with options:
 | --- | --- |
 | `--no-update` | Start with the games downloaded last time (offline) |
 | `--repos "a b"` | The private repositories, without asking (`--repos none`: none) |
-| `--port 8081` | Another port, if 8080 is taken |
+| `--port 8081` | Another port, if 8080 is taken (not remembered: give it at every start) |
 | `--no-open` | Don't open the browser |
+| `--branch main` | Another branch of the game repositories (default `production`) |
+| `--sign-in` | Download the public repositories with your GitHub sign-in too |
+| `--home DIR` | Another folder for downloads and the table's data |
 | `--service`, `--code ABCD-EFGH` | Join the Game Table service, see below |
 | `--version` | The package's version, and every game on the table with its version and source |
+| `--smoke-test` | Check the installation: start, check that the board answers and the games are there, stop |
+| `--help` | All the options |
 
 ## Remote players: the Game Table service
 
@@ -74,6 +125,8 @@ The table keeps its approval, so later starts need only `--service`. Without `--
 - **Update Game Table itself:** install the newest `game-table-macos.pkg`.
 - **Remove:** drag *Game Table* from Applications to the Trash. Downloads and the table's data are in
   `~/Library/Application Support/Game Table`; delete that folder too to remove everything.
+- **GitHub sign-in:** removing Game Table leaves it behind. The GitHub CLI keeps its sign-in in `~/.config/gh`;
+  `gh auth logout` (or `~/Library/Application Support/Game Table/tools/gh/bin/gh auth logout`) ends it.
 
 ## Where things are
 
@@ -82,9 +135,13 @@ The table keeps its approval, so later starts need only `--service`. Without `--
 | `/Applications/Game Table.app` | The program: Node.js, the table host, the built-in games |
 | `/Applications/Game Table.app/Contents/Resources/MANIFEST.json` | The package: its version and build time, Node.js, and the built-in games with their versions |
 | `~/Library/Application Support/Game Table/games.json` | Every game on the table at the last start: version, repository, commit, download time |
+| `~/Library/Application Support/Game Table/private-repos.txt` | The private repositories you named |
+| `~/Library/Application Support/Game Table/runtime` | A copy of the program the table runs from, with all games in `table-games` |
 | `~/Library/Application Support/Game Table/repos` | The downloaded games |
 | `~/Library/Application Support/Game Table/data` | The table's key, logs and saved games |
-| `~/Library/Application Support/Game Table/tools/gh` | The GitHub CLI, if it was needed |
+| `~/Library/Application Support/Game Table/tools/gh` | The GitHub CLI, if the starter installed it |
+
+Disk space: about 450 MB with the public games; private games add their own size.
 
 To develop games on a Mac, use `scripts/local-table.sh` from a clone of games-service instead (developer guide,
 section 14).

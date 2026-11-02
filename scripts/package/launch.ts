@@ -407,6 +407,8 @@ async function main() {
   const reposDir = join(home, "repos");
   const dataDir = join(home, "data");
   for (const d of [home, tools, reposDir, dataDir]) await mkdir(d, { recursive: true });
+  // Before any download: a taken port would only stop the start after all of it (feedback, 2026-11-01).
+  if (!(await portFree(o.port))) fail(`Port ${o.port} is in use (another table still running?). Close it, or start with --port ${o.port + 1}.`);
 
   // The runtime, copied into the user's folder once per package version: the package may be read-only
   // (/Applications), and the built-in games reach the SDK by a relative path, so all games sit inside this copy.
@@ -470,7 +472,6 @@ async function main() {
 
   const keyFile = join(dataDir, "table-key");
   if (!existsSync(keyFile)) await writeFile(keyFile, randomBytes(16).toString("hex") + "\n", { mode: 0o600 });
-  if (!(await portFree(o.port))) fail(`Port ${o.port} is in use (another table still running?). Close it, or start with --port ${o.port + 1}.`);
   const ip = await routeAddress();
 
   const env: NodeJS.ProcessEnv = {

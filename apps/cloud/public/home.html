@@ -424,6 +424,14 @@ html.lb-open, html.lb-open body { overflow: hidden; }
 
 /* ---------- install ---------- */
 .install .grid { display: grid; grid-template-columns: 1fr 1.1fr; gap: 50px; align-items: start; }
+.pkggrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-top: 40px; }
+.pkggrid .og b { font-size: 34px; }
+.pkggrid .og .os { font: 600 13px/1 var(--text); letter-spacing: .16em; text-transform: uppercase; color: var(--faint); }
+.pkg-foot { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 28px; align-items: center; margin-top: 28px; }
+.pkg-foot .btn { justify-self: start; }
+.pkg-foot .agent-alt { margin-top: 0; }
+.pkg-foot .agent-alt p { padding-right: 70px; }
+.pkg-foot .agent-alt q { overflow-wrap: anywhere; }
 .term { border-radius: 18px; background: #050d0a; border: 1px solid var(--line-2); overflow: hidden; box-shadow: 0 40px 80px rgba(0,0,0,.45); }
 .term .bar { position: relative; display: flex; gap: 6px; padding: 12px 14px; background: #0b1c17; border-bottom: 1px solid var(--line); align-items: center; }
 .term .bar i { width: 11px; height: 11px; border-radius: 50%; background: #2a3b35; }
@@ -497,6 +505,7 @@ footer a.terms { display: inline; margin: 0; }
   .hero-text { opacity: 1; transform: none; }
   .scene { height: 520px; transform: scale(.8); }
   .paths .grid, .games, .features, .links, .opengrid, .numbers { grid-template-columns: 1fr 1fr; }
+  .pkggrid, .pkg-foot { grid-template-columns: minmax(0, 1fr); }
   .game.wide { grid-column: span 2; }
   .code { position: static; }
   .aw-grid { grid-template-columns: minmax(0, 1fr); gap: 44px; }
@@ -546,7 +555,8 @@ footer a.terms { display: inline; margin: 0; }
       <a href="#games">Games</a>
       <a href="#lobby">The lobby</a>
       <a href="#build">Build a game</a>
-      <a href="#install">Play at home</a>
+      <a href="#download">Download</a>
+      <a href="#install">Docker</a>
       <a href="#table">The table</a>
     </nav>
     <span class="spacer"></span>
@@ -568,7 +578,7 @@ footer a.terms { display: inline; margin: 0; }
       <p class="lede rv" style="--d:.16s">Game Table turns a touchscreen lying flat on the table into a board that everyone in the room shares. Phones are the private hands. And the games? <b style="color:var(--ink)">You build them, with your AI, in hours.</b></p>
       <div class="ctas rv" style="--d:.24s">
         <a class="btn primary" href="#build">Build a game <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
-        <a class="btn" href="#install">Play at home</a>
+        <a class="btn" href="#download">Play at home</a>
       </div>
       <div class="facts rv" style="--d:.32s"><span>1–8 players per table</span><span>No app to install</span><span>AI players built in</span><span>Runs on your own WiFi</span></div>
     </div>
@@ -625,10 +635,10 @@ footer a.terms { display: inline; margin: 0; }
       <p>Turn your game idea into something people play together, fast. Describe it to your AI, and the platform supplies the lobby, seats, phones, AI scheduling, remote play, logs and replay.</p>
       <span class="go">Build a game →</span>
     </a>
-    <a class="path rv spot" style="--d:.08s" href="#install">
+    <a class="path rv spot" style="--d:.08s" href="#download">
       <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="3"/><circle cx="9" cy="9" r="1.2" fill="currentColor"/><circle cx="15" cy="15" r="1.2" fill="currentColor"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/></svg></span>
       <h3>Gamers</h3>
-      <p>Run a table at home with Docker and play the free games with friends around any screen. No cloud, no accounts.</p>
+      <p>Download Game Table for Windows, macOS or Linux and play the free games with friends around any screen. No cloud, no accounts.</p>
       <span class="go">Play at home →</span>
     </a>
     <a class="path rv spot" style="--d:.16s" href="#table">
@@ -1078,11 +1088,36 @@ node scripts/soak.ts 100</pre>
   </div>
 </section>
 
+<!-- ============ DOWNLOAD (D-257) ============ -->
+<section class="download" id="download">
+  <div class="wrap">
+    <div class="section-head">
+      <p class="eyebrow rv">Play at home</p>
+      <h2 class="rv" style="--d:.06s">Download it, start it, play.</h2>
+      <p class="lede rv" style="--d:.12s">One package for your computer, with everything inside: the table, the built-in games and its own Node.js. It needs no Docker and no account with us. At the first start it fetches the games from GitHub, your private game repositories too if you name them, and opens the board in the browser. Everyone joins with their phone on the same WiFi.</p>
+    </div>
+    <div class="pkggrid">
+      <a class="og rv spot" href="/docs/install/windows.md"><span class="os">Windows 11</span><b>.exe</b><h3>An installer for your user</h3><p>No administrator rights. Game Table appears in the Start menu and on the desktop.</p><code>/docs/install/windows.md</code></a>
+      <a class="og rv spot" style="--d:.06s" href="/docs/install/macos.md"><span class="os">macOS</span><b>.pkg</b><h3>Game Table in Applications</h3><p>Apple silicon and Intel. It opens a Terminal window that shows what the table is doing.</p><code>/docs/install/macos.md</code></a>
+      <a class="og rv spot" style="--d:.12s" href="/docs/install/linux.md"><span class="os">Linux</span><b>.tar.gz</b><h3>Unpack and start</h3><p>x64 and arm64, a Raspberry Pi 4 or 5 included. Runs from any folder.</p><code>/docs/install/linux.md</code></a>
+    </div>
+    <div class="pkg-foot">
+      <a class="btn primary rv" href="https://github.com/klaushofrichter/games-service/releases/tag/local-table" target="_blank" rel="noopener noreferrer">Download from GitHub</a>
+      <div class="agent-alt rv" style="--d:.08s">
+        <p>Or let your AI agent install it. It follows the install guide for your system, and you only sign in to GitHub when asked:</p>
+        <q id="download-prompt">Read https://games.skylar.technology/llms.txt and install the Game Table package on this computer by following the install guide for its system.</q>
+        <button class="copy" data-copy="#download-prompt">Copy</button>
+      </div>
+    </div>
+    <p class="rv muted" style="--d:.1s;margin-top:22px">Without the Game Table service, everyone plays at your table. To add players from elsewhere, the same installation joins the service later with <code>--service</code>. The packages aren't signed yet, so Windows and macOS ask once whether to open them; the guides show where to click.</p>
+  </div>
+</section>
+
 <!-- ============ INSTALL ============ -->
 <section class="install" id="install">
   <div class="wrap grid">
     <div>
-      <p class="eyebrow rv">Play at home</p>
+      <p class="eyebrow rv">Or with Docker</p>
       <h2 class="rv" style="--d:.06s">A table on any computer, in three commands.</h2>
       <p class="lede rv" style="--d:.12s;margin-top:20px">The table runs in Docker on a computer on your WiFi. Open the board in a browser, on a touchscreen if you have one, and everyone joins with their phone. No cloud service, no DNS entry and no HTTPS needed.</p>
       <div class="needs rv" style="--d:.18s"><span>Docker with Compose</span><span>git</span><span>Phones on the same WiFi</span><span>A touchscreen, an iPad or a mouse</span></div>
@@ -1221,7 +1256,7 @@ docker compose -f deploy/local/docker-compose.yml up -d --build">Copy</button></
       <p>Board and card games around one touchscreen, with phones as private hands. Free and open source under the MIT licence, with no warranty.</p>
       <p style="margin-top:14px">Version {{version}} · <a class="terms" href="/terms">Terms of service</a></p>
     </div>
-    <div><h4>Play</h4><a href="#games">Games</a><a href="#install">Play at home</a><a href="/docs/local-docker.md">Local runbook</a><a href="#table">The table</a><a href="#service">Game service</a></div>
+    <div><h4>Play</h4><a href="#games">Games</a><a href="#download">Download</a><a href="#install">Docker</a><a href="/docs/local-docker.md">Local runbook</a><a href="#table">The table</a><a href="#service">Game service</a></div>
     <div><h4>Build</h4><a href="/docs/game-development.md">Developer guide</a><a href="/llms.txt">llms.txt</a><a href="/llms-full.txt">llms-full.txt</a><a href="#repos">Game repositories</a><a href="https://github.com/klaushofrichter/games-service/blob/main/docs/decisions.md" target="_blank" rel="noopener noreferrer">Decision records</a></div>
     <div><h4>Source</h4><a href="https://github.com/klaushofrichter/games-service" target="_blank" rel="noopener noreferrer">games-service</a><a href="https://github.com/klaushofrichter/extra-games" target="_blank" rel="noopener noreferrer">extra-games</a><a href="https://github.com/klaushofrichter/games-service/releases" target="_blank" rel="noopener noreferrer">Releases</a><a href="https://github.com/klaushofrichter/games-service/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">MIT licence</a><a href="#about">About</a></div>
   </div>
