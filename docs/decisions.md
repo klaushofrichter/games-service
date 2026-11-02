@@ -2129,3 +2129,20 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   - **Not changed:** a phone's WebSocket in the test container was refused by the container's own network, not by the
     table (curl with the same headers got `101`); the *Board on another screen* link from the network address wasn't
     verified there and needs a real network.
+- **D-268 · 2026-11-02 · Klaus** — The third macOS review (package 8049713, Mac mini, macOS 27.2, in
+  #games-application, with a correction tested by hand) is taken in, and new packages follow once it ships. The upgrade
+  worked and all seven points of review 2 were confirmed. *Implementation (Claude):*
+  - **Closing the Terminal window asks first.** Terminal shows *Do you want to terminate running processes in this
+    window?* and the table runs on until *Terminate*. The macOS guide and the starter's line say so ("close this
+    window and click Terminate when Terminal asks"), and that the window shows *[Process completed]* afterwards.
+  - **A program listening only on 127.0.0.1** let the port check pass on macOS (a listen on `0.0.0.0` still
+    succeeds), and the table then answered on the other program's address. The check now also connects to
+    `127.0.0.1:<port>`; an answer means the port is taken, with the message that says what holds it. Checked here.
+  - **Stop before updating**, in all three guides, which also say the games, key and logs stay.
+  - **The guide ahead of the package:** each guide says it describes the newest package on the release page and how
+    to compare (`--version` and the release notes' *Built from …*). New packages are built after this release (D-266:
+    Klaus asked for them).
+  - **Logs sent later:** a local table keeps every game's log and queues it; the first start with `--service` sends
+    the queued ones too. The guides now say so, with how to avoid it (delete `data/logs` first). Whether a table
+    should rather drop or ask about logs from before it joined is open for Klaus.
+  - Not changed: the empty `~/Applications` left after removing the app.
