@@ -8,7 +8,7 @@ history.
 
 ## [Unreleased]
 
-- Packages: a start without a desktop no longer crashes; the version names its release; clearer starter lines and guide links (D-267).
+- Packages: a start without a desktop, or on a locked one, no longer crashes or opens a browser; a taken port says what holds it; the version names its release; clearer starter lines and guide links; the sound pill clears the north seat (D-267).
 - Packages: a failed GitHub sign-in starts the table with the public games; the sign-in's Enter step is explained; --repos no longer changes the saved list; the release has a checksum file the guides check against (D-265).
 - A local table without the service shows no invite button; links on the board wrap between their parts; two e2e checks no longer race the coin or hide why the AI wasn't ready (D-264).
 - Packages: --smoke-test fails on a missing named repository and keeps the saved private repositories; build times in the package versions; install guides take in the second macOS and Linux reviews (D-263).

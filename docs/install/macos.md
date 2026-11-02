@@ -32,6 +32,7 @@ curl -fL -o "$dir/game-table-macos.pkg" https://github.com/klaushofrichter/games
 curl -fL -o "$dir/SHA256SUMS" https://github.com/klaushofrichter/games-service/releases/download/local-table/game-table-SHA256SUMS.txt
 (cd "$dir" && grep ' game-table-macos.pkg$' SHA256SUMS | shasum -a 256 -c -)     # must say OK; stop if it doesn't
 installer -pkg "$dir/game-table-macos.pkg" -target CurrentUserHomeDirectory     # no sudo: installs for this user
+rm -rf "$dir"     # the download isn't needed any more
 gt="$HOME/Applications/Game Table.app/Contents/Resources/game-table.command"
 "$gt" --repos none --smoke-test      # check: ends with SMOKE TEST PASSED
 ```
@@ -41,9 +42,9 @@ The package isn't signed yet, so the checksum is its only check. A package insta
 - **The check:** `--smoke-test` starts the table for a moment, checks it and stops. It fails if a named repository
   couldn't be downloaded, so a missing game can't pass. It never asks a question and doesn't change the saved list of
   private repositories.
-- **Port 8080 taken:** if the check says *Port 8080 is in use* and no other table is running, another program holds
-  it. Add `--port 8081` (or another free port) to every command, and tell the person to start with it too: the port
-  isn't remembered.
+- **Port 8080 taken:** this isn't a failed check, so carry on. The message says what holds the port: another Game
+  Table (ask the person to close it), or another program. For another program, add `--port 8081` (or another free
+  port) to every command, and tell the person to start with it too: the port isn't remembered.
 - **Private repositories:** ask the person which ones they want, as `owner/name` (a name alone means
   `klaushofrichter/name`; see *Repositories of another organization*). If there are any, run the check with
   `--repos "owner/name1 owner/name2"` while the person is there to sign in to GitHub in the browser. Then `--version`
@@ -155,7 +156,8 @@ same network, and anyone with the key controls the table: give it only to your o
   this computer ([another screen](#the-board-on-another-screen) needs its own link).
 - A VPN on this computer can change which address the QR code holds. Turn it off, or start with the address phones
   reach: `PUBLIC_URL=http://192.168.1.20:8080` in the environment.
-- "Port 8080 is in use": another table is probably still running. Close it, or start with `--port 8081`.
+- "Port 8080 is in use": the message says whether another Game Table holds it (close that one) or another program
+  (start with `--port 8081`, at every start).
 
 ## Options
 

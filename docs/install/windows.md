@@ -33,6 +33,7 @@ Invoke-WebRequest -UseBasicParsing https://github.com/klaushofrichter/games-serv
 $want = ((Get-Content $sums | Where-Object { $_ -match ' game-table-windows\.exe$' }) -split ' ')[0]
 if ((Get-FileHash $f).Hash -ne $want) { throw "Checksum mismatch: stop" }     # stops on a mismatch
 Start-Process -Wait -FilePath $f -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/CURRENTUSER"
+Remove-Item $f, $sums     # the download isn't needed any more
 $gt = Join-Path $env:LOCALAPPDATA "Programs\Game Table\game-table.cmd"
 & $gt --repos none --smoke-test      # check: ends with SMOKE TEST PASSED
 ```
@@ -43,9 +44,9 @@ game service (for remote players) runs on a server with Docker, a DNS name and H
 - **The check:** `--smoke-test` starts the table for a moment, checks it and stops. It fails if a named repository
   couldn't be downloaded, so a missing game can't pass. It never asks a question and doesn't change the saved list of
   private repositories.
-- **Port 8080 taken:** if the check says *Port 8080 is in use* and no other table is running, another program holds
-  it. Add `--port 8081` (or another free port) to every command, and tell the person to start with it too: the port
-  isn't remembered.
+- **Port 8080 taken:** this isn't a failed check, so carry on. The message says what holds the port: another Game
+  Table (ask the person to close it), or another program. For another program, add `--port 8081` (or another free
+  port) to every command, and tell the person to start with it too: the port isn't remembered.
 - **Private repositories:** ask the person which ones they want, as `owner/name` (a name alone means
   `klaushofrichter/name`; see *Repositories of another organization*). If there are any, run the check with
   `--repos "owner/name1 owner/name2"` while the person is there to sign in to GitHub in the browser. Then `--version`
@@ -144,7 +145,8 @@ network, and anyone with the key controls the table: give it only to your own sc
   this computer ([another screen](#the-board-on-another-screen) needs its own link).
 - A VPN on this computer can change which address the QR code holds. Turn it off, or start with the address phones
   reach: `PUBLIC_URL=http://192.168.1.20:8080` in the environment.
-- "Port 8080 is in use": another table is probably still running. Close it, or start with `--port 8081`.
+- "Port 8080 is in use": the message says whether another Game Table holds it (close that one) or another program
+  (start with `--port 8081`, at every start).
 
 ## Options
 

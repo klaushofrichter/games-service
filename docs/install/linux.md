@@ -32,6 +32,7 @@ curl -fL -o "$dir/game-table-linux.tar.gz" https://github.com/klaushofrichter/ga
 curl -fL -o "$dir/SHA256SUMS" https://github.com/klaushofrichter/games-service/releases/download/local-table/game-table-SHA256SUMS.txt
 (cd "$dir" && grep ' game-table-linux.tar.gz$' SHA256SUMS | sha256sum -c -)     # must say OK; stop if it doesn't
 mkdir -p ~/apps && tar -xzf "$dir/game-table-linux.tar.gz" -C ~/apps
+rm -rf "$dir"     # the download isn't needed any more
 ~/apps/game-table/game-table --repos none --smoke-test      # check: ends with SMOKE TEST PASSED
 ```
 
@@ -41,17 +42,19 @@ command for the system (it needs `sudo`, so ask the person).
 - **The check:** `--smoke-test` starts the table for a moment, checks it and stops. It fails if a named repository
   couldn't be downloaded, so a missing game can't pass. It never asks a question and doesn't change the saved list of
   private repositories.
-- **Port 8080 taken:** if the check says *Port 8080 is in use* and no other table is running, another program holds
-  it. Add `--port 8081` (or another free port) to every command, and tell the person to start with it too: the port
-  isn't remembered.
+- **Port 8080 taken:** this isn't a failed check, so carry on. The message says what holds the port: another Game
+  Table (ask the person to close it), or another program. For another program, add `--port 8081` (or another free
+  port) to every command, and tell the person to start with it too: the port isn't remembered.
 - **Private repositories:** ask the person which ones they want, as `owner/name` (a name alone means
   `klaushofrichter/name`; see *Repositories of another organization*). If there are any, run the check with
   `--repos "owner/name1 owner/name2"` while the person is there to sign in to GitHub in the browser. Then `--version`
   lists every game with its version.
 - **The person's first start:** checks with `--repos` don't save the list, so the first plain start asks for the
   private repositories. Tell the person, and which names to type (or Enter for none).
-- **No desktop:** on a computer without a desktop (a server, Raspberry Pi OS Lite), start with `--no-open` and show the
-  board on another screen (below); without it the starter says it can't open a browser and keeps running.
+- **No desktop, or not the person's session:** on a computer without a desktop (a server, Raspberry Pi OS Lite), or
+  when you work from another session (SSH, or while the desktop is locked), start with `--no-open`. The starter opens
+  a browser only on an active, unlocked desktop of this user, since opening one elsewhere can take over a browser
+  that is already running. The person opens the board themselves, or shows it on another screen (below).
 
 ## Install
 
@@ -197,7 +200,8 @@ screens.
   this computer ([another screen](#the-board-on-another-screen) needs its own link).
 - A VPN on this computer can change which address the QR code holds. Turn it off, or start with the address phones
   reach: `PUBLIC_URL=http://192.168.1.20:8080` in the environment.
-- "Port 8080 is in use": another table is probably still running. Close it, or start with `--port 8081`.
+- "Port 8080 is in use": the message says whether another Game Table holds it (close that one) or another program
+  (start with `--port 8081`, at every start).
 
 ## Options
 

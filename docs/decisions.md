@@ -2092,8 +2092,8 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
       on the website, and the packages stay unsigned for now. They catch a damaged download, not a changed release.
     - `local-table` stays one moving release with one package per platform (D-256): no older builds to pin or go back
       to.
-- **D-267 · 2026-11-02 · Klaus** — The third Linux review (Ubuntu 24.04 in a headless container, build 8049713, in
-  #games-application) is taken in. Install, checksum and `--smoke-test` passed. *Implementation (Claude):*
+- **D-267 · 2026-11-02 · Klaus** — The third and fourth Linux reviews (Ubuntu 24.04 in a headless container, and a
+  Debian mini PC with a desktop; build 8049713, in #games-application) are taken in. Install, checksum and `--smoke-test` passed. *Implementation (Claude):*
   - **No desktop, no crash.** A plain start without `xdg-open` ended the starter with `spawn xdg-open ENOENT`: spawn
     reports a missing program as an `error` event, which nothing handled. The starter now handles it, and on Linux
     without `DISPLAY` or `WAYLAND_DISPLAY` doesn't try at all; either way it says where the board is and the table keeps
@@ -2107,6 +2107,19 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
     runbook and to GitHub; the developer guide is linked; no decision numbers; `--expect-games` in *Options*; the
     agent reports the `[table-host] join:` line, tells the person that their first plain start asks for the private
     repositories, and (Linux) starts with `--no-open` on a computer without a desktop.
+  - **The mini PC review** (Debian 13 with XFCE, the same build; the desktop was locked and the agent started the
+    table from another session): the install, a game and the board worked, but `xdg-open` started a new Chrome on the
+    locked desktop and the Chrome already running there went down, with no board window. Taken in:
+    - On Linux the starter opens a browser only when one of this user's graphical sessions is active and not locked
+      (`loginctl`; without it, as before), and otherwise says why it doesn't. Every start also prints *No board
+      window? Open …/board/*.
+    - A taken port: the starter asks the port's `/health` and says whether another Game Table holds it or another
+      program; the guides say this isn't a failed check and what to do in each case.
+    - The agent steps remove the download; the smoke test no longer says "Stop with Ctrl+C"; the lobby's hint names
+      the path to Developer settings (the tools button › Advanced); the *Tap to turn the sound on* pill sits between
+      the north seat plate and the centre instead of over the plate (measured at 1280×720, 1440×813 and 1920×1080).
+    - Not changed: the phone has no Leave button on its result screen, and the board takes three steps back to the
+      lobby after a game. That changes how every game ends, so it's for Klaus to decide.
   - **Not changed:** a phone's WebSocket in the test container was refused by the container's own network, not by the
     table (curl with the same headers got `101`); the *Board on another screen* link from the network address wasn't
     verified there and needs a real network.
