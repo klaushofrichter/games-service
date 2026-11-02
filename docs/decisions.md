@@ -2092,3 +2092,9 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
       on the website, and the packages stay unsigned for now. They catch a damaged download, not a changed release.
     - `local-table` stays one moving release with one package per platform (D-256): no older builds to pin or go back
       to.
+- **D-266 · 2026-11-02 · Klaus** — The packages for one computer are built and published by hand, when Klaus asks for
+  it, not for every release: "We do installers only manually, not for every version." The workflow
+  `local-table-packages` stays `workflow_dispatch` only (ref `production`, publish), and a release PR no longer asks
+  for a publish after its deploy. The release notes' *Built from games-service production (…) on … UTC* line says
+  which release a package comes from; games from extra-games and private repositories are downloaded at every start
+  anyway.
