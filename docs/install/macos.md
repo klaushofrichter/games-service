@@ -9,6 +9,9 @@ You get the built-in games, the games of
 [extra-games](https://github.com/klaushofrichter/extra-games), and the private game repositories your GitHub
 account can read.
 
+This guide describes the newest package on the release page. An older installation can behave differently: compare
+the version that `--version` shows with the release notes' *Built from …* line, and install the newest first.
+
 ## With an AI agent
 
 Tell your agent: *"Read https://games.skylar.technology/docs/install/macos.md and install Game Table on this
@@ -113,7 +116,9 @@ shows the table's messages:
 The players scan the QR code on the board with their phones. Their phones must be on the same network as this
 Mac: its WiFi, or a WiFi on the same router if the Mac is wired. Not mobile data, and not a guest WiFi.
 
-Stop the table by closing the Terminal window, or with Ctrl+C.
+Stop the table by closing the Terminal window and clicking **Terminate** when Terminal asks whether to terminate the
+running processes, or press Ctrl+C. Until you click Terminate, the table keeps running. Once it has stopped, the
+window shows *[Process completed]*, and you can close it.
 
 A private game repository must have a **`production` branch** with a **`games/` folder** in it; that is what the
 starter downloads. One without them is left out with a note. `--branch main` takes another branch, for every
@@ -192,11 +197,15 @@ watchers join from elsewhere, and it can deliver games to the table. The table n
   console.
 
 The table keeps its approval, so later starts need only `--service`. Without `--service` it plays on its own again.
+Every game's log is kept on the table, also without the service, and sent to the service once the table is
+connected: the first start with `--service` also sends the logs of games played before. Delete the folder
+`logs` in the table's `data` folder first if you don't want that.
 
 ## Update and remove
 
 - **Update the games:** every start brings the games up to date.
-- **Update Game Table itself:** install the newest `game-table-macos.pkg`.
+- **Update Game Table itself:** stop the table, then install the newest `game-table-macos.pkg`. Your games, the table's key
+  and its logs stay.
 - **An older Game Table in `/Applications`:** packages before November 2, 2026 installed for all users. Install the new
   one, then drag the old *Game Table* from `/Applications` to the Trash (that one asks for an administrator), so
   Spotlight finds only the new one.
