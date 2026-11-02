@@ -1369,9 +1369,14 @@ function cloudNotice() {
 // ---------- copying links (D-094) ----------
 const COPY_ICON = `<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M5 15V6a2 2 0 0 1 2-2h8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`;
 const DONE_ICON = `<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+/**
+ * A link that wraps between its parts (after "//", before the port, before each "/"), never inside the address or the
+ * port number (review, 2026-11-02: an 800 px window broke the join address in the middle of its port).
+ */
+const breakable = (url) => esc(url).replace(/(\/\/)|(:\d+)|(\/)/g, (m, slashes, port) => (slashes ? `${m}<wbr>` : `<wbr>${m}`));
 /** A link with a copy button beside it. */
 const linkLine = (url) =>
-  `<div class="url-line"><span class="url">${esc(url)}</span><button type="button" class="copy" data-copy="${esc(url)}" title="Copy link" aria-label="Copy link">${COPY_ICON}</button></div>`;
+  `<div class="url-line"><span class="url">${breakable(url)}</span><button type="button" class="copy" data-copy="${esc(url)}" title="Copy link" aria-label="Copy link">${COPY_ICON}</button></div>`;
 document.addEventListener("click", async (e) => {
   const b = e.target.closest("button[data-copy]");
   if (!b) return;
@@ -1400,7 +1405,14 @@ function remotePlaces() {
 }
 
 /** Invite: a player while a seat is free, else a watcher (D-168); off when the remote places are taken. */
+/** A local table (LOCAL_TABLE=1: the packages, scripts/local-table.sh) without a service has no invites at all. */
+function noInvites() {
+  return !!state.localTable && state.cloud?.status === "disabled";
+}
+
 function inviteButton(label) {
+  // D-264: on a local table without the service the button is left out instead of greyed out; its notice says why.
+  if (noInvites()) return "";
   if (state.cloud?.status !== "online")
     return `<button data-invite disabled title="Remote play needs the connection to the Game Table service">${label}</button>`;
   if (remotePlaces().full) return `<button data-invite disabled title="All remote places are taken (players and watchers)">${label}</button>`;
@@ -1413,6 +1425,7 @@ function inviteButton(label) {
 function remoteJoinText() {
   const r = remotePlaces();
   const used = `<span class="faint">${r.used} of ${r.max} remote places taken${r.watching ? ` (${r.watching} watching)` : ""}</span>`;
+  if (noInvites()) return `Someone remote <span class="faint">· not on this table: it runs without the Game Table service</span>`;
   if (state.cloud?.status !== "online") return `Someone remote, with an invite link <span class="faint">· needs the Game Table service</span>`;
   const what = r.full
     ? "Someone remote, with an invite link"
