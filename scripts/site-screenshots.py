@@ -62,6 +62,9 @@ PLAN = [
     ("last-card", {"turnSeconds": 0, "tapToPlay": True}, 6, ["Klaus"], 5, 60),
 ]
 
+# game, seats, AI players, seconds to wait after start: board and phone from one game with Klaus (AI-only above)
+PHONE_ONLY = [("chess", 2, 1, 4), ("backgammon", 2, 1, 4), ("pachisi", 4, 3, 4)]
+
 # Last Card (extra-games): a point of a card on the phone that no other card covers (the hand overlaps).
 SPOT = """e => { const r = e.getBoundingClientRect();
   for (const fy of [0.3, 0.5, 0.15]) for (const fx of [0.3, 0.15, 0.5]) {
@@ -211,6 +214,40 @@ try:
             for ph in phones:
                 ph.close()
             print("shot", game, a("GET", "/state")["phase"])
+        # Board and phone of the games that are played with AI players only above: they come from ONE game with Klaus
+        # at the table, so the two pictures show the same moment (the names, the seats, the position). The game waits
+        # at Klaus's turn; Chess plays a few opening moves first by tapping on the board.
+        for game, seats, ais, secs in PHONE_ONLY:
+            if ONLY and game not in ONLY:
+                continue
+            reset()
+            a("POST", "/layout", {"seats": seats})
+            ph = b.new_page(viewport={"width": 390, "height": 844}, device_scale_factor=2)
+            ph.goto(a("GET", "/join")["url"].replace("192.168.1.20:8080", f"127.0.0.1:{PORT}"))
+            ph.fill("input[name=name]", "Klaus")
+            ph.click("button[type=submit]")
+            ph.wait_for_selector(".who h1")
+            for _ in range(ais):
+                a("POST", "/ai", {})
+            a("POST", "/game/select", {"gameId": game, "settings": {}})
+            ph.click("#ready")
+            time.sleep(1.5)
+            a("POST", "/game/start", {})
+            time.sleep(secs)
+            if game == "chess":
+                for src, dst in [("e2", "e4"), ("g1", "f3"), ("f1", "c4"), ("d2", "d3")]:
+                    try:
+                        wait(lambda: "your move" in ph.inner_text("body").lower(), 30, "Klaus's turn")
+                        board.click(f'.ch-pc[data-sq="{src}"]')
+                        board.click(f'.ch-sq[data-sq="{dst}"]')
+                    except Exception as e:
+                        print("chess move", src, dst, e)
+                wait(lambda: "your move" in ph.inner_text("body").lower(), 30, "Klaus's turn")
+                time.sleep(1.5)
+            board.screenshot(path=os.path.join(OUT, f"{game}-board.png"))
+            ph.screenshot(path=os.path.join(OUT, f"{game}-phone.png"))
+            ph.close()
+            print("shot board and phone", game, a("GET", "/state")["phase"])
         # The statistics window (D-140, D-178): eight hands of Hold'em with six AI players, played to the end.
         if not ONLY or "statistics" in ONLY:
             reset()
