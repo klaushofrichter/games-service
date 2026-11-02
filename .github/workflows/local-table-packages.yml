@@ -118,6 +118,17 @@ jobs:
     steps:
       - uses: actions/download-artifact@v7
         with: { name: package-windows }
+      - name: The guide's checksum check (docs/install/windows.md), on a sums file like the release's
+        shell: powershell
+        run: |
+          $f = (Resolve-Path .\game-table-windows.exe).Path
+          $sums = Join-Path $env:TEMP "game-table-SHA256SUMS.txt"
+          "$((Get-FileHash $f).Hash.ToLower())  game-table-windows.exe" | Set-Content -Encoding ascii $sums
+          $want = ((Get-Content $sums | Where-Object { $_ -match ' game-table-windows\.exe$' }) -split ' ')[0]
+          if ((Get-FileHash $f).Hash -ne $want) { throw "Checksum mismatch: stop" }
+          "0000  game-table-windows.exe" | Set-Content -Encoding ascii $sums
+          $want = ((Get-Content $sums | Where-Object { $_ -match ' game-table-windows\.exe$' }) -split ' ')[0]
+          if ((Get-FileHash $f).Hash -eq $want) { throw "a wrong sum was accepted" }
       - name: Install and start, as on a clean computer
         shell: powershell
         env:
@@ -221,10 +232,12 @@ jobs:
           Each start downloads extra-games and the private game repositories you name; your GitHub sign-in is needed only for those.
           Each package holds MANIFEST.json (also here as game-table-<os>.manifest.json): its version, build time, Node.js and built-in games.
           After a start, games.json in the table's folder lists every game on the table with its version, repository and commit (game-table --version)."
-          sums=$(sha256sum game-table-windows.exe game-table-macos.pkg game-table-linux.tar.gz 2>/dev/null | awk '{print "- " $2 ": " $1}')
+          # The same sums as a file, so an agent can check its download without copying a hash by hand (Windows review).
+          sha256sum game-table-windows.exe game-table-macos.pkg game-table-linux.tar.gz 2>/dev/null > game-table-SHA256SUMS.txt
+          sums=$(awk '{print "- " $2 ": " $1}' game-table-SHA256SUMS.txt)
           notes="$notes
 
-          SHA-256 of the packages in this build:
+          SHA-256 of the packages in this build (also in game-table-SHA256SUMS.txt):
           $sums"
           m=$(ls game-table-*.manifest.json | head -1)
           notes="$notes

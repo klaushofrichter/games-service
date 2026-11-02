@@ -27,13 +27,17 @@ In PowerShell, as the person's own user (not as administrator):
 ```powershell
 $f = Join-Path $env:TEMP "game-table-windows.exe"
 Invoke-WebRequest -UseBasicParsing https://github.com/klaushofrichter/games-service/releases/download/local-table/game-table-windows.exe -OutFile $f
-(Get-FileHash $f).Hash     # must match the SHA-256 in the release notes; stop if it doesn't
+$sums = Join-Path $env:TEMP "game-table-SHA256SUMS.txt"
+Invoke-WebRequest -UseBasicParsing https://github.com/klaushofrichter/games-service/releases/download/local-table/game-table-SHA256SUMS.txt -OutFile $sums
+$want = ((Get-Content $sums | Where-Object { $_ -match ' game-table-windows\.exe$' }) -split ' ')[0]
+if ((Get-FileHash $f).Hash -ne $want) { throw "Checksum mismatch: stop" }     # stops on a mismatch
 Start-Process -Wait -FilePath $f -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/CURRENTUSER"
 $gt = Join-Path $env:LOCALAPPDATA "Programs\Game Table\game-table.cmd"
 & $gt --repos none --smoke-test      # check: ends with SMOKE TEST PASSED
 ```
 
-The release notes are at https://github.com/klaushofrichter/games-service/releases/tag/local-table. A silent install shows no SmartScreen warning.
+A silent install shows no SmartScreen warning. This installs a **table** for this computer, not a game service: a
+game service (for remote players) runs on a server with Docker, a DNS name and HTTPS (see *Remote players* below).
 
 - **The check:** `--smoke-test` starts the table for a moment, checks it and stops. It fails if a named repository
   couldn't be downloaded, so a missing game can't pass. It never asks a question and doesn't change the saved list of
@@ -51,7 +55,7 @@ The release notes are at https://github.com/klaushofrichter/games-service/releas
 1. Download **[`game-table-windows.exe`](https://github.com/klaushofrichter/games-service/releases/download/local-table/game-table-windows.exe)** (from the release
    [Game Table for your computer](https://github.com/klaushofrichter/games-service/releases/tag/local-table)).
    To check the download, compare `Get-FileHash $env:USERPROFILE\Downloads\game-table-windows.exe` in PowerShell with
-   the SHA-256 in the release notes.
+   the SHA-256 in the release notes (PowerShell prints it in capitals; it's the same value).
 2. Open it. The installer isn't signed yet, so Windows shows *Windows protected your PC*. Click **More info › Run
    anyway**.
 3. Click through the installer. It installs for your user only, so it needs no administrator rights, and it brings
@@ -75,12 +79,17 @@ Start **Game Table** from the Start menu or the desktop. A window opens and show
 1. The first time, it asks for the **private game repositories**: type their names, like `my-game` or
    `owner/my-game`, separated by spaces. A name alone means `klaushofrichter/my-game`; anyone else's repository needs
    `owner/name`. Press Enter alone if you have none. Next time Enter keeps the same list,
-   and `-` clears it.
+   and `-` clears it. Only this answer is saved; `--repos` doesn't change it.
 2. For private repositories it needs a **GitHub sign-in**:
    - If the GitHub CLI (`gh`) is already installed and signed in, the starter uses that account without asking. Check
      which one with `gh auth status`.
-   - Otherwise it installs the GitHub CLI into its own folder and signs you in: it shows a code and opens the browser,
-     where you enter it. You do this only once.
+   - If the GitHub CLI is installed but not signed in, the starter uses it and signs you in. Otherwise it installs the
+     GitHub CLI into its own folder first.
+   - To sign in, it shows a code and asks you to **press Enter**: do, in the starter's window. That opens the browser,
+     where you enter the code (or enter it at github.com/login/device on another device). The sign-in finishes only
+     after Enter was pressed. You do this only once.
+   - If the sign-in fails, the table starts anyway, with the public games, and says which private repositories were
+     left out. Start again to retry.
 3. It downloads the games and opens the board in the browser.
 4. When Windows asks whether *Node.js JavaScript Runtime* may communicate on networks, allow **Private networks**.
 
@@ -141,7 +150,7 @@ Add them to the starter in a terminal: `"%LOCALAPPDATA%\Programs\Game Table\game
 | Option | |
 | --- | --- |
 | `--no-update` | Start with the games downloaded last time (offline) |
-| `--repos "a b"` | The private repositories, without asking (`--repos none`: none) |
+| `--repos "a b"` | The private repositories for this start, without asking (`--repos none`: none). The saved list stays as it is; it changes only when you answer the question |
 | `--port 8081` | Another port, if 8080 is taken (not remembered: give it at every start) |
 | `--no-open` | Don't open the browser |
 | `--branch main` | Another branch of the game repositories (default `production`) |

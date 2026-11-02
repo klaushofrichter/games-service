@@ -28,14 +28,14 @@ In Terminal:
 ```sh
 dir="$(mktemp -d)"
 curl -fL -o "$dir/game-table-macos.pkg" https://github.com/klaushofrichter/games-service/releases/download/local-table/game-table-macos.pkg
-shasum -a 256 "$dir/game-table-macos.pkg"     # must match the SHA-256 in the release notes; stop if it doesn't
+curl -fL -o "$dir/SHA256SUMS" https://github.com/klaushofrichter/games-service/releases/download/local-table/game-table-SHA256SUMS.txt
+(cd "$dir" && grep ' game-table-macos.pkg$' SHA256SUMS | shasum -a 256 -c -)     # must say OK; stop if it doesn't
 installer -pkg "$dir/game-table-macos.pkg" -target CurrentUserHomeDirectory     # no sudo: installs for this user
 gt="$HOME/Applications/Game Table.app/Contents/Resources/game-table.command"
 "$gt" --repos none --smoke-test      # check: ends with SMOKE TEST PASSED
 ```
 
-The release notes are at https://github.com/klaushofrichter/games-service/releases/tag/local-table. The package isn't signed yet, so the checksum is
-its only check. A package installed this way gets no Gatekeeper warning and needs no administrator.
+The package isn't signed yet, so the checksum is its only check. A package installed this way gets no Gatekeeper warning and needs no administrator.
 
 - **The check:** `--smoke-test` starts the table for a moment, checks it and stops. It fails if a named repository
   couldn't be downloaded, so a missing game can't pass. It never asks a question and doesn't change the saved list of
@@ -91,12 +91,17 @@ shows the table's messages:
 1. The first time, it asks for the **private game repositories**: type their names, like `my-game` or
    `owner/my-game`, separated by spaces. A name alone means `klaushofrichter/my-game`; anyone else's repository needs
    `owner/name`. Press Enter alone if you have none. Next time Enter keeps the same list,
-   and `-` clears it.
+   and `-` clears it. Only this answer is saved; `--repos` doesn't change it.
 2. For private repositories it needs a **GitHub sign-in**:
    - If the GitHub CLI (`gh`) is already installed and signed in, the starter uses that account without asking. Check
      which one with `gh auth status`.
-   - Otherwise it installs the GitHub CLI into its own folder and signs you in: it shows a code and opens the browser,
-     where you enter it. You do this only once.
+   - If the GitHub CLI is installed but not signed in, the starter uses it and signs you in. Otherwise it installs the
+     GitHub CLI into its own folder first.
+   - To sign in, it shows a code and asks you to **press Enter**: do, in the starter's window. That opens the browser,
+     where you enter the code (or enter it at github.com/login/device on another device). The sign-in finishes only
+     after Enter was pressed. You do this only once.
+   - If the sign-in fails, the table starts anyway, with the public games, and says which private repositories were
+     left out. Start again to retry.
 3. It downloads the games and opens the board in the browser.
 4. If the macOS firewall is on, macOS asks whether `node` may accept incoming network connections: click **Allow**.
    If the firewall is off, you won't be asked.
@@ -160,7 +165,7 @@ Run the starter in Terminal with options:
 | Option | |
 | --- | --- |
 | `--no-update` | Start with the games downloaded last time (offline) |
-| `--repos "a b"` | The private repositories, without asking (`--repos none`: none) |
+| `--repos "a b"` | The private repositories for this start, without asking (`--repos none`: none). The saved list stays as it is; it changes only when you answer the question |
 | `--port 8081` | Another port, if 8080 is taken (not remembered: give it at every start) |
 | `--no-open` | Don't open the browser |
 | `--branch main` | Another branch of the game repositories (default `production`) |
