@@ -35,7 +35,16 @@ const built = new Date().toISOString().replace(/\.\d+Z$/, "Z");
 const date = built.slice(0, 10);
 const REPO_URL = "https://github.com/klaushofrichter/games-service";
 const nodeVersions: Record<string, string> = {};
-const version = process.env.PACKAGE_VERSION || `${date} (${commit})`;
+// The games-service release this build is (its tag, like v2026.11.02.8, when the checkout has it), so the package's
+// version matches the release the website names (Linux review, 2026-11-02); otherwise the build date.
+const release = (() => {
+  try {
+    return git("tag", "--points-at", "HEAD").split("\n").find((t) => /^v\d{4}\.\d{2}\.\d{2}\.\d+$/.test(t)) ?? "";
+  } catch {
+    return "";
+  }
+})();
+const version = process.env.PACKAGE_VERSION || `${release || date} (${commit})`;
 
 async function get(url: string): Promise<Buffer> {
   const r = await fetch(url, { headers: { "User-Agent": "game-table-build" } });
