@@ -33,7 +33,7 @@ const PUBLIC_LINKS: Record<string, string> = {
   [`${OWNER}/extra-games`]: `https://github.com/${OWNER}/extra-games`,
 };
 
-/** Where a downloaded repository's games came from: <reposDir>/<name>.json. */
+/** Where a downloaded repository's games came from: <reposDir>/<owner>/<name>.json. */
 interface Download {
   repository: string;
   branch: string;
@@ -236,8 +236,8 @@ async function choosePrivate(o: Options, savedFile: string): Promise<string[]> {
   else if (o.noUpdate || !process.stdin.isTTY) answer = known.join(" ");
   else {
     say("");
-    say(`Private game repositories: type the names of those your GitHub account can read, e.g. my-game or`);
-    say(`${OWNER}/my-game, separated by spaces or commas.`);
+    say(`Private game repositories: type the names of those your GitHub account can read, separated by spaces or`);
+    say(`commas: owner/name, like my-company/my-game. A name alone, like my-game, means ${OWNER}/my-game.`);
     say(known.length ? `Last time: ${known.join(", ")}. Press Enter to keep them, or type '-' for none.` : "Press Enter for none (only the public games).");
     const rl = createInterface({ input: process.stdin, output: process.stdout });
     answer = await rl.question("Repositories: ");
@@ -255,6 +255,28 @@ async function choosePrivate(o: Options, savedFile: string): Promise<string[]> {
 }
 
 // --- Game repositories -------------------------------------------------------------------------------------------
+/**
+ * A repository's folder: <reposDir>/<owner>/<name>, so that two owners' repositories of the same name don't overwrite
+ * each other (owner/game and other-org/game). Starters before this kept <reposDir>/<name>; a copy there that came from
+ * this repository moves over once, so --no-update keeps working after an update.
+ */
+function repoDir(reposDir: string, repo: string) {
+  const [owner, name] = repo.split("/");
+  return { dir: join(reposDir, owner, name), info: join(reposDir, owner, `${name}.json`) };
+}
+
+async function moveOldLayout(reposDir: string, repo: string) {
+  const name = repo.split("/")[1];
+  const at = repoDir(reposDir, repo);
+  const oldInfo = join(reposDir, `${name}.json`);
+  if (existsSync(at.dir) || !existsSync(join(reposDir, name, "games"))) return;
+  const d = await readJson<Download>(oldInfo);
+  if (d?.repository?.toLowerCase() !== repo.toLowerCase()) return;
+  await mkdir(dirname(at.dir), { recursive: true });
+  await rename(join(reposDir, name), at.dir);
+  await rename(oldInfo, at.info);
+}
+
 /** The commit a GitHub tarball was made from: its first entry, a pax global header, says "comment=<sha>". */
 function tarCommit(gz: Buffer): string {
   const head = gunzipSync(gz).subarray(0, 2048);
@@ -262,15 +284,15 @@ function tarCommit(gz: Buffer): string {
   return head.subarray(512, 1024).toString("utf8").match(/comment=([0-9a-f]{40})/)?.[1] ?? "";
 }
 
-/** Downloads a repository's branch and keeps its games/ folder: <reposDir>/<name>/games, and <name>.json. */
+/** Downloads a repository's branch and keeps its games/ folder: <reposDir>/<owner>/<name>/games, and <name>.json. */
 async function fetchGames(repo: string, branch: string, reposDir: string, token: string | null) {
   // With a token through the API; without one from codeload, which anonymous API limits don't count.
   const gz = token
     ? await get(`https://api.github.com/repos/${repo}/tarball/${encodeURIComponent(branch)}`, { Accept: "application/vnd.github+json", Authorization: `Bearer ${token}` })
     : await get(`https://codeload.github.com/${repo}/tar.gz/refs/heads/${encodeURIComponent(branch)}`);
   const entries = readTarGz(gz, 2 * 1024 * 1024 * 1024);
-  const name = repo.split("/")[1];
-  const staging = join(reposDir, `${name}.new`);
+  const at = repoDir(reposDir, repo);
+  const staging = `${at.dir}.new`;
   await rm(staging, { recursive: true, force: true });
   let top = "";
   let count = 0;
@@ -288,14 +310,12 @@ async function fetchGames(repo: string, branch: string, reposDir: string, token:
     count++;
   }
   if (!count) throw new Error(`no games/ folder on ${branch}`);
-  const target = join(reposDir, name);
-  await rm(target, { recursive: true, force: true });
-  await rename(staging, target);
+  await rm(at.dir, { recursive: true, force: true });
+  await rename(staging, at.dir);
   // The API names the folder <owner>-<name>-<sha>; both keep the full commit in the global header.
   const commit = tarCommit(gz) || (token ? (top.split("-").at(-1) ?? "") : "");
   const info: Download = { repository: repo, branch, commit, downloaded: new Date().toISOString().replace(/\.\d+Z$/, "Z") };
-  await writeFile(join(reposDir, `${name}.json`), JSON.stringify(info, null, 2) + "\n");
-  await rm(join(reposDir, `${name}.commit`), { force: true }); // before games.json, the commit alone
+  await writeFile(at.info, JSON.stringify(info, null, 2) + "\n");
   return commit.slice(0, 7) || "an unknown commit";
 }
 
@@ -371,7 +391,7 @@ async function writeGamesList(home: string, gamesDir: string, from: Map<string, 
     if (label === "games-service") {
       source = { repository: PUBLIC_LINKS["games-service"], package: pkg?.package.version ?? "dev", commit: pkg?.gamesService.commit ?? "" };
     } else {
-      const d = await readJson<Download>(join(reposDir, `${label.split("/")[1]}.json`));
+      const d = await readJson<Download>(repoDir(reposDir, label).info);
       source = { repository: PUBLIC_LINKS[label] ?? label, branch: d?.branch ?? "", commit: d?.commit ?? "", downloaded: d?.downloaded ?? "" };
     }
     games.push({ id, name: m?.name ?? id, version: m?.version ?? "", ...(m?.test ? { test: true } : {}), ...source });
@@ -432,8 +452,8 @@ async function main() {
   if ((priv.length || o.signIn) && !o.noUpdate) token = await githubToken(tools);
   const have: string[] = [];
   for (const r of repos) {
-    const name = r.split("/")[1];
-    const present = existsSync(join(reposDir, name, "games"));
+    await moveOldLayout(reposDir, r);
+    const present = existsSync(join(repoDir(reposDir, r).dir, "games"));
     if (o.noUpdate) {
       if (present) have.push(r);
       else note(`${r} was never downloaded; start without --no-update.`);
@@ -459,7 +479,7 @@ async function main() {
   await rm(gamesDir, { recursive: true, force: true });
   await mkdir(gamesDir, { recursive: true });
   const from = new Map<string, string>();
-  const sources: [string, string][] = [["games-service", join(runtime, "games")], ...have.map((r): [string, string] => [r, join(reposDir, r.split("/")[1], "games")])];
+  const sources: [string, string][] = [["games-service", join(runtime, "games")], ...have.map((r): [string, string] => [r, join(repoDir(reposDir, r).dir, "games")])];
   for (const [label, dir] of sources) {
     const ids: string[] = [];
     for (const e of await readdir(dir, { withFileTypes: true }).catch(() => [])) {
