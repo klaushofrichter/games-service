@@ -446,8 +446,6 @@ html.lb-open, html.lb-open body { overflow: hidden; }
 .story-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 10px; }
 .story-cols h3 { font-size: 24px; margin-bottom: 18px; }
 .story-cols a { color: var(--brass-hi); }
-.story-try { margin-top: 44px; max-width: 900px; }
-.story-try p { padding-right: 70px; }
 .agent-alt q { display: block; margin-top: 8px; font: 14.5px/1.6 var(--mono); color: var(--ink); quotes: none; padding-right: 70px; }
 
 /* ---------- the table ---------- */
@@ -628,14 +626,14 @@ footer a.terms { display: inline; margin: 0; }
 <!-- ============ PATHS ============ -->
 <section class="paths" id="paths">
   <div class="wrap grid">
-    <a class="path dev rv spot" href="#build">
-      <span class="badge">Start here</span>
+    <a class="path rv spot" href="#build">
       <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 9l-4 3 4 3M16 9l4 3-4 3M13.5 5l-3 14"/></svg></span>
       <h3>Game developers</h3>
       <p>Turn your game idea into something people play together, fast. Describe it to your AI, and the platform supplies the lobby, seats, phones, AI scheduling, remote play, logs and replay.</p>
       <span class="go">Build a game →</span>
     </a>
-    <a class="path rv spot" style="--d:.08s" href="#download">
+    <a class="path dev rv spot" style="--d:.08s" href="#download">
+      <span class="badge">Start here</span>
       <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="3"/><circle cx="9" cy="9" r="1.2" fill="currentColor"/><circle cx="15" cy="15" r="1.2" fill="currentColor"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/></svg></span>
       <h3>Gamers</h3>
       <p>Download Game Table for Windows, macOS or Linux and play the free games with friends around any screen. No cloud, no accounts.</p>
@@ -647,6 +645,37 @@ footer a.terms { display: inline; margin: 0; }
       <p>Build a table with a flat touchscreen and a small Linux PC. A kiosk kit boots straight into the board.</p>
       <span class="go">The table →</span>
     </a>
+  </div>
+</section>
+
+<!-- ============ ABOUT ============ -->
+<!-- Where the project and its code come from (D-187). -->
+<section class="story" id="about">
+  <div class="wrap">
+    <div class="section-head">
+      <p class="eyebrow rv">About</p>
+      <h2 class="rv" style="--d:.06s">Human players first.</h2>
+      <p class="lede rv" style="--d:.12s">Game Table began with a do-it-yourself game table that friends built, and with a love of board games. Klaus and those friends kept coming back to one idea: a game platform designed for the people at the table, helped by computer graphics and a referee that never tires. The rules are observed automatically, and the chores, like setting up the board and keeping the game moving, happen by themselves. What matters is the people playing together.</p>
+    </div>
+    <div class="story-cols">
+      <div class="rv" style="--d:.05s">
+        <h3>The idea</h3>
+        <ul class="show-list">
+          <li><b>The table is the centrepiece.</b> One shared touchscreen in the middle, and each player's phone as a private deck for the games that hide cards, like poker.</li>
+          <li><b>Remote players, on the side.</b> Friends far away can join, but there is no video, voice or chat in the game, on purpose. Talk to them the way you already do, with Google Meet or FaceTime running alongside.</li>
+          <li><b>AI players fill the seats.</b> Mainly so that a game that needs a certain number of players can start at all.</li>
+        </ul>
+      </div>
+      <div class="rv" style="--d:.1s">
+        <h3>The code</h3>
+        <ul class="show-list">
+          <li><b>Prompted, not typed.</b> The ideas went to Claude, and Claude Opus 5.5 developed all of the code, step by step. Every decision is in the <a href="https://github.com/klaushofrichter/games-service/blob/main/docs/decisions.md" target="_blank" rel="noopener noreferrer">decision records</a>: who asked, why, and how it was built.</li>
+          <li><b>A platform, and games from anywhere.</b> The platform and its lobby are separate from the games, with clear ways to bring in games from other repositories that fit the table.</li>
+          <li><b>The table stays at home.</b> The game service's lobby lets remote players find their game through an invite link, without the game table itself being exposed to the internet.</li>
+          <li><b>Open.</b> The project is hosted by Klaus's engineering company, <a href="https://skylar.technology" target="_blank" rel="noopener noreferrer">Skylar Technology</a>, and every source for a complete game runtime and development environment is public on GitHub.</li>
+        </ul>
+      </div>
+    </div>
   </div>
 </section>
 
@@ -867,7 +896,7 @@ awards: [
 {
   <span class="s">"id"</span>: <span class="s">"coin-flip"</span>,
   <span class="s">"name"</span>: <span class="s">"Coin Flip"</span>,
-  <span class="s">"version"</span>: <span class="s">"2026.10.19.1"</span>,
+  <span class="s">"version"</span>: <span class="s">"2026.10.23.1"</span>,
   <span class="s">"players"</span>: { <span class="s">"min"</span>: <span class="t">1</span>, <span class="s">"max"</span>: <span class="t">8</span> },
   <span class="s">"turnModel"</span>: <span class="s">"simultaneous"</span>,
   <span class="s">"seatLayouts"</span>: [<span class="t">2</span>, <span class="t">4</span>, <span class="t">6</span>, <span class="t">8</span>],
@@ -942,7 +971,7 @@ awards: [
       <div class="dbg-head">
         <p class="eyebrow rv">Platform feature</p>
         <h3 class="rv" style="--d:.06s">The sling: push a card off your phone, onto the table.</h3>
-        <p class="rv" style="--d:.1s">A game can let players push a card up and off the top of their phone. While the finger is still on the glass, the board shows the card coming in at that player's edge; let go and it flies onto the pile. Drawn cards fly the other way. Last Card, the newest game in extra-games, is built on it.</p>
+        <p class="rv" style="--d:.1s">A game can let players push a card up and off the top of their phone. While the finger is still on the glass, the board shows the card coming in at that player's edge; let go and it flies onto the pile. Drawn cards fly the other way. Last Card, a game in extra-games, is built on it.</p>
       </div>
       <div class="show-grid">
         <!-- A schematic, like the hero's table: a card pushed off the phone peeks in at the player's seat on the board
@@ -1109,7 +1138,7 @@ node scripts/soak.ts 100</pre>
         <button class="copy" data-copy="#download-prompt">Copy</button>
       </div>
     </div>
-    <p class="rv muted" style="--d:.1s;margin-top:22px">Without the Game Table service, everyone plays at your table. To add players from elsewhere, the same installation joins the service later with <code>--service</code>. The packages aren't signed yet, so Windows and macOS ask once whether to open them; the guides show where to click.</p>
+    <p class="rv muted" style="--d:.1s;margin-top:22px"><b style="color:var(--ink)">Players at your table only, out of the box.</b> The packages don't connect to a game service with a public DNS name, like <code>https://games.skylar.technology</code>, so nobody can join from elsewhere. That takes configuration: start the same installation with an access code from a game service (<code style="white-space:nowrap">--code</code>), or run your own game service on a public DNS name (see <a href="#service">Every table, one console</a>). The packages aren't signed yet, so Windows and macOS ask once whether to open them; the guides show where to click.</p>
   </div>
 </section>
 
@@ -1191,6 +1220,7 @@ docker compose -f deploy/local/docker-compose.yml up -d --build">Copy</button></
         <li><b>The games each table gets.</b> Add extra-game repositories from GitHub, and tick which tables get them, one by one or with their access code.</li>
         <li><b>Game logs for analysis.</b> Every game and simulation sends its log to the service. Filter by game, table and date, download the zips, or give a pipeline or a Claude session a download token. You choose how long logs are kept.</li>
         <li><b>This website.</b> The service serves this page, the developer guide and <code>llms.txt</code>.</li>
+        <li><b>A public host, on request.</b> games.skylar.technology can host other people's tables too: on request it issues an access code, a token for your table, and your installation joins with <code style="white-space:nowrap">--code</code>. <a href="https://github.com/klaushofrichter/games-service/issues/new?title=Access%20code%20request%3A%20" target="_blank" rel="noopener noreferrer">Ask on GitHub</a>. It's offered as is, with no guarantee of service.</li>
       </ul>
       <figure class="shot rv" style="--d:.1s"><img src="/site/admin.webp" alt="The admin console: an overview, two tables online, and the logs of their games and simulations with filters and Download buttons" loading="lazy"><figcaption>The admin console: two tables, the Living room approved by its pairing code and the Den by an access code, and the logs of their games and simulations (access codes and repositories are further down, left out here).</figcaption></figure>
     </div>
@@ -1206,44 +1236,9 @@ docker compose -f deploy/local/docker-compose.yml up -d --build">Copy</button></
     </div>
     <div class="opengrid">
       <a class="og rv spot" href="https://github.com/klaushofrichter/games-service/blob/main/LICENSE" target="_blank" rel="noopener noreferrer"><b>MIT</b><h3>Yours to use</h3><p>Platform and example games under the MIT licence: commercial use, changes and forks welcome. No warranty.</p></a>
-      <a class="og rv spot" style="--d:.06s" href="https://github.com/klaushofrichter/games-service/blob/main/docs/decisions.md" target="_blank" rel="noopener noreferrer"><b data-count="170" data-suffix="+">0</b><h3>Architecture Decision Records</h3><p>Every product and design decision, with who made it, why, and how it was built. Your AI can read the history, not just the code.</p></a>
-      <a class="og rv spot" style="--d:.12s" href="https://github.com/klaushofrichter/games-service/tree/main/tests" target="_blank" rel="noopener noreferrer"><b data-count="490" data-suffix="+">0</b><h3>Automated tests</h3><p>Rules, lobby, remote play and every game, plus browser checks on real boards and phones, on every pull request.</p></a>
+      <a class="og rv spot" style="--d:.06s" href="https://github.com/klaushofrichter/games-service/blob/main/docs/decisions.md" target="_blank" rel="noopener noreferrer"><b data-count="250" data-suffix="+">0</b><h3>Architecture Decision Records</h3><p>Every product and design decision, with who made it, why, and how it was built. Your AI can read the history, not just the code.</p></a>
+      <a class="og rv spot" style="--d:.12s" href="https://github.com/klaushofrichter/games-service/tree/main/tests" target="_blank" rel="noopener noreferrer"><b data-count="520" data-suffix="+">0</b><h3>Automated tests</h3><p>Rules, lobby, remote play and every game, plus browser checks on real boards and phones, on every pull request.</p></a>
       <a class="og rv spot" style="--d:.18s" href="https://github.com/klaushofrichter/games-service/blob/main/AGENTS.md" target="_blank" rel="noopener noreferrer"><b>AI</b><h3>Ready for agents</h3><p><code>AGENTS.md</code>, <code>llms.txt</code> and a developer guide written for language models: point your agent at the repository and go.</p></a>
-    </div>
-  </div>
-</section>
-<!-- ============ ABOUT ============ -->
-<!-- Where the project and its code come from (D-187). -->
-<section class="story" id="about">
-  <div class="wrap">
-    <div class="section-head">
-      <p class="eyebrow rv">About</p>
-      <h2 class="rv" style="--d:.06s">Human players first.</h2>
-      <p class="lede rv" style="--d:.12s">Game Table began with a do-it-yourself game table that friends built, and with a love of board games. Klaus and those friends kept coming back to one idea: a game platform designed for the people at the table, helped by computer graphics and a referee that never tires. The rules are observed automatically, and the chores, like setting up the board and keeping the game moving, happen by themselves. What matters is the people playing together.</p>
-    </div>
-    <div class="story-cols">
-      <div class="rv" style="--d:.05s">
-        <h3>The idea</h3>
-        <ul class="show-list">
-          <li><b>The table is the centrepiece.</b> One shared touchscreen in the middle, and each player's phone as a private deck for the games that hide cards, like poker.</li>
-          <li><b>Remote players, on the side.</b> Friends far away can join, but there is no video, voice or chat in the game, on purpose. Talk to them the way you already do, with Google Meet or FaceTime running alongside.</li>
-          <li><b>AI players fill the seats.</b> Mainly so that a game that needs a certain number of players can start at all.</li>
-        </ul>
-      </div>
-      <div class="rv" style="--d:.1s">
-        <h3>The code</h3>
-        <ul class="show-list">
-          <li><b>Prompted, not typed.</b> The ideas went to Claude, and Claude Opus 5.5 developed all of the code, step by step. Every decision is in the <a href="https://github.com/klaushofrichter/games-service/blob/main/docs/decisions.md" target="_blank" rel="noopener noreferrer">decision records</a>: who asked, why, and how it was built.</li>
-          <li><b>A platform, and games from anywhere.</b> The platform and its lobby are separate from the games, with clear ways to bring in games from other repositories that fit the table.</li>
-          <li><b>The table stays at home.</b> The game service's lobby lets remote players find their game through an invite link, without the game table itself being exposed to the internet.</li>
-          <li><b>Open.</b> The project is hosted by Klaus's engineering company, <a href="https://skylar.technology" target="_blank" rel="noopener noreferrer">Skylar Technology</a>, and every source for a complete game runtime and development environment is public on GitHub.</li>
-        </ul>
-      </div>
-    </div>
-    <div class="agent-alt rv story-try" style="--d:.15s">
-      <p><b style="color:var(--ink)">Try it with your own AI agent.</b> Ask it to set up a table on your computer and start playing, or to write a new game from a single sentence. Then play it, and ask the agent to fix whatever could be better: that fine-tuning is usually worth it. Your games can stay private or be shared with everyone.</p>
-      <q id="story-prompt">Read https://games.skylar.technology/llms.txt, set up Game Table on my computer, and write a new game for it: Yahtzee for 2–6 players.</q>
-      <button class="copy" data-copy="#story-prompt">Copy</button>
     </div>
   </div>
 </section>
