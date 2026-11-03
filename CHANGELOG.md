@@ -8,6 +8,10 @@ history.
 
 ## [Unreleased]
 
+- Release notes of the packages: extra-games linked and added automatically, the checksums named; a notes-only run rewrites them without a new build (D-276).
+- The website: the package cards' ".pkg" and ".tar.gz" keep the tails of their g (D-275).
+- The website: the captions under the hero's table each stay at least 1.2 s, also on a fast scroll (D-274).
+- The website: new text for the four numbers under the ticker (D-273).
 - Board: names in their colour on the away and waiting cards; the exchange offers an AI player on a board opened during a game; Versions name the game being played and its source; Live status shows clock times and no longer redraws while nothing happens (D-272).
 - The packages' publish step works again, and a test parses every bash step of the workflows (D-271).
 - Install guides and llms.txt: hints for AI agents about ports (firewalls) and the GitHub sign-in, and a Troubleshoot section; the starter saves the private repositories only when it asked (D-270).
