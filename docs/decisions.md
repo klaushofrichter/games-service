@@ -2190,3 +2190,8 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   `tests/workflow-shell.test.ts` runs `bash -n` on every bash `run:` block of every workflow (GitHub expressions
   replaced, PowerShell steps left out), so a pull request fails on it before anything is published. Checked that the
   test fails with the old line.
+- **D-275 · 2026-11-03 · Klaus** — On the landing page's package cards, the "g" of *.pkg* and *.tar.gz* lost its tail.
+  *Implementation (Claude):* those titles are painted with a gradient clipped to the text, and the gradient covers
+  only the element's box, which a line height of 1 ends above the descenders. The cards' titles (`.og b`, also *MIT*,
+  *250+* and *AI* further down) get room below (`padding-bottom: .18em`), taken back with a negative margin so the
+  layout doesn't move. Checked in screenshots of both card rows.

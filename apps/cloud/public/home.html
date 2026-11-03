@@ -479,7 +479,10 @@ html.lb-open, html.lb-open body { overflow: hidden; }
 .opengrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; }
 .og { display: grid; gap: 10px; align-content: start; padding: 28px 24px; border-radius: 20px; border: 1px solid var(--line); background: rgba(15,42,36,.55); color: var(--ink); transition: transform .3s, border-color .3s; }
 .og:hover { transform: translateY(-5px); border-color: var(--brass-deep); text-decoration: none; }
-.og b { font: 600 46px/1 var(--display); background: linear-gradient(180deg, var(--brass-hi), var(--brass-deep)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.og b { font: 600 46px/1 var(--display); background: linear-gradient(180deg, var(--brass-hi), var(--brass-deep)); -webkit-background-clip: text; background-clip: text; color: transparent;
+  /* The gradient is painted only inside the box, and a line height of 1 ends the box above the descenders: the "g" of
+     .pkg and .tar.gz lost its tail (D-275). Room below for them, taken back so the layout stays. */
+  padding-bottom: .18em; margin-bottom: -.18em; }
 .og h3 { font: 600 18px/1.3 var(--text); }
 .og p { color: var(--soft); font-size: 15px; }
 .og code { color: var(--brass-hi); font-size: 13.5px; }
