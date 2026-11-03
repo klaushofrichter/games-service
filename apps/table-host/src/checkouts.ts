@@ -3,6 +3,7 @@
 // service delivers from GitHub. The board says so once, with the branches.
 import { execFile } from "node:child_process";
 import { realpath } from "node:fs/promises";
+import { homedir } from "node:os";
 import { basename } from "node:path";
 import { promisify } from "node:util";
 import type { InstalledGame } from "./games.ts";
@@ -12,6 +13,8 @@ const run = promisify(execFile);
 export interface Checkout {
   /** The checkout's folder name, e.g. "games-service". */
   name: string;
+  /** Where it is, with the home folder as "~", e.g. "~/Development/traders-game" (D-272). */
+  path: string;
   /** Its branch, or "detached" at a commit. */
   branch: string;
   /** The commit checked out, short. */
@@ -46,7 +49,9 @@ export async function checkoutsOf(games: Map<string, InstalledGame>): Promise<Ch
           git(root, "rev-parse", "--short", "HEAD"),
           git(root, "status", "--porcelain", "--untracked-files=no"),
         ]);
-        c = { name: basename(root), branch: branch === "HEAD" ? "detached" : branch, commit, changed: status !== "", games: [] };
+        const home = homedir();
+        const path = home && (root === home || root.startsWith(`${home}/`)) ? `~${root.slice(home.length)}` : root;
+        c = { name: basename(root), path, branch: branch === "HEAD" ? "detached" : branch, commit, changed: status !== "", games: [] };
         byRoot.set(root, c);
       }
       c.games.push(g.manifest.id);

@@ -2190,3 +2190,24 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   `tests/workflow-shell.test.ts` runs `bash -n` on every bash `run:` block of every workflow (GitHub expressions
   replaced, PowerShell steps left out), so a pull request fails on it before anything is published. Checked that the
   test fails with the old line.
+- **D-272 · 2026-11-03 · Klaus** — From a Traders game on a local table (screenshots): the board's cards and windows
+  around an away player, the Versions, and Live status. Platform changes; Traders itself is unchanged.
+  - **Names in their colour** on the cards at a seat: *is away* (D-144), the game waiting for a player (D-119) and an
+    AI player out of time (D-112). The coloured dot stays.
+  - **The exchange offers an AI player again.** A board opened or reloaded during a game had no games list (it was
+    fetched only in the lobby), so the exchange dialog didn't know the game has AI players and left the choice out.
+    The board now fetches the list once when it has none, also during a game. When the player is the last one at the
+    table and *Games without a player at the table* is off, the AI choice says that picking it switches the setting
+    on (the confirmation already said so, D-223); with the setting on, it is offered plainly.
+  - **Versions name the game being played.** During a game, Advanced › Versions starts with *This game*: its name
+    and version, and where it runs from: *Local: ~/Development/traders-game* with branch and commit (a local
+    checkout, D-251; the checkout's folder is now in the table's state, home as `~`), *from a game repository*, or
+    *built in*.
+  - **Live status reads calmly.** It is polled twice a second and was redrawn every time, with every AI answer's
+    "… s ago" changing (an 11-hour-old answer read "39511.6 s ago") and the list jumping back to the top. The answers
+    now show their clock time, the window is redrawn only when something changed, and the scroll position stays.
+    The window stays: it shows what holds a game up (AI players, the board's pacing, phones held back) when a game
+    seems stuck.
+  - Checks: `scripts/e2e/exchange.py` reloads the board mid-game and finds the AI choice and *This game*, and reads
+    the AI choice's note for the last player; `scripts/e2e/developer.py` reads clock times in Live status and checks
+    that the idle window isn't redrawn.
