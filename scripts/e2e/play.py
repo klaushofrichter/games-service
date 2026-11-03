@@ -358,6 +358,11 @@ def coinflip(browser, board):
     board.wait_for_selector(".summary-table >> text=Heads %")
     decks[0].wait_for_selector(".summary-table >> text=Klaus")
     shot(board, "result")
+    # D-278: a phone can leave from the result; the seat is free for the next game, the others stay.
+    decks[1].click("[data-leave=table]")
+    decks[1].click(".leave-confirm")
+    wait(lambda: [p["name"] for p in api("GET", "/state")["players"] if p["kind"] == "human"] == ["Klaus"], 5, "Mira to leave after the game")
+    assert api("GET", "/state")["phase"] == "finished", "leaving must not end the result"
     return decks
 
 

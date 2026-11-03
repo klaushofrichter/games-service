@@ -521,7 +521,7 @@ function renderJoin() {
   });
 }
 
-/** "Leave the game" (D-158): on the Ready screen (leaves the table) and on the own tab during a game. */
+/** "Leave the game" (D-158): on the Ready screen and the result (leaves the table, D-278) and on the own tab during a game. */
 function leaveHtml(inGame) {
   return `<div class="leave-row"><button type="button" class="big leave-btn" data-leave="${inGame ? "game" : "table"}">Leave the game</button></div>`;
 }
@@ -595,7 +595,8 @@ function renderLobby(p) {
     action = `<div class="card"><div class="eyebrow">Result</div><div class="display" style="font-size:1.3em;margin-top:6px">${esc(state.summary.text)}</div>
       ${t ? `<div class="summary-scroll"><table class="summary-table"><tr>${t.columns.map((c) => `<th>${esc(c)}</th>`).join("")}</tr>${t.rows.map((r) => `<tr>${r.map((c) => `<td>${esc(c)}</td>`).join("")}</tr>`).join("")}</table></div>` : ""}</div>`;
   }
-  const leaveRow = state.phase === "ready" && state.game && p?.seat != null ? leaveHtml(false) : "";
+  // Before a game and on its result (D-278): leaving frees the seat for the next game.
+  const leaveRow = ((state.phase === "ready" && state.game) || state.phase === "finished") && p?.seat != null ? leaveHtml(false) : "";
   return `${action}<div class="card list"><div class="eyebrow" style="margin-bottom:6px">At the table</div>${playersHtml()}</div>${leaveRow}`;
 }
 
