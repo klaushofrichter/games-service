@@ -1293,12 +1293,31 @@ docker compose -f deploy/local/docker-compose.yml up -d --build">Copy</button></
     tt.style.setProperty("--rz", `${(-14 + mx * 8) * (1 - p)}deg`);
     tt.style.setProperty("--rx", `${50 - p * 40 - my * 6 * (1 - p)}deg`);
   }
+  // The captions under the table: a fast scroll used to flash the first two past unread. Each one shown now stays at
+  // least CAP_MS (its fade-in is .6 s) before the next, whatever the scroll does meanwhile (D-274).
+  const CAP_MS = 1200;
+  let capShown = -1, capTarget = -1, capSince = 0, capTimer = null;
+  function stepCaps() {
+    if (capTimer || capShown === capTarget) return;
+    // Forward one caption at a time; back (scrolling up) at once, straight to the one asked for.
+    const back = capTarget < capShown;
+    const wait = back || capShown === -1 ? 0 : Math.max(0, CAP_MS - (performance.now() - capSince));
+    capTimer = setTimeout(() => {
+      capTimer = null;
+      capShown = capTarget < capShown ? capTarget : capShown + 1;
+      capSince = performance.now();
+      caps.forEach((c, k) => c.classList.toggle("on", k === capShown));
+      stepCaps();
+    }, wait);
+  }
   function heroScroll() {
     if (still || !pinned()) { p = 0; hero.style.setProperty("--p", 0); return; }
     const span = hero.offsetHeight - innerHeight;
     p = Math.min(1, Math.max(0, (scrollY - hero.offsetTop) / span));
     hero.style.setProperty("--p", p.toFixed(3));
-    caps.forEach((c, k) => c.classList.toggle("on", p > 0.42 + k * 0.17 && (k === caps.length - 1 ? p <= 1 : p <= 0.42 + (k + 1) * 0.17)));
+    // Which caption the scroll position asks for; the captions follow it one step at a time (D-274).
+    capTarget = caps.findIndex((c, k) => p > 0.42 + k * 0.17 && (k === caps.length - 1 ? p <= 1 : p <= 0.42 + (k + 1) * 0.17));
+    stepCaps();
     camera();
   }
   addEventListener("scroll", heroScroll, { passive: true });
