@@ -753,7 +753,7 @@ function placeSettings(playing) {
  * since a remote board has no gear: there it offers the game logs only.
  */
 function placeTools(playing, front, gearCorner) {
-  toolsBtn.hidden = REMOTE && !state.remote?.boardControl;
+  toolsBtn.hidden = viewOnly();
   if (toolsBtn.hidden) return placeAlong(watchBtn, REMOTE ? 102 : 172, front, gearCorner, placeWatchers());
   // The developer setting (D-118) marks it while it is on, so nobody forgets it.
   toolsBtn.classList.toggle("dev", !!(state.developer?.allowNoLocalPlayer || state.developer?.boardDeck) && !REMOTE);
@@ -972,7 +972,7 @@ function openSettings() {
         const plays = aiPlays(p);
         if (!plays) return "";
         const { text, full } = plays;
-        return !REMOTE || state.remote?.boardControl
+        return !viewOnly()
           ? `<button class="ai-style" data-ai-options="${esc(p.id)}" title="${esc(full)}" aria-label="How ${esc(p.name)} plays: ${esc(full)}">${esc(text)}</button>`
           : `<span class="ai-style faint" title="${esc(full)}">${esc(text)}</span>`;
       };
@@ -994,7 +994,7 @@ function openSettings() {
       : "";
     // The table's rules for games with AI players (D-236, D-237): outside a game only, like the game settings.
     const rules = state.rules ?? { awayToAi: 0, distinctAiStyles: true };
-    const rulesEditable = !inRunningGame() && (!REMOTE || state.remote?.boardControl);
+    const rulesEditable = !inRunningGame() && !viewOnly();
     const awayText = (m) => (m ? `After ${m} minutes` : "Off");
     const tableRules = `<div class="group table-rules ${rulesEditable ? "" : "locked"}"><div class="eyebrow">Table rules${rulesEditable ? "" : ` <span class="lock" aria-label="locked">🔒 locked during the game</span>`}</div>
         <div class="row"><span title="A player of the running game whose phone or browser stays away this long gets an AI player in their seat, as Exchange › AI player would. Off: the seat waits, and the table decides.">A player away this long is replaced by an AI player</span>${rulesEditable
@@ -1495,7 +1495,14 @@ function renderLobby() {
 const PAGE_SIZE = 3;
 let gamePage = 0;
 /** A remote board that may not operate the table: a watcher, or board control switched off (D-167, D-170). */
-const viewOnly = () => REMOTE && !state.remote?.boardControl;
+/**
+ * A remote board that may only watch: the table's board, or a remote board with board control, may operate the table.
+ * The server sends `remote.boardControl` already decided (the table's switch, a player in that browser, and the game's
+ * `remoteBoardControl` during a game), so this is the one place the board asks (D-277).
+ */
+function viewOnly() {
+  return REMOTE && !state.remote?.boardControl;
+}
 // A remote board without board control (a watcher, or control switched off) shows the games, not as buttons (D-170).
 const tileHtml = (g) => `<button class="tile ${g.selectable ? "selectable" : ""} ${viewOnly() ? "view-only" : ""}" data-game="${g.id}" ${g.selectable && !viewOnly() ? "" : viewOnly() ? 'tabindex="-1" aria-disabled="true"' : "disabled"}>
           <span class="title">${esc(g.name)}</span><span class="desc">${esc(withSettings(g.description, g.settings, {}, { hints: false }))}</span>
@@ -1638,6 +1645,15 @@ function nearSeat(seat) {
   return { x: at.x + (W / 2 - at.x) * 0.22, y: at.y + (H / 2 - at.y) * 0.42 };
 }
 
+/** A player's name on a card at their seat: the dot and the name in the player's colour (D-272). */
+const whoLine = (color, name) =>
+  `<span class="dot" style="background:${color ?? "var(--brass)"}"></span><span style="color:${color ?? "inherit"}">${esc(name)}</span>`;
+/** The opening tag of a card near a seat, turned with the board (the AI-wait, player-wait and away cards). */
+const seatCardOpen = (cls, attrs, seat) => {
+  const { x, y } = nearSeat(seat);
+  return `<div class="ai-wait-card${cls ? ` ${cls}` : ""}" ${attrs} style="left:${x}px;top:${y}px;transform:translate(-50%,-50%) rotate(${ROT[gameEdge()]}deg)">`;
+};
+
 /**
  * An AI player is out of time (D-112): the game is paused and the board stays visible. A card near the AI's seat, facing
  * the players, offers "Play now" (the game's quick move for it); otherwise the game goes on when the AI answers. Remote
@@ -1645,10 +1661,9 @@ function nearSeat(seat) {
  */
 function renderAiWait(p) {
   const who = state.players.find((x) => x.id === p.ai?.playerId);
-  const { x, y } = nearSeat(p.ai?.seat);
-  const control = !REMOTE || state.remote?.boardControl;
-  pauseLayer.innerHTML = `<div class="ai-wait-card" data-ai-wait="${esc(p.ai?.playerId ?? "")}" style="left:${x}px;top:${y}px;transform:translate(-50%,-50%) rotate(${ROT[gameEdge()]}deg)">
-    <div class="who"><span class="dot" style="background:${who?.color ?? "var(--brass)"}"></span><span style="color:${who?.color ?? "inherit"}">${esc(p.ai?.name ?? "AI player")}</span></div>
+  const control = !viewOnly();
+  pauseLayer.innerHTML = `${seatCardOpen("", `data-ai-wait="${esc(p.ai?.playerId ?? "")}"`, p.ai?.seat)}
+    <div class="who">${whoLine(who?.color, p.ai?.name ?? "AI player")}</div>
     <div class="what"><span class="thinking-dots" aria-hidden="true"><i></i><i></i><i></i></span> is still thinking</div>
     <p>The game is paused. ${control ? "Wait for it, or let it move now." : "It goes on as soon as the AI moves."}</p>
     ${control ? `<div class="row"><button class="primary" data-pause="play-now">Play now</button>${REMOTE ? "" : `<button class="danger" data-pause="end">End game</button>`}</div>` : ""}
@@ -1662,14 +1677,13 @@ function renderAiWait(p) {
 function renderPlayerWait(p) {
   const list = p.players ?? [];
   const first = list[0];
-  const { x, y } = nearSeat(first?.seat);
-  const control = !REMOTE || state.remote?.boardControl;
+  const control = !viewOnly();
   const names = list.map((w) => {
     const who = state.players.find((x) => x.id === w.playerId);
-    return `<span class="dot" style="background:${who?.color ?? "var(--brass)"}"></span><span style="color:${who?.color ?? "inherit"}">${esc(w.name)}</span>`;
+    return whoLine(who?.color, w.name);
   }).join(" · ");
   const reasons = [...new Set(list.map((w) => w.text).filter(Boolean))];
-  pauseLayer.innerHTML = `<div class="ai-wait-card player-wait" data-player-wait="${esc(list.map((w) => w.playerId).join(" "))}" style="left:${x}px;top:${y}px;transform:translate(-50%,-50%) rotate(${ROT[gameEdge()]}deg)">
+  pauseLayer.innerHTML = `${seatCardOpen("player-wait", `data-player-wait="${esc(list.map((w) => w.playerId).join(" "))}"`, first?.seat)}
     <div class="who">${names || "A player"}</div>
     <div class="what">${list.every((w) => w.left) ? "left the game" : `<span class="thinking-dots" aria-hidden="true"><i></i><i></i><i></i></span> ${list.length > 1 ? "are" : "is"} away`}</div>
     ${reasons.map((r) => `<p>${esc(r)}</p>`).join("")}
@@ -1680,7 +1694,7 @@ function renderPlayerWait(p) {
 
 /** "Exchange …" for away players (D-144, D-159): opens the exchange dialog (an AI, someone at the table, a remote player). */
 function exchangeButtons(list) {
-  if (REMOTE && !state.remote?.boardControl) return "";
+  if (viewOnly()) return "";
   return list.map((w) => `<button data-exchange-away="${esc(w.playerId)}">Exchange ${esc(w.name)}…</button>`).join("");
 }
 
@@ -1798,14 +1812,13 @@ function openExchange(playerId) {
  * (D-159). The game is not paused; it waits by itself when it is their move.
  */
 function renderAway() {
-  const list = state.phase === "active" && (!REMOTE || state.remote?.boardControl) ? (state.away ?? []) : [];
+  const list = state.phase === "active" && !viewOnly() ? (state.away ?? []) : [];
   awayLayer.hidden = !list.length;
   const html = list
     .map((w) => {
       const who = state.players.find((x) => x.id === w.playerId);
-      const { x, y } = nearSeat(w.seat);
-      return `<div class="ai-wait-card away-card" data-away="${esc(w.playerId)}" style="left:${x}px;top:${y}px;transform:translate(-50%,-50%) rotate(${ROT[gameEdge()]}deg)">
-    <div class="who"><span class="dot" style="background:${who?.color ?? "var(--brass)"}"></span><span style="color:${who?.color ?? "inherit"}">${esc(w.name)}</span></div>
+      return `${seatCardOpen("away-card", `data-away="${esc(w.playerId)}"`, w.seat)}
+    <div class="who">${whoLine(who?.color, w.name)}</div>
     <div class="what">${w.left ? "left the game" : "is away"}</div>
     <p>${w.left ? "The seat waits: they come back by scanning the join code with their name. Or exchange them for another player." : "The seat waits for them. Or exchange them for another player, and the game goes on."}</p>
     ${exchangeButtons([w]) ? `<div class="row">${exchangeButtons([w])}</div>` : ""}
@@ -2451,10 +2464,6 @@ async function openInvite(watch = false) {
     return close();
   }
   let qr = "";
-  try {
-    const r = await fetch(`/api/v1/qr?text=${encodeURIComponent(inv.url)}`, { headers: { "x-table-key": KEY } });
-    if (r.ok) qr = await r.text();
-  } catch {}
   const until = new Date(inv.expiresAt).toLocaleString([], { weekday: "short", hour: "2-digit", minute: "2-digit" });
   // An optional name for the player (D-155): it travels in the link (?name=) and fills in their name field, which they
   // can still change. Cut to MAX_NAME characters like every name (D-148).
@@ -2470,7 +2479,7 @@ async function openInvite(watch = false) {
       if (r.ok) qr = await r.text();
     } catch {}
   };
-  if (guest) await loadQr(); // the code carries the name it starts with
+  await loadQr(); // with the name it starts with, if any (without one, the link is the invite's own)
   o.addEventListener("click", (e) => {
     const b = e.target.closest("button");
     if (b?.dataset.x === "name") openNamePad(guest, async (n) => ((guest = n), await loadQr(), draw()));

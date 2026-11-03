@@ -4,7 +4,7 @@
 // repository ticks, logs and invites survive restarts. One process owns the database and the table sockets, so the
 // service still runs as exactly one replica (D-071).
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { createHash, randomBytes, randomInt } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { BlockList, isIPv4, isIPv6 } from "node:net";
@@ -14,7 +14,7 @@ import { createAdminAuth, esc, HTML_HEADERS, randomToken, same, sendPage, type G
 import { GameRepoStore, type GameRepo } from "./game-repos.ts";
 import { Store } from "./store.ts";
 import { filterFrom, matches, readRunMeta, type LogFilter, type LogRecordMeta } from "./log-meta.ts";
-import { check, CODE_ALPHABET, codeState, expiryFor, formatCode, hashCode, isExpired, newCode, newCodeId, normalizeCode, parseScope, stale, VALIDITIES, type AccessCode, type CodeScope, type CodeStatus, type Validity } from "./access-codes.ts";
+import { check, codeState, expiryFor, formatCode, hashCode, isExpired, newCode, newCodeId, normalizeCode, parseScope, stale, VALIDITIES, type AccessCode, type CodeScope, type CodeStatus, type Validity } from "./access-codes.ts";
 
 const ADMIN_PAGE = fileURLToPath(new URL("../public/admin.html", import.meta.url));
 const REMOTE_PAGE = fileURLToPath(new URL("../public/remote.html", import.meta.url));
@@ -28,9 +28,8 @@ const INSTALL_GUIDES: Record<string, string> = Object.fromEntries(
   ["windows", "macos", "linux"].map((os) => [`/docs/install/${os}.md`, fileURLToPath(new URL(`../../../docs/install/${os}.md`, import.meta.url))]),
 );
 const REMOTE_SW = fileURLToPath(new URL("../public/remote-sw.js", import.meta.url));
-const FAVICON = fileURLToPath(new URL("../public/favicon.svg", import.meta.url));
-/** The icon for browsers without SVG favicons (Safari) and for iOS home screens (D-212). */
-const ICONS: Record<string, string> = { "/favicon.ico": "image/x-icon", "/favicon-32.png": "image/png", "/apple-touch-icon.png": "image/png" };
+/** The icons: SVG, and for browsers without SVG favicons (Safari) and iOS home screens (D-212). */
+const ICONS: Record<string, string> = { "/favicon.svg": "image/svg+xml", "/favicon.ico": "image/x-icon", "/favicon-32.png": "image/png", "/apple-touch-icon.png": "image/png" };
 const PUBLIC_DIR = fileURLToPath(new URL("../public/", import.meta.url));
 // The public website (D-176): one page and its images.
 const HOME_PAGE = fileURLToPath(new URL("../public/home.html", import.meta.url));
@@ -56,12 +55,10 @@ export interface IceServer {
   credential?: string;
 }
 
-/** Pairing and invite codes use the access codes' easy-to-read alphabet (D-026). */
 /** Fail the request with this HTTP status and message (the handler's catch answers it). */
 function fail(status: number, message: string): never {
   throw Object.assign(new Error(message), { status });
 }
-const code = (n: number) => Array.from({ length: n }, () => CODE_ALPHABET[randomInt(CODE_ALPHABET.length)]).join("");
 const MAX_PENDING = 500;
 const PENDING_TTL_MS = 10 * 60_000;
 /** Total bytes of stored logs; the oldest are dropped to make room for a new upload. */
@@ -567,10 +564,6 @@ export function startCloud(o: CloudOptions) {
     try {
       // {status, version}: the deploy smoke test and the cluster's version-exporter read the version (APP_VERSION, "dev" outside a release build).
       if (p === "/health") return json(res, 200, { status: "ok", version: appVersion() });
-      if (m === "GET" && p === "/favicon.svg") {
-        res.writeHead(200, { "content-type": "image/svg+xml", "cache-control": "public, max-age=86400" });
-        return res.end(await readFile(FAVICON));
-      }
       if (m === "GET" && ICONS[p]) {
         res.writeHead(200, { "content-type": ICONS[p], "cache-control": "public, max-age=86400" });
         return res.end(await readFile(PUBLIC_DIR + p.slice(1)));
@@ -688,7 +681,7 @@ export function startCloud(o: CloudOptions) {
             prunePending();
             if (pendingCount() >= MAX_PENDING) return json(res, 503, { error: "too many tables waiting for approval; try again later" });
           }
-          t = newTable(tableId, name, code(6));
+          t = newTable(tableId, name, newCode(6));
           tables.set(tableId, t);
         }
         if (t.status === "revoked") return json(res, 403, withCode({ status: "revoked" }));
@@ -791,8 +784,8 @@ export function startCloud(o: CloudOptions) {
           return json(res, 429, { error: "too many open invites for this table; wait until some expire" });
         }
         const exp = expiry(lifetime(b.ttlMinutes, 120, 24 * 60) * 60_000);
-        let token = code(8);
-        while (invites.has(tokenKey(token))) token = code(8);
+        let token = newCode(8);
+        while (invites.has(tokenKey(token))) token = newCode(8);
         const inv = { tableId: t.tableId, expiresAt: exp.at, used: false };
         invites.set(tokenKey(token), inv);
         store.put("invite", tokenKey(token), inv);

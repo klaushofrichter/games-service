@@ -2235,3 +2235,26 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   the same way, with the sign-in), the signing sentence with the checksums, and the built-in games. The publish step
   uses it, and a run of `local-table-packages` with *notes_only* rewrites the notes from the release's own files
   without building, so the current packages keep their files and checksums.
+- **D-277 · 2026-11-03 · Klaus** — A `/simplify` pass over games-service (four reviews: reuse, simplification,
+  efficiency, altitude). The fixes that change nothing for players, taken in:
+  - **Board control asked in one place.** The server sends a remote player's board `remote.boardControl` as it decides
+    it (`remoteControlAllowed`: the table's switch and, during a game, the game's `remoteBoardControl`), and the board
+    asks one helper, `viewOnly()`, instead of eight copies of the test. A game that refuses remote board control during
+    play no longer shows remote boards buttons the server answers with 403 (no current game does).
+  - **One test for a remote place** (`isRemotePlace`, `remotePlayers()` in table.ts) instead of four copies; one code
+    alphabet in the table host (`TOKEN_ALPHABET`, also for access codes); one code generator in the cloud
+    (`newCode(n)`).
+  - **The invite dialog** fetches its QR code once (it fetched it twice when a name was suggested).
+  - **The seat cards** (AI out of time, waiting for a player, away) share `seatCardOpen` and `whoLine`.
+  - **Players are sent as an allow list of fields**, so a private field added later can't leak; `standsInFor` no
+    longer goes to every board and phone.
+  - **Smaller:** `TableConfig` fields that host.ts always fills are required, without a second set of defaults; the
+    unused phase `loading` is gone; the cloud serves `favicon.svg` from its icon table; doc comments moved to the code
+    they describe, and stacked ones merged (the protocol's `seatColors` note says it is sent empty now).
+  - **Not taken (bigger changes, or a change in behaviour), noted for later:** one `syncPause()` deriving the pause
+    from its inputs; a route table for remote API access; `running`/`requireRunning()` for the "game is running"
+    test; a shared module for the remote board's edge; fewer full state broadcasts (batching `changed()`, not after
+    every slower-AI move); not refetching the games list on every lobby message; redraws only for changed views; a
+    cached Game Viewer replay; one replay instead of two at game end; the cloud's storage scan (it counts the files on
+    disk on purpose, D-114); parallel downloads in the launcher; shared sound helpers and socket requests across games
+    and pages; the join-code expiry only a test uses.

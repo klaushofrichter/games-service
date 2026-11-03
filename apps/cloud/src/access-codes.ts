@@ -45,7 +45,8 @@ export interface AccessCode {
 /** What a table hears about the code it presented. */
 export type CodeStatus = "accepted" | "unknown" | "expired" | "revoked" | "in-use";
 
-export const newCode = () => Array.from({ length: CODE_LENGTH }, () => CODE_ALPHABET[randomInt(CODE_ALPHABET.length)]).join("");
+/** A code of `n` letters from the easy-to-read alphabet (D-026): access codes (8), pairing and invite codes too. */
+export const newCode = (n = CODE_LENGTH) => Array.from({ length: n }, () => CODE_ALPHABET[randomInt(CODE_ALPHABET.length)]).join("");
 export const newCodeId = () => `c_${randomBytes(6).toString("hex")}`;
 
 /** Upper case, without spaces and dashes, so "abcd-efgh" and "ABCD EFGH" are the same code. Null if it can't be one. */

@@ -4,19 +4,17 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { randomBytes } from "node:crypto";
 import WebSocket from "ws";
-import { TableError, type Table } from "./table.ts";
+import { TableError, TOKEN_ALPHABET, type Table } from "./table.ts";
 import type { LogStore } from "./logs.ts";
 import type { RemoteGateway } from "./remote.ts";
 import type { BundleRef, ExtraGames } from "./extra-games.ts";
 import type { AccessCodeStatus } from "../../../packages/protocol/src/index.ts";
 
-/** The access code alphabet (D-026, D-113): no 0/O, no 1/I. */
-const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 /** "abcd-efgh" or "ABCD EFGH" as ABCDEFGH; null if it can't be an access code. */
 export function normalizeAccessCode(v: unknown): string | null {
   if (typeof v !== "string") return null;
   const s = v.toUpperCase().replace(/[\s-]/g, "");
-  return s.length === 8 && [...s].every((c) => CODE_ALPHABET.includes(c)) ? s : null;
+  return s.length === 8 && [...s].every((c) => TOKEN_ALPHABET.includes(c)) ? s : null; // the access code alphabet (D-026, D-113)
 }
 
 /** What the service says about a code it was shown. */

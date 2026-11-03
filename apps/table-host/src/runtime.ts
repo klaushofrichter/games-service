@@ -558,14 +558,14 @@ export function replayLog(manifest: Manifest, def: GameDefinition<any>, log: Log
   return { state: rt.state, hash: stateHash(rt.state) };
 }
 
-/**
- * Feed one logged record to a replaying runtime as the table did; records that are not inputs are skipped. An exception
- * the game threw when it was played, it throws again now (D-116): that is part of the game, so it is swallowed here.
- */
 /** The records replay feeds to the rules: everything else in a log is for reading only. */
 export type InputRecord = Extract<LogRecord, { t: "intent" | "timer" | "seatJoined" | "seatLeft" | "seatChanged" }>;
 export const isInput = (r: LogRecord): r is InputRecord => r.t === "intent" || r.t === "timer" || r.t === "seatJoined" || r.t === "seatLeft" || r.t === "seatChanged";
 
+/**
+ * Feed one logged record to a replaying runtime as the table did; records that are not inputs are skipped. An exception
+ * the game threw when it was played, it throws again now (D-116): that is part of the game, so it is swallowed here.
+ */
 export function feedInput(rt: GameRuntime, r: LogRecord) {
   try {
     if (isInput(r)) rt.setReplayTime(r.gt);
