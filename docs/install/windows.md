@@ -61,6 +61,35 @@ game service (for remote players) runs on a server with Docker, a DNS name and H
 - **The person's first start:** checks with `--repos` don't save the list, so the first plain start asks for the
   private repositories. Tell the person, and which names to type (or Enter for none).
 
+### Hints for AI agents: ports and the GitHub sign-in
+
+These two caused most trouble in real installations.
+
+**Ports and the network**
+
+- A passing `--smoke-test`, the board on `localhost` and the join link opened on this computer prove only that the
+  table runs. They don't prove that phones can reach it: a firewall can still block the port.
+- Check whether a firewall is on: `Get-NetConnectionProfile` (the network must be *Private*) and `Get-NetFirewallProfile | Select Name, Enabled`. If it is, tell the person at the handoff, with the step from
+  [Troubleshoot](#troubleshoot) for the port the table actually runs on. Leave the change itself to the person.
+- Ask the person to check from a phone: `http://<address>:<port>/health` (the address and port from the starter's
+  `phones:` line) shows `{"status":"ok", …}` when the phone can reach the table.
+- A taken port 8080 isn't a failed installation (above): use the port the starter suggests in every command, and
+  give the person that port too.
+- Run the commands in a normal shell of the person's own user. A restricted or sandboxed agent shell can see other
+  files (an old `games.json`) or another network than the person does.
+
+**The GitHub sign-in (private repositories only)**
+
+- First run `gh auth status`. If the GitHub CLI is signed in, the starter uses it silently, with no code and no
+  browser step: the easiest way.
+- If it isn't, don't start a sign-in in a window the person can't see or type into, such as your own tool's shell or
+  a background terminal tab. The GitHub CLI shows a code and then **waits for Enter in that window**; approving the
+  code in the browser alone doesn't finish it, and the table stays down until then.
+- Instead, let the person do the first start with private repositories themselves, from the Start menu (*Game Table*), which opens a window: they type the
+  repository names at the question (that list is saved; `--repos` isn't), press Enter when the GitHub CLI asks, and
+  enter the code in the browser.
+- Never ask for, read or pass on a token or a password.
+
 ## Install
 
 1. Download **[`game-table-windows.exe`](https://github.com/klaushofrichter/games-service/releases/download/local-table/game-table-windows.exe)** (from the release
@@ -110,7 +139,7 @@ Start **Game Table** from the Start menu or the desktop. A window opens and show
 4. When Windows asks whether *Node.js JavaScript Runtime* may communicate on networks, allow **Private networks**.
 
 The players scan the QR code on the board with their phones. Their phones must be on the same network as this
-computer: its WiFi, or a WiFi on the same router if the computer is wired. Not mobile data, and not a guest WiFi.
+computer: its WiFi, or a WiFi on the same router if the computer is wired. Not mobile data, and not a guest WiFi. If phones can't join, see [Troubleshoot](#troubleshoot): usually a firewall.
 
 Stop the table by closing the window, or with Ctrl+C.
 
@@ -145,12 +174,24 @@ board's settings › *Board on another screen…*: it shows a QR code and the li
 `http://<address>:<port>/board/screen?key=<table key>`, with the key from `%LOCALAPPDATA%\GameTable\data\table-key`. It works only from the same
 network, and anyone with the key controls the table: give it only to your own screens.
 
-## If phones can't join
+## Troubleshoot
 
-- Windows must treat your WiFi as **Private**: Settings › Network & internet › your WiFi › *Network profile type* ›
-  Private. The table warns when it's set to Public.
-- Node.js must be allowed through the firewall for Private networks: Windows Security › Firewall & network
-  protection › *Allow an app through firewall*.
+### Phones can't join
+
+**Phones need the table's port open on this computer, and a check on the computer itself doesn't prove that it
+is.** `--smoke-test`, the board on `localhost` and the join link opened on this computer all pass while a firewall
+still keeps every phone out.
+
+- **Check from a phone:** open `http://<this computer's address>:<port>/health` in the phone's browser (the address
+  and port from the starter's `phones:` line, like `http://192.168.1.20:8080/health`). It shows `{"status":"ok", …}`
+  when the phone can reach the table; if it doesn't load, something between them blocks the port.
+- Is the network Private, and is the firewall on? In PowerShell, `Get-NetConnectionProfile` shows the network's
+  *NetworkCategory* (Private or Public), and `Get-NetFirewallProfile | Select Name, Enabled` the firewall for each.
+- **The network must be Private:** Settings › Network & internet › your network › *Network profile type* › Private.
+  The table warns when it's Public.
+- **Let Node.js in on Private networks:** Windows asks at the first start; allow **Private networks**. If that was
+  missed: Windows Security › Firewall & network protection › *Allow an app through firewall* › Node.js JavaScript
+  Runtime › Private.
 - The QR code holds the computer's address on the network (WiFi or Ethernet) and the table's port, like `http://192.168.1.20:8080/j/ABCD`. Open
   that address in the phone's browser to check.
 - Open the address exactly as the QR code has it. `/board/` answers 403 from another device, because the board is for
@@ -159,6 +200,18 @@ network, and anyone with the key controls the table: give it only to your own sc
   reach: `PUBLIC_URL=http://192.168.1.20:8080` in the environment.
 - "Port 8080 is in use": the message says whether another Game Table holds it (close that one) or another program
   (start with `--port 8081`, at every start).
+
+### GitHub sign-in
+
+- **The sign-in waits for Enter.** The starter shows a code and waits until Enter is pressed **in its own window**; only
+  then does it open the browser and wait for the code. Approving the code in the browser alone isn't enough.
+- **Already signed in?** `gh auth status` shows the account. A signed-in GitHub CLI is used without any question, code or
+  browser step: the easiest way to private games.
+- **If the sign-in fails,** the table starts anyway with the public games and names the private repositories it left
+  out. Start again to retry.
+- **A private repository is left out with *no access*:** the signed-in account can't read it, it has no
+  `production` branch with a `games/` folder, or its organization hasn't approved the GitHub CLI (see *Repositories of
+  another organization*).
 
 ## Options
 
