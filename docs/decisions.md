@@ -2258,3 +2258,9 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
     cached Game Viewer replay; one replay instead of two at game end; the cloud's storage scan (it counts the files on
     disk on purpose, D-114); parallel downloads in the launcher; shared sound helpers and socket requests across games
     and pages; the join-code expiry only a test uses.
+- **D-278 · 2026-11-03 · Klaus** — **Leaving after a game.** A phone's result screen has *Leave the game*, as the
+  Ready screen does (D-158): a player can go home after a game without waiting for the board to get back to the lobby.
+  The game is over, so leaving frees the seat for the next game and the result stays on the board and the other
+  phones; a remote player's browser watches on (D-170). The board's way back to the lobby stays as it is (D-216).
+  *Implementation (Claude):* `deck.js` shows the leave row in the finished phase too; the server already removed a
+  player who leaves outside a running game. `scripts/e2e/play.py` (coin flip) leaves from the result.
