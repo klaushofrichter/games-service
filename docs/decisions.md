@@ -2190,3 +2190,48 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   `tests/workflow-shell.test.ts` runs `bash -n` on every bash `run:` block of every workflow (GitHub expressions
   replaced, PowerShell steps left out), so a pull request fails on it before anything is published. Checked that the
   test fails with the old line.
+- **D-272 · 2026-11-03 · Klaus** — From a Traders game on a local table (screenshots): the board's cards and windows
+  around an away player, the Versions, and Live status. Platform changes; Traders itself is unchanged.
+  - **Names in their colour** on the cards at a seat: *is away* (D-144), the game waiting for a player (D-119) and an
+    AI player out of time (D-112). The coloured dot stays.
+  - **The exchange offers an AI player again.** A board opened or reloaded during a game had no games list (it was
+    fetched only in the lobby), so the exchange dialog didn't know the game has AI players and left the choice out.
+    The board now fetches the list once when it has none, also during a game. When the player is the last one at the
+    table and *Games without a player at the table* is off, the AI choice says that picking it switches the setting
+    on (the confirmation already said so, D-223); with the setting on, it is offered plainly.
+  - **Versions name the game being played.** During a game, Advanced › Versions starts with *This game*: its name
+    and version, and where it runs from: *Local: ~/Development/traders-game* with branch and commit (a local
+    checkout, D-251; the checkout's folder is now in the table's state, home as `~`), *from a game repository*, or
+    *built in*.
+  - **Live status reads calmly.** It is polled twice a second and was redrawn every time, with every AI answer's
+    "… s ago" changing (an 11-hour-old answer read "39511.6 s ago") and the list jumping back to the top. The answers
+    now show their clock time, the window is redrawn only when something changed, and the scroll position stays.
+    The window stays: it shows what holds a game up (AI players, the board's pacing, phones held back) when a game
+    seems stuck.
+  - Checks: `scripts/e2e/exchange.py` reloads the board mid-game and finds the AI choice and *This game*, and reads
+    the AI choice's note for the last player; `scripts/e2e/developer.py` reads clock times in Live status and checks
+    that the idle window isn't redrawn.
+- **D-273 · 2026-11-03 · Klaus** — The landing page's four numbers under the ticker read: *1 prompt* to build your
+  own game, *9 games* playable out of the box, *8 players* to join, *0 lines* of lobby code in your game. *Implementation
+  (Claude):* the unit after each number is smaller and stays on the number's line, so the four read evenly on a wide
+  screen and in two columns on a phone; the other counters on the page ("250+") are unchanged.
+- **D-274 · 2026-11-03 · Klaus** — The three captions under the landing page's table (*Everyone shares the board.*,
+  *Everyone keeps their own hand.*, *Nobody looks at a TV.*) can be read when scrolling fast: "Show each text at least
+  0.5 seconds". *Implementation (Claude):* the scroll position still says which caption is due, but the captions
+  follow it one step at a time, each shown at least 1.2 s (its fade-in takes 0.6 s), so a fast scroll plays all three
+  in turn instead of flashing the first two past; scrolling back up goes straight to the caption due, or none.
+  Checked in a browser with one jump to the end of the hero: the captions came at 0.2 s, 1.5 s and 2.6 s.
+- **D-275 · 2026-11-03 · Klaus** — On the landing page's package cards, the "g" of *.pkg* and *.tar.gz* lost its tail.
+  *Implementation (Claude):* those titles are painted with a gradient clipped to the text, and the gradient covers
+  only the element's box, which a line height of 1 ends above the descenders. The cards' titles (`.og b`, also *MIT*,
+  *250+* and *AI* further down) get room below (`padding-bottom: .18em`), taken back with a negative margin so the
+  layout doesn't move. Checked in screenshots of both card rows.
+- **D-276 · 2026-11-03 · Klaus** — The notes of the release `local-table` say that the extra games are in a separate
+  repository, linked, and are added automatically; and "The packages aren't signed, but there is a SHA-256 checksum
+  available" instead of "The packages aren't signed yet." *Implementation (Claude):* the notes come from one script,
+  `scripts/package/release-notes.sh`, which reads the packages' manifests and `game-table-SHA256SUMS.txt`: the version,
+  the build, links to the three install guides on the website, a paragraph on extra-games
+  (https://github.com/klaushofrichter/extra-games: downloaded and added at each start, no sign-in; private repositories
+  the same way, with the sign-in), the signing sentence with the checksums, and the built-in games. The publish step
+  uses it, and a run of `local-table-packages` with *notes_only* rewrites the notes from the release's own files
+  without building, so the current packages keep their files and checksums.

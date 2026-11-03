@@ -1648,7 +1648,7 @@ function renderAiWait(p) {
   const { x, y } = nearSeat(p.ai?.seat);
   const control = !REMOTE || state.remote?.boardControl;
   pauseLayer.innerHTML = `<div class="ai-wait-card" data-ai-wait="${esc(p.ai?.playerId ?? "")}" style="left:${x}px;top:${y}px;transform:translate(-50%,-50%) rotate(${ROT[gameEdge()]}deg)">
-    <div class="who"><span class="dot" style="background:${who?.color ?? "var(--brass)"}"></span>${esc(p.ai?.name ?? "AI player")}</div>
+    <div class="who"><span class="dot" style="background:${who?.color ?? "var(--brass)"}"></span><span style="color:${who?.color ?? "inherit"}">${esc(p.ai?.name ?? "AI player")}</span></div>
     <div class="what"><span class="thinking-dots" aria-hidden="true"><i></i><i></i><i></i></span> is still thinking</div>
     <p>The game is paused. ${control ? "Wait for it, or let it move now." : "It goes on as soon as the AI moves."}</p>
     ${control ? `<div class="row"><button class="primary" data-pause="play-now">Play now</button>${REMOTE ? "" : `<button class="danger" data-pause="end">End game</button>`}</div>` : ""}
@@ -1666,7 +1666,7 @@ function renderPlayerWait(p) {
   const control = !REMOTE || state.remote?.boardControl;
   const names = list.map((w) => {
     const who = state.players.find((x) => x.id === w.playerId);
-    return `<span class="dot" style="background:${who?.color ?? "var(--brass)"}"></span>${esc(w.name)}`;
+    return `<span class="dot" style="background:${who?.color ?? "var(--brass)"}"></span><span style="color:${who?.color ?? "inherit"}">${esc(w.name)}</span>`;
   }).join(" · ");
   const reasons = [...new Set(list.map((w) => w.text).filter(Boolean))];
   pauseLayer.innerHTML = `<div class="ai-wait-card player-wait" data-player-wait="${esc(list.map((w) => w.playerId).join(" "))}" style="left:${x}px;top:${y}px;transform:translate(-50%,-50%) rotate(${ROT[gameEdge()]}deg)">
@@ -1727,7 +1727,9 @@ function openExchange(playerId) {
         REMOTE || state.developer?.boardDeck ? "" : `<button class="choice" data-ex="local"><b>Someone at the table</b><span>A QR code to scan with their phone</span></button>`,
         `<button class="choice" data-ex="remote" ${online && room ? "" : "disabled"}><b>A remote player</b><span>${!online ? "Needs the connection to the Game Table service" : room ? "An invite link to send" : "All remote places are taken (players and watchers)"}</span></button>`,
         ...(state.watchers ?? []).map((w) => `<button class="choice" data-ex="watcher" data-watcher="${esc(w.id)}"><b>${esc(w.name)}, watching</b><span>Takes the seat from their own window</span></button>`),
-        g?.ai && cur.kind !== "ai" ? `<button class="choice" data-ex="ai"><b>An AI player</b><span>Takes over at once</span></button>` : "",
+        g?.ai && cur.kind !== "ai"
+          ? `<button class="choice" data-ex="ai"><b>An AI player</b><span>${state.developer?.protectedPlayer === cur.id && !REMOTE ? `Takes over at once. ${esc(cur.name)} is the last player at the table, so this also switches on the developer setting “Games without a player at the table”` : "Takes over at once"}</span></button>`
+          : "",
         cur.kind === "ai" && (g?.aiOptions?.length ?? 0) ? `<button class="choice" data-ex="ai-options"><b>How ${esc(cur.name)} plays</b><span>Change this AI player's settings</span></button>` : "",
       ].join("");
       setPanel(o, `<div class="panel exchange-panel">${head}
@@ -1803,7 +1805,7 @@ function renderAway() {
       const who = state.players.find((x) => x.id === w.playerId);
       const { x, y } = nearSeat(w.seat);
       return `<div class="ai-wait-card away-card" data-away="${esc(w.playerId)}" style="left:${x}px;top:${y}px;transform:translate(-50%,-50%) rotate(${ROT[gameEdge()]}deg)">
-    <div class="who"><span class="dot" style="background:${who?.color ?? "var(--brass)"}"></span>${esc(w.name)}</div>
+    <div class="who"><span class="dot" style="background:${who?.color ?? "var(--brass)"}"></span><span style="color:${who?.color ?? "inherit"}">${esc(w.name)}</span></div>
     <div class="what">${w.left ? "left the game" : "is away"}</div>
     <p>${w.left ? "The seat waits: they come back by scanning the join code with their name. Or exchange them for another player." : "The seat waits for them. Or exchange them for another player, and the game goes on."}</p>
     ${exchangeButtons([w]) ? `<div class="row">${exchangeButtons([w])}</div>` : ""}
@@ -2108,8 +2110,20 @@ function openScreenLink() {
  */
 function versionsGroup(platform) {
   const list = [...games].sort((a, b) => a.name.localeCompare(b.name));
+  // During a game, the game being played first, with where it runs from (D-272): a local checkout (scripts/local-table.sh,
+  // D-251) with its folder, branch and commit, or a game repository the table got it from, or the platform itself.
+  const now = state?.game && inRunningGame() ? state.game : null;
+  let playing = "";
+  if (now) {
+    const g = games.find((x) => x.id === now.id);
+    const co = (state.checkouts ?? []).find((c) => c.games.includes(now.id));
+    const from = co
+      ? `Local: ${esc(co.path ?? co.name)} <span class="faint">· ${esc(co.branch)} ${esc(co.commit)}${co.changed ? ", with changes not committed" : ""}</span>`
+      : g?.extra ? "from a game repository" : "built in";
+    playing = `<span>This game</span><span class="v">${esc(g?.name ?? now.name ?? now.id)} ${esc(now.version ?? g?.version ?? "")} <span class="faint">· ${from}</span></span>`;
+  }
   return `<div class="group versions"><div class="eyebrow">Versions</div>
-    <div class="vlist"><span>Platform</span><span class="v">${platform ? `${esc(platform.version)} <span class="faint">· protocol ${esc(String(platform.protocol))}</span>` : `<span class="faint">…</span>`}</span>
+    <div class="vlist">${playing}<span>Platform</span><span class="v">${platform ? `${esc(platform.version)} <span class="faint">· protocol ${esc(String(platform.protocol))}</span>` : `<span class="faint">…</span>`}</span>
       ${list.map((g) => `<span data-game="${esc(g.id)}">${esc(g.name)}${g.extra ? ` <span class="faint">(added)</span>` : ""}</span><span class="v">${esc(g.version)}</span>`).join("")}</div></div>`;
 }
 
@@ -2181,6 +2195,10 @@ function openLiveStatus() {
   const o = document.createElement("div");
   o.className = "overlay live-status";
   const s = (ms) => (ms === null || ms === undefined ? "–" : ms < 1000 ? `${ms} ms` : `${(ms / 1000).toFixed(1)} s`);
+  // Each AI answer at its clock time (D-272): the list stays still between answers, instead of every line's
+  // "… s ago" changing at each redraw while nothing happens.
+  const clock = (at) => new Date(at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  let last = "";
   const draw = (d) => {
     if (!d) return;
     const p = d.pacing;
@@ -2194,9 +2212,15 @@ function openLiveStatus() {
       <div class="group"><div class="eyebrow">Phones held back until the board shows the AI moves</div>
         ${d.decks.length ? d.decks.map((x) => `<div class="row"><span>${esc(x.player)}</span><span>${x.held} message${x.held > 1 ? "s" : ""}, the oldest ${s(x.oldestMsAgo)}</span></div>`).join("") : `<div class="row"><span>None: every phone has the latest</span></div>`}</div>
       <div class="group"><div class="eyebrow">Recent AI answers</div>
-        <div class="live-trace">${d.trace.length ? d.trace.slice().reverse().map((t) => `<div>${s(t.msAgo)} ago · ${esc(t.name)}: ${esc(t.what)}</div>`).join("") : "none yet"}</div></div>
+        <div class="live-trace">${d.trace.length ? d.trace.slice().reverse().map((t) => `<div>${clock(d.now - t.msAgo)} · ${esc(t.name)}: ${esc(t.what)}</div>`).join("") : "none yet"}</div></div>
       <div class="actions settings-actions"><button class="primary" data-close-overlay>Done</button></div></div>`;
+    // Polled twice a second, but redrawn only when something changed, keeping where the answers were scrolled to.
+    if (html === last) return;
+    last = html;
+    const top = o.querySelector(".live-trace")?.scrollTop ?? 0;
     setPanel(o, html);
+    const t = o.querySelector(".live-trace");
+    if (t) t.scrollTop = top;
   };
   let stop = false;
   const poll = async () => {
@@ -2629,8 +2653,9 @@ function connect() {
       state = m.payload;
       document.body.classList.remove("offline");
       if (selectedPlayer && !state.players.some((p) => p.id === selectedPlayer)) selectedPlayer = null;
-      // The games list serves only the lobby and its dialogs: skip it while a game runs.
-      if (state.phase !== "active" && state.phase !== "paused" && state.phase !== "terminating") await refreshGames();
+      // The games list serves the lobby and its dialogs, so it isn't fetched again while a game runs. A board opened
+      // during a game still needs it once: without it, the exchange dialog offered no AI player (D-272).
+      if ((state.phase !== "active" && state.phase !== "paused" && state.phase !== "terminating") || !games.length) await refreshGames();
       render();
       showSoundHint();
       showLocalNotice();

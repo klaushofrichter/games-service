@@ -341,7 +341,7 @@ export interface LobbyState {
    * The git checkouts on this computer the games run from (D-251): a table of scripts/local-table.sh plays local
    * clones at their branches, not what the service delivers. Empty on a table whose games aren't in a checkout.
    */
-  checkouts: { name: string; branch: string; commit: string; changed: boolean; games: string[] }[];
+  checkouts: { name: string; path?: string; branch: string; commit: string; changed: boolean; games: string[] }[];
   /** A table of scripts/local-table.sh (LOCAL_TABLE=1, D-251): the board says once that it is local. */
   localTable: boolean;
 }

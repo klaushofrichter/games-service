@@ -21,6 +21,10 @@ on:
         description: publish the tested packages on the release "local-table"
         type: boolean
         default: false
+      notes_only:
+        description: only rewrite the release notes of "local-table" from its own files (no build, no new packages)
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -34,6 +38,7 @@ env:
 
 jobs:
   build:
+    if: ${{ !inputs.notes_only }}
     strategy:
       fail-fast: false
       matrix:
@@ -214,6 +219,8 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v7
+        with: { path: src, sparse-checkout: scripts/package }
       - uses: actions/download-artifact@v8
         with: { pattern: package-*, merge-multiple: true }
       - name: Replace the packages on the release "local-table"
@@ -223,29 +230,9 @@ jobs:
           REF: ${{ inputs.ref }}
         run: |
           sha=$(gh api "repos/$GH_REPO/commits/$REF" --jq .sha)
-          # The packages' own version (like v2026.11.02.10 (22570a1)), the same that game-table --version shows (macOS review).
-          ver=$(jq -r .package.version "$(ls game-table-*.manifest.json | head -1)")
-          notes="Game Table for one computer, without the Game Table service: players here join with their phones on the same network.
-          Version $ver, the same that game-table --version shows. Built from games-service $REF ($(echo "$sha" | cut -c1-7)), published $(date -u '+%Y-%m-%d %H:%M UTC'). The packages aren't signed yet.
-
-          - Windows 11: game-table-windows.exe (docs/install/windows.md)
-          - macOS: game-table-macos.pkg (docs/install/macos.md)
-          - Linux: game-table-linux.tar.gz (docs/install/linux.md)
-
-          Each start downloads extra-games and the private game repositories you name; your GitHub sign-in is needed only for those.
-          Each package holds MANIFEST.json (also here as game-table-<os>.manifest.json): its version, build time, Node.js and built-in games.
-          After a start, games.json in the table's folder lists every game on the table with its version, repository and commit (game-table --version)."
           # The same sums as a file, so an agent can check its download without copying a hash by hand (Windows review).
           sha256sum game-table-windows.exe game-table-macos.pkg game-table-linux.tar.gz 2>/dev/null > game-table-SHA256SUMS.txt
-          sums=$(awk '{print "- " $2 ": " $1}' game-table-SHA256SUMS.txt)
-          notes="$notes
-
-          SHA-256 of the packages in this build (also in game-table-SHA256SUMS.txt):
-          $sums"
-          m=$(ls game-table-*.manifest.json | head -1)
-          notes="$notes
-
-          Built-in games: $(jq -r '[.games[] | select(.test | not) | "\(.name) \(.version)"] | join(", ")' "$m")"
+          notes=$(bash src/scripts/package/release-notes.sh .)
           if gh release view local-table >/dev/null 2>&1; then
             gh api -X PATCH "repos/$GH_REPO/git/refs/tags/local-table" -f sha="$sha" -F force=true >/dev/null
             gh release edit local-table --title "Game Table for your computer" --notes "$notes" --latest
@@ -254,3 +241,24 @@ jobs:
           fi
           gh release upload local-table game-table-* --clobber
           gh release view local-table --json assets --jq '.assets[] | "\(.name)  \(.size)"'
+
+  # Only the text of the release (D-276): from the release's own manifests and checksums, so the packages stay as they
+  # are. Actions > local-table-packages > Run workflow with "notes_only".
+  notes:
+    if: ${{ inputs.notes_only }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with: { sparse-checkout: scripts/package }
+      - name: Rewrite the notes of the release "local-table"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          mkdir -p rel
+          gh release download local-table --dir rel --pattern 'game-table-*.manifest.json' --pattern 'game-table-SHA256SUMS.txt'
+          notes=$(bash scripts/package/release-notes.sh rel)
+          gh release edit local-table --notes "$notes"
+          gh release view local-table --json body --jq .body | head -5
