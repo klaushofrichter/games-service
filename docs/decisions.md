@@ -2215,3 +2215,9 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   own game, *9 games* playable out of the box, *8 players* to join, *0 lines* of lobby code in your game. *Implementation
   (Claude):* the unit after each number is smaller and stays on the number's line, so the four read evenly on a wide
   screen and in two columns on a phone; the other counters on the page ("250+") are unchanged.
+- **D-274 · 2026-11-03 · Klaus** — The three captions under the landing page's table (*Everyone shares the board.*,
+  *Everyone keeps their own hand.*, *Nobody looks at a TV.*) can be read when scrolling fast: "Show each text at least
+  0.5 seconds". *Implementation (Claude):* the scroll position still says which caption is due, but the captions
+  follow it one step at a time, each shown at least 1.2 s (its fade-in takes 0.6 s), so a fast scroll plays all three
+  in turn instead of flashing the first two past; scrolling back up goes straight to the caption due, or none.
+  Checked in a browser with one jump to the end of the hero: the captions came at 0.2 s, 1.5 s and 2.6 s.
