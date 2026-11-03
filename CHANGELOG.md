@@ -8,6 +8,7 @@ history.
 
 ## [Unreleased]
 
+- Phone: *Leave the game* on the result screen too, so a player can leave right after a game (D-278).
 - Code cleanup: board control decided once by the server, one remote-place test, shared code alphabet and generator, the invite QR fetched once, players sent as an allow list, smaller tidy-ups (D-277).
 - Release notes of the packages: extra-games linked and added automatically, the checksums named; a notes-only run rewrites them without a new build (D-276).
 - The website: the package cards' ".pkg" and ".tar.gz" keep the tails of their g (D-275).
