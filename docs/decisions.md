@@ -2146,3 +2146,19 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
     the queued ones too. The guides now say so, with how to avoid it (delete `data/logs` first). Whether a table
     should rather drop or ask about logs from before it joined is open for Klaus.
   - Not changed: the empty `~/Applications` left after removing the app.
+- **D-269 · 2026-11-02 · Klaus** — The wording points of the v2026.11.02.10 install tests (Windows, macOS, Linux, in
+  #games-application; all three installed cleanly) are fixed: "details matter".
+  - **A taken port, said exactly:** the check stops with *Port 8080 is in use …* and exit code 1, without
+    `SMOKE TEST PASSED`; the agent sections say this one case isn't a failed installation and what to do for each
+    holder, and *Check that it works* shows the check with `--port 8081`.
+  - **What the agent reports:** the board's address and the network address phones use (the `phones:` line), not a
+    join code: each start makes a new one, so the person's phones scan the QR code on the board. The starter's
+    `phones:` line says so ("it holds http://… and a join code that is new at every start").
+  - **The sign-in in the agent rules:** the person presses Enter in the starter's window, then enters the code in the
+    browser (D-265).
+  - **Versions that can be compared:** the release notes name the packages' version (`v2026.11.02.10 (22570a1)`),
+    the same that `--version` shows, and the guides say to compare those two. The notes no longer show a decision
+    number.
+  - **Network, not WiFi,** on the website (the facts row, *Play at home*, the Docker section, the table's specs, the
+    service section) and in `llms.txt`, as in the guides: a wired computer works too.
+  - Backgammon's board text naming three AI strengths instead of six is fixed in extra-games (E-047).

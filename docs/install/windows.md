@@ -9,7 +9,8 @@ You get the built-in games, the games of
 account can read.
 
 This guide describes the newest package on the release page. An older installation can behave differently: compare
-the version that `--version` shows with the release notes' *Built from …* line, and install the newest first.
+the version that `--version` shows (like `v2026.11.02.10 (22570a1)`) with the *Version* in the release notes, and install
+the newest first.
 
 ## With an AI agent
 
@@ -19,12 +20,14 @@ computer."* For the agent:
 - Do the steps in order and run each check. When one fails, stop and report it with its output instead of working
   around it.
 - Never ask for a GitHub token or password, and never handle one. Signing in to GitHub, for private game repositories,
-  is the person's: the starter shows a code and opens the browser, and the person enters it there.
+  is the person's: the starter shows a code, the person presses Enter in its window, and enters the code in the
+  browser that opens.
 - Leave the firewall question and network settings to the person: tell them what to allow (below) rather than
   changing settings yourself.
-- At the end, report the board's address (the starter's `board:` line), the address in the QR code (the
-  `[table-host] join:` line, like `http://192.168.1.20:8080/j/ABCD`), and how to start the
-  table again. Leave the table for the person to start; it runs until its window is closed.
+- At the end, report the board's address (the starter's `board:` line, `http://localhost:8080/board/`), the
+  network address phones use (the `phones:` line, like `http://192.168.1.20:8080`), and how to start the table
+  again. Don't report a join code (`/j/…`): each start makes a new one, so phones scan the QR code on the board.
+  Leave the table for the person to start; it runs until its window is closed.
 
 In PowerShell, as the person's own user (not as administrator):
 
@@ -47,9 +50,10 @@ game service (for remote players) runs on a server with Docker, a DNS name and H
 - **The check:** `--smoke-test` starts the table for a moment, checks it and stops. It fails if a named repository
   couldn't be downloaded, so a missing game can't pass. It never asks a question and doesn't change the saved list of
   private repositories.
-- **Port 8080 taken:** this isn't a failed check, so carry on. The message says what holds the port: another Game
-  Table (ask the person to close it), or another program. For another program, add `--port 8081` (or another free
-  port) to every command, and tell the person to start with it too: the port isn't remembered.
+- **Port 8080 taken:** the check stops with *Port 8080 is in use …* and exit code 1, without `SMOKE TEST PASSED`.
+  This one case isn't a failed installation, so carry on. The message says what holds the port: another Game Table
+  (ask the person to close it, then run the check again), or another program. For another program, add `--port 8081`
+  (or another free port) to every command, and tell the person to start with it too: the port isn't remembered.
 - **Private repositories:** ask the person which ones they want, as `owner/name` (a name alone means
   `klaushofrichter/name`; see *Repositories of another organization*). If there are any, run the check with
   `--repos "owner/name1 owner/name2"` while the person is there to sign in to GitHub in the browser. Then `--version`
@@ -77,7 +81,12 @@ It asks nothing, uses the private repositories you named before, and fails if on
 "%LOCALAPPDATA%\Programs\Game Table\game-table.cmd" --smoke-test
 ```
 
-It ends with `SMOKE TEST PASSED`.
+It ends with `SMOKE TEST PASSED`. If it says *Port 8080 is in use … by another program*, add another port, here and at
+every start:
+
+```
+"%LOCALAPPDATA%\Programs\Game Table\game-table.cmd" --smoke-test --port 8081
+```
 
 ## Start
 
