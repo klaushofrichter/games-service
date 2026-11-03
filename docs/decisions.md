@@ -2190,3 +2190,12 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   `tests/workflow-shell.test.ts` runs `bash -n` on every bash `run:` block of every workflow (GitHub expressions
   replaced, PowerShell steps left out), so a pull request fails on it before anything is published. Checked that the
   test fails with the old line.
+- **D-276 · 2026-11-03 · Klaus** — The notes of the release `local-table` say that the extra games are in a separate
+  repository, linked, and are added automatically; and "The packages aren't signed, but there is a SHA-256 checksum
+  available" instead of "The packages aren't signed yet." *Implementation (Claude):* the notes come from one script,
+  `scripts/package/release-notes.sh`, which reads the packages' manifests and `game-table-SHA256SUMS.txt`: the version,
+  the build, links to the three install guides on the website, a paragraph on extra-games
+  (https://github.com/klaushofrichter/extra-games: downloaded and added at each start, no sign-in; private repositories
+  the same way, with the sign-in), the signing sentence with the checksums, and the built-in games. The publish step
+  uses it, and a run of `local-table-packages` with *notes_only* rewrites the notes from the release's own files
+  without building, so the current packages keep their files and checksums.
