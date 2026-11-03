@@ -62,22 +62,22 @@ export interface TableConfig {
   publicUrl: string; // e.g. http://192.168.1.20:8080
   graceMs: number; // how long a disconnected seat is held
   /** A minute of the away-to-AI rule (D-236); shorter only for the browser tests (AWAY_TO_AI_MINUTE_MS). */
-  awayToAiMinuteMs?: number;
+  awayToAiMinuteMs: number;
   aiDelayMs: number; // pause before an AI acts, so people can follow
   /** AI players wait until the table's board has shown everything (D-141); off for fast tests (BOARD_PACING=0). */
-  boardPacing?: boolean;
+  boardPacing: boolean;
   /** An AI waits at most this long for a board that does not answer (D-141). */
-  boardPaceTimeoutMs?: number;
+  boardPaceTimeoutMs: number;
   joinTokenTtlMs: number;
   requireCloud: boolean; // phase 1a dev mode may run without the cloud
   maxRemotePlayers: number;
   showTestGames: boolean; // stub games used by the automated tests
   /** A snapshot of the whole state in the log every N inputs (D-116); 0: none. */
-  logSnapshotEvery?: number;
+  logSnapshotEvery: number;
   /** The developer setting's value at start (ALLOW_NO_LOCAL_PLAYER, D-118); the board can change it until a restart. */
-  allowNoLocalPlayer?: boolean;
+  allowNoLocalPlayer: boolean;
   /** Play from the board (D-175): the developer setting at start (BOARD_DECK=1). */
-  boardDeck?: boolean;
+  boardDeck: boolean;
 }
 
 interface Player extends PlayerInfo {
@@ -94,8 +94,11 @@ interface Player extends PlayerInfo {
   standsInFor?: string;
 }
 
-// Join tokens avoid look-alike characters so they can be read out loud.
-const TOKEN_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+/** A remote player who takes one of the table's remote places (D-168); one who left only watches (D-170). */
+const isRemotePlace = (p: Player) => p.location === "remote" && !p.leftGame;
+
+/** Join codes and access codes avoid look-alike characters (no 0/O, no 1/I), so they can be read out loud and typed. */
+export const TOKEN_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 function shortToken(len = 8): string {
   let s = "";
   for (let i = 0; i < len; i++) s += TOKEN_ALPHABET[randomInt(TOKEN_ALPHABET.length)];
@@ -150,8 +153,8 @@ export class Table extends EventEmitter {
   constructor(config: TableConfig, games: Map<string, InstalledGame>, logs: LogStore) {
     super();
     this.config = config;
-    this.allowNoLocalPlayer = !!config.allowNoLocalPlayer;
-    this.boardDeck = !!config.boardDeck;
+    this.allowNoLocalPlayer = config.allowNoLocalPlayer;
+    this.boardDeck = config.boardDeck;
     this.games = games;
     this.logs = logs;
     this.rotateJoinToken();
@@ -248,7 +251,7 @@ export class Table extends EventEmitter {
       remote: {
         boardControl: this.remoteBoardControl,
         maxPlayers: this.config.maxRemotePlayers,
-        players: this.humans().filter((p) => p.location === "remote" && !p.leftGame).length, // one who left watches (D-170)
+        players: this.remotePlayers().length,
         joined: this.invitesJoined,
       },
       watchers: this.watchers(),
@@ -585,13 +588,13 @@ export class Table extends EventEmitter {
    * are connected now (a dropped one keeps the seat while away), and watchers. No names.
    */
   presence(): { remote: number; remoteConnected: number; watchers: number } {
-    const remote = this.humans().filter((p) => p.location === "remote" && !p.leftGame);
+    const remote = this.remotePlayers();
     return { remote: remote.length, remoteConnected: remote.filter((p) => p.connected).length, watchers: this.watchers().length };
   }
 
   /** Remote players and watchers, without `except`'s session: together at most `maxRemotePlayers` (D-168). */
   remoteCount(except?: string) {
-    const players = this.humans().filter((p) => p.location === "remote" && !p.leftGame && p.remoteSession !== except).length;
+    const players = this.remotePlayers().filter((p) => p.remoteSession !== except).length;
     return players + [...this.visitors.keys()].filter((s) => s !== except && this.isWatcher(s)).length;
   }
 
@@ -601,7 +604,7 @@ export class Table extends EventEmitter {
    * whose place frees up if they are a remote player whose browser goes too (with a board open they stay as a watcher).
    */
   assertRemoteRoom(session?: string, leaving?: Player) {
-    const frees = leaving?.location === "remote" && !leaving.leftGame && leaving.remoteSession !== session && !this.visitors.get(leaving.remoteSession!)?.boards;
+    const frees = leaving && isRemotePlace(leaving) && leaving.remoteSession !== session && !this.visitors.get(leaving.remoteSession!)?.boards;
     if (this.remoteCount(session) - (frees ? 1 : 0) >= this.config.maxRemotePlayers) throw new TableError(409, REMOTE_FULL, "remote-full");
   }
 
@@ -800,7 +803,6 @@ export class Table extends EventEmitter {
     return p;
   }
 
-  /** A player at the table who left the running game and whose seat still waits, by name (ignoring case), D-172. */
   /** The seated AI player that took this name's seat in an exchange (D-222), if any. */
   private aiStandingInFor(raw: unknown) {
     const k = nameKey(trimName(raw));
@@ -826,6 +828,7 @@ export class Table extends EventEmitter {
     return { playerId: p.id, sessionToken: p.sessionToken! };
   }
 
+  /** A player at the table who left the running game and whose seat still waits, by name (ignoring case), D-172. */
   private leftPlayerNamed(raw: unknown) {
     const k = nameKey(trimName(raw));
     if (!k) return undefined;
@@ -864,7 +867,7 @@ export class Table extends EventEmitter {
   private scheduleAwayToAi(p: Player) {
     this.clearAwayToAi(p.id);
     if (!this.awayToAi) return;
-    this.awayToAiTimers.set(p.id, setTimeout(() => this.awayToAiNow(p.id), this.awayToAi * (this.config.awayToAiMinuteMs ?? 60_000)));
+    this.awayToAiTimers.set(p.id, setTimeout(() => this.awayToAiNow(p.id), this.awayToAi * this.config.awayToAiMinuteMs));
   }
 
   private clearAwayToAi(playerId: string) {
@@ -888,15 +891,15 @@ export class Table extends EventEmitter {
 
   // ---------- seats ----------
 
+  /** The people who take a remote place: remote players, not one who left (they only watch now, D-170). */
+  private remotePlayers() {
+    return this.humans().filter(isRemotePlace);
+  }
+
   private humans() {
     return [...this.players.values()].filter((p) => p.kind === "human");
   }
 
-  /**
-   * Why nobody can take a seat now, in words for the phone and the board, or null when a seat is free (D-129). A seat
-   * is taken as soon as a player has joined (phone, invite or AI), connected or reconnecting. Full: every seat of the
-   * layout on the edges the chosen game uses is taken, or the chosen game has as many players as it takes.
-   */
   /** A name for someone joining without one (D-244): "Player N", the lowest N no one at the table has. */
   suggestedName(): string {
     const taken = new Set([...this.players.values()].map((p) => nameKey(p.name)));
@@ -905,6 +908,11 @@ export class Table extends EventEmitter {
     return `Player ${n}`;
   }
 
+  /**
+   * Why nobody can take a seat now, in words for the phone and the board, or null when a seat is free (D-129). A seat
+   * is taken as soon as a player has joined (phone, invite or AI), connected or reconnecting. Full: every seat of the
+   * layout on the edges the chosen game uses is taken, or the chosen game has as many players as it takes.
+   */
   noFreeSeat(): string | null {
     const playing = this.playing;
     const m = this.phase === "ready" || playing ? this.selected?.game.manifest : undefined;
@@ -1092,7 +1100,19 @@ export class Table extends EventEmitter {
 
   private playerInfos(): PlayerInfo[] {
     const colors = this.colors();
-    return [...this.players.values()].map(({ sessionToken, graceTimer, aiSeed, remoteSession, chosenColor, keptColor, leftGame, ...info }) => ({ ...info, color: colors.get(info.id) ?? null }));
+    // The fields every client may see, named (an allow list): a field added to Player stays private until it is added
+    // here (standsInFor was sent to every board and phone and read by none).
+    return [...this.players.values()].map((p) => ({
+      id: p.id,
+      name: p.name,
+      kind: p.kind,
+      location: p.location,
+      seat: p.seat,
+      connected: p.connected,
+      ready: p.ready,
+      ...(p.aiOptions !== undefined ? { aiOptions: p.aiOptions } : {}),
+      color: colors.get(p.id) ?? null,
+    }));
   }
 
   /**
@@ -1803,14 +1823,14 @@ export class Table extends EventEmitter {
   }
   /** Whether the game goes at the local board's pace now: pacing on and a local board connected (D-141, D-143). */
   get pacedByBoard() {
-    return !!this.config.boardPacing && this.localBoard;
+    return this.config.boardPacing && this.localBoard;
   }
   /** How long anything waits for a board that does not answer (D-141). */
   get boardPaceTimeoutMs() {
-    return this.config.boardPaceTimeoutMs ?? 20_000;
+    return this.config.boardPaceTimeoutMs;
   }
   private waitingForBoard() {
-    if (!this.config.boardPacing || !this.localBoard || this.boardShown >= this.boardSent) return false;
+    if (!this.pacedByBoard || this.boardShown >= this.boardSent) return false;
     return Date.now() - this.boardSentAt < this.boardPaceTimeoutMs;
   }
 
