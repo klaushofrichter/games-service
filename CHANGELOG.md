@@ -8,6 +8,7 @@ history.
 
 ## [Unreleased]
 
+- Board: names in their colour on the away and waiting cards; the exchange offers an AI player on a board opened during a game; Versions name the game being played and its source; Live status shows clock times and no longer redraws while nothing happens (D-272).
 - The packages' publish step works again, and a test parses every bash step of the workflows (D-271).
 - Install guides and llms.txt: hints for AI agents about ports (firewalls) and the GitHub sign-in, and a Troubleshoot section; the starter saves the private repositories only when it asked (D-270).
 - Install guides, website and release notes: exact wording for a taken port, what an agent reports, comparable versions, network instead of WiFi (D-269).

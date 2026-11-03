@@ -6,7 +6,7 @@ removed while a game is chosen. The setting, Simulation and Game logs are under 
 beside the gear (D-128), not in Settings or the lobby; turned on, Advanced shows DEV, and a game of AI players only
 starts from the board and plays on it.
 """
-import os, sys
+import os, re, sys
 from playwright.sync_api import sync_playwright
 from common import api, errors, join_deck, start_table, wait, watch
 
@@ -79,6 +79,23 @@ try:
         wait(lambda: a("GET", "/state")["phase"] in ("active", "finished"), 10, "the AI game to start")
         wait(lambda: a("GET", "/state")["phase"] == "finished", 30, "the AI game to finish")
         board.screenshot(path=os.path.join(OUT, "developer-ai-game.png"))
+
+        # Live status (D-157, D-272): the AI answers at their clock times, and while nothing happens the window isn't
+        # redrawn (it is polled twice a second; it used to redraw every time, with every "… s ago" changing).
+        board.click("#tools-button")
+        board.click(".overlay.advanced [data-adv=live]")
+        board.wait_for_selector(".overlay.live-status .live-trace div")
+        first = board.inner_text(".overlay.live-status .live-trace div >> nth=0")
+        assert re.match(r"^\d{1,2}:\d{2}:\d{2}( [AP]M)? · ", first), first
+        board.wait_for_timeout(1500)  # the game's last moves settle
+        changes = board.evaluate("""() => new Promise((done) => {
+            let n = 0;
+            const ob = new MutationObserver(() => n++);
+            ob.observe(document.querySelector('.overlay.live-status'), { childList: true, subtree: true, characterData: true });
+            setTimeout(() => (ob.disconnect(), done(n)), 2000);
+        })""")
+        assert changes == 0, f"the Live status window was redrawn {changes} times with nothing happening"
+        board.click(".overlay.live-status [data-close-overlay]")
 
         # Off again: the gear is plain.
         a("POST", "/developer", {"allowNoLocalPlayer": False})

@@ -53,6 +53,23 @@ try:
         except Exception:
             pass  # refused (409): a running game keeps its players
 
+        # D-272: a board opened during the game (a reload) still knows the game's AI, so the exchange offers one, and
+        # Advanced › Versions names the game being played first.
+        board.reload()
+        board.wait_for_selector("#settings-button")
+        board.click("#settings-button")
+        board.click(f".overlay.settings [data-exchange='{players()['Ben']['id']}']")
+        board.wait_for_selector(".overlay.exchange [data-ex=ai]", timeout=5000)
+        board.click(".overlay.exchange [data-close-overlay]")
+        board.click(".overlay.settings [data-close-overlay]")
+        board.wait_for_selector(".overlay", state="detached")
+        board.click("#tools-button")
+        board.wait_for_selector(".overlay .versions")
+        v = board.inner_text(".overlay .versions")
+        assert "This game" in v and "Coin Flip" in v, v
+        board.click(".overlay [data-close-overlay]")
+        board.wait_for_selector(".overlay", state="detached")
+
         board.click("#settings-button")
         board.wait_for_selector(".overlay.settings [data-exchange]")
         board.screenshot(path=os.path.join(OUT, "exchange-settings.png"))
@@ -91,6 +108,9 @@ try:
         if not board.locator(".overlay.settings").count():
             board.click("#settings-button")
         board.click(f".overlay.settings [data-exchange='{players()['Ann']['id']}']")
+        # The choice itself says so before it is picked (D-272).
+        board.wait_for_selector(".overlay.exchange [data-ex=ai]")
+        assert "switches on the developer setting" in board.inner_text(".overlay.exchange [data-ex=ai]")
         board.click(".overlay.exchange [data-ex=ai]")
         board.wait_for_selector(".dialog >> text=the last player at the table", timeout=5000)
         assert "“Games without a player at the table”, so it is switched on now" in board.inner_text(".dialog")
