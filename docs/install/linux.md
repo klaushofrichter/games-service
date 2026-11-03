@@ -63,6 +63,35 @@ command for the system (it needs `sudo`, so ask the person).
   a browser only on an active, unlocked desktop of this user, since opening one elsewhere can take over a browser
   that is already running. The person opens the board themselves, or shows it on another screen (below).
 
+### Hints for AI agents: ports and the GitHub sign-in
+
+These two caused most trouble in real installations.
+
+**Ports and the network**
+
+- A passing `--smoke-test`, the board on `localhost` and the join link opened on this computer prove only that the
+  table runs. They don't prove that phones can reach it: a firewall can still block the port.
+- Check whether a firewall is on: `systemctl is-active ufw` or `systemctl is-active firewalld` (no `sudo` needed). If it is, tell the person at the handoff, with the step from
+  [Troubleshoot](#troubleshoot) for the port the table actually runs on. Leave the change itself to the person.
+- Ask the person to check from a phone: `http://<address>:<port>/health` (the address and port from the starter's
+  `phones:` line) shows `{"status":"ok", …}` when the phone can reach the table.
+- A taken port 8080 isn't a failed installation (above): use the port the starter suggests in every command, and
+  give the person that port too.
+- Run the commands in a normal shell of the person's own user. A restricted or sandboxed agent shell can see other
+  files (an old `games.json`) or another network than the person does.
+
+**The GitHub sign-in (private repositories only)**
+
+- First run `gh auth status`. If the GitHub CLI is signed in, the starter uses it silently, with no code and no
+  browser step: the easiest way.
+- If it isn't, don't start a sign-in in a window the person can't see or type into, such as your own tool's shell or
+  a background terminal tab. The GitHub CLI shows a code and then **waits for Enter in that window**; approving the
+  code in the browser alone doesn't finish it, and the table stays down until then.
+- Instead, let the person do the first start with private repositories themselves, from a terminal of their own: `~/apps/game-table/game-table`: they type the
+  repository names at the question (that list is saved; `--repos` isn't), press Enter when the GitHub CLI asks, and
+  enter the code in the browser.
+- Never ask for, read or pass on a token or a password.
+
 ## Install
 
 Download **[`game-table-linux.tar.gz`](https://github.com/klaushofrichter/games-service/releases/download/local-table/game-table-linux.tar.gz)** (from the release
@@ -126,7 +155,7 @@ starter downloads. One without them is left out with a note. `--branch main` tak
 repository.
 
 The players scan the QR code on the board with their phones. Their phones must be on the same network as this
-computer: its WiFi, or a WiFi on the same router if the computer is wired. Not mobile data, and not a guest WiFi.
+computer: its WiFi, or a WiFi on the same router if the computer is wired. Not mobile data, and not a guest WiFi. If phones can't join, see [Troubleshoot](#troubleshoot): usually a firewall.
 
 Stop the table with Ctrl+C.
 
@@ -203,9 +232,30 @@ anywhere else it answers 403. Another screen needs the board's own link, which c
 The link works only from the same network, and anyone with the key controls the table: give it only to your own
 screens.
 
-## If phones can't join
+## Troubleshoot
 
-- A firewall must let the table's port in (8080 unless you chose another), for example `sudo ufw allow 8080/tcp`.
+### Phones can't join
+
+**Phones need the table's port open on this computer, and a check on the computer itself doesn't prove that it
+is.** `--smoke-test`, the board on `localhost` and the join link opened on this computer all pass while a firewall
+still keeps every phone out.
+
+- **Check from a phone:** open `http://<this computer's address>:<port>/health` in the phone's browser (the address
+  and port from the starter's `phones:` line, like `http://192.168.1.20:8080/health`). It shows `{"status":"ok", …}`
+  when the phone can reach the table; if it doesn't load, something between them blocks the port.
+- Is a firewall on? `systemctl is-active ufw` (Debian, Ubuntu, Raspberry Pi OS) or `systemctl is-active firewalld`
+  (Fedora) says `active` when it is. These need no `sudo`; reading or changing the rules does.
+- **Open the table's port to your home network only** (here 8081 and a home network of `192.168.1.x`; use your port
+  and network):
+
+  ```sh
+  sudo ufw allow from 192.168.1.0/24 to any port 8081 proto tcp          # ufw
+  sudo ufw delete allow from 192.168.1.0/24 to any port 8081 proto tcp   # undo it
+  sudo firewall-cmd --add-port=8081/tcp                                  # firewalld, until the next reboot
+  ```
+
+  The table doesn't need a restart. Docker's published ports often bypass `ufw`, so a Docker table may have worked
+  where this one doesn't.
 - The QR code holds the computer's address on the network (WiFi or Ethernet) and the port, like `http://192.168.1.20:8080/j/ABCD`. Open that
   address in the phone's browser to check.
 - Open the address exactly as the QR code has it. `/board/` answers 403 from another device, because the board is for
@@ -214,6 +264,18 @@ screens.
   reach: `PUBLIC_URL=http://192.168.1.20:8080` in the environment.
 - "Port 8080 is in use": the message says whether another Game Table holds it (close that one) or another program
   (start with `--port 8081`, at every start).
+
+### GitHub sign-in
+
+- **The sign-in waits for Enter.** The starter shows a code and waits until Enter is pressed **in its own window**; only
+  then does it open the browser and wait for the code. Approving the code in the browser alone isn't enough.
+- **Already signed in?** `gh auth status` shows the account. A signed-in GitHub CLI is used without any question, code or
+  browser step: the easiest way to private games.
+- **If the sign-in fails,** the table starts anyway with the public games and names the private repositories it left
+  out. Start again to retry.
+- **A private repository is left out with *no access*:** the signed-in account can't read it, it has no
+  `production` branch with a `games/` folder, or its organization hasn't approved the GitHub CLI (see *Repositories of
+  another organization*).
 
 ## Options
 
@@ -251,7 +313,8 @@ connected: the first start with `--service` also sends the logs of games played 
 - **Update the games:** every start brings the games up to date.
 - **Update Game Table itself:** stop the table (and its service, if you made one), then unpack the newest
   `game-table-linux.tar.gz` over the old folder. Your games, the table's key and its logs stay.
-- **Remove:** stop the table first (close its window, or Ctrl+C). Then delete `~/apps/game-table`, plus `~/.local/share/game-table` (downloads and the table's data). With a
+- **Remove:** stop the table first (close its window, or Ctrl+C). Then delete `~/apps/game-table`, plus `~/.local/share/game-table` (downloads and the table's data). If you
+  opened the port in a firewall for it, undo that too (*Troubleshoot*). With a
   service, first `systemctl --user disable --now game-table` and delete its file.
 - **GitHub sign-in:** removing Game Table leaves it behind. The GitHub CLI keeps its sign-in in `~/.config/gh`;
   `gh auth logout` (or `~/.local/share/game-table/tools/gh/bin/gh auth logout`) ends it.
