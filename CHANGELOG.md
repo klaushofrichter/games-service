@@ -8,6 +8,7 @@ history.
 
 ## [Unreleased]
 
+- Release notes of the packages: extra-games linked and added automatically, the checksums named; a notes-only run rewrites them without a new build (D-276).
 - The website: the package cards' ".pkg" and ".tar.gz" keep the tails of their g (D-275).
 - The website: the captions under the hero's table each stay at least 1.2 s, also on a fast scroll (D-274).
 - The website: new text for the four numbers under the ticker (D-273).
