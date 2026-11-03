@@ -2221,3 +2221,8 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   follow it one step at a time, each shown at least 1.2 s (its fade-in takes 0.6 s), so a fast scroll plays all three
   in turn instead of flashing the first two past; scrolling back up goes straight to the caption due, or none.
   Checked in a browser with one jump to the end of the hero: the captions came at 0.2 s, 1.5 s and 2.6 s.
+- **D-275 · 2026-11-03 · Klaus** — On the landing page's package cards, the "g" of *.pkg* and *.tar.gz* lost its tail.
+  *Implementation (Claude):* those titles are painted with a gradient clipped to the text, and the gradient covers
+  only the element's box, which a line height of 1 ends above the descenders. The cards' titles (`.og b`, also *MIT*,
+  *250+* and *AI* further down) get room below (`padding-bottom: .18em`), taken back with a negative margin so the
+  layout doesn't move. Checked in screenshots of both card rows.
