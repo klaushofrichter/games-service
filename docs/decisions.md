@@ -2211,3 +2211,7 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   - Checks: `scripts/e2e/exchange.py` reloads the board mid-game and finds the AI choice and *This game*, and reads
     the AI choice's note for the last player; `scripts/e2e/developer.py` reads clock times in Live status and checks
     that the idle window isn't redrawn.
+- **D-273 · 2026-11-03 · Klaus** — The landing page's four numbers under the ticker read: *1 prompt* to build your
+  own game, *9 games* playable out of the box, *8 players* to join, *0 lines* of lobby code in your game. *Implementation
+  (Claude):* the unit after each number is smaller and stays on the number's line, so the four read evenly on a wide
+  screen and in two columns on a phone; the other counters on the page ("250+") are unchanged.
