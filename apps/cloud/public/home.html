@@ -164,6 +164,9 @@ body:has(.preview-sash) .top .wrap { padding-right: clamp(0px, calc(150px - (100
 .num { display: grid; gap: 6px; padding-left: 20px; border-left: 2px solid var(--brass-deep); }
 .num b { font: 600 clamp(48px, 5vw, 72px)/1 var(--display); background: linear-gradient(180deg, var(--brass-hi), var(--brass-deep)); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .num span { color: var(--soft); font-size: 15px; }
+/* The unit after the number ("prompt", "games", …) smaller, on the number's line, so the four stay even. */
+.num b { white-space: nowrap; }
+.num b small { font-size: .5em; }
 /* a soft light that follows the pointer over cards */
 .spot { position: relative; isolation: isolate; }
 .spot::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: radial-gradient(360px circle at var(--mx, -999px) var(--my, -999px), rgba(214,169,74,.13), transparent 60%); pointer-events: none; z-index: -1; opacity: 0; transition: opacity .3s; }
@@ -618,9 +621,9 @@ footer a.terms { display: inline; margin: 0; }
 </div></div>
 
 <div class="numbers wrap">
-  <div class="num rv"><b data-count="1">0</b><span>prompt to a working Backgammon</span></div>
-  <div class="num rv" style="--d:.06s"><b data-count="9">0</b><span>free games to play today</span></div>
-  <div class="num rv" style="--d:.12s"><b data-count="8">0</b><span>players around one board</span></div>
+  <div class="num rv"><b data-count="1" data-suffix=" prompt">0</b><span>to build your own game</span></div>
+  <div class="num rv" style="--d:.06s"><b data-count="9" data-suffix=" games">0</b><span>playable out of the box</span></div>
+  <div class="num rv" style="--d:.12s"><b data-count="8" data-suffix=" players">0</b><span>to join</span></div>
   <div class="num rv" style="--d:.18s"><b data-count="0" data-suffix=" lines">0</b><span>of lobby code in your game</span></div>
 </div>
 
@@ -1311,9 +1314,12 @@ docker compose -f deploy/local/docker-compose.yml up -d --build">Copy</button></
     if (!e.isIntersecting) return;
     counters.unobserve(e.target);
     const el = e.target, to = Number(el.dataset.count), suffix = el.dataset.suffix || "";
-    if (still || to === 0) return void (el.textContent = to + suffix);
+    // A hero number's unit goes in a <small> beside it (.num b small); elsewhere ("250+") it stays plain.
+    const unit = el.closest(".num") && suffix.trim();
+    const show = (n) => { el.textContent = unit ? n : n + suffix; if (unit) { const u = document.createElement("small"); u.textContent = unit; el.append(" ", u); } };
+    if (still || to === 0) return void show(to);
     const t0 = performance.now();
-    const step = (t) => { const k = Math.min(1, (t - t0) / 1400); el.textContent = Math.round(to * (1 - Math.pow(1 - k, 3))) + suffix; if (k < 1) requestAnimationFrame(step); };
+    const step = (t) => { const k = Math.min(1, (t - t0) / 1400); show(Math.round(to * (1 - Math.pow(1 - k, 3)))); if (k < 1) requestAnimationFrame(step); };
     requestAnimationFrame(step);
   }), { threshold: 0.6 });
   $$("[data-count]").forEach((el) => counters.observe(el));

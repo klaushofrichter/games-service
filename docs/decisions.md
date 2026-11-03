@@ -2190,3 +2190,7 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   `tests/workflow-shell.test.ts` runs `bash -n` on every bash `run:` block of every workflow (GitHub expressions
   replaced, PowerShell steps left out), so a pull request fails on it before anything is published. Checked that the
   test fails with the old line.
+- **D-273 · 2026-11-03 · Klaus** — The landing page's four numbers under the ticker read: *1 prompt* to build your
+  own game, *9 games* playable out of the box, *8 players* to join, *0 lines* of lobby code in your game. *Implementation
+  (Claude):* the unit after each number is smaller and stays on the number's line, so the four read evenly on a wide
+  screen and in two columns on a phone; the other counters on the page ("250+") are unchanged.
