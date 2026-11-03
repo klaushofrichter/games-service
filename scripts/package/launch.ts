@@ -242,11 +242,13 @@ function repoName(text: string): string {
 }
 
 async function choosePrivate(o: Options, savedFile: string): Promise<string[]> {
+  let asked = false;
   const known = existsSync(savedFile) ? (await readFile(savedFile, "utf8")).split(/\s+/).filter(Boolean) : [];
   let answer: string;
   if (o.repos !== undefined) answer = o.repos;
   else if (o.noUpdate || o.smokeTest || !process.stdin.isTTY) answer = known.join(" ");
   else {
+    asked = true;
     say("");
     say(`Private game repositories: type the names of those your GitHub account can read, separated by spaces or`);
     say(`commas: owner/name, like my-company/my-game. A name alone, like my-game, means ${OWNER}/my-game.`);
@@ -264,7 +266,8 @@ async function choosePrivate(o: Options, savedFile: string): Promise<string[]> {
   }
   // Only the answer to the question is saved. --repos is for this start, and a check changes nothing: --repos none on
   // an existing install keeps its list (Linux and Windows reviews, 2026-11-02).
-  if (!o.smokeTest && o.repos === undefined) await writeFile(savedFile, list.join("\n") + (list.length ? "\n" : ""));
+  // Only an answer is saved: a start without a terminal (an agent's) left an empty list behind (Linux follow-up).
+  if (asked) await writeFile(savedFile, list.join("\n") + (list.length ? "\n" : ""));
   return list;
 }
 
