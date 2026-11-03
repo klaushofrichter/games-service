@@ -579,7 +579,7 @@ footer a.terms { display: inline; margin: 0; }
         <a class="btn primary" href="#build">Build a game <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
         <a class="btn" href="#download">Play at home</a>
       </div>
-      <div class="facts rv" style="--d:.32s"><span>1–8 players per table</span><span>No app to install</span><span>AI players built in</span><span>Runs on your own WiFi</span></div>
+      <div class="facts rv" style="--d:.32s"><span>1–8 players per table</span><span>No app to install</span><span>AI players built in</span><span>Runs on your own network</span></div>
     </div>
     <div class="scene" id="scene" aria-hidden="true">
       <div class="tabletop" id="tabletop">
@@ -1124,7 +1124,7 @@ node scripts/soak.ts 100</pre>
     <div class="section-head">
       <p class="eyebrow rv">Play at home</p>
       <h2 class="rv" style="--d:.06s">Download it, start it, play.</h2>
-      <p class="lede rv" style="--d:.12s">One package for your computer, with everything inside: the table, the built-in games and its own Node.js. It needs no Docker and no account with us. At the first start it fetches the games from GitHub, your private game repositories too if you name them, and opens the board in the browser. Everyone joins with their phone on the same WiFi.</p>
+      <p class="lede rv" style="--d:.12s">One package for your computer, with everything inside: the table, the built-in games and its own Node.js. It needs no Docker and no account with us. At the first start it fetches the games from GitHub, your private game repositories too if you name them, and opens the board in the browser. Everyone joins with their phone on the same network as that computer.</p>
     </div>
     <div class="pkggrid">
       <a class="og rv spot" href="/docs/install/windows.md"><span class="os">Windows 11</span><b>.exe</b><h3>An installer for your user</h3><p>No administrator rights. Game Table appears in the Start menu and on the desktop.</p><code>/docs/install/windows.md</code></a>
@@ -1149,8 +1149,8 @@ node scripts/soak.ts 100</pre>
     <div>
       <p class="eyebrow rv">Or with Docker</p>
       <h2 class="rv" style="--d:.06s">A table on any computer, in three commands.</h2>
-      <p class="lede rv" style="--d:.12s;margin-top:20px">The table runs in Docker on a computer on your WiFi. Open the board in a browser, on a touchscreen if you have one, and everyone joins with their phone. No cloud service, no DNS entry and no HTTPS needed.</p>
-      <div class="needs rv" style="--d:.18s"><span>Docker with Compose</span><span>git</span><span>Phones on the same WiFi</span><span>A touchscreen, an iPad or a mouse</span></div>
+      <p class="lede rv" style="--d:.12s;margin-top:20px">The table runs in Docker on a computer on your home network. Open the board in a browser, on a touchscreen if you have one, and everyone joins with their phone. No cloud service, no DNS entry and no HTTPS needed.</p>
+      <div class="needs rv" style="--d:.18s"><span>Docker with Compose</span><span>git</span><span>Phones on the same network</span><span>A touchscreen, an iPad or a mouse</span></div>
       <p class="rv muted" style="--d:.22s">Games from other repositories, private ones too, are added by cloning them. The <a href="/docs/local-docker.md">runbook</a> has every step, with a check after each one.</p>
       <p class="rv muted" style="--d:.24s;margin-top:14px"><b style="color:var(--ink)">No touchscreen table yet?</b> An iPad makes a small game board, good enough to try a game or test your own: in the board's settings, <em>Board on another screen…</em> shows a QR code, the iPad scans it, and the board moves there while the table keeps running on the computer.</p>
       <div class="agent-alt rv" style="--d:.26s">
@@ -1196,7 +1196,7 @@ docker compose -f deploy/local/docker-compose.yml up -d --build">Copy</button></
       <div class="specs rv" style="--d:.18s">
         <div class="spec"><b>Touchscreen</b><span>16:9, 1080p or 4K, lying flat</span></div>
         <div class="spec"><b>Computer</b><span>A Linux mini PC, 16 GB RAM</span></div>
-        <div class="spec"><b>Network</b><span>The same WiFi as the phones</span></div>
+        <div class="spec"><b>Network</b><span>The same network as the phones</span></div>
         <div class="spec"><b>Software</b><span>Debian 12, Docker and a kiosk browser</span></div>
       </div>
       <p class="rv muted" style="--d:.22s">Want to build your own now? The table PC kit installs Docker, the table and a full-screen kiosk that opens the board at boot.</p>
@@ -1216,7 +1216,7 @@ docker compose -f deploy/local/docker-compose.yml up -d --build">Copy</button></
     </div>
     <div class="grid">
       <ul class="show-list rv" style="--d:.05s">
-        <li><b>Remote players from anywhere.</b> An invite link brings a player or a watcher to your table from any browser, not just from your WiFi. The service introduces them, then they connect straight to the table.</li>
+        <li><b>Remote players from anywhere.</b> An invite link brings a player or a watcher to your table from any browser, not just from your home network. The service introduces them, then they connect straight to the table.</li>
         <li><b>Many tables, approved by you.</b> A new table shows a pairing code on its board for you to approve, or starts with an access code you issued: a token for one table, valid for a week, a year or for good. Disconnect a table, or revoke its code, at any time.</li>
         <li><b>The games each table gets.</b> Add extra-game repositories from GitHub, and tick which tables get them, one by one or with their access code.</li>
         <li><b>Game logs for analysis.</b> Every game and simulation sends its log to the service. Filter by game, table and date, download the zips, or give a pipeline or a Claude session a download token. You choose how long logs are kept.</li>

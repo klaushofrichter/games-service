@@ -596,7 +596,7 @@ async function main() {
   say("");
   say(`Game Table ${version} on this computer`);
   say(`  board:   http://localhost:${o.port}/board/`);
-  if (env.PUBLIC_URL) say(`  phones:  scan the QR code on the board (${env.PUBLIC_URL}/j/…, the "[table-host] join:" line below), on the same network as this computer (its WiFi, or a WiFi on the same router), not mobile data or a guest WiFi`);
+  if (env.PUBLIC_URL) say(`  phones:  scan the QR code on the board: it holds ${env.PUBLIC_URL} and a join code that is new at every start; on the same network as this computer (its WiFi, or a WiFi on the same router), not mobile data or a guest WiFi`);
   if (o.service) {
     say(`  service: ${SERVICE_URL}: remote players can join once the table is approved`);
     if (!o.code) say(`           If the board shows a pairing code, approve it in the console at ${CONSOLE_URL}.`);
