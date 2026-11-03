@@ -2162,6 +2162,27 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   - **Network, not WiFi,** on the website (the facts row, *Play at home*, the Docker section, the table's specs, the
     service section) and in `llms.txt`, as in the guides: a wired computer works too.
   - Backgammon's board text naming three AI strengths instead of six is fixed in extra-games (E-047).
+- **D-270 · 2026-11-02 · Klaus** — Hints for AI agents that install Game Table, about the ports and the GitHub
+  sign-in: "We want some hints for LLMs that try the installation. They need to take care of the ports and the github
+  login." From the v2026.11.02.10 follow-ups with real phones and private games (#games-application): phones joined
+  and private games played on all three platforms, but on Linux `ufw` kept the phone out while every check on the
+  computer passed, and on Windows the agent started the GitHub sign-in in a terminal tab it couldn't type into, where
+  the sign-in waited for Enter. *Implementation (Claude):*
+  - **Each install guide** has *Hints for AI agents: ports and the GitHub sign-in* in its agent section: local checks
+    don't prove that phones can reach the table; how to see whether a firewall is on (per system, without `sudo`);
+    tell the person at handoff and leave the change to them; check from a phone with `/health`; a taken port means
+    another port at every start; run in a normal shell of the person's user (a sandboxed agent shell showed an old
+    `games.json` on Windows). For GitHub: `gh auth status` first, since a signed-in CLI is used silently; never start
+    the sign-in in a window the person can't type into; let the person do the first start with private repositories
+    themselves; never handle a token.
+  - **`llms.txt`** says the same in one paragraph, with a pointer to the guides' hints.
+  - **Troubleshoot** replaces *If phones can't join*, linked from *Start*: *Phones can't join* (the phone check, the
+    firewall check, per system the fix; on Linux a rule for the home network only with how to undo it) and *GitHub
+    sign-in* (Enter in the starter's window, an existing sign-in, a failed sign-in starts the public games, *no access*).
+  - **The saved list** of private repositories is written only when the starter asked the question: a start without
+    a terminal left an empty list behind.
+  - The Windows report's `games.json` "possible bug" was withdrawn by the tester: the restricted shell showed an older
+    copy of the file.
 - **D-271 · 2026-11-03 · Klaus** — The packages' publish step can't fail on a shell syntax error again. Publishing
   v2026.11.02.12 (run 41566284606) built and tested all six packages, then failed in the publish step: the release
   notes' text from D-269 closed its quote one line early, so bash stopped with `syntax error near unexpected token
