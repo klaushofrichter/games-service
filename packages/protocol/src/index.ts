@@ -174,7 +174,7 @@ export function allowedPlayerCounts(m: Manifest): number[] {
 
 // ---------- Lobby ----------
 
-export type Phase = "idle" | "loading" | "ready" | "active" | "paused" | "terminating" | "finished";
+export type Phase = "idle" | "ready" | "active" | "paused" | "terminating" | "finished";
 
 /**
  * Player colours (D-106): one per player, chosen in the board's settings and the same in every game. By default a player
@@ -288,9 +288,9 @@ export interface LobbyState {
    */
   needed: Record<string, string>;
   /**
-   * Empty seats whose player left during the game, with that player's colour (D-125), seat → colour: a game that goes
-   * on with the seat keeps showing it in the same colour. Kept until the next game starts
-   * or the table returns to the lobby; `playerColor(info, seat)` in the board kit uses it.
+   * Seat → colour for empty seats whose player left during the game (D-125), read by `playerColor(info, seat)` in the
+   * board kit. A player who leaves keeps the seat now (it waits, D-144), so the host sends it empty; it stays in the
+   * game contract for games that read it.
    */
   seatColors: Record<number, string>;
   /**
@@ -298,11 +298,11 @@ export interface LobbyState {
    * take (host clock, `deadline`). Games may show it; the board shows "Play now" once a deadline has passed.
    */
   aiThinking: { playerId: string; seat: number; since: number; deadline: number }[];
-  /** Remote play: whether remote boards may act, and how many remote players fit. */
-  /** `joined`: invites (codes) that brought a player, newest last, with that player's name (D-164). */
   /**
-   * `watching`: only in the state a remote board gets whose browser has no player at the table (D-167, D-168);
-   * `mayJoin`: only for remote boards, whether their page shows the deck (a player, or one let in to play).
+   * Remote play: whether remote boards may act (for a remote board, as the host decides it for that browser, D-277),
+   * and how many remote players fit. `joined`: invites (codes) that brought a player, newest last, with that player's
+   * name (D-164). `watching`: only in the state a remote board gets whose browser has no player at the table (D-167,
+   * D-168). `mayJoin`: only for remote boards, whether their page shows the deck (a player, or one let in to play).
    * `watcherId`: only in a watcher's own state, their id in `watchers` (D-221).
    */
   remote: { boardControl: boolean; maxPlayers: number; players: number; joined: { invite: string; name: string }[]; watching?: boolean; mayJoin?: boolean; watcherId?: string };
@@ -321,17 +321,17 @@ export interface LobbyState {
   away: { playerId: string; name: string; seat: number; since: number; left?: boolean }[];
   /**
    * The seat exchange the board has open (D-159): seat `seat` (now `name`'s) waits for a person to join with `url`, at
-   * the table (`local`, a QR code) or remotely (an invite). Null when none is open.
+   * the table (`local`, a QR code) or remotely (an invite). Null when none is open. `watcher`: the exchange is for
+   * that watcher, who takes the seat from their own page (D-168).
    */
-  /** `watcher`: the exchange is for that watcher, who takes the seat from their own page (D-168). */
   exchange: { seat: number; kind: "local" | "remote"; url: string; since: number; playerId: string | null; name: string | null; watcher?: { id: string; name: string } | null } | null;
   /** Remote watchers (D-168): browsers that see the board without a player, by an id of their own and a name. */
   watchers: { id: string; name: string }[];
   /**
-   * The developer setting (D-118): games without a player at the table. `protectedPlayer`: the one player the board
-   * may not remove while it is off (the last one at the table, while a game is chosen or running).
+   * The developer settings (D-118, D-175): games without a player at the table; play from the board.
+   * `protectedPlayer`: the one player the board may not remove while the first is off (the last one at the table,
+   * while a game is chosen or running).
    */
-  /** The developer settings (D-118, D-175): games without a player at the table; play from the board. */
   developer: { allowNoLocalPlayer: boolean; boardDeck: boolean; protectedPlayer: string | null };
   /** Why nobody can take a seat now (every seat taken, or the chosen game is full), or null (D-129). */
   noSeat: string | null;

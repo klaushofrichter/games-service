@@ -147,7 +147,9 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
     const s = { ...state, joinUrl: "", exchange: hideLink ? { ...state.exchange!, url: "" } : state.exchange };
     if (session === undefined) return s;
     const mayJoin = table.mayJoin(session);
-    if (table.hasRemotePlayer(session)) return { ...s, remote: { ...s.remote, mayJoin } };
+    // Board control as the server decides it for this browser (D-277): the table's switch and, during a game, the game's
+    // remoteBoardControl, so a remote board never shows a control the server would refuse.
+    if (table.hasRemotePlayer(session)) return { ...s, remote: { ...s.remote, mayJoin, boardControl: table.remoteControlAllowed(session) } };
     return { ...s, remote: { ...s.remote, boardControl: false, watching: true, mayJoin, watcherId: table.watcherIdOf(session) ?? undefined } };
   };
   /** The serialised state is shared by clients that see the same: the table's, remote decks, remote boards by their rights. */
