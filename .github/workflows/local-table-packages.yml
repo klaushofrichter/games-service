@@ -226,7 +226,7 @@ jobs:
           # The packages' own version (like v2026.11.02.10 (22570a1)), the same that game-table --version shows (macOS review).
           ver=$(jq -r .package.version "$(ls game-table-*.manifest.json | head -1)")
           notes="Game Table for one computer, without the Game Table service: players here join with their phones on the same network.
-          Version $ver, the same that game-table --version shows. Built from games-service $REF ($(echo "$sha" | cut -c1-7)), published $(date -u '+%Y-%m-%d %H:%M UTC'). The packages aren't signed yet."
+          Version $ver, the same that game-table --version shows. Built from games-service $REF ($(echo "$sha" | cut -c1-7)), published $(date -u '+%Y-%m-%d %H:%M UTC'). The packages aren't signed yet.
 
           - Windows 11: game-table-windows.exe (docs/install/windows.md)
           - macOS: game-table-macos.pkg (docs/install/macos.md)

@@ -2162,3 +2162,10 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   - **Network, not WiFi,** on the website (the facts row, *Play at home*, the Docker section, the table's specs, the
     service section) and in `llms.txt`, as in the guides: a wired computer works too.
   - Backgammon's board text naming three AI strengths instead of six is fixed in extra-games (E-047).
+- **D-271 · 2026-11-03 · Klaus** — The packages' publish step can't fail on a shell syntax error again. Publishing
+  v2026.11.02.12 (run 41566284606) built and tested all six packages, then failed in the publish step: the release
+  notes' text from D-269 closed its quote one line early, so bash stopped with `syntax error near unexpected token
+  '('`. Nothing was replaced; the release kept v2026.11.02.10. *Implementation (Claude):* the quote is fixed, and
+  `tests/workflow-shell.test.ts` runs `bash -n` on every bash `run:` block of every workflow (GitHub expressions
+  replaced, PowerShell steps left out), so a pull request fails on it before anything is published. Checked that the
+  test fails with the old line.
