@@ -2183,3 +2183,10 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
     a terminal left an empty list behind.
   - The Windows report's `games.json` "possible bug" was withdrawn by the tester: the restricted shell showed an older
     copy of the file.
+- **D-271 · 2026-11-03 · Klaus** — The packages' publish step can't fail on a shell syntax error again. Publishing
+  v2026.11.02.12 (run 41566284606) built and tested all six packages, then failed in the publish step: the release
+  notes' text from D-269 closed its quote one line early, so bash stopped with `syntax error near unexpected token
+  '('`. Nothing was replaced; the release kept v2026.11.02.10. *Implementation (Claude):* the quote is fixed, and
+  `tests/workflow-shell.test.ts` runs `bash -n` on every bash `run:` block of every workflow (GitHub expressions
+  replaced, PowerShell steps left out), so a pull request fails on it before anything is published. Checked that the
+  test fails with the old line.

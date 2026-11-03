@@ -8,6 +8,7 @@ history.
 
 ## [Unreleased]
 
+- The packages' publish step works again, and a test parses every bash step of the workflows (D-271).
 - Install guides and llms.txt: hints for AI agents about ports (firewalls) and the GitHub sign-in, and a Troubleshoot section; the starter saves the private repositories only when it asked (D-270).
 - Install guides, website and release notes: exact wording for a taken port, what an agent reports, comparable versions, network instead of WiFi (D-269).
 - Packages: a program on 127.0.0.1 counts as holding the port; macOS: close the window and click Terminate; guides say to stop before updating, which package they describe, and that --service sends earlier logs (D-268).
