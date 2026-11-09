@@ -89,7 +89,9 @@ describe("invites", () => {
   it("expire after their time to live", async () => {
     const t = await pairedTable();
     const inv = (await t.as("POST", "/api/tables/invites", { ttlMinutes: 0.005 })).body; // 300 ms
-    expect((await fetch(`${base}/i/${inv.token}`)).status).toBe(200);
+    const page = await fetch(`${base}/i/${inv.token}`);
+    expect(page.status).toBe(200);
+    expect(page.headers.get("x-frame-options")).toBe("DENY"); // never framed, like every other page (D-279)
     await sleep(400);
     expect((await fetch(`${base}/i/${inv.token}`)).status).toBe(404);
   });

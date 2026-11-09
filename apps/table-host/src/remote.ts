@@ -17,6 +17,9 @@ const CHUNK = 16 * 1024; // base64 characters per frame, well under SCTP message
 /** The largest WebSocket message a remote session may send, as for the table's own sockets. */
 const MAX_MESSAGE = 64 * 1024;
 const MAX_SESSIONS = 16;
+/** Requests one remote browser has handled at once (D-279); more wait their turn, up to MAX_QUEUED (a board's art). */
+const MAX_REQUESTS = 8;
+const MAX_QUEUED = 400;
 const OPEN_TIMEOUT_MS = 30_000;
 
 type Handler = (req: IncomingMessage, res: ServerResponse) => Promise<unknown>;
@@ -98,6 +101,8 @@ class Session {
   openTimer: NodeJS.Timeout | undefined;
   private pingTimer: NodeJS.Timeout | undefined;
   private lastSeen = Date.now();
+  private requests = 0;
+  private waiting: (() => void)[] = [];
   readonly id: string;
   readonly pc: RTCPeerConnection;
   /** sha256 of the invite this session came through (D-164), when the service says. */
@@ -139,12 +144,21 @@ class Session {
       // Only the paths a remote board or deck needs; everything else stays on the table.
       // Plus /qr.svg, which the host answers for a remote board only with an open remote exchange's invite (D-166).
       if (!/^\/((board|deck|shared|games|api\/v1)(\/|$)|qr\.svg(\?|$))/.test(f.path)) return this.reply(f.id, 404, "application/json", Buffer.from('{"error":"not found"}'));
+      // Bounded like the sockets' intents (D-202): a page that floods requests must not stall the table (D-279).
+      if (this.requests >= MAX_REQUESTS) {
+        if (this.waiting.length >= MAX_QUEUED) return this.reply(f.id, 429, "application/json", Buffer.from('{"error":"too many requests at once"}'));
+        await new Promise<void>((go) => this.waiting.push(go)); // a finished request hands its slot over
+      } else this.requests++;
       await new Promise<void>((resolve) => {
         const res = fakeResponse((status, type, body) => {
           this.reply(f.id, status, type, body);
           resolve();
         });
         this.gw.handler(fakeRequest(method, f.path, typeof f.body === "string" ? f.body : undefined, ctx), res).catch(() => resolve());
+      }).finally(() => {
+        const next = this.waiting.shift();
+        if (next) next();
+        else this.requests--;
       });
     } else if (f.k === "ws" && Number.isInteger(f.sid)) {
       if (f.op === "open" && !this.sockets.has(f.sid) && this.sockets.size < 8) {

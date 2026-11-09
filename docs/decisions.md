@@ -2264,3 +2264,17 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   phones; a remote player's browser watches on (D-170). The board's way back to the lobby stays as it is (D-216).
   *Implementation (Claude):* `deck.js` shows the leave row in the finished phase too; the server already removed a
   player who leaves outside a running game. `scripts/e2e/play.py` (coin flip) leaves from the result.
+- **D-279 · 2026-11-09 · Klaus** — Fixes from a `/code-review` of the whole repository ("fix all issues that are
+  fixable"):
+  - **A log sent again keeps its earlier copy when the new one can't fit.** The service dropped the stored log before
+    the room check, so a re-upload refused as too large (507) lost both.
+  - **Extra-game repositories:** a file directly in `games/` (a README) and hidden files (`.gitkeep`, `.DS_Store`) are
+    left out of the bundle instead of failing the whole repository. A tar header whose size is not octal fails the
+    download with a clear error instead of ending the archive early.
+  - **Remote requests are bounded:** a remote browser has eight requests handled at once on the table; more wait
+    their turn (up to 400, then 429), so a page that floods requests can't stall the game. A board's art still loads.
+  - **AI options before a game is chosen** are checked for size: at most 16, each a short text, number or yes/no
+    (a game's options are checked against its manifest as before).
+  - **The invite page is never framed**, like every other page (`HTML_HEADERS`).
+  - **The cloud's rate limiters** sweep a large map at most once a second instead of on every request.
+  - The remote allowlist's comment now says what D-159 decided (remote boards with control change AI options).
