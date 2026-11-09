@@ -407,6 +407,10 @@ describe("remote play", { timeout: 60_000 }, () => {
     const results = await Promise.all(paths.map((p) => peer.request("GET", p)));
     results.forEach((r, i) => expect(r.status, paths[i]).toBe(200));
     expect(JSON.parse(results[4].body.toString()).tableName).toBeTruthy();
+    // More at once than the table handles together (eight, D-279): the rest wait their turn, none is refused.
+    const many = Array.from({ length: 40 }, (_, i) => paths[i % paths.length]);
+    const all = await Promise.all(many.map((p) => peer.request("GET", p)));
+    all.forEach((r, i) => expect(r.status, many[i]).toBe(200));
   });
 
   it("keeps the join QR code and the board's key away from remote players", async () => {

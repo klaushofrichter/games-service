@@ -82,7 +82,12 @@ export function readTarGz(gz: Buffer, maxBytes = BUNDLE_LIMITS.totalBytes * 4): 
     const end = s.indexOf(0);
     return s.subarray(0, end < 0 ? len : end).toString("utf8");
   };
-  const octal = (b: Buffer, from: number, len: number) => parseInt(str(b, from, len).trim() || "0", 8);
+  const octal = (b: Buffer, from: number, len: number) => {
+    const s = str(b, from, len).trim() || "0";
+    // Octal only: a base-256 size (GNU, files over 8 GB) or a damaged header must fail, not end the archive early (D-279).
+    if (!/^[0-7]+$/.test(s)) throw new Error("unreadable tar archive (a header's size is not octal)");
+    return parseInt(s, 8);
+  };
   let pos = 0;
   let longName: string | null = null;
   let paxPath: string | null = null;

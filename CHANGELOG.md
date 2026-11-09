@@ -8,6 +8,7 @@ history.
 
 ## [Unreleased]
 
+- Code review fixes: a re-uploaded log keeps its earlier copy when refused; extra-game repositories with a README or hidden files in games/ work; remote requests are bounded; AI options are checked before a game is chosen; the invite page is never framed (D-279).
 - Phone: *Leave the game* on the result screen too, so a player can leave right after a game (D-278).
 - Code cleanup: board control decided once by the server, one remote-place test, shared code alphabet and generator, the invite QR fetched once, players sent as an allow list, smaller tidy-ups (D-277).
 - Release notes of the packages: extra-games linked and added automatically, the checksums named; a notes-only run rewrites them without a new build (D-276).

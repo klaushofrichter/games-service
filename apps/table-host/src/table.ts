@@ -1052,7 +1052,11 @@ export class Table extends EventEmitter {
     if (p.kind !== "ai") throw new TableError(400, "only AI players have options");
     // During a game only an AI player in it (D-159): the board changes how it plays from its next move.
     if ((this.phase === "active" || this.phase === "paused") && !this.inRunningGame(p)) this.assertNotPlaying("change AI options");
-    if (!options || typeof options !== "object") throw new TableError(400, "options must be an object");
+    if (!options || typeof options !== "object" || Array.isArray(options)) throw new TableError(400, "options must be an object");
+    // Without a game to check them against, at least small and plain (D-279): every board and phone receives them.
+    const plain = (v: unknown) => typeof v === "boolean" || (typeof v === "number" && Number.isFinite(v)) || (typeof v === "string" && v.length <= 60);
+    const entries = Object.entries({ ...(this.players.get(playerId)?.aiOptions ?? {}), ...options });
+    if (entries.length > 16 || entries.some(([k, v]) => k.length > 40 || !plain(v))) throw new TableError(400, "AI options are at most 16 short names with a short text, number or yes/no each");
     const m = this.selected?.game.manifest;
     if (m) {
       for (const [k, v] of Object.entries(options)) {

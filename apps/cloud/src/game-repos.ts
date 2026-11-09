@@ -83,6 +83,10 @@ export function packRepoTarball(gz: Buffer, repo: string, ref: string) {
     top ||= path.slice(0, slash);
     const rel = path.slice(slash + 1);
     if (!rel.startsWith("games/")) continue;
+    // Games are folders: a file directly in games/ (a README) is no game. Hidden files (.gitkeep, .DS_Store) are not
+    // part of a game either; both are left out instead of failing the repository (D-279).
+    const parts = rel.split("/");
+    if (parts.length < 3 || parts.some((s) => s.startsWith("."))) continue;
     if (!safeBundlePath(rel)) throw new Error(`unsafe file name in ${repo}: ${rel}`);
     if (data.length > BUNDLE_LIMITS.fileBytes) throw new Error(`${rel} is larger than ${BUNDLE_LIMITS.fileBytes / 1024 / 1024} MB`);
     total += data.length;

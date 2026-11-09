@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { startCloud } from "../apps/cloud/src/server.ts";
 import { packRepoTarball, parseRepoSpec } from "../apps/cloud/src/game-repos.ts";
 import { decodeBundle, readTarGz, safeBundlePath } from "../packages/protocol/src/bundle.ts";
+import { gunzipSync, gzipSync } from "node:zlib";
 import { githubTarball } from "./tar.ts";
 import { sleep, testHost, until } from "./helpers.ts";
 import { BUNDLE_LIMITS } from "../packages/protocol/src/bundle.ts";
@@ -109,6 +110,19 @@ describe("bundles", () => {
     expect(a.games).toEqual([{ id: "dice-duel", name: "Dice Duel", version: "0.1.0" }]);
     const files = Object.keys(decodeBundle(a.payload, a.hash).files).sort();
     expect(files).toEqual(["games/dice-duel/board.js", "games/dice-duel/deck.js", "games/dice-duel/manifest.json", "games/dice-duel/rules.ts"]);
+  });
+
+  it("leaves out files directly in games/ and hidden files, instead of refusing the repository (D-279)", () => {
+    const tar = githubTarball("o/r", "1", { ...gameFiles("dice-duel"), "games/README.md": "the games", "games/.gitkeep": "", "games/dice-duel/assets/.DS_Store": "x" });
+    const a = packRepoTarball(tar, "o/r", "main");
+    expect(a.games.map((g) => g.id)).toEqual(["dice-duel"]);
+    expect(a.hash).toBe(packRepoTarball(githubTarball("o/r", "1", gameFiles("dice-duel")), "o/r", "main").hash);
+  });
+
+  it("refuses a tar archive whose size field is not octal, instead of reading part of it (D-279)", () => {
+    const raw = gunzipSync(githubTarball("o/r", "1", gameFiles("dice-duel")));
+    raw[1024 + 124] = 0x80; // the first file's header (after the global header and the top folder): a base-256 size
+    expect(() => readTarGz(gzipSync(raw))).toThrow(/not octal/);
   });
 
   it("reads long names from pax headers and skips links", () => {
@@ -447,7 +461,6 @@ describe("several independent repositories", () => {
 // ----- the table's installer on its own: what it does with bad, malicious or repeated input -----
 import { ExtraGames } from "../apps/table-host/src/extra-games.ts";
 import { BUNDLE_FORMAT, encodeBundle } from "../packages/protocol/src/bundle.ts";
-import { gzipSync } from "node:zlib";
 import { createHash } from "node:crypto";
 
 /** A bundle for the installer, as the cloud would serve it. */
