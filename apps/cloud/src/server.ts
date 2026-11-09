@@ -280,9 +280,15 @@ export function startCloud(o: CloudOptions) {
    * A per-address map grows by one entry per address between the 10-minute prunes; past a size many addresses could
    * reach (an IPv6 range), entries whose minute is over go at once (D-202).
    */
+  /**
+   * Drops expired entries once a map is large. At most once a second per map (D-279): a flood from many addresses
+   * keeps every entry fresh, and scanning them all on each request would make the limiter the hot spot.
+   */
+  const swept = new WeakMap<Map<string, { reset: number }>, number>();
   const sweep = (m: Map<string, { reset: number }>) => {
-    if (m.size < 50_000) return;
     const now = Date.now();
+    if (m.size < 50_000 || now - (swept.get(m) ?? 0) < 1000) return;
+    swept.set(m, now);
     for (const [k, v] of m) if (v.reset < now) m.delete(k);
   };
   /** Wrong codes per client address; a hello with a code is refused once a client has too many in a minute. */
@@ -741,16 +747,21 @@ export function startCloud(o: CloudOptions) {
         const gameId = String(url.searchParams.get("gameId") ?? "");
         // Bounded in total, and on disk by the volume's free space: the oldest logs make room for the new one, and the
         // reserve stays free for the database (D-114). Re-uploading the same id replaces it.
-        if (existing) dropLog(match[1]);
         let total = logBytes();
         const vol = statVolume();
         let free = vol ? vol.free : Infinity;
         const reserve = vol ? reserveFor(vol.total) : 0;
         const fits = () => total + data.length <= maxLogBytes && free - data.length >= reserve;
-        // Larger than all the room there could be: refuse before dropping anything. The table keeps its copy.
+        // Larger than all the room there could be: refuse before dropping anything, the earlier copy of this log too
+        // (D-279). The table keeps its copy.
         if (data.length > maxLogBytes || free + total - data.length < reserve) {
           console.warn(`[cloud] log ${match[1]} (${data.length} bytes) refused: not enough room on the volume`);
           return json(res, 507, { error: "the service's storage is full; the table keeps its own copy" });
+        }
+        if (existing) {
+          dropLog(match[1]);
+          total -= existing.meta.bytes;
+          free += existing.meta.bytes;
         }
         for (const l of [...logs.values()].sort((a, b) => a.meta.uploadedAt - b.meta.uploadedAt)) {
           if (fits()) break;
@@ -796,7 +807,7 @@ export function startCloud(o: CloudOptions) {
         const inv = invites.get(tokenKey(match[1].toUpperCase()));
         // A used invite still serves the page: the player who claimed it reconnects with their session.
         if (!inv || inv.expiresAt < Date.now()) return sendPage(res, 404, "Invite not found", `<p>This invite has expired or the code is wrong. Ask for a new one.</p>`);
-        res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "referrer-policy": "no-referrer" });
+        res.writeHead(200, HTML_HEADERS); // never framed, like every other page (D-279)
         return res.end(await readFile(REMOTE_PAGE));
       }
       if (m === "GET" && p === "/remote-sw.js") {

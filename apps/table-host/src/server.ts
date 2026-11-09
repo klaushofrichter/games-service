@@ -81,8 +81,8 @@ export function cleanGesture(p: unknown): Record<string, unknown> | null {
 /** Reads a remote client may make: lobby and game state, never logs, saves, simulations or local join codes. */
 const REMOTE_DENIED = /^\/(join|simulation|logs|saves|invites|remote|qr|cloud|developer)(\/|$)/;
 /**
- * Changes a remote client may make (an allowlist): seat layout and running games. Never turn the table's
- * board (remote boards face their own seat), remove or move players, add AI seats, change AI options,
+ * Changes a remote client may make (an allowlist): seat layout, running games, and players' colours and AI options
+ * (D-159). Never turn the table's board (remote boards face their own seat), remove or move players, add AI seats,
  * save, or resume — those stay with the people at the table. "Play now" for an AI that is out of time (D-112) and
  * skipping a game's wait (D-136) are moves of the running game, so remote players with board control may tap them too.
  * The table's rules (D-236, D-237) go with the game settings.

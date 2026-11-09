@@ -200,6 +200,10 @@ describe("persistent store", () => {
     expect(((await admin("GET", "/admin/api/logs")).body as any[]).map((l) => l.id).sort()).toEqual(["log-2", "log-3", "log-4"]);
     expect(existsSync(join(dir, "logs", "log-1.zip"))).toBe(false);
     expect(await put("log-big", 7_000_000)).toBe(507); // larger than all the room there is: refused, nothing dropped
+    // The same goes for a log sent again under its id (D-279): the earlier copy stays when the new one can't fit.
+    expect(await put("log-2", 7_000_000)).toBe(507);
+    expect(((await admin("GET", "/admin/api/logs")).body as any[]).map((l) => l.id).sort()).toEqual(["log-2", "log-3", "log-4"]);
+    expect(existsSync(join(dir, "logs", "log-2.zip"))).toBe(true);
     const m = (await admin("GET", "/admin/api/metrics")).body.storage;
     expect(m).toMatchObject({ total, reserve: 150_000_000, free: 150_000_000, logBytes: 6_000_000, low: true });
   });

@@ -566,6 +566,12 @@ describe("AI configuration", () => {
     const { playerId: ai1 } = await t.ok("POST", "/ai", {});
     const { playerId: ai2 } = await t.ok("POST", "/ai", {});
     expect((await t.api("POST", `/players/${a.playerId}/ai-options`, { options: { style: "erratic" } })).status).toBe(400);
+    // Before a game is chosen nothing checks the names, so the options must be small and plain (D-279).
+    expect((await t.api("POST", `/players/${ai1}/ai-options`, { options: { style: { deep: "x".repeat(1000) } } })).status).toBe(400);
+    expect((await t.api("POST", `/players/${ai1}/ai-options`, { options: { style: "y".repeat(61) } })).status).toBe(400);
+    expect((await t.api("POST", `/players/${ai1}/ai-options`, { options: Object.fromEntries(Array.from({ length: 17 }, (_, i) => [`k${i}`, 1])) })).status).toBe(400);
+    expect((await t.api("POST", `/players/${ai1}/ai-options`, { options: ["x"] })).status).toBe(400);
+    expect((await t.ok("POST", `/players/${ai1}/ai-options`, { options: { style: "erratic" } })).players.find((p: any) => p.id === ai1).aiOptions).toEqual({ style: "erratic" });
     await t.ok("POST", "/game/select", { gameId: "roulette" });
     const games = await t.ok("GET", "/games");
     expect(games.find((g: any) => g.id === "roulette").aiOptions[0]).toMatchObject({ key: "style", values: ["conservative", "aggressive", "erratic"] });
