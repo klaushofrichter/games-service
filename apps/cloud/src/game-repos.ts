@@ -23,7 +23,7 @@ export interface GameRepo {
   ref: string;
   addedAt: number;
   /** The last bundle that fetched and checked out cleanly. A failed refresh keeps it. */
-  bundle: { hash: string; payload: Buffer; games: BundleGame[]; commit: string; bytes: number; fetchedAt: number } | null;
+  bundle: { hash: string; payload: Buffer; games: BundleGame[]; commit: string; bytes: number; fetchedAt: number; private?: boolean } | null;
   /** Why the last fetch failed, or null. */
   error: string | null;
   lastAttempt: number | null;
@@ -67,7 +67,26 @@ async function fetchRepoBundle(repo: string, ref: string, o: GameRepoOptions) {
     chunks.push(Buffer.from(c as Uint8Array));
   }
   const gz = Buffer.concat(chunks);
-  return packRepoTarball(gz, repo, ref);
+  return { ...packRepoTarball(gz, repo, ref), ...(await isPrivate(repo, o)) };
+}
+
+/**
+ * Whether GitHub calls the repository private (D-287), for the lobby's red border; nothing when it can't be asked.
+ * Not part of the bundle, so its hash stays that of the files.
+ */
+async function isPrivate(repo: string, o: GameRepoOptions): Promise<{ private?: boolean }> {
+  const api = (o.apiUrl ?? "https://api.github.com").replace(/\/$/, "");
+  try {
+    const r = await fetch(`${api}/repos/${repo}`, {
+      headers: { accept: "application/vnd.github+json", "user-agent": "games-service", "x-github-api-version": "2022-11-28", ...(o.token ? { authorization: `Bearer ${o.token}` } : {}) },
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!r.ok) return {};
+    const j = (await r.json()) as { private?: unknown };
+    return typeof j.private === "boolean" ? { private: j.private } : {};
+  } catch {
+    return {};
+  }
 }
 
 /** Turn a GitHub tarball into a bundle: only games/**, every path checked, every manifest valid. */
@@ -217,7 +236,7 @@ export class GameRepoStore {
     return ids
       .map((id) => this.repos.get(id))
       .filter((r): r is GameRepo & { bundle: NonNullable<GameRepo["bundle"]> } => !!r?.bundle)
-      .map((r) => ({ repo: r.id, source: `${r.repo}@${r.ref}`, hash: r.bundle.hash, commit: r.bundle.commit, games: r.bundle.games, bytes: r.bundle.bytes }));
+      .map((r) => ({ repo: r.id, source: `${r.repo}@${r.ref}`, hash: r.bundle.hash, commit: r.bundle.commit, games: r.bundle.games, bytes: r.bundle.bytes, ...(typeof r.bundle.private === "boolean" ? { private: r.bundle.private } : {}) }));
   }
 
   /** The bundle bytes for a hash, if one of these repositories currently has it. */
