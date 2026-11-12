@@ -293,7 +293,11 @@ def coinflip(browser, board):
     except Exception:
         plates = board.evaluate("() => [...document.querySelectorAll('.seat')].map((s) => s.className + ': ' + s.innerText.replace(/\\s+/g, ' '))")
         players = [(p["name"], p["kind"], p.get("seat"), p.get("ready")) for p in api("GET", "/state")["players"]]
-        raise AssertionError(f"the AI never showed Ready; seat plates {plates}; players {players}; phase {api('GET', '/state')['phase']}")
+        # #311: with no seat plates at all, say what the board page is instead (its address, title, first text, socket
+        # state and any browser errors), and keep a picture of it.
+        page = board.evaluate("() => ({ url: location.href, title: document.title, text: document.body.innerText.replace(/\\s+/g, ' ').slice(0, 300), seats: !!document.getElementById('seats'), overlays: [...document.querySelectorAll('.overlay, .dialog-backdrop')].map((o) => o.className) })")
+        shot(board, "ai-never-ready")
+        raise AssertionError(f"the AI never showed Ready; seat plates {plates}; players {players}; phase {api('GET', '/state')['phase']}; board page {page}; browser errors {errors[-5:]}")
     decks[0].wait_for_selector("text=You are not ready yet")
     assert decks[0].inner_text("#ready") == "Switch to ready"
     for d in decks:
