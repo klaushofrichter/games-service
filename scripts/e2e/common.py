@@ -33,6 +33,29 @@ def watch(page, label, ignore=()):
     page.on("pageerror", lambda e: errors.append(f"{label}: {e}"))
 
 
+def open_board(page, url):
+    """Open the board and wait until its script has drawn it (seat plates or the centre panel).
+
+    #311: on the Docker runbook's fresh host the container's network comes up while the browser loads the page;
+    Chromium then aborts the requests in flight (net::ERR_NETWORK_CHANGED), the board's module never runs and the page
+    stays blank. Only in that case, reported by the browser itself, the board is loaded once more; anything else fails.
+    """
+    drawn = "() => document.querySelectorAll('#seats .seat').length > 0 || (document.getElementById('center')?.children.length ?? 0) > 0"
+    page.goto(url)
+    try:
+        page.wait_for_function(drawn, timeout=15000)
+        return
+    except Exception:
+        changed = [e for e in errors if "ERR_NETWORK_CHANGED" in e]
+        if not changed:
+            raise AssertionError(f"the board at {url} never drew itself; browser errors {errors[-5:]}")
+    for e in changed:
+        errors.remove(e)
+    print(f"notice: the network changed while the board loaded (#311); loading it again: {changed}")
+    page.reload()
+    page.wait_for_function(drawn, timeout=15000)
+
+
 def wait(fn, secs=20, what="condition"):
     """Poll fn until it returns something truthy and return that; fail after secs."""
     end = time.time() + secs

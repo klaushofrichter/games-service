@@ -8,7 +8,7 @@ Fails (exit 1) on any browser console error or uncaught exception.
 """
 import os, sys, time
 from playwright.sync_api import sync_playwright
-from common import BASE, api, errors, join_deck, pick_game, reset, watch, wait
+from common import BASE, api, errors, join_deck, open_board, pick_game, reset, watch, wait
 
 GAME = sys.argv[1] if len(sys.argv) > 1 else "roulette"
 OUT = sys.argv[2] if len(sys.argv) > 2 else "e2e-out"
@@ -826,7 +826,7 @@ def main():
         board = browser.new_page(viewport={"width": 1920, "height": 1080})
         watch(board, "board")
         reset()
-        board.goto(BASE + "/board/")
+        open_board(board, BASE + "/board/")  # once more only if the network changed under it (#311)
         time.sleep(0.8)
         decks = SCENARIOS[GAME](browser, board)
         time.sleep(0.3)
