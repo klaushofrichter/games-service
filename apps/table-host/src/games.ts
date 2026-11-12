@@ -14,6 +14,12 @@ export interface InstalledGame {
   rulesFile?: string;
   /** Where an extra game came from (D-097): "owner/name@ref", its commit and bundle hash. Absent for built-in games. */
   source?: { repo: string; commit: string; hash: string };
+  /**
+   * The repository a game that isn't built in comes from, for the lobby (D-287): "owner/name" or a checkout's folder
+   * name, and whether it is private (unknown for a checkout). From the service's bundle, the packages' starter
+   * (`.sources.json` beside the games) or the checkout it was loaded from.
+   */
+  from?: { repo: string; private?: boolean };
   /** The game ships rules for players: how-to-play.md in its folder (D-099). */
   howToPlay?: boolean;
 }
@@ -47,9 +53,11 @@ export function registerSdkHook() {
 export async function loadGames(dir: string, source?: InstalledGame["source"]): Promise<Map<string, InstalledGame>> {
   registerSdkHook();
   const games = new Map<string, InstalledGame>();
+  // Where the packages' starter got each game (D-287): { "<game id>": { "repo": "owner/name", "private": true } }.
+  const fromFile = await readFile(join(dir, ".sources.json"), "utf8").then((t) => JSON.parse(t) as Record<string, unknown>, () => ({}) as Record<string, unknown>);
   for (const entry of await readdir(dir)) {
     const gameDir = join(dir, entry);
-    if (!(await stat(gameDir)).isDirectory()) continue;
+    if (entry.startsWith(".") || !(await stat(gameDir)).isDirectory()) continue;
     try {
       const manifest = manifestSchema.parse(JSON.parse(await readFile(join(gameDir, "manifest.json"), "utf8")));
       // The folder name is the id: two packages can't claim the same game, whatever order the disk lists them in.
@@ -61,7 +69,9 @@ export async function loadGames(dir: string, source?: InstalledGame["source"]): 
       const mod = await import(pathToFileURL(join(gameDir, rulesFile)).href);
       if (!mod.default || typeof mod.default.setup !== "function") throw new Error("rules must export default defineGame({...})");
       const howToPlay = files.includes(HOW_TO_PLAY);
-      games.set(manifest.id, { manifest, def: mod.default, dir: gameDir, rulesFile: join(gameDir, rulesFile), howToPlay, ...(source ? { source } : {}) });
+      const f = fromFile[manifest.id] as { repo?: unknown; private?: unknown } | undefined;
+      const from = f && typeof f.repo === "string" && f.repo ? { repo: f.repo, ...(typeof f.private === "boolean" ? { private: f.private } : {}) } : undefined;
+      games.set(manifest.id, { manifest, def: mod.default, dir: gameDir, rulesFile: join(gameDir, rulesFile), howToPlay, ...(source ? { source } : {}), ...(from ? { from } : {}) });
     } catch (err) {
       console.error(`[games] skipping ${entry}: ${(err as Error).message}`);
     }

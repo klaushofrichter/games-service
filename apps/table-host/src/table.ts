@@ -422,6 +422,9 @@ export class Table extends EventEmitter {
       // One person at the table plays from the board: refused while more are there.
       const local = this.localPeople();
       if (local.length > 1) throw new TableError(409, `only one person at the table can play from the board; ${local.map((p) => p.name).join(", ")} are there`, "board-deck");
+      // No seat for the deck beside the board (D-288): the person already at the table could move there under their
+      // name, but nobody new can sit down, so the board would ask for a name it can't seat.
+      if (!local.length && this.noFreeSeat()) throw new TableError(409, "Game is full, first remove a player.", "board-deck-full");
     }
     let changed = false;
     if (typeof o.allowNoLocalPlayer === "boolean" && o.allowNoLocalPlayer !== this.allowNoLocalPlayer) {
@@ -1270,7 +1273,9 @@ export class Table extends EventEmitter {
         aiOptions: m.ai.options,
         ...(m.ai.notice ? { aiNotice: m.ai.notice } : {}),
         howToPlay: howToPlayUrl(g),
-        ...(source ? { extra: true } : {}),
+        ...(source || g.from ? { extra: true } : {}),
+        // The repository it comes from, for the lobby (D-287): its name, and whether it is private.
+        ...(g.from ? { repo: g.from.repo.replace(/^.*\//, ""), ...(g.from.private ? { private: true } : {}) } : {}),
       };
     });
   }

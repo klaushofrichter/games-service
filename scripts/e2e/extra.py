@@ -47,6 +47,14 @@ hang = {"on": False}
 
 class FakeGitHub(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
+        # The repository itself (D-287): private, so the lobby gives its games a red border.
+        if self.path == "/repos/klaushofrichter/extra-games" and self.headers.get("authorization") == f"Bearer {TOKEN}":
+            body = b'{"full_name":"klaushofrichter/extra-games","private":true}'
+            self.send_response(200)
+            self.send_header("content-type", "application/json")
+            self.send_header("content-length", str(len(body)))
+            self.end_headers()
+            return self.wfile.write(body)
         m = re.match(r"^/repos/klaushofrichter/extra-games/tarball/(production|main)$", self.path)
         # Private: without the token GitHub answers 404, as it does for a private repository.
         if not m or self.headers.get("authorization") != f"Bearer {TOKEN}":
@@ -144,7 +152,11 @@ try:
             return False
 
         assert wait(lambda: tile_on_board(board), 10, "the Dice Duel tile on the local board")
-        assert "extra" in board.inner_text("button.tile[data-game=dice-duel]")
+        # D-287: the tile names its repository, and a private one has a red border.
+        tile = board.locator("button.tile[data-game=dice-duel]")
+        assert "extra-games" in tile.inner_text(), tile.inner_text()
+        assert "private" in (tile.get_attribute("class") or "").split(), tile.get_attribute("class")
+        shot(board, "board-private-tile")
         shot(board, "local-board-tile")
 
         # ----- untick and tick again on the table's row -----
@@ -223,6 +235,8 @@ try:
         hang["on"] = True
         n0 = len(attempts)
         refresh_btn = console.locator("button[data-repo-refresh=extra-games]")
+        tip = refresh_btn.get_attribute("title") or ""  # D-285: what Refresh does, as its tooltip
+        assert "from GitHub now" in tip and "every hour" in tip, tip
         refresh_btn.dblclick()
         console.wait_for_selector("button[data-repo-refresh=extra-games]:disabled >> text=Refreshing…")
         time.sleep(12)  # through the console's 10-second redraw

@@ -240,6 +240,9 @@ async function start() {
 async function loadSettings() { try { const s = await api("GET", "/admin/api/settings"); $("#ret-days").value = s.logRetentionDays; } catch {} }
 
 /** Repository checkboxes: one per listed repository, ticked for the ids given. */
+/** What Refresh does (D-285): the button's tooltip. */
+const refreshTip = (r) =>
+  `Fetch ${r.repo}@${r.ref} from GitHub now and pack its games again. Tables ticked for it get the new bundle when they next check in, after a running game. The service also does this every hour.`;
 const repoChecks = (ids, attrs) => repos.map((r) => `<label title="${esc(r.repo)}@${esc(r.ref)}"><input type="checkbox" value="${esc(r.id)}" ${attrs}${ids.includes(r.id) ? " checked" : ""}>${esc(r.id)}</label>`).join("");
 let repos = [];
 let pairReposKey = null;
@@ -255,7 +258,7 @@ function drawRepos(data) {
         ${r.error ? `<div class="msg err" style="margin-top:4px">${esc(r.error)}${b ? " (tables keep the last good bundle)" : ""}</div>` : ""}</td>
       <td class="games">${games}</td>
       <td>${b ? ago(b.fetchedAt) : r.lastAttempt ? "failed" : "…"}</td>
-      <td style="text-align:right;white-space:nowrap"><button data-repo-refresh="${esc(r.id)}" ${repoBusy.has(r.id) ? "disabled" : ""}>${repoBusy.has(r.id) ? "Refreshing…" : "Refresh"}</button> ${r.origin === "deploy" ? "" : `<button class="danger" data-repo-remove="${esc(r.id)}">Remove</button>`}</td></tr>`;
+      <td style="text-align:right;white-space:nowrap"><button data-repo-refresh="${esc(r.id)}" title="${esc(refreshTip(r))}" ${repoBusy.has(r.id) ? "disabled" : ""}>${repoBusy.has(r.id) ? "Refreshing…" : "Refresh"}</button> ${r.origin === "deploy" ? "" : `<button class="danger" data-repo-remove="${esc(r.id)}">Remove</button>`}</td></tr>`;
   }).join("") || `<tr><td colspan="4" class="faint">No repositories yet.</td></tr>`;
   // The approval checkboxes are redrawn only when the list changes, so the 10-second refresh keeps what is ticked.
   const key = repos.map((r) => r.id).join(",");

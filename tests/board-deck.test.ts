@@ -76,6 +76,21 @@ describe("play from the board (D-175)", () => {
     expect((await t.api("POST", "/developer", {})).status).toBe(400);
   });
 
+  it("is refused when every seat is taken and nobody at the table could move to the board (D-288)", async () => {
+    t = await testHost();
+    await t.ok("POST", "/layout", { seats: 2 });
+    const ai1 = (await t.ok("POST", "/ai", {})).playerId;
+    await t.ok("POST", "/ai", {});
+    const r = await boardDeck(true);
+    expect(r.status).toBe(409);
+    expect(r.body.error).toBe("Game is full, first remove a player.");
+    expect((await state()).developer.boardDeck).toBe(false);
+    // A free seat again: switched on, and the deck beside the board takes it.
+    await t.ok("DELETE", `/players/${ai1}`);
+    expect((await boardDeck(true)).status).toBe(200);
+    await expect(fromBoard("Ann")).resolves.toBeTruthy();
+  });
+
   it("serves the board-and-deck page only on the table PC, with the table key", async () => {
     t = await testHost();
     const page = await (await fetch(`${t.base}/board/play.html`)).text();

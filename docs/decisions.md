@@ -2329,3 +2329,33 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
     solo game (D-282); a showcase *Not every table needs a crowd* shows the FM-1 and the SMK-37 and credits
     [fm1-emu](https://github.com/joakimeriksson/fm1-emu) by Joakim Eriksson, the only link the page makes outside
     Klaus's repositories and skylar.technology (`tests/website.test.ts`). Pictures from synth-game's own browser check.
+- **D-285 · 2026-11-12 · Klaus** — **The console's Refresh button for a game repository has a tooltip.** It says what
+  it does: "Fetch owner/name@ref from GitHub now and pack its games again. Tables ticked for it get the new bundle when
+  they next check in, after a running game. The service also does this every hour." *Implementation (Claude):*
+  `refreshTip()` in `apps/cloud/public/admin.html`; `scripts/e2e/extra.py` reads the title.
+- **D-286 · 2026-11-12 · Klaus** — **The board's pulldown list has a light green frame.** With FM-1 Synth's *Device to
+  start with* the open list showed two brass borders, the list's frame around the chosen option's. Klaus: the frame
+  shows that it is the board's own pulldown (D-248), so it stays, in light green (the board's jade); only the chosen
+  option is brass. Every pulldown on the board: game settings, AI options, board settings. *Implementation (Claude):*
+  `.pick-menu` in `board.css`.
+- **D-287 · 2026-11-12 · Klaus** — **A game tile names its repository, and a private one has a red border.** "What
+  does the word extra mean? … I would prefer to refer to the repo where this is included … We can give private repos
+  a red border." The lobby's tile shows the repository's name (extra-games, synth-game, loopy-game, …) where it said
+  *extra*, on a line of its own under the players that wraps like the rest of the tile (no tooltip and no "…": the
+  board is a touchscreen), with "· private" for a private one; built-in games show none. A game from a private repository has a red border. Board settings › Versions
+  say the same. *Implementation (Claude):*
+  - **The service** asks GitHub whether a listed repository is private when it fetches it (`GET /repos/owner/name`
+    with its token; nothing when it can't tell) and tells tables with each bundle (`private`).
+  - **The packages' starter** writes `.sources.json` beside the games (each game's repository, private unless it is
+    one of the public ones it always downloads); **a local table** names a clone's games by its folder (private
+    unknown, so no red border).
+  - The game list (`/api/v1/games`) has `repo` and `private`; the tile's class `private`.
+  - Checks: `tests/extra-games.test.ts` (a private repository's games, `.sources.json`), `scripts/e2e/extra.py`
+    (the tile's name and red border).
+- **D-288 · 2026-11-12 · Klaus** — **Play from the board is refused when the game is full.** "With a player on the
+  board … and I enable the dev setting Play from the board, it shows the dialog to enter the player name despite no
+  room on the table. We should not show that onscreen deck and show an error message: Game is full, first remove a
+  player." Switching *Play from the board* (D-175) on is refused with exactly that message when no seat is free and
+  nobody at the table could move to the board; the board stays as it was. A person already at the table still may: the
+  deck beside the board takes over their seat under their name, which needs no free seat. *Implementation (Claude):*
+  `setDeveloper` in table.ts (code `board-deck-full`); `tests/board-deck.test.ts`.
