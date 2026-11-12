@@ -157,23 +157,29 @@ function noticeDialog(title, text, okLabel = "OK") {
  * people here can join, by the QR code on this network; games from git checkouts on this computer (local-table.sh
  * --all-games or --extra) run those clones at their branches, not what GitHub has. The other games' repositories too
  * (D-289): those the service delivers (its configured repositories, as GitHub has them now) and those the packages'
- * starter downloaded, each with branch and commit. The service's arrive a moment after the board starts, so an open
- * notice fills in as they come. Shown after the board starts, until dismissed; it comes back only when what it says
+ * starter downloaded, each with its branch. Each game with its version, and games-service with the platform's: versions
+ * people compare, not commits (D-290). The service's arrive a moment after the board starts, so an open notice fills
+ * in as they come. Shown after the board starts, until dismissed; it comes back only when what it says
  * changes (another branch, the service back). Not on a remote board.
  */
 const LOCAL_NOTICE_KEY = "gametable.localNotice";
 let localNoticeShown = false;
 let localNotice = null; // the open notice's body, refreshed with each state while it is open
+let localNoticePlatform = null; // the platform's version for the games-service clone (GET /version), when it has one: not "dev"
 function localNoticeBody() {
   const noService = state.cloud?.status === "disabled";
   const checkouts = state.checkouts ?? [];
-  const name = (id) => games.find((g) => g.id === id)?.name ?? id; // only the games the board lists (no test games)
+  // Only the games the board lists (no test games), each with its version.
+  const named = (id) => {
+    const g = games.find((g) => g.id === id);
+    return g ? `${esc(g.name)} <span class="version">${esc(g.version)}</span>` : esc(id);
+  };
   const service = noService
     ? `<p><b>No Game Table service.</b> This table runs on its own, without the service and its console: only people here can join,
         by the QR code on this network. Remote players and watchers can't join, and there are no invites.</p>`
     : "";
   const repoLine = (r) =>
-    `<li><b>${esc(r.name)}</b>${r.branch ? ` · branch <code>${esc(r.branch)}</code>` : ""}${r.commit ? ` (${esc(r.commit)})` : ""}${r.changed ? ", with changes not committed" : ""}<br><span class="faint">${r.games.map((id) => esc(name(id))).join(", ")}</span></li>`;
+    `<li><b>${esc(r.name)}</b>${r.name === "games-service" && localNoticePlatform ? ` ${esc(localNoticePlatform)}` : ""}${r.branch ? ` · branch <code>${esc(r.branch)}</code>` : ""}${r.changed ? ", with changes not committed" : ""}<br><span class="faint">${r.games.map(named).join(", ")}</span></li>`;
   const clones = checkouts.length
     ? `<p><b>Games from the clones on this computer</b>, not from GitHub: each runs as its checkout is now.</p>
        <ul class="local-checkouts">${checkouts.map((c) => repoLine({ ...c, games: c.games.filter((id) => games.some((g) => g.id === id)) })).join("")}</ul>`
@@ -192,7 +198,7 @@ function localNoticeBody() {
   const fromService = noService
     ? ""
     : served.length
-      ? `<p><b>Games from the Game Table service</b>: the repositories configured there, as GitHub has them now. A newer commit
+      ? `<p><b>Games from the Game Table service</b>: the repositories configured there, as GitHub has them now. A newer version
           comes to this table when the service has it.</p><ul class="local-checkouts">${served.map(repoLine).join("")}</ul>`
       : `<p><b>Other games come from the Game Table service</b>: the repositories configured there, as GitHub has them now.
           They show up here as they arrive.</p>`;
@@ -224,6 +230,7 @@ function showLocalNotice() {
     <div class="actions"><button class="primary" data-x="ok">Got it</button></div></div>`;
   localNotice = d.querySelector(".muted");
   localNotice.dataset.html = localNoticeBody();
+  api("GET", "/version").then((v) => ((localNoticePlatform = v?.version && v.version !== "dev" ? v.version : null), localNotice && showLocalNotice())).catch(() => {});
   // "Got it" (or Escape, or a tap beside it) dismisses it for good, until what it says changes.
   d.addEventListener("click", (e) => {
     if (e.target.dataset?.x !== "ok" && e.target !== d) return;
