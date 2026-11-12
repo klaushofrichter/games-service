@@ -1574,7 +1574,7 @@ function viewOnly() {
 const roomTile = (g) => !g.selectable && g.room && !REMOTE;
 const tileHtml = (g) => `<button class="tile ${g.selectable ? "selectable" : ""} ${roomTile(g) ? "room" : ""} ${g.private ? "private" : ""} ${viewOnly() ? "view-only" : ""}" ${roomTile(g) ? "data-room" : "data-game"}="${g.id}" ${g.selectable || roomTile(g) ? (viewOnly() ? 'tabindex="-1" aria-disabled="true"' : "") : viewOnly() ? 'tabindex="-1" aria-disabled="true"' : "disabled"}>
           <span class="title">${esc(g.name)}</span><span class="desc">${esc(withSettings(g.description, g.settings, {}, { hints: false }))}</span>
-          <span class="faint" style="font-size:.66em">${playersLabel(g.players)}${g.ai ? " · AI" : ""}${g.extra ? ` · <span class="repo">${esc(g.repo ?? "added")}</span>` : ""}</span>
+          <span class="faint" style="font-size:.66em">${playersLabel(g.players)}${g.ai ? " · AI" : ""}</span>${g.extra ? `<span class="repo" style="font-size:.66em">${esc(g.repo ?? "added")}${g.private ? " · private" : ""}</span>` : ""}
           ${g.selectable ? `<span class="hint">${esc(tileHint(g))}</span>` : `<span class="why">${esc(g.reasons[0][0].toUpperCase() + g.reasons[0].slice(1))}${roomTile(g) ? " · tap to make room" : ""}</span>`}</button>`;
 function gameTiles() {
   const pages = Math.max(1, Math.ceil(games.length / PAGE_SIZE));

@@ -2341,7 +2341,8 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
 - **D-287 · 2026-11-12 · Klaus** — **A game tile names its repository, and a private one has a red border.** "What
   does the word extra mean? … I would prefer to refer to the repo where this is included … We can give private repos
   a red border." The lobby's tile shows the repository's name (extra-games, synth-game, loopy-game, …) where it said
-  *extra*; built-in games show none. A game from a private repository has a red border. Board settings › Versions
+  *extra*, on a line of its own under the players that wraps like the rest of the tile (no tooltip and no "…": the
+  board is a touchscreen), with "· private" for a private one; built-in games show none. A game from a private repository has a red border. Board settings › Versions
   say the same. *Implementation (Claude):*
   - **The service** asks GitHub whether a listed repository is private when it fetches it (`GET /repos/owner/name`
     with its token; nothing when it can't tell) and tells tables with each bundle (`private`).
