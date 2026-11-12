@@ -2278,3 +2278,10 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   - **The invite page is never framed**, like every other page (`HTML_HEADERS`).
   - **The cloud's rate limiters** sweep a large map at most once a second instead of on every request.
   - The remote allowlist's comment now says what D-159 decided (remote boards with control change AI options).
+- **D-280 · 2026-11-12 · Klaus** — **The game's corner buttons turn with a north-facing game on the table's own board.**
+  Asked from the synth-game repository: Lobby, Show result and Awards and Results stayed upright for a south reader
+  while the game and its seat plates faced north. They now stay in their corner (the manifest's `lobbyButton`) and turn
+  180° in place when the game faces north (D-101), as on a remote board turned to a north seat (D-157), where they also
+  move to that player's corner. The gear, the turn button and the tools stay as they are. *Implementation (Claude):*
+  `cornerClass()` in `board.js` adds `turned` on the table's board when `gameEdge()` is north;
+  `scripts/e2e/play.py` (roulette) checks the class and that turning the game does not move Lobby.
