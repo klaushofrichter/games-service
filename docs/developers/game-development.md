@@ -46,8 +46,8 @@ request.
   seat) and the same phone page, through a peer-to-peer channel to the table. **Watchers** get the board only: no seat,
   no phone page, not in `info.players`; a game needs to do nothing for them, beyond keeping secrets out of `boardView`.
 - **AI players** sit in seats like people. The platform asks the game's `ai()` for their moves.
-- Up to 8 seats, on the four edges of the table (`north`, `east`, `south`, `west`). Seat layouts have 2, 4, 6 or 8
-  seats.
+- Up to 8 seats, on the four edges of the table (`north`, `east`, `south`, `west`). Seat layouts have 1 (a solo game,
+  D-282), 2, 4, 6 or 8 seats.
 
 A game is **rules** (pure functions on a state, run by the host) plus **two UIs** (the board and the phone, plain
 browser JavaScript modules that draw what the rules' views say). Everything else is the platform's: lobby, seats,
@@ -121,7 +121,7 @@ the SDK by path (`../../packages/sdk/src/index.ts`); games in other repositories
 | `sdk` | The SDK version range the game is written for (`"^0.1"` today). |
 | `players` | `{ "min", "max" }` or a list of allowed counts, 1–8. |
 | `turnModel` | `"sequential"` or `"simultaneous"`. The rules decide who may act; the platform uses it to schedule AI players (in a simultaneous game an AI waiting out its pause keeps its place when someone else moves). |
-| `seatLayouts` | Table layouts (2, 4, 6, 8 seats) the game can be played in. |
+| `seatLayouts` | Table layouts (1, 2, 4, 6, 8 seats) the game can be played in. `1` is one seat at the south, for solo games (D-282). |
 | `edges` | Edges seats may be on; must include `north` and `south`. |
 | `localSeat` | Optional edge for a single person at the table when everyone else is remote or AI (they are moved there at the start). For games whose board has a front, like chess. |
 | `dynamicPlayers` | `true`: people who join during a game get a free seat and `onSeatJoined` is called. Default `false`: newcomers wait for the next game. |

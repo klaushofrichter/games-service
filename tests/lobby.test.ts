@@ -258,7 +258,7 @@ describe("game selection gating", () => {
   it("a game can be chosen before anyone joins; what it still needs is listed, and start waits for it", async () => {
     const g = await avail("roulette");
     expect(g.selectable).toBe(true);
-    expect(g.needs).toEqual(["needs 1 more player", "needs at least one player at the table (or games without one: the board's tools button › Advanced › Developer settings)"]);
+    expect(g.needs).toEqual(["needs one more player", "needs at least one player at the table (or games without one: the board's tools button › Advanced › Developer settings)"]);
     await t.ok("POST", "/ai", {});
     const s = await t.ok("POST", "/game/select", { gameId: "roulette" });
     expect(s.phase).toBe("ready");
@@ -269,7 +269,7 @@ describe("game selection gating", () => {
   it("an exact-count game without AI: chosen with 3 players, blocked by an AI seat, startable at exactly 4", async () => {
     for (const n of ["A", "B", "C"]) await t.joinDeck(n);
     expect((await avail("quartet")).selectable).toBe(true);
-    expect((await avail("quartet")).needs).toEqual(["needs exactly 4 players, 1 more"]);
+    expect((await avail("quartet")).needs).toEqual(["needs exactly four players, one more"]);
     await t.ok("POST", "/ai", {});
     const withAi = await avail("quartet");
     expect(withAi.selectable).toBe(false);
@@ -277,7 +277,7 @@ describe("game selection gating", () => {
     const s = await t.ok("GET", "/state");
     await t.ok("DELETE", `/players/${s.players.find((p: any) => p.kind === "ai").id}`);
     await t.ok("POST", "/game/select", { gameId: "quartet" });
-    expect((await t.ok("GET", "/state")).game.needs).toEqual(["needs exactly 4 players, 1 more"]);
+    expect((await t.ok("GET", "/state")).game.needs).toEqual(["needs exactly four players, one more"]);
     await t.joinDeck("D");
     expect((await t.ok("GET", "/state")).game.needs).toEqual([]);
   });
@@ -288,7 +288,42 @@ describe("game selection gating", () => {
     expect((await avail("quartet")).selectable).toBe(false);
     const r = await t.api("POST", "/game/select", { gameId: "quartet" });
     expect(r.status).toBe(409);
-    expect(r.body.error).toMatch(/Quartet takes at most 4 players \(5 seated\)/);
+    expect(r.body.error).toMatch(/Quartet takes exactly four players \(5 seated\)/);
+    // The board can offer to free the seats (D-282): one too many.
+    expect((await avail("quartet")).room).toEqual({ remove: 1, ai: false, max: 4 });
+  });
+
+  it("a solo game: one seat (layout 1), \"needs exactly one player\", no AI, and room to make when more sit (D-282)", async () => {
+    // A copy of Quartet for one player, in the one-seat layout, beside games/ (its rules import the SDK by relative path).
+    const dir = await mkdtemp(join(GAMES, "../.test-games-"));
+    try {
+      await cp(join(GAMES, "quartet"), join(dir, "solo"), { recursive: true });
+      const mf = join(dir, "solo", "manifest.json");
+      await writeFile(mf, JSON.stringify({ ...JSON.parse(await readFile(mf, "utf8")), id: "solo", name: "Solo", players: [1], seatLayouts: [1] }));
+      await t.close();
+      t = await testHost({ gamesDir: dir, showTestGames: true });
+      const solo = async () => (await t.ok("GET", "/games")).find((g: any) => g.id === "solo");
+      expect((await solo()).needs[0]).toBe("needs exactly one player");
+      expect((await t.ok("GET", "/state")).layouts).toEqual([1]);
+      await t.joinDeck("Ann");
+      await t.joinDeck("Ben");
+      let g = await solo();
+      expect(g.selectable).toBe(false);
+      expect(g.reasons[0]).toBe("takes exactly one player (2 seated)");
+      expect(g.room).toEqual({ remove: 1, ai: false, max: 1 });
+      const s = await t.ok("GET", "/state");
+      await t.ok("DELETE", `/players/${s.players.find((p: any) => p.name === "Ben").id}`);
+      g = await solo();
+      expect(g.selectable).toBe(true);
+      expect(g.room).toBeUndefined();
+      const chosen = await t.ok("POST", "/game/select", { gameId: "solo" });
+      expect(chosen.layout).toBe(1);
+      expect(chosen.seatEdges).toEqual(["south"]);
+      expect((await t.api("POST", "/ai", {})).status).toBe(409); // no AI players, and no free seat
+      expect(chosen.game.needs).toEqual([]);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 
   it("choosing a game switches the table to a seat layout the game supports, with room for its players", async () => {
@@ -341,13 +376,13 @@ describe("game selection gating", () => {
     for (const n of ["A", "B", "C"]) await t.joinDeck(n);
     await t.ok("POST", "/game/select", { gameId: "pachisi" }); // at most 4
     await t.ok("POST", "/ai", {});
-    expect((await t.api("POST", "/ai", {})).body.error).toMatch(/Pachisi takes at most 4 players/);
+    expect((await t.api("POST", "/ai", {})).body.error).toMatch(/Pachisi takes at most four players/);
     // D-129: a newcomer is refused with the reason, instead of joining without a seat.
-    await expect(t.joinDeck("Late")).rejects.toThrow(/Pachisi takes at most 4 players/);
+    await expect(t.joinDeck("Late")).rejects.toThrow(/Pachisi takes at most four players/);
     const s = await t.ok("GET", "/state");
     expect(s.phase).toBe("ready"); // the choice stands
     expect(s.players).toHaveLength(4);
-    expect(s.noSeat).toMatch(/Pachisi takes at most 4 players/);
+    expect(s.noSeat).toMatch(/Pachisi takes at most four players/);
   });
 
   it("validates settings against the manifest", async () => {

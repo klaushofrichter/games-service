@@ -84,11 +84,11 @@ describe("all seats taken: can another one come in?", () => {
     await t.joinDeck("Ann");
     await t.ok("POST", "/game/select", { gameId: "pachisi" }); // 2 to 4 players
     for (let i = 0; i < 3; i++) await t.ok("POST", "/ai", {});
-    expect(state().noSeat).toMatch(/Pachisi takes at most 4 players/);
+    expect(state().noSeat).toMatch(/Pachisi takes at most four players/);
     const { token } = await t.ok("GET", "/join");
     expect((await hello(token, "Ben")).payload.code).toBe("no-seat");
     expect((await t.api("POST", "/ai", {})).status).toBe(409);
-    expect(() => table().joinRemote("Rita", "s-rita")).toThrow(/at most 4/);
+    expect(() => table().joinRemote("Rita", "s-rita")).toThrow(/at most four/);
     expect(state().phase).toBe("ready"); // the choice stays
   });
 

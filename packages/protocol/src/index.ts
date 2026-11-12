@@ -24,11 +24,14 @@ export function envelope<P>(ch: Channel, type: string, payload?: P, extra: Parti
 
 export type Edge = "north" | "east" | "south" | "west";
 export const EDGES_CLOCKWISE: Edge[] = ["south", "west", "north", "east"];
-export type SeatLayout = 2 | 4 | 6 | 8;
+export type SeatLayout = 1 | 2 | 4 | 6 | 8;
 
 /** Edge of every seat for a layout. Seats are numbered South first, then North, then East, then West. */
 export function seatEdges(layout: SeatLayout): Edge[] {
   switch (layout) {
+    case 1:
+      // One seat, at the south (D-282): solo games, played by the person at the board.
+      return ["south"];
     case 2:
       return ["south", "north"];
     case 4:
@@ -93,7 +96,7 @@ export const manifestSchema = z.object({
     z.array(z.number().int().min(1).max(8)).nonempty(),
   ]),
   turnModel: z.enum(["sequential", "simultaneous"]),
-  seatLayouts: z.array(z.union([z.literal(2), z.literal(4), z.literal(6), z.literal(8)])).nonempty(),
+  seatLayouts: z.array(z.union([z.literal(1), z.literal(2), z.literal(4), z.literal(6), z.literal(8)])).nonempty(),
   /** Edges of the table the game can seat players on. Not about which way the board faces: games draw the same
    *  either way, and the lobby faces whichever edge the table is turned to (D-079). */
   edges: z.array(z.enum(["north", "east", "south", "west"])).refine(
@@ -378,8 +381,13 @@ export interface GameAvailability {
   selectable: boolean;
   /** Why it cannot be chosen now. */
   reasons: string[];
-  /** What it would still need before it could start, in plain words (e.g. "needs 2 more players"). */
+  /** What it would still need before it could start, in plain words (e.g. "needs two more players"). */
   needs: string[];
+  /**
+   * Seats to free before it can be chosen (D-282), when only the players block it: `remove` players beyond its maximum
+   * `max`, and `ai` when it has no AI players but some are seated. The board offers to remove them.
+   */
+  room?: { remove: number; ai: boolean; max: number };
   seatLayouts: SeatLayout[];
   ai: boolean;
   simulation: boolean;

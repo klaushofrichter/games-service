@@ -4,10 +4,11 @@ import { seatEdges } from "../packages/protocol/src/index.ts";
 // @ts-expect-error plain browser module, no types
 import { seatName, seatTitle } from "../apps/table-host/public/shared/board-kit.js";
 
-const names = (layout: 2 | 4 | 6 | 8) => seatEdges(layout).map((_, i, e) => seatName(e, i));
+const names = (layout: 1 | 2 | 4 | 6 | 8) => seatEdges(layout).map((_, i, e) => seatName(e, i));
 
 describe("seat names", () => {
   it("names each seat by its place at the table, unique in every layout", () => {
+    expect(names(1)).toEqual(["south"]); // a solo game (D-282)
     expect(names(2)).toEqual(["south", "north"]);
     expect(names(4)).toEqual(["south", "west", "north", "east"]);
     expect(names(6)).toEqual(["southwest", "southeast", "northeast", "northwest", "east", "west"]);
