@@ -2352,3 +2352,10 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   - The game list (`/api/v1/games`) has `repo` and `private`; the tile's class `private`.
   - Checks: `tests/extra-games.test.ts` (a private repository's games, `.sources.json`), `scripts/e2e/extra.py`
     (the tile's name and red border).
+- **D-288 · 2026-11-12 · Klaus** — **Play from the board is refused when the game is full.** "With a player on the
+  board … and I enable the dev setting Play from the board, it shows the dialog to enter the player name despite no
+  room on the table. We should not show that onscreen deck and show an error message: Game is full, first remove a
+  player." Switching *Play from the board* (D-175) on is refused with exactly that message when no seat is free and
+  nobody at the table could move to the board; the board stays as it was. A person already at the table still may: the
+  deck beside the board takes over their seat under their name, which needs no free seat. *Implementation (Claude):*
+  `setDeveloper` in table.ts (code `board-deck-full`); `tests/board-deck.test.ts`.
