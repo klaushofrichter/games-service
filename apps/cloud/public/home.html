@@ -711,13 +711,14 @@ footer a.terms { display: inline; margin: 0; }
   <div class="wrap">
     <div class="section-head">
       <p class="eyebrow rv">Free games</p>
-      <h2 class="rv" style="--d:.06s">Nine games, and room for yours.</h2>
-      <p class="lede rv" style="--d:.12s">Four games come with the platform; five more come from <a href="https://github.com/klaushofrichter/extra-games" target="_blank" rel="noopener noreferrer">extra-games</a>, a separate repository that shows how anyone can add games. All of them are free and play for points, never money.</p>
+      <h2 class="rv" style="--d:.06s">Nine games, a synthesizer, and room for yours.</h2>
+      <p class="lede rv" style="--d:.12s">Four games come with the platform; five more come from <a href="https://github.com/klaushofrichter/extra-games" target="_blank" rel="noopener noreferrer">extra-games</a>, a separate repository that shows how anyone can add games. And from <a href="https://github.com/klaushofrichter/synth-game" target="_blank" rel="noopener noreferrer">synth-game</a>, something for one: a pocket synthesizer to play on the board. All of them are free and play for points, never money.</p>
     </div>
     <div class="filters rv" role="tablist">
       <button class="chipbtn on" data-f="all">All games</button>
       <button class="chipbtn" data-f="built-in">Built in</button>
       <button class="chipbtn" data-f="extra">From extra-games</button>
+      <button class="chipbtn" data-f="synth">Solo</button>
     </div>
     <div class="games" id="games-grid"></div>
     <p class="games-foot rv">Click a game for a closer look. Every screenshot is the real board, taken by the platform's browser tests.</p>
@@ -806,7 +807,7 @@ awards: [
     </div>
     <div class="features">
       <div class="feature rv spot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3M21 14v7h-7"/></svg><h3>Join by QR code</h3><p>One code for everyone at the table. When no seat is free, the board and the phone say so.</p></div>
-      <div class="feature rv spot" style="--d:.05s"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="4" y="5" width="16" height="14" rx="2"/><path d="M4 10h16M10 5v14"/></svg><h3>Seats and colours</h3><p>2 to 8 seats around the edges, each with a name and colour; the board turns toward each side.</p></div>
+      <div class="feature rv spot" style="--d:.05s"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="4" y="5" width="16" height="14" rx="2"/><path d="M4 10h16M10 5v14"/></svg><h3>Seats and colours</h3><p>1 to 8 seats around the edges, each with a name and colour; the board turns toward each side. One seat is a solo game.</p></div>
       <div class="feature rv spot" style="--d:.1s"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="6" y="2" width="12" height="20" rx="3"/><path d="M10 18h4"/></svg><h3>Away phones keep their seat</h3><p>A locked screen or a dead battery doesn't end the game. The seat waits, then the table decides.</p></div>
       <div class="feature rv spot" style="--d:.15s"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h13l-3-3M20 17H7l3 3"/></svg><h3>Exchange a player</h3><p>Mid-game, hand a seat to someone at the table, a remote friend, a watcher or an AI. The game carries on.</p></div>
       <div class="feature rv spot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10 14a5 5 0 007 0l3-3a5 5 0 00-7-7l-1 1"/><path d="M14 10a5 5 0 00-7 0l-3 3a5 5 0 007 7l1-1"/></svg><h3>Remote invites</h3><p>A link, optionally with a name. The browser connects straight to the table over WebRTC.</p></div>
@@ -1048,6 +1049,29 @@ gesture(seat, data) { sling.gesture(seat, data); }</code>
           </div>
           <figcaption>The real thing in Last Card: one moment on Klaus's phone and on the board, the same card at the same seat.</figcaption>
         </figure>
+    </div>
+
+    <!-- One player and a touchscreen (D-284): FM-1 Synth from synth-game, built on fm1-emu. -->
+    <div class="showcase" id="synth">
+      <div class="dbg-head">
+        <p class="eyebrow rv">One player</p>
+        <h3 class="rv" style="--d:.06s">Not every table needs a crowd: FM-1 Synth.</h3>
+        <p class="rv" style="--d:.1s">A board you can touch with every finger is an instrument, too. FM-1 Synth puts a pocket synthesizer on the table for one player, in a seat of its own. It is a game like any other to the platform: the lobby, the QR code, the seat plate and the phone work as for Chess, so a single-player idea needs no platform of its own.</p>
+      </div>
+      <div class="show-grid">
+        <figure class="dbg-shot show-shot rv" style="--d:.05s" id="synth-shot">
+          <div class="pair"><img src="/site/fm1-synth.webp" alt="The M-VAVE FM-1 on the board: knobs, a screen running the Felucca firmware, buttons and two rows of keys, with the player's seat plate below" loading="lazy" width="1600" height="900"><img class="alt" src="/site/fm1-synth-smk37.webp" alt="The same board with the SMK-37: pitch and mod wheels, the screen, knobs, pads, faders and 37 keys" loading="lazy" width="1600" height="900"></div>
+          <figcaption><span class="cap">The FM-1</span><span class="cap alt">The SMK-37</span> · switch between them any time</figcaption>
+        </figure>
+        <ul class="show-list rv" style="--d:.1s">
+          <li><b>One seat.</b> A game may take a single player; the table gives it one seat at the south, and the board turns north for a player on the other side.</li>
+          <li><b>Played by touch.</b> Keys, knobs, buttons, pads and faders, with as many fingers as you like. No keyboard, MIDI cable or app.</li>
+          <li><b>The real firmwares.</b> The community's firmwares run unchanged; each is downloaded from its author's site when it is picked.</li>
+          <li><b>Your phone is the remote.</b> It shows what runs, lists the firmwares, switches between the two devices and ends the session.</li>
+          <li><b>An emulator in the board.</b> <a href="https://github.com/joakimeriksson/fm1-emu" target="_blank" rel="noopener noreferrer">fm1-emu</a> by Joakim Eriksson emulates the FM-1's processor, screen, keys, knobs and sound in WebAssembly; the game runs it on the table's board.</li>
+          <li><b>Open source.</b> The game and its copy of the emulator are in <a href="https://github.com/klaushofrichter/synth-game" target="_blank" rel="noopener noreferrer">synth-game</a> (MIT). The packages for Windows, macOS and Linux add it at every start, like extra-games.</li>
+        </ul>
+      </div>
     </div>
 
     <!-- Test and debug with your AI (D-180): AI-only simulations, logs an AI can read, references to a move. -->
@@ -1387,6 +1411,8 @@ docker compose -f deploy/local/docker-compose.yml up -d --build">Copy</button></
   // Games.
   const GS = "https://github.com/klaushofrichter/games-service/tree/main/games/";
   const EX = "https://github.com/klaushofrichter/extra-games/tree/main/games/";
+  const SY = "https://github.com/klaushofrichter/synth-game/tree/main/games/";
+  const SRC_LABEL = { "built-in": "Built in", extra: "extra-games", synth: "synth-game" };
   const GAMES = [
     { id: "holdem", name: "Hold'em", players: "2–8 players", src: "built-in", wide: true, phone: "holdem-phone",
       text: "Fixed-limit Texas Hold'em. Your two cards stay on your phone; the board shows the shared cards and the pot. AI players in two styles, side pots, awards." },
@@ -1404,13 +1430,15 @@ docker compose -f deploy/local/docker-compose.yml up -d --build">Copy</button></
       text: "Dominoes up to double twelve: grow your own train from the hub, or the Mexican train everyone shares. Your tiles stay on your phone. A demo game for developers that customises nearly everything." },
     { id: "last-card", name: "Last Card", players: "2–8 players", src: "extra", phone: "last-card-phone",
       text: "Match the colour or the number, and push your card off the top of your phone: it lands on the pile in the middle. Skips, reverses, draw cards and wilds; shout your last card and be first to 200 points." },
+    { id: "fm1-synth", name: "FM-1 Synth", players: "1 player", src: "synth", wide: true, phone: "fm1-synth-phone",
+      text: "Not quite a game: a pocket synthesizer, the M-VAVE FM-1 or its big sibling the SMK-37, emulated on the board. One player plays its keys, knobs and pads by touch, with as many fingers as they like, and picks one of the community's firmwares on their phone. Built on fm1-emu by Joakim Eriksson." },
     { id: "coin-flip", name: "Coin Flip", players: "1–8 players", src: "built-in", phone: "coin-flip-phone",
       text: "Everyone guesses heads or tails, then the coin flips. The smallest complete game, and the one to copy when you start your own." },
   ];
   const grid = $("#games-grid");
   grid.innerHTML = GAMES.map((g, i) => `
     <button class="game rv spot${g.wide ? " wide" : ""}" style="--d:${(i % 3) * 0.06}s" data-src="${g.src}" data-i="${i}">
-      <span class="src${g.src === "extra" ? " extra" : ""}">${g.src === "extra" ? "extra-games" : "Built in"}</span>
+      <span class="src${g.src === "built-in" ? "" : " extra"}">${SRC_LABEL[g.src]}</span>
       <div class="pic"><img src="/site/${g.id}.webp" alt="${g.name} on the board" loading="lazy" width="1600" height="900"></div>
       <div class="info"><div class="row"><h3>${g.name}</h3><span class="players">${g.players}</span></div><p>${g.text}</p></div>
     </button>`).join("");
@@ -1432,7 +1460,7 @@ docker compose -f deploy/local/docker-compose.yml up -d --build">Copy</button></
     $("#lb-img").src = `/site/${g.id}.webp`; $("#lb-img").alt = `${g.name} on the board`;
     $("#lb-name").textContent = g.name; $("#lb-desc").textContent = `${g.players}. ${g.text}`;
     const ph = $("#lb-phone"); ph.hidden = !g.phone; if (g.phone) { ph.src = `/site/${g.phone}.webp`; ph.alt = `${g.name} on a phone`; }
-    $("#lb-link").href = (g.src === "extra" ? EX : GS) + g.id;
+    $("#lb-link").href = ({ extra: EX, synth: SY }[g.src] ?? GS) + g.id;
     lb.scrollTop = 0;
     lb.classList.add("open");
     document.documentElement.classList.add("lb-open");
@@ -1443,13 +1471,15 @@ docker compose -f deploy/local/docker-compose.yml up -d --build">Copy</button></
   addEventListener("keydown", (e) => { if (e.key === "Escape") close(); });
 
   // The demo game's picture (D-186): the second look fades in once the picture is above the middle of the window.
-  const looks = $("#show-shot");
-  if (looks) {
+  const looks = $$(".show-shot"); // Mexican Train's two looks, and the FM-1 and the SMK-37 (D-284)
+  if (looks.length) {
     let ticking = false;
     const swap = () => {
       ticking = false;
-      const r = looks.getBoundingClientRect();
-      looks.classList.toggle("alt", r.top + r.height / 2 < innerHeight / 2);
+      for (const el of looks) {
+        const r = el.getBoundingClientRect();
+        el.classList.toggle("alt", r.top + r.height / 2 < innerHeight / 2);
+      }
     };
     addEventListener("scroll", () => { if (!ticking) { ticking = true; requestAnimationFrame(swap); } }, { passive: true });
     swap();

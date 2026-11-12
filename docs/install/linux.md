@@ -6,7 +6,8 @@ service**, so there are no remote players, and as many players here as a game ta
 [connect it to the service](#remote-players-the-game-table-service) later.
 
 You get the built-in games, the games of
-[extra-games](https://github.com/klaushofrichter/extra-games), and the private game repositories your GitHub
+[extra-games](https://github.com/klaushofrichter/extra-games), FM-1 Synth from
+[synth-game](https://github.com/klaushofrichter/synth-game), and the private game repositories your GitHub
 account can read.
 
 This guide describes the newest package on the release page. An older installation can behave differently: compare

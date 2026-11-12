@@ -3,7 +3,7 @@
   Game Table on a Windows 11 computer, without the Game Table service (D-255).
 
 .DESCRIPTION
-  Downloads games-service and extra-games (and the private game repositories you name) from GitHub, installs what
+  Downloads games-service, extra-games and synth-game (and the private game repositories you name) from GitHub, installs what
   they need to run, and starts a Table Host on this computer. The board opens in the browser; players join with
   their phones on the same WiFi by the QR code. Without the service there are no remote players, watchers or
   invites, but any number of players here.
@@ -64,7 +64,7 @@ $ProgressPreference = "SilentlyContinue" # Invoke-WebRequest is many times slowe
 
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $Owner = "klaushofrichter"
-$PublicRepos = @("$Owner/games-service", "$Owner/extra-games")
+$PublicRepos = @("$Owner/games-service", "$Owner/extra-games", "$Owner/synth-game")
 $NodeMajor = 26
 
 function Say([string]$Text) { Write-Host $Text }
