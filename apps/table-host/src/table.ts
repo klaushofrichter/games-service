@@ -17,7 +17,7 @@ import {
   type SeatLayout,
   type CloudStatus,
 } from "../../../packages/protocol/src/index.ts";
-import { createRng, list, type GameEvent, type Intent, type SeatInfo } from "../../../packages/sdk/src/index.ts";
+import { count, createRng, list, type GameEvent, type Intent, type SeatInfo } from "../../../packages/sdk/src/index.ts";
 import { HOW_TO_PLAY, settingsWithDefaults, type InstalledGame } from "./games.ts";
 import { withStatistics } from "./stats.ts";
 import { GameRuntime, realClock, type AiMoveMeta, type LogRecord, type PauseReason, type ResumeReason } from "./runtime.ts";
@@ -920,7 +920,7 @@ export class Table extends EventEmitter {
     const atMax = !!m && this.seated().length >= max;
     if (!atMax && this.freeSeats().length > 0) return null;
     if (playing) return "There is no free seat in this game. Join after it.";
-    if (atMax) return `There is no free seat: ${m!.name} takes at most ${max} players. Remove a player on the board first.`;
+    if (atMax) return `There is no free seat: ${m!.name} takes ${allowedPlayerCounts(m!).length === 1 ? "exactly" : "at most"} ${count(max, "player")}. Remove a player on the board first.`;
     const larger = this.allowedLayouts().some((l) => l > this.layout);
     return larger ? "There is no free seat. Choose more seats on the board, or remove a player there." : "There is no free seat. Remove a player on the board first.";
   }
@@ -957,7 +957,7 @@ export class Table extends EventEmitter {
   }
 
   setLayout(n: number) {
-    if (![2, 4, 6, 8].includes(n)) throw new TableError(400, "layout must be 2, 4, 6 or 8");
+    if (![1, 2, 4, 6, 8].includes(n)) throw new TableError(400, "layout must be 1, 2, 4, 6 or 8");
     this.assertNotPlaying("change the layout");
     const layout = n as SeatLayout;
     const m = this.phase === "ready" ? this.selected?.game.manifest : undefined;
@@ -1024,7 +1024,7 @@ export class Table extends EventEmitter {
     this.assertNotPlaying("add AI players");
     const m = this.phase === "ready" ? this.selected?.game.manifest : undefined;
     if (m && !m.ai.supported) throw new TableError(409, `${m.name} has no AI players`);
-    if (m && this.seated().length >= Math.max(...allowedPlayerCounts(m))) throw new TableError(409, `${m.name} takes at most ${Math.max(...allowedPlayerCounts(m))} players`);
+    if (m && this.seated().length >= Math.max(...allowedPlayerCounts(m))) throw new TableError(409, `${m.name} takes at most ${count(Math.max(...allowedPlayerCounts(m)), "player")}`);
     const free = this.freeSeats();
     const target = seat ?? free[0];
     if (target === undefined || !free.includes(target)) throw new TableError(409, "no free seat");
@@ -1261,6 +1261,7 @@ export class Table extends EventEmitter {
         selectable: reasons.length === 0,
         reasons,
         needs: this.needsFor(m),
+        ...(this.roomFor(m) ? { room: this.roomFor(m)! } : {}),
         seatLayouts: m.seatLayouts,
         ai: m.ai.supported,
         simulation: m.simulation.supported && m.ai.supported,
@@ -1285,10 +1286,24 @@ export class Table extends EventEmitter {
     if (this.config.requireCloud && !this.cloudOnline) reasons.push("the table is offline");
     const seated = this.seated();
     const max = Math.max(...allowedPlayerCounts(m));
-    if (seated.length > max) reasons.push(`takes at most ${max} players (${seated.length} seated)`);
+    if (seated.length > max) reasons.push(`takes ${allowedPlayerCounts(m).length === 1 ? "exactly" : "at most"} ${count(max, "player")} (${seated.length} seated)`);
     if (!m.ai.supported && seated.some((p) => p.kind === "ai")) reasons.push("has no AI players; remove the AI seats");
     if (seated.length <= max && this.layoutFor(m) === null) reasons.push(`has no seat layout for ${seated.length} players`);
     return reasons;
+  }
+
+  /**
+   * What the table must give up before the game can be chosen (D-282): seats beyond the game's maximum, and AI players
+   * in a game without them. Only when nothing else blocks it (a running game, the table offline, no seat layout), so
+   * the board can offer to free the seats and then choose the game. Null when the players already fit.
+   */
+  private roomFor(m: Manifest): { remove: number; ai: boolean; max: number } | null {
+    if (this.playing || (this.config.requireCloud && !this.cloudOnline)) return null;
+    const seated = this.seated();
+    const max = Math.max(...allowedPlayerCounts(m));
+    const ai = !m.ai.supported && seated.some((p) => p.kind === "ai");
+    const remove = Math.max(0, seated.length - max);
+    return remove || ai ? { remove, ai, max } : null;
   }
 
   /** What a game still needs before it can start (other than everyone tapping Ready), in plain words. */
@@ -1300,7 +1315,8 @@ export class Table extends EventEmitter {
       const next = counts.find((c) => c > seated.length);
       if (next !== undefined) {
         const more = next - seated.length;
-        needs.push(counts.length === 1 ? `needs exactly ${counts[0]} players, ${more} more` : `needs ${more} more player${more === 1 ? "" : "s"}`);
+        // In words (D-282): "needs exactly one player", "needs exactly four players, two more", "needs one more player".
+        needs.push(counts.length === 1 ? `needs exactly ${count(counts[0], "player")}${more < counts[0] ? `, ${count(more, "more", "more")}` : ""}` : `needs ${count(more, "more player", "more players")}`);
       }
     }
     if (!this.allowNoLocalPlayer && !seated.some((p) => p.kind === "human" && p.location === "local")) needs.push("needs at least one player at the table (or games without one: the board's tools button › Advanced › Developer settings)");

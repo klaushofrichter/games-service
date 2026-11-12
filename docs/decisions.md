@@ -2292,3 +2292,19 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   (D-097). *Checked (Claude):* `production` at 87a1f51 packs as the cloud packs it (`packRepoTarball`/`decodeBundle`):
   one game, 16 files, 1.5 MB compressed; its largest file (`assets/emu/fm1_web.wasm`, 3.4 MB) is under the 5 MB file
   limit; the id clashes with no built-in game and no game of the other repositories.
+- **D-282 · 2026-11-12 · Klaus** — **Solo games, player counts in words, and making room for a game.** From FM-1 Synth,
+  a game for exactly one player without AI players:
+  - **A one-seat layout** (Klaus: "add a 1 player option to the 2, 4, 6, 8 … enables solo games"): `seatLayouts` may
+    list `1`, one seat at the south. The layout buttons show it when a game offers it; a game for one player picks it.
+  - **Counts in words:** "1 player", "needs exactly one player", "needs exactly four players, one more", "takes at most
+    four players"; never "1 players".
+  - **A game the seated players don't fit can't be chosen** (as before: more players than it takes, or AI players in
+    a game without them, D-078), but on the table's board its tile now says so with "tap to make room". Tapping it
+    lists who is seated, each with *Remove* (an AI player goes, a person at the table leaves) or *Make a watcher* (a
+    remote player keeps watching the board, D-167). Once the players fit, *Choose* goes on as a tap on the tile does.
+    The last player at the table stays (D-118). The API's game list carries what is missing as `room`.
+  - **AI players:** "+ AI player" stays hidden for a chosen game without AI players, and the table refuses one
+    (unchanged); a game's `ai.supported` is the manifest entry for it.
+  *Implementation (Claude):* `SeatLayout` 1 and `seatEdges(1)` in the protocol, `roomFor()` and the wording in
+  table.ts, `makeRoom()` and `playersLabel()` in board.js; `tests/lobby.test.ts` plays a solo copy of Quartet (layout
+  1, too many players, room, choose).

@@ -90,6 +90,11 @@ html, body { overflow: hidden; }
 .tile .hint { font-size: 0.68em; color: var(--jade); margin-top: auto; }
 .tile.selectable:hover { border-color: var(--brass); }
 .tile:disabled { opacity: 0.55; }
+/* A game only the seated players block (D-282): tappable, to make room for it. */
+.tile.room { opacity: 0.8; }
+.tile.room:hover { border-color: var(--brass); }
+.dialog.room .list { display: flex; flex-direction: column; gap: 8px; margin: 14px 0 4px; }
+.dialog.room .list .row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 
 .toolbar { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; align-items: center; }
 /* Player management sits on the right; when the row is full it wraps as a group, still right-aligned. */
