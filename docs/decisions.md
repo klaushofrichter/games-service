@@ -2370,3 +2370,9 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   commit. *Implementation (Claude):* the game list (`/api/v1/games`) says how a game came (`via`: `service` or
   `download`) with `branch` and `commit`; the starter's `.sources.json` carries the branch and commit of each
   download. Checks: `tests/extra-games.test.ts`, `scripts/e2e/extra.py` (a local table paired with the service).
+- **D-290 · 2026-11-12 · Klaus** — **A local table's notice shows versions, not commits.** "When we show the local or
+  repository games at launch, we should show the version id, not the hash." Each game in the notice (D-251, D-289) has
+  its version after its name (Coin Flip 2026.10.23.1); a repository line has its branch, and games-service the
+  platform's version when the table has one (the packages; a clone runs as "dev", so none). No commit hashes. Board
+  settings › Versions keep the commit for a clone, where a developer looks for it. *Implementation (Claude):*
+  `localNoticeBody()` in `board.js`; the platform's version from `GET /version`. Check: `scripts/e2e/extra.py`.

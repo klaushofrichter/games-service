@@ -267,10 +267,13 @@ try:
             console.check("#pair-repos input[value=extra-games]")
             console.click("#pair-form button.primary")
             console.wait_for_selector("#pair-msg >> text=with games from extra-games")
-            # The open notice fills in as the bundle arrives: the repository, its branch and commit, and its game.
+            # The open notice fills in as the bundle arrives: the repository and its branch, and its game with its version,
+            # no commit (D-290).
             lb.wait_for_selector(".local-notice >> text=Games from the Game Table service", timeout=30000)
             text = note.inner_text()
-            assert re.search(r"extra-games · branch production \(e2e0001\)\s+Dice Duel", text), text
+            assert re.search(r"extra-games · branch production\s+Dice Duel 0\.1\.0", text), text
+            assert "e2e0001" not in text, text
+            assert re.search(r"Coin Flip \d{4}\.\d{2}\.\d{2}\.\d+", text), text
             assert "Games from the clones on this computer" in text and "games-service" in text, text
             shot(lb, "local-notice-service")
             lb.close()
