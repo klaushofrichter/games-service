@@ -90,8 +90,15 @@ def roulette(browser, board):
     flip, gear = north = buttons()
     assert flip["x"] < gear["x"], f"the turn-around button is left of the gear: {flip} {gear}"
     assert gear["y"] > 1080 / 2, f"the gear stays at the bottom while the game faces north: {gear}"
+    # D-280: with the game facing north, Lobby stays in its corner, turned to read from the north; facing south, upright.
+    lobby = lambda: (board.locator("#lobby-button").get_attribute("class") or "", board.locator("#lobby-button").bounding_box())
+    north_cls, north_box = lobby()
+    assert "turned" in north_cls.split(), f"Lobby is not turned with the game facing north: {north_cls}"
     board.click("#flip-button")
     wait(lambda: api("GET", "/state")["frontEdge"] == "south", 5, "the game to face south")
+    board.wait_for_function("() => !document.getElementById('lobby-button').classList.contains('turned')", timeout=5000)
+    south_box = lobby()[1]
+    assert abs(south_box["x"] - north_box["x"]) < 2 and abs(south_box["y"] - north_box["y"]) < 2, f"turning the game moved Lobby: {north_box} -> {south_box}"
     time.sleep(0.6)
     assert buttons() == north, f"turning the game moved the buttons: {north} -> {buttons()}"
     assert plates() == before, "turning the game must not move the seat plates"

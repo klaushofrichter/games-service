@@ -1287,10 +1287,13 @@ function openCodePad() {
  * The game's corner for Lobby, Show result and Statistics (its manifest's `lobbyButton`), as a class. On a remote board
  * turned to a north seat the surface stands on its head, so the corner is taken as its player sees it and the buttons
  * turn with them (D-157): "top-right" is their top right, with upright text, and the tools stay at their bottom left.
+ * On the table's own board a game turned north (D-101) keeps the buttons in their corner, turned to read from the north
+ * like the game (D-280).
  */
 const CORNER_NAMES = ["top-left", "top-right", "bottom-right", "bottom-left"];
 function cornerClass(name) {
-  if (!REMOTE || remoteEdge() !== "north") return name;
+  if (!REMOTE) return gameEdge() === "north" ? `${name} turned` : name;
+  if (remoteEdge() !== "north") return name;
   return `${CORNER_NAMES[(CORNER_NAMES.indexOf(name) + 2) % 4]} turned`;
 }
 
