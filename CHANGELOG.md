@@ -8,6 +8,7 @@ history.
 
 ## [Unreleased]
 
+- Remote boards: a watcher's view stays upright when the table turns its board, in the lobby and during a game (D-283).
 - Solo games: a one-seat layout; player counts in words ("needs exactly one player"); a game the seated players don't fit offers to make room (remove players, remote players become watchers) before it is chosen (D-282).
 - The extra-game repository synth-game (FM-1 Synth) is listed for tables (D-281).
 - Board: Lobby, Show result and Awards and Results turn to read from the north, in their corner, when the game faces north on the table's own board (D-280).
