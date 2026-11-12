@@ -8,6 +8,7 @@ history.
 
 ## [Unreleased]
 
+- A local table's notice also lists the repositories its other games come from (the service's, or downloaded at start), with branch and commit (D-289).
 - Play from the board can't be switched on when every seat is taken: "Game is full, first remove a player." (D-288).
 - Lobby: a game tile names the repository it comes from instead of "extra"; games from private repositories have a red border (D-287).
 - Board: an open pulldown has a light green frame; only the chosen option is brass (D-286).
