@@ -1276,6 +1276,8 @@ export class Table extends EventEmitter {
         ...(source || g.from ? { extra: true } : {}),
         // The repository it comes from, for the lobby (D-287): its name, and whether it is private.
         ...(g.from ? { repo: g.from.repo.replace(/^.*\//, ""), ...(g.from.private ? { private: true } : {}) } : {}),
+        // How it reached this table, for a local table's notice (D-289): the service's bundle or the starter's download.
+        ...(g.from?.via ? { via: g.from.via, ...(g.from.branch ? { branch: g.from.branch } : {}), ...(g.from.commit ? { commit: g.from.commit } : {}) } : {}),
       };
     });
   }

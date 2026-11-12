@@ -573,8 +573,15 @@ async function main() {
     say(`Games from ${label}: ${ids.join(", ") || "(none)"}`);
   }
   // Which repository each game came from, for the lobby (D-287): the table host reads it beside the games.
-  const sourcesJson: Record<string, { repo: string; private: boolean }> = {};
-  for (const [id, label] of from) if (label !== "games-service") sourcesJson[id] = { repo: label, private: !PUBLIC_REPOS.includes(label) };
+  // With the branch and commit it was downloaded at, for a local table's notice (D-289).
+  const sourcesJson: Record<string, { repo: string; private: boolean; branch?: string; commit?: string }> = {};
+  const downloads = new Map<string, Download | null>();
+  for (const [id, label] of from) {
+    if (label === "games-service") continue;
+    if (!downloads.has(label)) downloads.set(label, await readJson<Download>(repoDir(reposDir, label).info));
+    const d = downloads.get(label);
+    sourcesJson[id] = { repo: label, private: !PUBLIC_REPOS.includes(label), ...(d?.branch ? { branch: d.branch } : {}), ...(d?.commit ? { commit: d.commit.slice(0, 7) } : {}) };
+  }
   await writeFile(join(gamesDir, ".sources.json"), JSON.stringify(sourcesJson, null, 2) + "\n");
   const gamesList = await writeGamesList(home, gamesDir, from, reposDir);
 

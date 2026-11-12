@@ -2359,3 +2359,14 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   nobody at the table could move to the board; the board stays as it was. A person already at the table still may: the
   deck beside the board takes over their seat under their name, which needs no free seat. *Implementation (Claude):*
   `setDeveloper` in table.ts (code `board-deck-full`); `tests/board-deck.test.ts`.
+- **D-289 · 2026-11-12 · Klaus** — **A local table's notice names every repository its games come from.** "Can we
+  show also the games that we bring in from the current repos, or is that not determined?" The notice of D-251 listed
+  only the clones on this computer. It now also lists, each with its branch, short commit and games:
+  - **Games from the Game Table service**: the repositories configured there (and ticked for this table), as GitHub
+    has them now; a newer commit comes when the service has it. They arrive a moment after the board starts, so the
+    open notice fills in as they come; until then it says that the other games come from the service.
+  - **Games downloaded from GitHub** when the table started (the packages' starter).
+  Dismissing still lasts until the clones, the service or the downloaded repositories and branches change, not a new
+  commit. *Implementation (Claude):* the game list (`/api/v1/games`) says how a game came (`via`: `service` or
+  `download`) with `branch` and `commit`; the starter's `.sources.json` carries the branch and commit of each
+  download. Checks: `tests/extra-games.test.ts`, `scripts/e2e/extra.py` (a local table paired with the service).

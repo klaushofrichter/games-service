@@ -132,8 +132,9 @@ export class ExtraGames {
       }
     }
     const games = await loadGames(join(root, "games"), { repo: ref.source, commit: ref.commit, hash: ref.hash });
-    const repo = ref.source.replace(/@.*$/, "");
-    for (const g of games.values()) g.from = { repo, ...(typeof ref.private === "boolean" ? { private: ref.private } : {}) };
+    const [repo, branch] = ref.source.split("@");
+    const commit = ref.commit.slice(0, 7);
+    for (const g of games.values()) g.from = { repo, ...(typeof ref.private === "boolean" ? { private: ref.private } : {}), ...(branch ? { branch } : {}), ...(commit ? { commit } : {}), via: "service" };
     if (!games.size) throw new Error("the bundle has no game that loads on this table (see the log above)");
     this.loaded.set(ref.hash, games);
     return games;
