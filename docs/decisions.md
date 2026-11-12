@@ -2308,3 +2308,10 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   *Implementation (Claude):* `SeatLayout` 1 and `seatEdges(1)` in the protocol, `roomFor()` and the wording in
   table.ts, `makeRoom()` and `playersLabel()` in board.js; `tests/lobby.test.ts` plays a solo copy of Quartet (layout
   1, too many players, room, choose).
+- **D-283 · 2026-11-12 · Klaus** — **A watcher's board keeps its orientation.** "When we have a watcher … and we use the
+  rotate board button on the board during the game, the remote view also rotates. … The remote player or watcher
+  should keep the orientation. The same for the orientation buttons for the lobby view." A remote player with a seat
+  already faced their seat (D-157); a remote board without one (a watcher, or a remote player between seats) followed
+  the table's facing. It now stays upright (south), in the lobby and in a game, whatever the table's turn and facing
+  buttons do. *Implementation (Claude):* `viewEdge()` in `board.js`; `scripts/e2e/watch.py` turns the table's game north
+  and checks that the watcher's view does not turn.
