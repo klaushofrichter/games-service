@@ -584,7 +584,11 @@ function remoteEdge() {
   const e = myEdge();
   return e && sideSeat(e) && landscape ? "south" : e;
 }
-const viewEdge = () => remoteEdge() ?? state.frontEdge;
+/**
+ * The edge this board's view is turned to. A remote board without its own seat (a watcher, or a remote player between
+ * seats) stays upright (D-283): the table's turn and facing buttons are for the people at the table, not for it.
+ */
+const viewEdge = () => (REMOTE ? (remoteEdge() ?? "south") : state.frontEdge);
 
 /**
  * Games use the board's full width (D-101): on the table's own board a game faces north or south only, whichever the
