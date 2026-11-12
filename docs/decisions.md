@@ -2333,3 +2333,8 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   it does: "Fetch owner/name@ref from GitHub now and pack its games again. Tables ticked for it get the new bundle when
   they next check in, after a running game. The service also does this every hour." *Implementation (Claude):*
   `refreshTip()` in `apps/cloud/public/admin.html`; `scripts/e2e/extra.py` reads the title.
+- **D-286 · 2026-11-12 · Klaus** — **The board's pulldown list has a light green frame.** With FM-1 Synth's *Device to
+  start with* the open list showed two brass borders, the list's frame around the chosen option's. Klaus: the frame
+  shows that it is the board's own pulldown (D-248), so it stays, in light green (the board's jade); only the chosen
+  option is brass. Every pulldown on the board: game settings, AI options, board settings. *Implementation (Claude):*
+  `.pick-menu` in `board.css`.
