@@ -2292,3 +2292,40 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   (D-097). *Checked (Claude):* `production` at 87a1f51 packs as the cloud packs it (`packRepoTarball`/`decodeBundle`):
   one game, 16 files, 1.5 MB compressed; its largest file (`assets/emu/fm1_web.wasm`, 3.4 MB) is under the 5 MB file
   limit; the id clashes with no built-in game and no game of the other repositories.
+- **D-282 · 2026-11-12 · Klaus** — **Solo games, player counts in words, and making room for a game.** From FM-1 Synth,
+  a game for exactly one player without AI players:
+  - **A one-seat layout** (Klaus: "add a 1 player option to the 2, 4, 6, 8 … enables solo games"): `seatLayouts` may
+    list `1`, one seat at the south. The layout buttons show it when a game offers it; a game for one player picks it.
+  - **Counts in words:** "1 player", "needs exactly one player", "needs exactly four players, one more", "takes at most
+    four players"; never "1 players".
+  - **A game the seated players don't fit can't be chosen** (as before: more players than it takes, or AI players in
+    a game without them, D-078), but on the table's board its tile now says so with "tap to make room". Tapping it
+    lists who is seated, each with *Remove* (an AI player goes, a person at the table leaves) or *Make a watcher* (a
+    remote player keeps watching the board, D-167). Once the players fit, *Choose* goes on as a tap on the tile does.
+    The last player at the table stays (D-118). The API's game list carries what is missing as `room`.
+  - **AI players:** "+ AI player" stays hidden for a chosen game without AI players, and the table refuses one
+    (unchanged); a game's `ai.supported` is the manifest entry for it.
+  *Implementation (Claude):* `SeatLayout` 1 and `seatEdges(1)` in the protocol, `roomFor()` and the wording in
+  table.ts, `makeRoom()` and `playersLabel()` in board.js; `tests/lobby.test.ts` plays a solo copy of Quartet (layout
+  1, too many players, room, choose).
+- **D-283 · 2026-11-12 · Klaus** — **A watcher's board keeps its orientation.** "When we have a watcher … and we use the
+  rotate board button on the board during the game, the remote view also rotates. … The remote player or watcher
+  should keep the orientation. The same for the orientation buttons for the lobby view." A remote player with a seat
+  already faced their seat (D-157); a remote board without one (a watcher, or a remote player between seats) followed
+  the table's facing. It now stays upright (south), in the lobby and in a game, whatever the table's turn and facing
+  buttons do. *Implementation (Claude):* `viewEdge()` in `board.js`; `scripts/e2e/watch.py` turns the table's game north
+  and checks that the watcher's view does not turn.
+- **D-284 · 2026-11-12 · Klaus** — **synth-game is installed like extra-games, and the website shows FM-1 Synth.**
+  "The synth game is a new category of single player games — it's actually not really a game, but a good use of the
+  touch screen. … that particular repository which is now public should be part of the normal installation process,
+  just like extra-games. We want to mention the one player capability and add a section in the examples specifically
+  for the Synth game." *Implementation (Claude):*
+  - **Installation:** the packages' starter (`scripts/package/launch.ts`) and the Windows script download
+    `klaushofrichter/synth-game` at every start, no sign-in, beside extra-games; the package manifest, the release
+    notes, the three install guides and the local Docker files (`GAME_REPOS`) name it; the package smoke tests expect
+    `fm1-synth`. The hosted service lists it since D-281; which tables get it stays a tick in the console.
+  - **Website:** the games grid has FM-1 Synth (one player, from synth-game, a *Solo* filter) with its board and phone;
+    the heading says "Nine games, a synthesizer, and room for yours"; the seats feature says 1 to 8 seats, one for a
+    solo game (D-282); a showcase *Not every table needs a crowd* shows the FM-1 and the SMK-37 and credits
+    [fm1-emu](https://github.com/joakimeriksson/fm1-emu) by Joakim Eriksson, the only link the page makes outside
+    Klaus's repositories and skylar.technology (`tests/website.test.ts`). Pictures from synth-game's own browser check.

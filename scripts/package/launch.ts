@@ -1,6 +1,6 @@
 // Starts a Game Table from an installed package (D-256): Windows, macOS and Linux alike. The package brings Node.js and
 // games-service's runtime (the table host, the SDK, the built-in games, the runtime packages); this launcher copies that
-// runtime into the user's own folder, downloads extra-games and the private game repositories the user names (with
+// runtime into the user's own folder, downloads extra-games, synth-game and the private game repositories the user names (with
 // the GitHub CLI's sign-in), puts all games in one folder and starts the table host without the Game Table service.
 // With --service it joins the service instead (remote players; approval in the console or an access code, D-113).
 //
@@ -23,7 +23,8 @@ import JSZip from "jszip";
 import { readTarGz } from "../../packages/protocol/src/bundle.ts";
 
 const OWNER = "klaushofrichter";
-const PUBLIC_REPOS = [`${OWNER}/extra-games`];
+/** Downloaded at every start, no sign-in (D-284): extra-games, and synth-game (FM-1 Synth, a solo game). */
+const PUBLIC_REPOS = [`${OWNER}/extra-games`, `${OWNER}/synth-game`];
 const SERVICE_URL = "https://games.skylar.technology";
 const CONSOLE_URL = "https://games-console.skylar.technology";
 const UA = { "User-Agent": "game-table-launcher" };
@@ -31,6 +32,7 @@ const UA = { "User-Agent": "game-table-launcher" };
 const PUBLIC_LINKS: Record<string, string> = {
   "games-service": `https://github.com/${OWNER}/games-service`,
   [`${OWNER}/extra-games`]: `https://github.com/${OWNER}/extra-games`,
+  [`${OWNER}/synth-game`]: `https://github.com/${OWNER}/synth-game`,
 };
 
 /** Where a downloaded repository's games came from: <reposDir>/<owner>/<name>.json. */

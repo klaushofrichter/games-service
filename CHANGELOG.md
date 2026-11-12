@@ -8,6 +8,9 @@ history.
 
 ## [Unreleased]
 
+- synth-game (FM-1 Synth) is installed by the packages like extra-games; the website shows FM-1 Synth, solo games and credits fm1-emu (D-284).
+- Remote boards: a watcher's view stays upright when the table turns its board, in the lobby and during a game (D-283).
+- Solo games: a one-seat layout; player counts in words ("needs exactly one player"); a game the seated players don't fit offers to make room (remove players, remote players become watchers) before it is chosen (D-282).
 - The extra-game repository synth-game (FM-1 Synth) is listed for tables (D-281).
 - Board: Lobby, Show result and Awards and Results turn to read from the north, in their corner, when the game faces north on the table's own board (D-280).
 - Code review fixes: a re-uploaded log keeps its earlier copy when refused; extra-game repositories with a README or hidden files in games/ work; remote requests are bounded; AI options are checked before a game is chosen; the invite page is never framed (D-279).

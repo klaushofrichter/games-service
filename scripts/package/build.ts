@@ -120,7 +120,7 @@ async function manifest(runtimeDir: string, besideStarter: string) {
         gamesService: { repository: REPO_URL, ref: process.env.PACKAGE_REF || null, commit: fullCommit, commitDate },
         node: nodeVersions,
         games,
-        downloadedAtStart: ["https://github.com/klaushofrichter/extra-games", "the private game repositories you name"],
+        downloadedAtStart: ["https://github.com/klaushofrichter/extra-games", "https://github.com/klaushofrichter/synth-game", "the private game repositories you name"],
       },
       null,
       2,

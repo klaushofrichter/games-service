@@ -450,6 +450,64 @@ async function chooseGame(id) {
   if (settings) act("POST", "/game/select", { gameId: id, settings });
 }
 
+const NUMBER_WORDS = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight"];
+const inWords = (n) => NUMBER_WORDS[n] ?? String(n);
+
+/**
+ * Free seats for a game the seated players keep from being chosen (D-282): more players than it takes, or AI players
+ * in a game without them. The window lists who is seated; each can be removed (an AI player goes, a person at the table
+ * leaves it, a remote player keeps watching the board, D-167). Once the players fit, "Choose" goes on as a tap on the
+ * tile would.
+ */
+function makeRoom(id) {
+  const d = document.createElement("div");
+  d.className = "dialog-backdrop";
+  const close = () => {
+    d.remove();
+    state && render();
+  };
+  const draw = () => {
+    const g = games.find((x) => x.id === id);
+    if (!g) return close();
+    const room = g.room;
+    const seated = state.players.filter((p) => p.seat !== null);
+    const p = g.players;
+    const takes = p.length === 1 ? `exactly ${inWords(p[0])} ${p[0] === 1 ? "player" : "players"}` : `${inWords(p[0])} to ${inWords(p.at(-1))} players`;
+    const todo = [];
+    if (room?.remove) todo.push(`Remove ${inWords(room.remove)} ${room.remove === 1 ? "player" : "players"}.`);
+    if (room?.ai) todo.push("It has no AI players, so the AI players go too.");
+    const lead = `${esc(g.name)} is for ${takes}; ${inWords(seated.length)} ${seated.length === 1 ? "is" : "are"} seated.`;
+    const what = todo.length ? ` ${esc(todo.join(" "))}` : g.selectable ? " The players fit now." : ` ${esc(g.reasons[0] ?? "")}.`;
+    const row = (p) => {
+      const label = p.kind === "ai" ? "Remove" : p.location === "remote" ? "Make a watcher" : "Remove";
+      const kept = state.developer?.protectedPlayer === p.id;
+      return `<div class="row"><span class="chip player" style="--pc:${esc(p.color ?? "")}">${esc(p.name)}${p.location === "remote" ? " · remote" : ""}</span>
+        <button data-out="${esc(p.id)}" ${kept ? 'disabled title="The last player at the table stays"' : ""}>${label}</button></div>`;
+    };
+    d.innerHTML = `<div class="dialog room"><h2>Make room for ${esc(g.name)}</h2><div class="muted">${lead}${what} A remote player you remove keeps watching the board.</div>
+      <div class="list">${seated.map(row).join("")}</div>
+      <div class="actions"><button data-x="no">Cancel</button><button class="primary" data-x="choose" ${g.selectable ? "" : "disabled"}>Choose ${esc(g.name)}</button></div></div>`;
+    faceFront(d.querySelector(".dialog"));
+  };
+  d.addEventListener("click", async (e) => {
+    const b = e.target.closest("button");
+    if (e.target === d || b?.dataset.x === "no") return close();
+    if (b?.dataset.x === "choose") {
+      d.remove();
+      return chooseGame(id);
+    }
+    if (b?.dataset.out) {
+      b.disabled = true;
+      if (selectedPlayer === b.dataset.out) selectedPlayer = null;
+      await act("DELETE", `/players/${b.dataset.out}`);
+      await refreshGames();
+      if (d.isConnected) draw();
+    }
+  });
+  draw();
+  overlayRoot.appendChild(d);
+}
+
 /**
  * The last player at the table can't be removed while a game is chosen or running (D-118), unless the developer
  * setting allows games without one: say so instead of asking. The table refuses it too.
@@ -526,7 +584,11 @@ function remoteEdge() {
   const e = myEdge();
   return e && sideSeat(e) && landscape ? "south" : e;
 }
-const viewEdge = () => remoteEdge() ?? state.frontEdge;
+/**
+ * The edge this board's view is turned to. A remote board without its own seat (a watcher, or a remote player between
+ * seats) stays upright (D-283): the table's turn and facing buttons are for the people at the table, not for it.
+ */
+const viewEdge = () => (REMOTE ? (remoteEdge() ?? "south") : state.frontEdge);
 
 /**
  * Games use the board's full width (D-101): on the table's own board a game faces north or south only, whichever the
@@ -1507,10 +1569,13 @@ function viewOnly() {
   return REMOTE && !state.remote?.boardControl;
 }
 // A remote board without board control (a watcher, or control switched off) shows the games, not as buttons (D-170).
-const tileHtml = (g) => `<button class="tile ${g.selectable ? "selectable" : ""} ${viewOnly() ? "view-only" : ""}" data-game="${g.id}" ${g.selectable && !viewOnly() ? "" : viewOnly() ? 'tabindex="-1" aria-disabled="true"' : "disabled"}>
+// A game only the seated players keep from being chosen (D-282) stays tappable on the table's board: it offers to free
+// the seats (makeRoom), then to choose the game.
+const roomTile = (g) => !g.selectable && g.room && !REMOTE;
+const tileHtml = (g) => `<button class="tile ${g.selectable ? "selectable" : ""} ${roomTile(g) ? "room" : ""} ${viewOnly() ? "view-only" : ""}" ${roomTile(g) ? "data-room" : "data-game"}="${g.id}" ${g.selectable || roomTile(g) ? (viewOnly() ? 'tabindex="-1" aria-disabled="true"' : "") : viewOnly() ? 'tabindex="-1" aria-disabled="true"' : "disabled"}>
           <span class="title">${esc(g.name)}</span><span class="desc">${esc(withSettings(g.description, g.settings, {}, { hints: false }))}</span>
           <span class="faint" style="font-size:.66em">${playersLabel(g.players)}${g.ai ? " · AI" : ""}${g.extra ? ` · <span style="color:var(--brass)">extra</span>` : ""}</span>
-          ${g.selectable ? `<span class="hint">${esc(tileHint(g))}</span>` : `<span class="why">${esc(g.reasons[0])}</span>`}</button>`;
+          ${g.selectable ? `<span class="hint">${esc(tileHint(g))}</span>` : `<span class="why">${esc(g.reasons[0][0].toUpperCase() + g.reasons[0].slice(1))}${roomTile(g) ? " · tap to make room" : ""}</span>`}</button>`;
 function gameTiles() {
   const pages = Math.max(1, Math.ceil(games.length / PAGE_SIZE));
   gamePage = Math.min(gamePage, pages - 1);
@@ -1562,7 +1627,7 @@ function remoteNote() {
 }
 
 function playersLabel(p) {
-  if (p.length === 1) return `${p[0]} players`;
+  if (p.length === 1) return `${p[0]} player${p[0] === 1 ? "" : "s"}`; // "1 player" (D-282)
   const contiguous = p.every((n, i) => i === 0 || n === p[i - 1] + 1);
   return contiguous ? `${p[0]}–${p.at(-1)} players` : `${p.join(", ")} players`;
 }
@@ -1964,6 +2029,7 @@ center.addEventListener("click", async (e) => {
   if (!b) return;
   const d = b.dataset;
   if (d.game) chooseGame(d.game);
+  else if (d.room) makeRoom(d.room);
   else if (d.page) ((gamePage = Math.max(0, gamePage + Number(d.page))), render());
   else if (d.pageTo) ((gamePage = Number(d.pageTo)), render());
   else if (d.config) configureAi(d.config);

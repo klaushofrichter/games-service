@@ -73,6 +73,17 @@ try:
         board.screenshot(path=os.path.join(OUT, "watch-list.png"))
         board.click(".overlay.watchers [data-close-overlay]")
 
+        # D-283: the table turns its game to face north; the watcher, who has no seat, keeps an upright view.
+        turned = lambda page: page.locator(".cf-center").evaluate("e => e.style.transform")
+        wcenter = lambda: wanda.frame_locator("#board").locator(".cf-center").evaluate("e => e.style.transform")
+        assert "rotate(0deg)" in wcenter(), wcenter()
+        board.click("#flip-button")
+        wait(lambda: "rotate(180deg)" in turned(board), 5, "the table's game to face north")
+        time.sleep(1.0)
+        assert "rotate(0deg)" in wcenter(), f"the watcher's view turned with the table: {wcenter()}"
+        board.click("#flip-button")
+        wait(lambda: "rotate(0deg)" in turned(board), 5, "the table's game to face south again")
+
         # D-221: Wanda's own eye window has her name to change and Fullscreen (a watcher has no settings), and says the
         # table's board lets her play, not "Settings".
         wb = wanda.frame_locator("#board")
