@@ -20,7 +20,7 @@ Version $ver, the same that \`game-table --version\` shows. Built from games-ser
 - macOS: game-table-macos.pkg ([install guide]($site/macos.md))
 - Linux: game-table-linux.tar.gz ([install guide]($site/linux.md))
 
-The packages hold the platform and its built-in games. The extra games, like Chess and Backgammon, are in a separate repository, [klaushofrichter/extra-games](https://github.com/klaushofrichter/extra-games): each start downloads them and adds them to the table automatically, with no sign-in. Private game repositories you name are added the same way; only those need your GitHub sign-in.
+The packages hold the platform and its built-in games. The extra games, like Chess and Backgammon, are in a separate repository, [klaushofrichter/extra-games](https://github.com/klaushofrichter/extra-games), and FM-1 Synth, a pocket synthesizer for one player to play on the board, is in [klaushofrichter/synth-game](https://github.com/klaushofrichter/synth-game): each start downloads both and adds their games to the table automatically, with no sign-in. Private game repositories you name are added the same way; only those need your GitHub sign-in.
 
 The packages aren't signed, but there is a SHA-256 checksum for each, below and in game-table-SHA256SUMS.txt.
 

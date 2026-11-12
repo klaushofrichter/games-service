@@ -37,7 +37,8 @@ describe("the public website (D-176)", () => {
     expect(await (await get("/?signed-out=1")).text()).toContain("You are signed out");
     // Only first-party resources: no fonts, scripts or images from elsewhere. Links go to the GitHub repositories and
     // to skylar.technology, the company that hosts the project (D-187).
-    expect(html).not.toMatch(/(src|href)="https?:\/\/(?!github\.com\/klaushofrichter\/|skylar\.technology")/);
+    // One more, the emulator FM-1 Synth is built on, credited to its author (D-284).
+    expect(html).not.toMatch(/(src|href)="https?:\/\/(?!github\.com\/klaushofrichter\/|skylar\.technology"|github\.com\/joakimeriksson\/fm1-emu")/);
     // The private game repositories are never named on the public page.
     expect(html).not.toMatch(/loopy|starforge/i);
   });

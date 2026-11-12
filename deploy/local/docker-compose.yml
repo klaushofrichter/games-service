@@ -45,9 +45,9 @@ services:
       # setup.sh --cloud writes it (16+ characters); the service refuses to start without it.
       ADMIN_TOKEN: ${ADMIN_TOKEN:-}
       DATA_DIR: /data
-      # Only the public example repository, not the hosted service's list.
+      # Only the public repositories (extra-games, synth-game), not the hosted service's list.
       GAME_REPOS_FILE: none
-      GAME_REPOS: ${GAME_REPOS:-klaushofrichter/extra-games@production}
+      GAME_REPOS: ${GAME_REPOS:-klaushofrichter/extra-games@production,klaushofrichter/synth-game@production}
       # Reads private repositories in GAME_REPOS (runbook Part C); games at the table need no token (Part B).
       GAME_REPO_TOKEN: ${GAME_REPO_TOKEN:-}
       ICE_SERVERS: ${ICE_SERVERS:-[]}

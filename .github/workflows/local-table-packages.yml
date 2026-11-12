@@ -34,7 +34,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  EXPECT: holdem,coin-flip,backgammon,chess
+  EXPECT: holdem,coin-flip,backgammon,chess,fm1-synth
 
 jobs:
   build:

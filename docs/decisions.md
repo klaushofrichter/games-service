@@ -2315,3 +2315,17 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   the table's facing. It now stays upright (south), in the lobby and in a game, whatever the table's turn and facing
   buttons do. *Implementation (Claude):* `viewEdge()` in `board.js`; `scripts/e2e/watch.py` turns the table's game north
   and checks that the watcher's view does not turn.
+- **D-284 · 2026-11-12 · Klaus** — **synth-game is installed like extra-games, and the website shows FM-1 Synth.**
+  "The synth game is a new category of single player games — it's actually not really a game, but a good use of the
+  touch screen. … that particular repository which is now public should be part of the normal installation process,
+  just like extra-games. We want to mention the one player capability and add a section in the examples specifically
+  for the Synth game." *Implementation (Claude):*
+  - **Installation:** the packages' starter (`scripts/package/launch.ts`) and the Windows script download
+    `klaushofrichter/synth-game` at every start, no sign-in, beside extra-games; the package manifest, the release
+    notes, the three install guides and the local Docker files (`GAME_REPOS`) name it; the package smoke tests expect
+    `fm1-synth`. The hosted service lists it since D-281; which tables get it stays a tick in the console.
+  - **Website:** the games grid has FM-1 Synth (one player, from synth-game, a *Solo* filter) with its board and phone;
+    the heading says "Nine games, a synthesizer, and room for yours"; the seats feature says 1 to 8 seats, one for a
+    solo game (D-282); a showcase *Not every table needs a crowd* shows the FM-1 and the SMK-37 and credits
+    [fm1-emu](https://github.com/joakimeriksson/fm1-emu) by Joakim Eriksson, the only link the page makes outside
+    Klaus's repositories and skylar.technology (`tests/website.test.ts`). Pictures from synth-game's own browser check.
