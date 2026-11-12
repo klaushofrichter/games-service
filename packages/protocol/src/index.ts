@@ -402,6 +402,13 @@ export interface GameAvailability {
   repo?: string;
   /** That repository is private on GitHub (D-287). */
   private?: boolean;
+  /**
+   * How the game reached the table (D-289): "service" for a bundle from the Game Table service, "download" for the
+   * packages' starter; with the repository's branch and short commit when known. Absent for built-in games and clones.
+   */
+  via?: "service" | "download";
+  branch?: string;
+  commit?: string;
   /** Where the game's rules for players are, or null (D-099). */
   howToPlay: string | null;
 }

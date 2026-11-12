@@ -250,6 +250,32 @@ try:
         time.sleep(15)  # the hanging fetch finishes on the service (it shares one fetch per repository)
         refresh_btn.click()
         console.wait_for_selector("#repo-msg.ok >> text=is at commit", timeout=30000)
+
+        # ----- D-289: a local table's notice names the service's repositories too, with branch and commit -----
+        local_host = start_table(8191, PUBLIC_URL="http://127.0.0.1:8191", TABLE_KEY="k", TABLE_NAME="Local", CLOUD_URL=CLOUD, LOCAL_TABLE="1")
+        try:
+            lt = lambda m, p: api(m, p, None, base="http://127.0.0.1:8191", key="k")
+            code2 = wait(lambda: lt("GET", "/state")["cloud"].get("pairingCode"), 15, "the local table's pairing code")
+            lb = b.new_page(viewport={"width": 1600, "height": 900})
+            watch(lb, "local table board")
+            lb.goto("http://127.0.0.1:8191/board/")
+            note = lb.locator(".local-notice")
+            note.wait_for(timeout=10000)
+            # Before the service delivers anything, it says where the other games will come from.
+            assert "Other games come from the Game Table service" in note.inner_text(), note.inner_text()
+            console.fill("#pair-code", code2)
+            console.check("#pair-repos input[value=extra-games]")
+            console.click("#pair-form button.primary")
+            console.wait_for_selector("#pair-msg >> text=with games from extra-games")
+            # The open notice fills in as the bundle arrives: the repository, its branch and commit, and its game.
+            lb.wait_for_selector(".local-notice >> text=Games from the Game Table service", timeout=30000)
+            text = note.inner_text()
+            assert re.search(r"extra-games · branch production \(e2e0001\)\s+Dice Duel", text), text
+            assert "Games from the clones on this computer" in text and "games-service" in text, text
+            shot(lb, "local-notice-service")
+            lb.close()
+        finally:
+            local_host.terminate()
         b.close()
 finally:
     host.terminate()

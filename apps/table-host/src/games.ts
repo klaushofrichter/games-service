@@ -17,9 +17,10 @@ export interface InstalledGame {
   /**
    * The repository a game that isn't built in comes from, for the lobby (D-287): "owner/name" or a checkout's folder
    * name, and whether it is private (unknown for a checkout). From the service's bundle, the packages' starter
-   * (`.sources.json` beside the games) or the checkout it was loaded from.
+   * (`.sources.json` beside the games) or the checkout it was loaded from. `branch` and `commit` (short) when known,
+   * and `via`: "service" for a bundle from the Game Table service, "download" for the packages' starter (D-289).
    */
-  from?: { repo: string; private?: boolean };
+  from?: { repo: string; private?: boolean; branch?: string; commit?: string; via?: "service" | "download" };
   /** The game ships rules for players: how-to-play.md in its folder (D-099). */
   howToPlay?: boolean;
 }
@@ -69,8 +70,12 @@ export async function loadGames(dir: string, source?: InstalledGame["source"]): 
       const mod = await import(pathToFileURL(join(gameDir, rulesFile)).href);
       if (!mod.default || typeof mod.default.setup !== "function") throw new Error("rules must export default defineGame({...})");
       const howToPlay = files.includes(HOW_TO_PLAY);
-      const f = fromFile[manifest.id] as { repo?: unknown; private?: unknown } | undefined;
-      const from = f && typeof f.repo === "string" && f.repo ? { repo: f.repo, ...(typeof f.private === "boolean" ? { private: f.private } : {}) } : undefined;
+      const f = fromFile[manifest.id] as { repo?: unknown; private?: unknown; branch?: unknown; commit?: unknown } | undefined;
+      const branch = typeof f?.branch === "string" && f.branch.length <= 200 ? f.branch : "";
+      const commit = typeof f?.commit === "string" && /^[0-9a-f]{4,64}$/.test(f.commit) ? f.commit : "";
+      const from: InstalledGame["from"] = f && typeof f.repo === "string" && f.repo
+        ? { repo: f.repo, ...(typeof f.private === "boolean" ? { private: f.private } : {}), ...(branch ? { branch } : {}), ...(commit ? { commit: commit.slice(0, 7) } : {}), via: "download" }
+        : undefined;
       games.set(manifest.id, { manifest, def: mod.default, dir: gameDir, rulesFile: join(gameDir, rulesFile), howToPlay, ...(source ? { source } : {}), ...(from ? { from } : {}) });
     } catch (err) {
       console.error(`[games] skipping ${entry}: ${(err as Error).message}`);

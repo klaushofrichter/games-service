@@ -237,6 +237,8 @@ describe("tables get the games of their repositories", () => {
       const games = await t.ok("GET", "/games");
       // Named by its repository, and marked private as GitHub says (D-287); built-in games are neither.
       expect(games.find((g: { id: string }) => g.id === "dice-duel")).toMatchObject({ name: "Dice Duel", extra: true, selectable: true, repo: "extra-games", private: true });
+      // How it came, for a local table's notice (D-289): the service's bundle, at the branch and commit it was built from.
+      expect(games.find((g: { id: string }) => g.id === "dice-duel")).toMatchObject({ via: "service", branch: "main", commit: "abc1234" });
       expect(games.find((g: { id: string }) => g.id === "roulette").extra).toBeUndefined();
       expect(games.find((g: { id: string }) => g.id === "roulette").repo).toBeUndefined();
       // The UI files are served like a built-in game's; the rules never are.
@@ -674,10 +676,10 @@ describe("the service, edge cases", () => {
     try {
       await cp(join(GAMES_DIR_FOR_SOURCES, "coin-flip"), join(dir, "coin-flip"), { recursive: true });
       await cp(join(GAMES_DIR_FOR_SOURCES, "roulette"), join(dir, "roulette"), { recursive: true });
-      await writeFile(join(dir, ".sources.json"), JSON.stringify({ roulette: { repo: "someone/secret-games", private: true }, nope: { repo: 1 } }));
+      await writeFile(join(dir, ".sources.json"), JSON.stringify({ roulette: { repo: "someone/secret-games", private: true, branch: "main", commit: "0123456789abcdef" }, nope: { repo: 1 } }));
       const { loadGames } = await import("../apps/table-host/src/games.ts");
       const games = await loadGames(dir);
-      expect(games.get("roulette")!.from).toEqual({ repo: "someone/secret-games", private: true });
+      expect(games.get("roulette")!.from).toEqual({ repo: "someone/secret-games", private: true, branch: "main", commit: "0123456", via: "download" });
       expect(games.get("coin-flip")!.from).toBeUndefined();
     } finally {
       await rm(dir, { recursive: true, force: true });
