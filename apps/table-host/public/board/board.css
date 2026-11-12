@@ -90,6 +90,11 @@ html, body { overflow: hidden; }
 .tile .hint { font-size: 0.68em; color: var(--jade); margin-top: auto; }
 .tile.selectable:hover { border-color: var(--brass); }
 .tile:disabled { opacity: 0.55; }
+/* A game from another repository says which (D-287); one from a private repository has a red border. */
+.tile .repo { color: var(--brass); margin-top: -4px; }
+/* The repository has a line of its own and wraps like the rest of the tile; no tooltip on a touchscreen (Klaus). */
+.tile.private { border-color: #c96a5a; }
+.tile.private:hover { border-color: #e08070; }
 /* A game only the seated players block (D-282): tappable, to make room for it. */
 .tile.room { opacity: 0.8; }
 .tile.room:hover { border-color: var(--brass); }

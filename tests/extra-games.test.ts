@@ -2,7 +2,7 @@
 // bundle, an admin ticks repositories per table, and the table installs, updates and drops those games between games.
 import { createServer, type Server } from "node:http";
 import { execFile } from "node:child_process";
-import { mkdtemp, readdir, readFile, rm, mkdir, writeFile } from "node:fs/promises";
+import { cp, mkdtemp, readdir, readFile, rm, mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
@@ -72,6 +72,13 @@ beforeEach(async () => {
   tarballRequests = 0;
   githubDelayMs = 0;
   github = createServer((req, res) => {
+    // The repository itself (D-287): whether it is private, for the lobby; only with the token for a private one.
+    const info = req.url!.match(/^\/repos\/([^/]+\/[^/]+)$/);
+    if (info) {
+      const r = [...repos.entries()].find(([k]) => k.startsWith(`${info[1]}@`))?.[1];
+      if (!r || (r.private && req.headers.authorization !== `Bearer ${TOKEN}`)) return void res.writeHead(404).end('{"message":"Not Found"}');
+      return void res.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({ full_name: info[1], private: !!r.private }));
+    }
     const m = req.url!.match(/^\/repos\/([^/]+\/[^/]+)\/tarball\/(.+)$/);
     const r = m && repos.get(`${m[1]}@${decodeURIComponent(m[2])}`);
     if (!r || (r.private && req.headers.authorization !== `Bearer ${TOKEN}`)) return void res.writeHead(404).end('{"message":"Not Found"}');
@@ -99,6 +106,8 @@ async function pairedTable(repoIds: string[]) {
   await until(() => t.host.table.cloud.status === "online");
   return { t, tableId: r.body.tableId as string };
 }
+
+const GAMES_DIR_FOR_SOURCES = join(import.meta.dirname, "../games");
 
 describe("bundles", () => {
   it("packs only games/, keeps the commit, and hashes the same files the same way", () => {
@@ -226,8 +235,10 @@ describe("tables get the games of their repositories", () => {
     try {
       await until(() => t.host.table.games.has("dice-duel"));
       const games = await t.ok("GET", "/games");
-      expect(games.find((g: { id: string }) => g.id === "dice-duel")).toMatchObject({ name: "Dice Duel", extra: true, selectable: true });
+      // Named by its repository, and marked private as GitHub says (D-287); built-in games are neither.
+      expect(games.find((g: { id: string }) => g.id === "dice-duel")).toMatchObject({ name: "Dice Duel", extra: true, selectable: true, repo: "extra-games", private: true });
       expect(games.find((g: { id: string }) => g.id === "roulette").extra).toBeUndefined();
+      expect(games.find((g: { id: string }) => g.id === "roulette").repo).toBeUndefined();
       // The UI files are served like a built-in game's; the rules never are.
       expect((await fetch(`${t.base}/games/dice-duel/board.js`)).status).toBe(200);
       expect((await fetch(`${t.base}/games/dice-duel/rules.ts`)).status).toBe(404);
@@ -655,6 +666,21 @@ describe("the service, edge cases", () => {
       expect(t.host.table.games.has("dice-duel")).toBe(true);
     } finally {
       await t.close();
+    }
+  });
+
+  it("games the packages' starter put beside the built-in ones say where they came from (.sources.json, D-287)", async () => {
+    const dir = await mkdtemp(join(GAMES_DIR_FOR_SOURCES, "../.test-games-"));
+    try {
+      await cp(join(GAMES_DIR_FOR_SOURCES, "coin-flip"), join(dir, "coin-flip"), { recursive: true });
+      await cp(join(GAMES_DIR_FOR_SOURCES, "roulette"), join(dir, "roulette"), { recursive: true });
+      await writeFile(join(dir, ".sources.json"), JSON.stringify({ roulette: { repo: "someone/secret-games", private: true }, nope: { repo: 1 } }));
+      const { loadGames } = await import("../apps/table-host/src/games.ts");
+      const games = await loadGames(dir);
+      expect(games.get("roulette")!.from).toEqual({ repo: "someone/secret-games", private: true });
+      expect(games.get("coin-flip")!.from).toBeUndefined();
+    } finally {
+      await rm(dir, { recursive: true, force: true });
     }
   });
 

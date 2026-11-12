@@ -2338,3 +2338,17 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   shows that it is the board's own pulldown (D-248), so it stays, in light green (the board's jade); only the chosen
   option is brass. Every pulldown on the board: game settings, AI options, board settings. *Implementation (Claude):*
   `.pick-menu` in `board.css`.
+- **D-287 · 2026-11-12 · Klaus** — **A game tile names its repository, and a private one has a red border.** "What
+  does the word extra mean? … I would prefer to refer to the repo where this is included … We can give private repos
+  a red border." The lobby's tile shows the repository's name (extra-games, synth-game, loopy-game, …) where it said
+  *extra*, on a line of its own under the players that wraps like the rest of the tile (no tooltip and no "…": the
+  board is a touchscreen), with "· private" for a private one; built-in games show none. A game from a private repository has a red border. Board settings › Versions
+  say the same. *Implementation (Claude):*
+  - **The service** asks GitHub whether a listed repository is private when it fetches it (`GET /repos/owner/name`
+    with its token; nothing when it can't tell) and tells tables with each bundle (`private`).
+  - **The packages' starter** writes `.sources.json` beside the games (each game's repository, private unless it is
+    one of the public ones it always downloads); **a local table** names a clone's games by its folder (private
+    unknown, so no red border).
+  - The game list (`/api/v1/games`) has `repo` and `private`; the tile's class `private`.
+  - Checks: `tests/extra-games.test.ts` (a private repository's games, `.sources.json`), `scripts/e2e/extra.py`
+    (the tile's name and red border).

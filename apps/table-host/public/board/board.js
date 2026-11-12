@@ -1572,9 +1572,9 @@ function viewOnly() {
 // A game only the seated players keep from being chosen (D-282) stays tappable on the table's board: it offers to free
 // the seats (makeRoom), then to choose the game.
 const roomTile = (g) => !g.selectable && g.room && !REMOTE;
-const tileHtml = (g) => `<button class="tile ${g.selectable ? "selectable" : ""} ${roomTile(g) ? "room" : ""} ${viewOnly() ? "view-only" : ""}" ${roomTile(g) ? "data-room" : "data-game"}="${g.id}" ${g.selectable || roomTile(g) ? (viewOnly() ? 'tabindex="-1" aria-disabled="true"' : "") : viewOnly() ? 'tabindex="-1" aria-disabled="true"' : "disabled"}>
+const tileHtml = (g) => `<button class="tile ${g.selectable ? "selectable" : ""} ${roomTile(g) ? "room" : ""} ${g.private ? "private" : ""} ${viewOnly() ? "view-only" : ""}" ${roomTile(g) ? "data-room" : "data-game"}="${g.id}" ${g.selectable || roomTile(g) ? (viewOnly() ? 'tabindex="-1" aria-disabled="true"' : "") : viewOnly() ? 'tabindex="-1" aria-disabled="true"' : "disabled"}>
           <span class="title">${esc(g.name)}</span><span class="desc">${esc(withSettings(g.description, g.settings, {}, { hints: false }))}</span>
-          <span class="faint" style="font-size:.66em">${playersLabel(g.players)}${g.ai ? " · AI" : ""}${g.extra ? ` · <span style="color:var(--brass)">extra</span>` : ""}</span>
+          <span class="faint" style="font-size:.66em">${playersLabel(g.players)}${g.ai ? " · AI" : ""}</span>${g.extra ? `<span class="repo" style="font-size:.66em">${esc(g.repo ?? "added")}${g.private ? " · private" : ""}</span>` : ""}
           ${g.selectable ? `<span class="hint">${esc(tileHint(g))}</span>` : `<span class="why">${esc(g.reasons[0][0].toUpperCase() + g.reasons[0].slice(1))}${roomTile(g) ? " · tap to make room" : ""}</span>`}</button>`;
 function gameTiles() {
   const pages = Math.max(1, Math.ceil(games.length / PAGE_SIZE));
@@ -2201,12 +2201,12 @@ function versionsGroup(platform) {
     const co = (state.checkouts ?? []).find((c) => c.games.includes(now.id));
     const from = co
       ? `Local: ${esc(co.path ?? co.name)} <span class="faint">· ${esc(co.branch)} ${esc(co.commit)}${co.changed ? ", with changes not committed" : ""}</span>`
-      : g?.extra ? "from a game repository" : "built in";
+      : g?.extra ? (g.repo ? `from ${esc(g.repo)}${g.private ? " (private)" : ""}` : "from a game repository") : "built in";
     playing = `<span>This game</span><span class="v">${esc(g?.name ?? now.name ?? now.id)} ${esc(now.version ?? g?.version ?? "")} <span class="faint">· ${from}</span></span>`;
   }
   return `<div class="group versions"><div class="eyebrow">Versions</div>
     <div class="vlist">${playing}<span>Platform</span><span class="v">${platform ? `${esc(platform.version)} <span class="faint">· protocol ${esc(String(platform.protocol))}</span>` : `<span class="faint">…</span>`}</span>
-      ${list.map((g) => `<span data-game="${esc(g.id)}">${esc(g.name)}${g.extra ? ` <span class="faint">(added)</span>` : ""}</span><span class="v">${esc(g.version)}</span>`).join("")}</div></div>`;
+      ${list.map((g) => `<span data-game="${esc(g.id)}">${esc(g.name)}${g.extra ? ` <span class="faint">(${esc(g.repo ?? "added")})</span>` : ""}</span><span class="v">${esc(g.version)}</span>`).join("")}</div></div>`;
 }
 
 /**
