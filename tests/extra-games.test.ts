@@ -679,9 +679,9 @@ import { parseRepoConfig } from "../apps/cloud/src/game-repos.ts";
 import { spawn } from "node:child_process";
 
 describe("the deploy-time repository list", () => {
-  it("deploy/game-repos.json is valid and lists extra-games, loopy-game and starforge-game on their production branches", async () => {
+  it("deploy/game-repos.json is valid and lists extra-games, loopy-game, starforge-game and synth-game on their production branches", async () => {
     const text = await readFile(new URL("../deploy/game-repos.json", import.meta.url), "utf8");
-    expect(parseRepoConfig(text)).toEqual(["klaushofrichter/extra-games@production", "klaushofrichter/loopy-game@production", "klaushofrichter/starforge-game@production"]);
+    expect(parseRepoConfig(text)).toEqual(["klaushofrichter/extra-games@production", "klaushofrichter/loopy-game@production", "klaushofrichter/starforge-game@production", "klaushofrichter/synth-game@production"]);
   });
 
   it("parses entries with and without a branch, and refuses anything malformed", () => {
@@ -745,6 +745,7 @@ describe("the deploy-time repository list", () => {
       ["klaushofrichter/extra-games", "production", "deploy"],
       ["klaushofrichter/loopy-game", "production", "deploy"],
       ["klaushofrichter/starforge-game", "production", "deploy"],
+      ["klaushofrichter/synth-game", "production", "deploy"],
       ["someone/more-games", "main", "deploy"],
     ]);
   }, 20000);

@@ -2285,3 +2285,10 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   move to that player's corner. The gear, the turn button and the tools stay as they are. *Implementation (Claude):*
   `cornerClass()` in `board.js` adds `turned` on the table's board when `gameEdge()` is north;
   `scripts/e2e/play.py` (roulette) checks the class and that turning the game does not move Lobby.
+- **D-281 · 2026-11-12 · Klaus** — **synth-game is listed for tables.** The public repository
+  `klaushofrichter/synth-game@production` joins `deploy/game-repos.json` beside extra-games, loopy-game and
+  starforge-game (D-098), so the console has it after every deploy. It brings one game, *FM-1 Synth* (`fm1-synth`), an
+  emulated FM-1 / SMK-37 for one player, played by touch on the board. Which tables get it stays a tick in the console
+  (D-097). *Checked (Claude):* `production` at 87a1f51 packs as the cloud packs it (`packRepoTarball`/`decodeBundle`):
+  one game, 16 files, 1.5 MB compressed; its largest file (`assets/emu/fm1_web.wasm`, 3.4 MB) is under the 5 MB file
+  limit; the id clashes with no built-in game and no game of the other repositories.

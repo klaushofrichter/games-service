@@ -3,6 +3,7 @@
   "repos": [
     { "repo": "klaushofrichter/extra-games", "ref": "production" },
     { "repo": "klaushofrichter/loopy-game", "ref": "production" },
-    { "repo": "klaushofrichter/starforge-game", "ref": "production" }
+    { "repo": "klaushofrichter/starforge-game", "ref": "production" },
+    { "repo": "klaushofrichter/synth-game", "ref": "production" }
   ]
 }
