@@ -223,6 +223,8 @@ try:
         hang["on"] = True
         n0 = len(attempts)
         refresh_btn = console.locator("button[data-repo-refresh=extra-games]")
+        tip = refresh_btn.get_attribute("title") or ""  # D-285: what Refresh does, as its tooltip
+        assert "from GitHub now" in tip and "every hour" in tip, tip
         refresh_btn.dblclick()
         console.wait_for_selector("button[data-repo-refresh=extra-games]:disabled >> text=Refreshing…")
         time.sleep(12)  # through the console's 10-second redraw
