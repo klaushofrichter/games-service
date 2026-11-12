@@ -1273,7 +1273,9 @@ export class Table extends EventEmitter {
         aiOptions: m.ai.options,
         ...(m.ai.notice ? { aiNotice: m.ai.notice } : {}),
         howToPlay: howToPlayUrl(g),
-        ...(source ? { extra: true } : {}),
+        ...(source || g.from ? { extra: true } : {}),
+        // The repository it comes from, for the lobby (D-287): its name, and whether it is private.
+        ...(g.from ? { repo: g.from.repo.replace(/^.*\//, ""), ...(g.from.private ? { private: true } : {}) } : {}),
       };
     });
   }

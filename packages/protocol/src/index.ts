@@ -398,6 +398,10 @@ export interface GameAvailability {
   aiNotice?: string;
   /** The game came from an extra-game repository (D-097), not with the table. */
   extra?: boolean;
+  /** That repository's name, e.g. "synth-game" (D-287), when the table knows it. */
+  repo?: string;
+  /** That repository is private on GitHub (D-287). */
+  private?: boolean;
   /** Where the game's rules for players are, or null (D-099). */
   howToPlay: string | null;
 }

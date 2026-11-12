@@ -572,6 +572,10 @@ async function main() {
     }
     say(`Games from ${label}: ${ids.join(", ") || "(none)"}`);
   }
+  // Which repository each game came from, for the lobby (D-287): the table host reads it beside the games.
+  const sourcesJson: Record<string, { repo: string; private: boolean }> = {};
+  for (const [id, label] of from) if (label !== "games-service") sourcesJson[id] = { repo: label, private: !PUBLIC_REPOS.includes(label) };
+  await writeFile(join(gamesDir, ".sources.json"), JSON.stringify(sourcesJson, null, 2) + "\n");
   const gamesList = await writeGamesList(home, gamesDir, from, reposDir);
 
   const keyFile = join(dataDir, "table-key");

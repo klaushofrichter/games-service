@@ -16,6 +16,8 @@ export interface BundleRef {
   hash: string;
   commit: string;
   games: { id: string; name: string; version: string }[];
+  /** The repository is private on GitHub (D-287); missing when the service couldn't tell. */
+  private?: boolean;
 }
 
 const HASH_RE = /^[0-9a-f]{64}$/;
@@ -130,6 +132,8 @@ export class ExtraGames {
       }
     }
     const games = await loadGames(join(root, "games"), { repo: ref.source, commit: ref.commit, hash: ref.hash });
+    const repo = ref.source.replace(/@.*$/, "");
+    for (const g of games.values()) g.from = { repo, ...(typeof ref.private === "boolean" ? { private: ref.private } : {}) };
     if (!games.size) throw new Error("the bundle has no game that loads on this table (see the log above)");
     this.loaded.set(ref.hash, games);
     return games;

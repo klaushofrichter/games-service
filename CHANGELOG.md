@@ -9,6 +9,8 @@ history.
 ## [Unreleased]
 
 - Play from the board can't be switched on when every seat is taken: "Game is full, first remove a player." (D-288).
+- Lobby: a game tile names the repository it comes from instead of "extra"; games from private repositories have a red border (D-287).
+- Board: an open pulldown has a light green frame; only the chosen option is brass (D-286).
 - Console: the Refresh button of a game repository says what it does (D-285).
 - synth-game (FM-1 Synth) is installed by the packages like extra-games; the website shows FM-1 Synth, solo games and credits fm1-emu (D-284).
 - Remote boards: a watcher's view stays upright when the table turns its board, in the lobby and during a game (D-283).
