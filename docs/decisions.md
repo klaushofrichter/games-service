@@ -2376,3 +2376,11 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   platform's version when the table has one (the packages; a clone runs as "dev", so none). No commit hashes. Board
   settings › Versions keep the commit for a clone, where a developer looks for it. *Implementation (Claude):*
   `localNoticeBody()` in `board.js`; the platform's version from `GET /version`. Check: `scripts/e2e/extra.py`.
+- **D-291 · 2026-11-13 · Klaus** — **ge150pro-game is listed for tables.** "There is a new public repo for a ge150
+  game. It should show in the games service when ready." `klaushofrichter/ge150pro-game@production` joins
+  `deploy/game-repos.json` (D-098), listed once its `production` branch exists. It brings one game, *GE150 Pro*
+  (`ge150-pro`): remote control of a Mooer GE150 Pro guitar pedal on the table's computer (USB, WebHID in the board),
+  for one player (`seatLayouts: [1]`, D-282), no AI players. Which tables get it stays a tick in the console (D-097).
+  *Checked (Claude):* `main` at 039e7e0 packs as the cloud packs it (`packRepoTarball`/`decodeBundle`): one game, 9
+  files, 49 KB compressed; its largest file 110 KB; the id clashes with no built-in game and no game of the other
+  repositories.
