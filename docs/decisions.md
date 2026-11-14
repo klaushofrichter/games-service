@@ -2384,3 +2384,15 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   *Checked (Claude):* `production` at 039e7e0 (public) packs as the cloud packs it (`packRepoTarball`/`decodeBundle`): one game, 9
   files, 49 KB compressed; its largest file 110 KB; the id clashes with no built-in game and no game of the other
   repositories.
+- **D-292 · 2026-11-14 · Klaus** — **The website shows GE150 Pro.** "Add the ge150 game to the landing page. Mention
+  that this requires a GE150 Pro device, that it's for electric guitar players. Mention that the phone/deck is an
+  example for a second screen usage." The games grid has *GE150 Pro* (one player, from ge150pro-game, in the *Solo*
+  filter with FM-1 Synth; the last row is FM-1 Synth, GE150 Pro and Coin Flip at normal width, so no row has a gap), and
+  a showcase *A second screen — For electric guitar players: GE150 Pro* after FM-1 Synth's: the pedal it needs (USB to
+  the table's computer, firmware 2.1.2 or newer), the board as its editor, the phone as a second screen on the music
+  stand (an example of a phone that is more than a hand of cards), one player, open source and unofficial (not
+  affiliated with Mooer; trademarks named). Klaus: "Refer to the specific ge150 game repo": the section, its list and the
+  card name `klaushofrichter/ge150pro-game`, linked where text can link. The games headline names the guitar pedal. *Implementation (Claude):*
+  `home.html` (`solo` flag on a game, the `solo` filter, `ge150` source); the pictures `ge150-pro.webp`,
+  `ge150-pro-phone.webp` (Rhythm) and `ge150-pro-phone-play.webp` are screenshots of the game's own browser check with
+  its simulated pedal; the Play tab with six saved sounds on its quick slots ("this one is pretty empty", Klaus). Check: `scripts/e2e/website.py` (the Solo filter and the close-up's link).
