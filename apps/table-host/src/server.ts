@@ -284,7 +284,9 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
       if (!transform) {
         const st = await stat(file);
         etag = `"${st.size.toString(36)}-${Math.trunc(st.mtimeMs).toString(36)}"`;
-        if (req.headers["if-none-match"] === etag) {
+        // Weak tags, a list of tags or "*" as browsers and proxies send them.
+        const asked = String(req.headers["if-none-match"] ?? "").split(",").map((x) => x.trim().replace(/^W\//, ""));
+        if (asked.includes(etag) || asked.includes("*")) {
           res.writeHead(304, { ...headers, etag });
           return res.end();
         }

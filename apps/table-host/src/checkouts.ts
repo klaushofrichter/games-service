@@ -4,7 +4,7 @@
 import { execFile } from "node:child_process";
 import { realpath } from "node:fs/promises";
 import { homedir } from "node:os";
-import { basename } from "node:path";
+import { basename, resolve } from "node:path";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 import type { InstalledGame } from "./games.ts";
@@ -30,6 +30,12 @@ export interface Checkout {
 
 /** This Table Host's own checkout: apps/table-host/src is three folders below it. */
 const OWN_ROOT = realpath(fileURLToPath(new URL("../../..", import.meta.url))).catch(() => "");
+/** Two spellings of one folder: git prints C:/x where Node has C:\x on Windows, and drive letters vary in case. */
+const samePath = (a: string, b: string) => {
+  if (!a || !b) return false;
+  const norm = (p: string) => (process.platform === "win32" ? resolve(p).toLowerCase() : resolve(p));
+  return norm(a) === norm(b);
+};
 
 async function git(dir: string, ...args: string[]): Promise<string> {
   const { stdout } = await run("git", ["-C", dir, ...args], { timeout: 5000 });
@@ -57,7 +63,7 @@ export async function checkoutsOf(games: Map<string, InstalledGame>): Promise<Ch
         ]);
         const home = homedir();
         const path = home && (root === home || root.startsWith(`${home}/`)) ? `~${root.slice(home.length)}` : root;
-        c = { name: basename(root), path, branch: branch === "HEAD" ? "detached" : branch, commit, changed: status !== "", games: [], ...(root === (await OWN_ROOT) ? { platform: true } : {}) };
+        c = { name: basename(root), path, branch: branch === "HEAD" ? "detached" : branch, commit, changed: status !== "", games: [], ...(samePath(root, await OWN_ROOT) ? { platform: true } : {}) };
         byRoot.set(root, c);
       }
       c.games.push(g.manifest.id);

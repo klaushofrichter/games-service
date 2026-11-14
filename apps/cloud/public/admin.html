@@ -601,7 +601,6 @@ document.addEventListener("click", async (e) => {
 const COPY_ICON = `<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M5 15V6a2 2 0 0 1 2-2h8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`;
 const DONE_ICON = `<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
-/** Copy the download link; if the clipboard is refused, select the text so Cmd/Ctrl-C works. */
 $("#dl-msg").addEventListener("click", (e) => {
   const b = e.target.closest("#dl-copy");
   if (b) copyWith(b, $("#dl-url").textContent, $("#dl-url"));

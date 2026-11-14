@@ -2414,6 +2414,9 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   - Smaller: the console's two copy buttons share `copyWith()`; the board's `skipTimer` uses `api()` with a quiet 409;
     `LogStore.finish` reuses `saveInterrupted`; the move texts name a seat through one `who()`; two comments about
     `seatColors` say it is always empty since D-159.
+  A review of the pass: the ETag also matches weak tags and lists of tags; the own checkout is compared as a path
+  (Windows spells it two ways); a skip that can't reach the table says "Could not skip" again; the seats' dead "in a
+  game" branch went.
   *Not done, larger than a cleanup (each its own change if wanted):* one route table for what a remote board may do
   (server and board each keep a list now); one place where a game's origin is set (`source`, `from`); a game list
   fetched only when it can change; one replay at game over for the check and the move list, and a kept replay for

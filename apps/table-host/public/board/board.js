@@ -692,9 +692,9 @@ function aiPlays(p) {
   return { text: g.aiOptions.map(value).join(" · "), full: g.aiOptions.map((o) => `${o.label ?? o.key}: ${value(o)}`).join(" · ") };
 }
 
+/** The lobby's seats (only in the lobby: they are hidden while a game runs). */
 function renderSeats() {
   const pos = seatPositions(state.seatEdges);
-  const playing = inRunningGame();
   const allowed = state.game?.edges;
   seatsEl.innerHTML = "";
   pos.forEach((p, seat) => {
@@ -722,7 +722,7 @@ function renderSeats() {
           : pl.kind === "ai" ? `AI player${pl.aiOptions ? ` · ${esc(Object.values(pl.aiOptions).join(", "))}` : ""}` : pl.location === "remote" ? "Remote" : "";
     el.innerHTML = `<div class="num">${esc(seatName(state.seatEdges, seat))}</div>
       <div class="name${pl && [...pl.name].length > 12 ? " long" : ""}">${pl ? `<span class="pdot" aria-hidden="true"></span>${esc(pl.name)}` : "—"}</div><div class="status">${status}</div>`;
-    if (!playing && !REMOTE) el.addEventListener("click", () => onSeatTap(seat, pl)); // seating stays with the table
+    if (!REMOTE) el.addEventListener("click", () => onSeatTap(seat, pl)); // seating stays with the table
     seatsEl.appendChild(el);
   });
 }
@@ -2000,7 +2000,10 @@ function boardAct(seat, name, payload) {
 async function skipTimer(id) {
   return api("POST", "/game/skip-timer", { id }, { quiet: [409] }).then(
     () => ({ ok: true }),
-    (e) => ({ ok: false, reason: e.message || undefined }),
+    (e) => {
+      if (e instanceof TypeError) toast("Could not skip"); // the table did not answer (api() toasts refusals)
+      return { ok: false, reason: e.message || undefined };
+    },
   );
 }
 

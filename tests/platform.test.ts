@@ -218,6 +218,8 @@ describe("HTTP hardening", () => {
     expect(again.status).toBe(304);
     expect(await again.text()).toBe("");
     expect((await fetch(`${t.base}/board/board.js`, { headers: { "if-none-match": '"other"' } })).status).toBe(200);
+    // As browsers and proxies send it: weak, in a list.
+    expect((await fetch(`${t.base}/board/board.js`, { headers: { "if-none-match": `"other", W/${etag}` } })).status).toBe(304);
     // The board's page carries the table key: filled in on every request, no ETag.
     const page = await fetch(`${t.base}/board/`);
     expect(page.headers.get("etag")).toBeNull();

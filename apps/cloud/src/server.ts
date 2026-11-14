@@ -285,13 +285,17 @@ export function startCloud(o: CloudOptions) {
   const perMinute = () => {
     const m = new Map<string, { n: number; reset: number }>();
     let swept = 0;
+    const prune = (now = Date.now()) => {
+      for (const [k, v] of m) if (v.reset < now) m.delete(k);
+    };
     return {
+      prune,
       /** Counts one more for the key; returns the count in its current minute. */
       hit(key: string) {
         const now = Date.now();
         if (m.size >= 50_000 && now - swept >= 1000) {
           swept = now;
-          this.prune(now);
+          prune(now);
         }
         const e = m.get(key);
         if (!e || e.reset <= now) return m.set(key, { n: 1, reset: now + 60_000 }), 1;
@@ -301,9 +305,6 @@ export function startCloud(o: CloudOptions) {
       count(key: string) {
         const e = m.get(key);
         return e && e.reset > Date.now() ? e.n : 0;
-      },
-      prune(now = Date.now()) {
-        for (const [k, v] of m) if (v.reset < now) m.delete(k);
       },
     };
   };
