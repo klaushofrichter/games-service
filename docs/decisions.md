@@ -2395,4 +2395,4 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   card name `klaushofrichter/ge150pro-game`, linked where text can link. The games headline names the guitar pedal. *Implementation (Claude):*
   `home.html` (`solo` flag on a game, the `solo` filter, `ge150` source); the pictures `ge150-pro.webp`,
   `ge150-pro-phone.webp` (Rhythm) and `ge150-pro-phone-play.webp` are screenshots of the game's own browser check with
-  its simulated pedal. Check: `scripts/e2e/website.py` (the Solo filter and the close-up's link).
+  its simulated pedal; the Play tab with six saved sounds on its quick slots ("this one is pretty empty", Klaus). Check: `scripts/e2e/website.py` (the Solo filter and the close-up's link).
