@@ -43,6 +43,9 @@ if ! (cd "$DIR" && docker compose pull); then
   exit 1
 fi
 (cd "$DIR" && docker compose up -d)
+# The kiosk runs as 'table' and can't read .env (0600, it holds the key): it gets the port alone.
+grep -E '^PORT=' "$DIR/.env" > "$DIR/kiosk.env" || true
+chmod 0644 "$DIR/kiosk.env"
 systemctl restart gametable-kiosk.service || true
 
 PORT=$(grep -E '^PORT=' "$DIR/.env" | cut -d= -f2)

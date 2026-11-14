@@ -30,7 +30,7 @@ export const PAYOUT: Record<BetType, number> = {
 };
 
 export function validBet(type: unknown, target: unknown): string | null {
-  if (typeof type !== "string" || !(type in PAYOUT)) return "unknown bet type";
+  if (typeof type !== "string" || !Object.hasOwn(PAYOUT, type)) return "unknown bet type"; // not "constructor" & co.
   if (type === "straight") return Number.isInteger(target) && (target as number) >= 0 && (target as number) <= 36 ? null : "straight bets need a number 0–36";
   if (type === "dozen" || type === "column") return Number.isInteger(target) && (target as number) >= 1 && (target as number) <= 3 ? null : `${type} bets need 1, 2 or 3`;
   return target === undefined || target === null ? null : "this bet takes no number";

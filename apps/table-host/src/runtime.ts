@@ -273,7 +273,12 @@ export class GameRuntime {
     const h = this.clock.setTimeout(() => {
       this.timers.delete(id);
       this.deadlines.delete(id);
-      this.fireTimer(id);
+      // From the event loop: a game's error here (already logged and recorded by the step) must not end the process.
+      try {
+        this.fireTimer(id);
+      } catch (e) {
+        console.error(`[game] timer ${id}: ${(e as Error)?.message ?? e}`);
+      }
     }, ms);
     this.timers.set(id, h);
     this.deadlines.set(id, this.clock.now() + ms);

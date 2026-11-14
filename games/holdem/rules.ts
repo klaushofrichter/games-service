@@ -34,6 +34,8 @@ export interface State {
   currentBet: number;
   bets: number; // bets and raises on this street (capped at 4)
   needToAct: number[];
+  /** Seats that may only call on this street: they had acted before a short all-in, which reopens no raising. */
+  callOnly?: number[];
   toAct: number | null;
   lastAction: { seat: number; action: string; amount: number } | null;
   result: { winners: Winner[]; shown: Record<number, Card[]>; byFold: boolean } | null;
@@ -92,6 +94,7 @@ const clone = (s: State): State => ({
   dealt: [...s.dealt],
   inHand: [...s.inHand],
   needToAct: [...s.needToAct],
+  callOnly: [...(s.callOnly ?? [])],
   stats: Object.fromEntries(Object.entries(s.stats ?? {}).map(([k, v]) => [k, { ...v }])),
 });
 
@@ -129,6 +132,14 @@ function startHand(prev: State, ctx: GameContext): { state: State; events: GameE
   s.currentBet = s.smallBet;
   s.bets = 1;
   s.needToAct = players.filter((x) => !s.allIn[x]);
+  s.callOnly = [];
+  // Only one player can still act, everyone else all-in from the blinds: they only have to match the most anyone else
+  // put in (a big blind all-in for less than the blind asks no more than it has), never what nobody can win.
+  if (s.needToAct.length === 1) {
+    const x = s.needToAct[0];
+    const most = Math.max(0, ...players.filter((y) => y !== x).map((y) => s.roundBet[y] ?? 0));
+    s.currentBet = Math.min(s.currentBet, Math.max(most, s.roundBet[x] ?? 0));
+  }
   const started = { name: "handStarted", data: { hand: s.hand, dealer: s.dealer, sb, bb } };
   // Blinds can put everyone (or all but one, already matched) all-in: deal the board and show down.
   const open = s.needToAct.filter((x) => (s.roundBet[x] ?? 0) < s.currentBet || s.needToAct.length > 1);
@@ -228,6 +239,7 @@ function advance(s: State, ctx: GameContext, events: GameEvent[]): { state: Stat
   s.currentBet = 0;
   s.bets = 0;
   s.needToAct = s.inHand.filter((x) => !s.allIn[x]);
+  s.callOnly = [];
   s.toAct = nextSeat(s, s.dealer, (x) => s.needToAct.includes(x));
   if (s.turnMs > 0) ctx.setTimer("turn", s.turnMs);
   return { state: s, events: [...events, { name: "street", data: { street: STREETS[s.street], board: s.board } }] };
@@ -237,7 +249,7 @@ export function legalActions(s: State, seat: number) {
   if (s.phase !== "betting" || s.toAct !== seat) return null;
   const toCall = s.currentBet - (s.roundBet[seat] ?? 0);
   const stack = s.stacks[seat];
-  const canRaise = s.bets < 4 && stack > toCall;
+  const canRaise = s.bets < 4 && stack > toCall && !(s.callOnly ?? []).includes(seat);
   return {
     fold: toCall > 0,
     check: toCall === 0,
@@ -268,7 +280,7 @@ function act(prev: State, seat: number, action: string, ctx: GameContext) {
       break;
     case "raise":
     case "bet": {
-      if (legal.raise === null) return { reject: s.bets >= 4 ? "betting is capped this round" : "not enough points to raise" };
+      if (legal.raise === null) return { reject: s.bets >= 4 ? "betting is capped this round" : (s.callOnly ?? []).includes(seat) ? "a short all-in reopens no raising: call or fold" : "not enough points to raise" };
       amount = pay(s, seat, toCall + betSize(s));
       if (s.stats[seat]) s.stats[seat].raises++;
       const now = s.roundBet[seat];
@@ -280,8 +292,12 @@ function act(prev: State, seat: number, action: string, ctx: GameContext) {
           // everyone else still in the hand must answer it.
           s.bets += 1;
           s.needToAct = s.inHand.filter((x) => x !== seat && !s.allIn[x]);
+          s.callOnly = [];
         } else {
-          // A short all-in is treated as a call: players who already acted only have to match it.
+          // A short all-in is treated as a call: players who already acted only have to match it, and may not
+          // raise again on it (those still to act keep their options).
+          const acted = s.inHand.filter((x) => x !== seat && !s.allIn[x] && !prev.needToAct.includes(x));
+          s.callOnly = [...new Set([...(s.callOnly ?? []), ...acted])];
           s.needToAct = s.inHand.filter((x) => x !== seat && !s.allIn[x] && (s.roundBet[x] ?? 0) < now);
         }
       }

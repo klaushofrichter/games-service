@@ -8,6 +8,8 @@ history.
 
 ## [Unreleased]
 
+- Review fixes: no markup from a table in the console, the Table Host survives a malformed socket message and a game's timer error, log uploads never lose a log, remote boards show only what they may do, Hold'em short all-ins and Roulette bet types (D-293).
+- Simplify pass: the table's files are cached by the browser until they change, an AI move draws the board once, a local table recognises its own checkout by path, shared rate limiting in the service (D-293).
 - The website shows GE150 Pro, a guitar pedal's remote control for electric guitar players, with the phone as a second screen (D-292).
 - The extra-game repository ge150pro-game (GE150 Pro) is listed for tables (D-291).
 - A local table's notice shows each game's version instead of commit hashes (D-290).

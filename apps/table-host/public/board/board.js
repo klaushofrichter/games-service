@@ -47,7 +47,8 @@ let gameMsg = null; // last game.board message
 let selectedPlayer = null;
 
 // ---------- API ----------
-async function api(method, path, body) {
+/** A call to the table's API; a refusal shows its reason as a toast (except for the statuses in `quiet`) and throws. */
+async function api(method, path, body, { quiet = [] } = {}) {
   const res = await fetch(`/api/v1${path}`, {
     method,
     headers: { ...(KEY ? { "x-table-key": KEY } : {}), ...(body ? { "content-type": "application/json" } : {}) },
@@ -55,7 +56,7 @@ async function api(method, path, body) {
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    toast(data.error ?? `Request failed (${res.status})`);
+    if (!quiet.includes(res.status)) toast(data.error ?? `Request failed (${res.status})`);
     throw new Error(data.error);
   }
   return data;
@@ -165,7 +166,7 @@ function noticeDialog(title, text, okLabel = "OK") {
 const LOCAL_NOTICE_KEY = "gametable.localNotice";
 let localNoticeShown = false;
 let localNotice = null; // the open notice's body, refreshed with each state while it is open
-let localNoticePlatform = null; // the platform's version for the games-service clone (GET /version), when it has one: not "dev"
+let localNoticePlatform = null; // the platform's version for its own clone (GET /version), when it has one: not "dev"
 function localNoticeBody() {
   const noService = state.cloud?.status === "disabled";
   const checkouts = state.checkouts ?? [];
@@ -179,7 +180,7 @@ function localNoticeBody() {
         by the QR code on this network. Remote players and watchers can't join, and there are no invites.</p>`
     : "";
   const repoLine = (r) =>
-    `<li><b>${esc(r.name)}</b>${r.name === "games-service" && localNoticePlatform ? ` ${esc(localNoticePlatform)}` : ""}${r.branch ? ` · branch <code>${esc(r.branch)}</code>` : ""}${r.changed ? ", with changes not committed" : ""}<br><span class="faint">${r.games.map(named).join(", ")}</span></li>`;
+    `<li><b>${esc(r.name)}</b>${r.platform && localNoticePlatform ? ` ${esc(localNoticePlatform)}` : ""}${r.branch ? ` · branch <code>${esc(r.branch)}</code>` : ""}${r.changed ? ", with changes not committed" : ""}<br><span class="faint">${r.games.map(named).join(", ")}</span></li>`;
   const clones = checkouts.length
     ? `<p><b>Games from the clones on this computer</b>, not from GitHub: each runs as its checkout is now.</p>
        <ul class="local-checkouts">${checkouts.map((c) => repoLine({ ...c, games: c.games.filter((id) => games.some((g) => g.id === id)) })).join("")}</ul>`
@@ -691,9 +692,9 @@ function aiPlays(p) {
   return { text: g.aiOptions.map(value).join(" · "), full: g.aiOptions.map((o) => `${o.label ?? o.key}: ${value(o)}`).join(" · ") };
 }
 
+/** The lobby's seats (only in the lobby: they are hidden while a game runs). */
 function renderSeats() {
   const pos = seatPositions(state.seatEdges);
-  const playing = inRunningGame();
   const allowed = state.game?.edges;
   seatsEl.innerHTML = "";
   pos.forEach((p, seat) => {
@@ -721,7 +722,7 @@ function renderSeats() {
           : pl.kind === "ai" ? `AI player${pl.aiOptions ? ` · ${esc(Object.values(pl.aiOptions).join(", "))}` : ""}` : pl.location === "remote" ? "Remote" : "";
     el.innerHTML = `<div class="num">${esc(seatName(state.seatEdges, seat))}</div>
       <div class="name${pl && [...pl.name].length > 12 ? " long" : ""}">${pl ? `<span class="pdot" aria-hidden="true"></span>${esc(pl.name)}` : "—"}</div><div class="status">${status}</div>`;
-    if (!playing && !REMOTE) el.addEventListener("click", () => onSeatTap(seat, pl)); // seating stays with the table
+    if (!REMOTE) el.addEventListener("click", () => onSeatTap(seat, pl)); // seating stays with the table
     seatsEl.appendChild(el);
   });
 }
@@ -823,11 +824,12 @@ function settleFinal() {
  * its Back to game shows that last screen again, with Awards and Results still in the corner (D-233).
  */
 function showStatistics(fromEnd = false) {
-  if (!state?.summary || overlayRoot.querySelector(".overlay.statistics")) return;
+  if (!state?.summary || overlayRoot.querySelector(".overlay.statistics.of-game")) return;
   const onClose = fromEnd ? () => ((holdFinal = false), render()) : undefined;
   // Award holders in their players' colours, as the table has them now (D-239); render() recolours an open window.
   const colorOf = (seat) => state?.players?.find((p) => p.seat === seat)?.color ?? null;
-  openStatistics({ summary: state.summary, gameName: state.game?.name, overlayRoot, edge: overlayEdge(), turnable: !REMOTE, onClose, backToGame: fromEnd, colorOf });
+  // Marked as the game's own: the Game Viewer's Awards and Results (same window) stays when a game starts (D-293).
+  openStatistics({ summary: state.summary, gameName: state.game?.name, overlayRoot, edge: overlayEdge(), turnable: !REMOTE, onClose, backToGame: fromEnd, colorOf }).classList.add("of-game");
 }
 statsBtn.addEventListener("click", () => showStatistics(true));
 resultBtn.addEventListener("click", () => {
@@ -1417,7 +1419,7 @@ function render() {
   // Dialogs too (D-252): a pad opened from one turns with the board, and the window behind it must turn with it.
   for (const d of overlayRoot.querySelectorAll(".dialog-backdrop > .dialog")) faceFront(d);
   gameEdge(); // keeps the last north/south facing current, so a game starts facing the way the lobby last did
-  renderSeats();
+  if (lobbyPhase()) renderSeats(); // hidden while a game runs: no rebuild on every lobby message then
   if (REMOTE) fit();
   renderViewButton();
   const front = viewEdge();
@@ -1450,7 +1452,7 @@ function render() {
   resultBtn.className = `primary ${gameCorner}`;
   statsBtn.hidden = !atEnd || !stats;
   statsBtn.className = `primary ${gameCorner}`;
-  if (state.phase !== "finished") overlayRoot.querySelector(".overlay.statistics")?.remove();
+  if (state.phase !== "finished") overlayRoot.querySelector(".overlay.statistics.of-game")?.remove();
 
   renderPause();
   renderAway();
@@ -1578,7 +1580,7 @@ function joinPanel() {
 /** Seat layout buttons: only the layouts that may be chosen now (the chosen game's, or any visible game's). */
 function seatButtons() {
   const layouts = state.layouts?.length ? state.layouts : [2, 4, 6, 8];
-  return `<span class="seg" title="Seats around the table">${layouts.map((n) => `<button data-layout="${n}" class="${state.layout === n ? "on" : ""}">${n}</button>`).join("")}</span>`;
+  return `<span class="seg" title="Seats around the table">${layouts.map((n) => `<button data-layout="${n}" class="${state.layout === n ? "on" : ""}"${viewOnly() ? " disabled" : ""}>${n}</button>`).join("")}</span>`;
 }
 
 function toolbar() {
@@ -1733,7 +1735,7 @@ function renderFinished() {
       <div class="summary"><div class="eyebrow">${esc(state.game?.name ?? "Game")} · finished</div>
       <div class="big">${esc(s?.text ?? "Game over")}</div>
       ${s?.table ? `<div class="summary-scroll">${summaryTable(s.table, s)}</div>` : ""}
-      <div class="toolbar"><button class="primary" data-again>Play again</button>${hasStatistics(s) ? `<button data-stats>Awards and Results</button>` : ""}<button data-close>Back to lobby</button></div></div>
+      <div class="toolbar">${viewOnly() ? "" : `<button class="primary" data-again>Play again</button>`}${hasStatistics(s) ? `<button data-stats>Awards and Results</button>` : ""}${viewOnly() ? "" : `<button data-close>Back to lobby</button>`}</div></div>
     </section>${joinPanel()}`;
 }
 
@@ -1751,9 +1753,9 @@ function renderPause() {
     <h2>${online ? "Connection is back" : "Game paused"}</h2>
     <p>${online ? "Continue where you left off." : "The table lost its connection to the Game Table service. The game continues by itself when the connection returns."}</p>
     <div class="row">
-      ${online ? `<button class="primary" data-pause="resume">Continue</button>` : `<button disabled>Waiting…</button>`}
-      ${p.canSave ? `<button data-pause="save">Save and exit</button>` : ""}
-      <button class="danger" data-pause="end">End game</button></div></div>`;
+      ${REMOTE ? "" : online ? `<button class="primary" data-pause="resume">Continue</button>` : `<button disabled>Waiting…</button>`}
+      ${p.canSave && !REMOTE ? `<button data-pause="save">Save and exit</button>` : ""}
+      ${viewOnly() ? "" : `<button class="danger" data-pause="end">End game</button>`}</div></div>`;
 }
 
 /** Where a waiting card goes: from the seat a little toward the middle, so it covers the seat's corner of the game, not the table's edge. */
@@ -1997,15 +1999,13 @@ function boardAct(seat, name, payload) {
  * fired meanwhile (a second tap, the wait ran out) answers 409 and is not worth a toast.
  */
 async function skipTimer(id) {
-  const res = await fetch("/api/v1/game/skip-timer", {
-    method: "POST",
-    headers: { ...(KEY ? { "x-table-key": KEY } : {}), "content-type": "application/json" },
-    body: JSON.stringify({ id }),
-  }).catch(() => null);
-  if (res?.ok) return { ok: true };
-  const data = await res?.json().catch(() => ({}));
-  if (res?.status !== 409) toast(data?.error ?? "Could not skip");
-  return { ok: false, reason: data?.error };
+  return api("POST", "/game/skip-timer", { id }, { quiet: [409] }).then(
+    () => ({ ok: true }),
+    (e) => {
+      if (e instanceof TypeError) toast("Could not skip"); // the table did not answer (api() toasts refusals)
+      return { ok: false, reason: e.message || undefined };
+    },
+  );
 }
 
 function gameInfo() {
@@ -2015,7 +2015,7 @@ function gameInfo() {
     // remote board only while the table gives remote players board control.
     boardControl: !REMOTE || !!state.remote?.boardControl,
     players: state.players,
-    seatColors: state.seatColors ?? {}, // seats whose player left keep their colour (D-125)
+    seatColors: state.seatColors ?? {}, // always empty since D-159 (no seat loses its player); kept for the game UI contract
     seatEdges: state.seatEdges,
     seatPositions: seatPositions(state.seatEdges),
     frontEdge: gameEdge(),
@@ -2152,10 +2152,11 @@ function openLobbyOverlay() {
       <div class="group">${REMOTE ? "" : `<div class="row"><span>Remote players${state.remote?.players ? ` · ${state.remote.players} joined` : ""}${state.watchers?.length ? ` · ${state.watchers.length} watching` : ""}</span>${inviteButton("Invite…")}</div>`}
         <div class="row"><span>Terms of service</span><button data-terms>Open</button></div></div>
       <div class="actions" style="display:flex;justify-content:space-between;margin-top:20px">
-        <button class="danger" data-end>End game</button><button class="primary" data-close-overlay>Back to game</button></div></div>`);
+        ${viewOnly() ? "<span></span>" : `<button class="danger" data-end>End game</button>`}<button class="primary" data-close-overlay>Back to game</button></div></div>`);
   };
   draw();
-  const unsub = onState(draw);
+  // The game ended meanwhile (its last move, End game elsewhere): the overlay goes, its buttons no longer apply.
+  const unsub = onState(() => (inRunningGame() ? draw() : (unsub(), o.remove())));
   o.addEventListener("click", async (e) => {
     const b = e.target.closest("button");
     if (e.target === o || b?.dataset.closeOverlay !== undefined) return (unsub(), o.remove());
@@ -2581,6 +2582,7 @@ async function openInvite(watch = false) {
   } catch {
     return close();
   }
+  if (!o.isConnected) return; // closed while the invite was being made
   let qr = "";
   const until = new Date(inv.expiresAt).toLocaleString([], { weekday: "short", hour: "2-digit", minute: "2-digit" });
   // An optional name for the player (D-155): it travels in the link (?name=) and fills in their name field, which they
@@ -2598,6 +2600,7 @@ async function openInvite(watch = false) {
     } catch {}
   };
   await loadQr(); // with the name it starts with, if any (without one, the link is the invite's own)
+  if (!o.isConnected) return; // closed meanwhile: no listener for a window that is gone
   o.addEventListener("click", (e) => {
     const b = e.target.closest("button");
     if (b?.dataset.x === "name") openNamePad(guest, async (n) => ((guest = n), await loadQr(), draw()));

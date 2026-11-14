@@ -291,7 +291,7 @@ async function refresh() {
       <td><div>${esc(t.name)}</div><div class="mono faint">${esc(t.tableId)}</div></td>
       <td><span class="pill ${t.status}"${pillTip("table", t.status)}>${t.status}</span>${t.status === "pending" ? ` <span class="mono">${esc(t.pairingCode)}</span>` : ""}${t.code?.pastValidity ? ` <span class="pill past" title="Its access code has run out; disconnect it if it should stop">code past validity</span>` : ""}</td>
       <td><span class="dot ${t.online ? "on" : ""}"></span>${t.online ? "online" : `last seen ${ago(t.lastSeen)}`}${presenceLine(t.presence)}</td>
-      <td>${t.metrics.gamesPlayed ?? 0}</td>
+      <td>${esc(String(t.metrics.gamesPlayed ?? 0))}</td>
       <td>${t.status === "pending" ? `<span class="faint">ticked when approving</span>`
         : t.reposFrom === "code" ? `<div class="faint" style="font-size:13px">from access code <span class="codehint">${esc(t.code.hint)}••</span>${t.code.label ? ` ${esc(t.code.label)}` : ""}</div>${repos.length ? `<span class="checks" title="Change the code's games under Access codes">${repoChecks(t.repos ?? [], "disabled")}</span>` : ""}`
         : repos.length ? `<span class="checks" data-table-repos="${esc(t.tableId)}">${repoChecks(t.repos ?? [], "")}</span>` : `<span class="faint">no repositories</span>`}</td>
@@ -389,15 +389,20 @@ $("#code-form").addEventListener("submit", async (e) => {
     refresh();
   } catch (err) { msg("#code-msg", err.message); }
 });
-$("#code-msg").addEventListener("click", async (e) => {
-  const b = e.target.closest("#code-copy"); if (!b) return;
-  // Shown as ABCD-EFGH for reading; copied without the dash, which tables ignore anyway.
-  const text = $("#code-new").textContent.replace(/-/g, "");
+/** Copy a value with a copy button: it shows "Copied" for a moment; if the clipboard is refused, the shown text is
+ *  selected so Cmd/Ctrl-C works. */
+async function copyWith(b, text, shown) {
+  const title = b.getAttribute("aria-label") ?? b.title; // not "Copied" on a second tap
   try {
     await navigator.clipboard.writeText(text);
     b.innerHTML = DONE_ICON; b.classList.add("done"); b.title = "Copied";
-    setTimeout(() => { b.innerHTML = COPY_ICON; b.classList.remove("done"); b.title = "Copy code"; }, 1600);
-  } catch { getSelection().selectAllChildren($("#code-new")); }
+    setTimeout(() => { b.innerHTML = COPY_ICON; b.classList.remove("done"); b.title = title; }, 1600);
+  } catch { getSelection().selectAllChildren(shown); }
+}
+$("#code-msg").addEventListener("click", (e) => {
+  const b = e.target.closest("#code-copy"); if (!b) return;
+  // Shown as ABCD-EFGH for reading; copied without the dash, which tables ignore anyway.
+  copyWith(b, $("#code-new").textContent.replace(/-/g, ""), $("#code-new"));
 });
 document.addEventListener("click", async (e) => {
   const b = e.target.closest("button"); if (!b) return;
@@ -596,18 +601,9 @@ document.addEventListener("click", async (e) => {
 const COPY_ICON = `<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M5 15V6a2 2 0 0 1 2-2h8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`;
 const DONE_ICON = `<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
-/** Copy the download link; if the clipboard is refused, select the text so Cmd/Ctrl-C works. */
-$("#dl-msg").addEventListener("click", async (e) => {
+$("#dl-msg").addEventListener("click", (e) => {
   const b = e.target.closest("#dl-copy");
-  if (!b) return;
-  const text = $("#dl-url").textContent;
-  try {
-    await navigator.clipboard.writeText(text);
-    b.innerHTML = DONE_ICON; b.classList.add("done"); b.title = "Copied";
-    setTimeout(() => { b.innerHTML = COPY_ICON; b.classList.remove("done"); b.title = "Copy link"; }, 1600);
-  } catch {
-    getSelection().selectAllChildren($("#dl-url"));
-  }
+  if (b) copyWith(b, $("#dl-url").textContent, $("#dl-url"));
 });
 
 $("#dl-form").addEventListener("submit", async (e) => {

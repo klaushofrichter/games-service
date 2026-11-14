@@ -128,6 +128,15 @@ describe("access codes: console", () => {
     expect(r.body).toMatchObject({ label: "Demo kit", validity: "forever", expiresAt: null, scope: { kind: "repos", repos: ["klaus/extra-games"] } });
     expect((await admin("PATCH", "/admin/api/codes/c_000000000000", { label: "x" })).status).toBe(404);
   });
+
+  it("a refused edit leaves the code as it was", async () => {
+    const c = await newCode({ validity: "week", label: "Before" });
+    const before = (await admin("GET", "/admin/api/codes")).body.find((x: { id: string }) => x.id === c.id);
+    const r = await admin("PATCH", `/admin/api/codes/${c.id}`, { label: "After", validity: "forever", scope: { kind: "repos", repos: ["klaus/nowhere"] } });
+    expect(r.status).toBe(400);
+    const now = (await admin("GET", "/admin/api/codes")).body.find((x: { id: string }) => x.id === c.id);
+    expect(now).toEqual(before);
+  });
 });
 
 describe("access codes: tables", () => {

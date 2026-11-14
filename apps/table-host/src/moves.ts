@@ -69,6 +69,7 @@ export function compact(v: unknown, max = 60): string {
 const minutes = (ms: number) => (ms >= 3_600_000 ? `${Math.floor(ms / 3_600_000)} h ${Math.round((ms % 3_600_000) / 60_000)} min` : `${Math.round(ms / 60_000)} min`);
 
 function genericText(r: LogRecord, names: Record<number, string>): string {
+  const who = (seat: number) => names[seat] ?? `seat ${seat}`;
   switch (r.t) {
     case "start":
       return `Game started: ${r.gameId} ${r.version}, ${r.seats.map((s) => `${s.name} (seat ${s.seat}${s.kind === "ai" ? ", AI" : ""})`).join(", ")}`;
@@ -86,17 +87,17 @@ function genericText(r: LogRecord, names: Record<number, string>): string {
     case "seatJoined":
       return `${r.seat.name} took seat ${r.seat.seat}`;
     case "seatLeft":
-      return `${names[r.seat] ?? `seat ${r.seat}`} left${r.ended ? " · the game ended" : ""}`;
+      return `${who(r.seat)} left${r.ended ? " · the game ended" : ""}`;
     case "disconnected":
-      return `${names[r.seat] ?? `seat ${r.seat}`}'s phone went away${r.waiting ? ` · the game waits: ${r.waiting}` : ""}`;
+      return `${who(r.seat)}'s phone went away${r.waiting ? ` · the game waits: ${r.waiting}` : ""}`;
     case "reconnected":
-      return `${names[r.seat] ?? `seat ${r.seat}`}'s phone is back`;
+      return `${who(r.seat)}'s phone is back`;
     case "seatChanged":
-      return `${r.seat.name} took over ${names[r.seat.seat] ?? `seat ${r.seat.seat}`}'s seat (exchanged on the board)`;
+      return `${r.seat.name} took over ${who(r.seat.seat)}'s seat (exchanged on the board)`;
     case "aiOptions":
-      return `${names[r.seat] ?? `seat ${r.seat}`}'s AI options changed: ${compact(r.aiOptions)}`;
+      return `${who(r.seat)}'s AI options changed: ${compact(r.aiOptions)}`;
     case "aiTakeover":
-      return `${r.name} took over ${names[r.seat] ?? `seat ${r.seat}`}'s seat (the board handed it to an AI player)`;
+      return `${r.name} took over ${who(r.seat)}'s seat (the board handed it to an AI player)`;
     case "pause":
       return r.reason === "cloud" ? "Game paused: the connection to the service was lost"
         : r.reason === "player" ? "Game paused: waiting for a player to come back"
@@ -116,9 +117,8 @@ function genericText(r: LogRecord, names: Record<number, string>): string {
 
 /** The seat a record belongs to, for the player column. */
 function seatOf(r: LogRecord): number | null {
-  if (r.t === "intent" || r.t === "seatLeft" || r.t === "disconnected" || r.t === "reconnected" || r.t === "aiTakeover") return r.seat;
+  if (r.t === "intent" || r.t === "seatLeft" || r.t === "disconnected" || r.t === "reconnected" || r.t === "aiTakeover" || r.t === "aiOptions") return r.seat;
   if (r.t === "seatJoined" || r.t === "seatChanged") return r.seat.seat;
-  if (r.t === "aiOptions") return r.seat;
   if (r.t === "pause" || r.t === "error") return r.seat ?? null;
   return null;
 }

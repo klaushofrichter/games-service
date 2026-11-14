@@ -178,7 +178,7 @@ describe("remote play", { timeout: 60_000 }, () => {
     expect((await peer.request("GET", "/admin")).status).toBe(404); // nothing outside the board and deck
 
     // the remote deck takes a seat with just a name
-    const deck = await peer.socket({ name: "Rita" });
+    let deck = await peer.socket({ name: "Rita" });
     const welcome = await deck.next((m) => m.type === "welcome");
     expect(welcome.payload.sessionToken).toBeTruthy();
     const rita = t.host.table.state().players.find((p) => p.name === "Rita")!;
@@ -195,6 +195,9 @@ describe("remote play", { timeout: 60_000 }, () => {
     const again = await peer.socket({ name: "Rita's friend" });
     expect((await again.next((m) => m.type === "welcome")).payload.playerId).toBe(rita.id);
     expect(t.host.table.state().players.filter((p) => p.location === "remote")).toHaveLength(1);
+    // One deck per player (D-133, D-293): the newer window replaces the older one, so one browser can't hold every slot.
+    await until(() => deck.s.closed);
+    deck = again;
 
     // the remote board connects without a key and sees the lobby
     const rb = await peer.socket({ role: "board" });
