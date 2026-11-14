@@ -711,14 +711,14 @@ footer a.terms { display: inline; margin: 0; }
   <div class="wrap">
     <div class="section-head">
       <p class="eyebrow rv">Free games</p>
-      <h2 class="rv" style="--d:.06s">Nine games, a synthesizer, and room for yours.</h2>
-      <p class="lede rv" style="--d:.12s">Four games come with the platform; five more come from <a href="https://github.com/klaushofrichter/extra-games" target="_blank" rel="noopener noreferrer">extra-games</a>, a separate repository that shows how anyone can add games. And from <a href="https://github.com/klaushofrichter/synth-game" target="_blank" rel="noopener noreferrer">synth-game</a>, something for one: a pocket synthesizer to play on the board. All of them are free and play for points, never money.</p>
+      <h2 class="rv" style="--d:.06s">Nine games, a synthesizer, a guitar pedal, and room for yours.</h2>
+      <p class="lede rv" style="--d:.12s">Four games come with the platform; five more come from <a href="https://github.com/klaushofrichter/extra-games" target="_blank" rel="noopener noreferrer">extra-games</a>, a separate repository that shows how anyone can add games. And from <a href="https://github.com/klaushofrichter/synth-game" target="_blank" rel="noopener noreferrer">synth-game</a>, something for one: a pocket synthesizer to play on the board. Electric guitar players with a Mooer GE150 Pro pedal get its remote control from <a href="https://github.com/klaushofrichter/ge150pro-game" target="_blank" rel="noopener noreferrer">ge150pro-game</a>. All of them are free and play for points, never money.</p>
     </div>
     <div class="filters rv" role="tablist">
       <button class="chipbtn on" data-f="all">All games</button>
       <button class="chipbtn" data-f="built-in">Built in</button>
       <button class="chipbtn" data-f="extra">From extra-games</button>
-      <button class="chipbtn" data-f="synth">Solo</button>
+      <button class="chipbtn" data-f="solo">Solo</button>
     </div>
     <div class="games" id="games-grid"></div>
     <p class="games-foot rv">Click a game for a closer look. Every screenshot is the real board, taken by the platform's browser tests.</p>
@@ -1074,6 +1074,31 @@ gesture(seat, data) { sling.gesture(seat, data); }</code>
       </div>
     </div>
 
+    <!-- A second screen (D-292): GE150 Pro from ge150pro-game, a pedal's remote control for electric guitar players. -->
+    <div class="showcase" id="ge150">
+      <div class="dbg-head">
+        <p class="eyebrow rv">A second screen</p>
+        <h3 class="rv" style="--d:.06s">For electric guitar players: GE150 Pro.</h3>
+        <p class="rv" style="--d:.1s">Plug a Mooer GE150 Pro multi-effects pedal into the table's computer and the board becomes its editor, big enough to read from where you stand with the guitar. Your phone is the second screen: it sits on the music stand and does what you need between two songs, while your hands stay on the strings. It is an example of what a phone can be besides a hand of cards.</p>
+      </div>
+      <div class="show-grid">
+        <figure class="dbg-shot rv sling-real" style="--d:.05s">
+          <div class="sling-stage">
+            <img class="sl-phone" src="/site/ge150-pro-phone-play.webp" alt="The phone's Play tab: the current preset 2A, buttons for the previous and next preset, and quick slots 1 to 8" loading="lazy" width="500" height="888">
+            <img class="sl-board" src="/site/ge150-pro.webp" alt="The board: the pedal's signal chain of nine modules across the top, the faders of the AMP module, and the four presets of bank 2" loading="lazy" width="1600" height="900">
+          </div>
+          <figcaption>The phone and the board with the same pedal, from the game's browser test with a simulated pedal.</figcaption>
+        </figure>
+        <ul class="show-list rv" style="--d:.1s">
+          <li><b>Needs the pedal.</b> A Mooer GE150 Pro (firmware 2.1.2 or newer), connected by USB to the computer that runs the table's board. The guitar plays through the pedal as always; the table only controls it.</li>
+          <li><b>The board is the editor.</b> The signal chain, each module on or off, its model and every parameter on a large fader; banks and presets; save a sound to its slot (it asks first).</li>
+          <li><b>The phone is the second screen.</b> Play: the current preset, the next and previous, eight quick slots. Rhythm: the pedal's drum machine and a click from the table's speakers with tap tempo. Pedal: the connection and your saved configurations.</li>
+          <li><b>One player.</b> Like FM-1 Synth, it takes the table's single seat; the lobby, the QR code and the phone work as for any game.</li>
+          <li><b>Open source, unofficial.</b> The game is in <a href="https://github.com/klaushofrichter/ge150pro-game" target="_blank" rel="noopener noreferrer">ge150pro-game</a> (MIT), on the hosted service for the tables that tick it in the console. Not affiliated with or endorsed by Mooer; "Mooer" and "GE150" are trademarks of their owners.</li>
+        </ul>
+      </div>
+    </div>
+
     <!-- Test and debug with your AI (D-180): AI-only simulations, logs an AI can read, references to a move. -->
     <div class="dbg" id="debug">
       <div class="dbg-head">
@@ -1412,7 +1437,8 @@ docker compose -f deploy/local/docker-compose.yml up -d --build">Copy</button></
   const GS = "https://github.com/klaushofrichter/games-service/tree/main/games/";
   const EX = "https://github.com/klaushofrichter/extra-games/tree/main/games/";
   const SY = "https://github.com/klaushofrichter/synth-game/tree/main/games/";
-  const SRC_LABEL = { "built-in": "Built in", extra: "extra-games", synth: "synth-game" };
+  const GE = "https://github.com/klaushofrichter/ge150pro-game/tree/main/games/";
+  const SRC_LABEL = { "built-in": "Built in", extra: "extra-games", synth: "synth-game", ge150: "ge150pro-game" };
   const GAMES = [
     { id: "holdem", name: "Hold'em", players: "2–8 players", src: "built-in", wide: true, phone: "holdem-phone",
       text: "Fixed-limit Texas Hold'em. Your two cards stay on your phone; the board shows the shared cards and the pot. AI players in two styles, side pots, awards." },
@@ -1430,14 +1456,16 @@ docker compose -f deploy/local/docker-compose.yml up -d --build">Copy</button></
       text: "Dominoes up to double twelve: grow your own train from the hub, or the Mexican train everyone shares. Your tiles stay on your phone. A demo game for developers that customises nearly everything." },
     { id: "last-card", name: "Last Card", players: "2–8 players", src: "extra", phone: "last-card-phone",
       text: "Match the colour or the number, and push your card off the top of your phone: it lands on the pile in the middle. Skips, reverses, draw cards and wilds; shout your last card and be first to 200 points." },
-    { id: "fm1-synth", name: "FM-1 Synth", players: "1 player", src: "synth", wide: true, phone: "fm1-synth-phone",
+    { id: "fm1-synth", name: "FM-1 Synth", players: "1 player", src: "synth", solo: true, phone: "fm1-synth-phone",
       text: "Not quite a game: a pocket synthesizer, the M-VAVE FM-1 or its big sibling the SMK-37, emulated on the board. One player plays its keys, knobs and pads by touch, with as many fingers as they like, and picks one of the community's firmwares on their phone. Built on fm1-emu by Joakim Eriksson." },
+    { id: "ge150-pro", name: "GE150 Pro", players: "1 player", src: "ge150", solo: true, phone: "ge150-pro-phone",
+      text: "Not a game either: remote control for a Mooer GE150 Pro multi-effects pedal, for electric guitar players. It needs the pedal, connected to the table's computer by USB. The board shows the signal chain, every module's settings and the presets; the phone is a second screen on the music stand that switches sounds and runs a click while you play. Unofficial, not affiliated with Mooer." },
     { id: "coin-flip", name: "Coin Flip", players: "1–8 players", src: "built-in", phone: "coin-flip-phone",
       text: "Everyone guesses heads or tails, then the coin flips. The smallest complete game, and the one to copy when you start your own." },
   ];
   const grid = $("#games-grid");
   grid.innerHTML = GAMES.map((g, i) => `
-    <button class="game rv spot${g.wide ? " wide" : ""}" style="--d:${(i % 3) * 0.06}s" data-src="${g.src}" data-i="${i}">
+    <button class="game rv spot${g.wide ? " wide" : ""}" style="--d:${(i % 3) * 0.06}s" data-src="${g.src}"${g.solo ? " data-solo" : ""} data-i="${i}">
       <span class="src${g.src === "built-in" ? "" : " extra"}">${SRC_LABEL[g.src]}</span>
       <div class="pic"><img src="/site/${g.id}.webp" alt="${g.name} on the board" loading="lazy" width="1600" height="900"></div>
       <div class="info"><div class="row"><h3>${g.name}</h3><span class="players">${g.players}</span></div><p>${g.text}</p></div>
@@ -1451,7 +1479,7 @@ docker compose -f deploy/local/docker-compose.yml up -d --build">Copy</button></
   $$(".filters .chipbtn").forEach((b) => b.addEventListener("click", () => {
     $$(".filters .chipbtn").forEach((x) => x.classList.toggle("on", x === b));
     const f = b.dataset.f;
-    $$(".game").forEach((g) => { g.classList.toggle("hide", f !== "all" && g.dataset.src !== f); g.classList.toggle("wide", f === "all" && !!GAMES[g.dataset.i].wide); });
+    $$(".game").forEach((g) => { g.classList.toggle("hide", f !== "all" && (f === "solo" ? g.dataset.solo === undefined : g.dataset.src !== f)); g.classList.toggle("wide", f === "all" && !!GAMES[g.dataset.i].wide); });
   }));
   const lb = $("#lightbox");
   grid.addEventListener("click", (e) => {
@@ -1460,7 +1488,7 @@ docker compose -f deploy/local/docker-compose.yml up -d --build">Copy</button></
     $("#lb-img").src = `/site/${g.id}.webp`; $("#lb-img").alt = `${g.name} on the board`;
     $("#lb-name").textContent = g.name; $("#lb-desc").textContent = `${g.players}. ${g.text}`;
     const ph = $("#lb-phone"); ph.hidden = !g.phone; if (g.phone) { ph.src = `/site/${g.phone}.webp`; ph.alt = `${g.name} on a phone`; }
-    $("#lb-link").href = ({ extra: EX, synth: SY }[g.src] ?? GS) + g.id;
+    $("#lb-link").href = ({ extra: EX, synth: SY, ge150: GE }[g.src] ?? GS) + g.id;
     lb.scrollTop = 0;
     lb.classList.add("open");
     document.documentElement.classList.add("lb-open");

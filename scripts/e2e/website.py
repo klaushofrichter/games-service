@@ -61,6 +61,14 @@ try:
                 assert page.locator(".game:not(.hide)").count() == 5, "extra-games has five games"
                 page.click(".filters [data-f=built-in]")
                 assert page.locator(".game:not(.hide)").count() == 4, "four built-in games"
+                # Solo (D-292): FM-1 Synth and GE150 Pro, each linking to its own repository in the close-up.
+                page.click(".filters [data-f=solo]")
+                solo = page.locator(".game:not(.hide) h3").all_inner_texts()
+                assert solo == ["FM-1 Synth", "GE150 Pro"], solo
+                page.click(".game:not(.hide) >> nth=1")
+                page.wait_for_selector("#lightbox.open")
+                assert page.get_attribute("#lb-link", "href").endswith("/ge150pro-game/tree/main/games/ge150-pro"), page.get_attribute("#lb-link", "href")
+                page.keyboard.press("Escape")
                 page.click(".filters [data-f=all]")
                 page.click(".game[data-i='0']")
                 page.wait_for_selector("#lightbox.open")
