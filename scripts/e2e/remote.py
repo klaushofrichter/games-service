@@ -114,8 +114,8 @@ try:
         board.uncheck(".invite input[name=control]")
         wait(lambda: not state()["remote"]["boardControl"])
         rboard.locator("text=view only").wait_for(timeout=10000)
-        rboard.locator("button[data-layout='4']").click()
-        rboard.locator(".toast").wait_for(timeout=5000)
+        # View only: the seat layout shows but can't be changed (D-277, D-293: no control the table would refuse).
+        assert rboard.locator("button[data-layout='4']").is_disabled(), "a view-only board's layout buttons are off"
         assert state()["layout"] == 6
         remote.screenshot(path=os.path.join(OUT, "remote-view-only.png"))
         board.check(".invite input[name=control]")

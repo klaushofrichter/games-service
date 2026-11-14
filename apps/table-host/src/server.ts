@@ -1,6 +1,6 @@
 // HTTP + WebSocket server of the Table Host: board and deck pages, board control API, live updates.
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { readFile } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import { extname, join, normalize, sep } from "node:path";
 import { createHash, timingSafeEqual } from "node:crypto";
 import { WebSocketServer, type WebSocket } from "ws";
@@ -271,23 +271,38 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
     }
   };
 
-  const serveFile = async (res: ServerResponse, rel: string, transform?: (s: string) => string, root = opts.publicDir) => {
+  const serveFile = async (req: IncomingMessage, res: ServerResponse, rel: string, transform?: (s: string) => string, root = opts.publicDir) => {
     const file = normalize(join(root, rel));
     // Inside root, not merely starting like it (a sibling folder "chess2" starts like "chess", D-202).
     if (!file.startsWith(root.endsWith(sep) ? root : root + sep)) return json(res, 404, { error: "not found" });
     try {
+      const asset = root !== opts.publicDir && !/\.(js|css)$/.test(file);
+      const headers = { "content-type": MIME[extname(file)] ?? "application/octet-stream", "cache-control": "no-cache", ...(asset ? ASSET_HEADERS : {}) };
+      // A file as it is on disk has an ETag (size and change time): a browser asks again on every load (no-cache) and
+      // gets 304 while it is unchanged. Pages filled in here (transform) are always sent.
+      let etag: string | undefined;
+      if (!transform) {
+        const st = await stat(file);
+        etag = `"${st.size.toString(36)}-${Math.trunc(st.mtimeMs).toString(36)}"`;
+        // Weak tags, a list of tags or "*" as browsers and proxies send them.
+        const asked = String(req.headers["if-none-match"] ?? "").split(",").map((x) => x.trim().replace(/^W\//, ""));
+        if (asked.includes(etag) || asked.includes("*")) {
+          res.writeHead(304, { ...headers, etag });
+          return res.end();
+        }
+      }
       let data: Buffer | string = await readFile(file);
       if (transform) data = transform(data.toString("utf8"));
-      const asset = root !== opts.publicDir && !/\.(js|css)$/.test(file);
-      res.writeHead(200, { "content-type": MIME[extname(file)] ?? "application/octet-stream", "cache-control": "no-cache", ...(asset ? ASSET_HEADERS : {}) });
+      res.writeHead(200, { ...headers, ...(etag ? { etag } : {}) });
       res.end(data);
     } catch {
       json(res, 404, { error: "not found" });
     }
   };
 
-  const assertDeckRoom = () => {
-    if ([...clients].filter((o) => o.role === "deck").length >= MAX_DECKS) throw new TableError(409, "the table serves eight phones at most");
+  /** Room for one more deck; the windows of `replacing` (a player whose newest window replaces them) don't count. */
+  const assertDeckRoom = (replacing?: string) => {
+    if ([...clients].filter((o) => o.role === "deck" && (replacing === undefined || o.playerId !== replacing)).length >= MAX_DECKS) throw new TableError(409, "the table serves eight phones at most");
   };
 
   /** A new invite from the service (remote play), for a player, a watcher or an exchange. */
@@ -390,9 +405,16 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
       table.assertExchange(seat, kind); // before asking the service for an invite that could not be used
       // The last player at the table goes (D-223): the board asked, and games without one are allowed from now on. The
       // developer setting is the table's own board's to change, not a remote one's.
+      // A refused exchange leaves the setting as it was.
+      const before = table.allowNoLocalPlayer;
       if (body.allowNoLocalPlayer === true && !remote) table.setDeveloper({ allowNoLocalPlayer: true });
-      const url = kind === "remote" ? (await newInvite()).url : undefined;
-      return json(res, 200, { ...table.exchange(seat, kind, url, body.watcher), state: table.state() });
+      try {
+        const url = kind === "remote" ? (await newInvite()).url : undefined;
+        return json(res, 200, { ...table.exchange(seat, kind, url, body.watcher), state: table.state() });
+      } catch (e) {
+        if (table.allowNoLocalPlayer !== before) table.setDeveloper({ allowNoLocalPlayer: before });
+        throw e;
+      }
     }
     if (m === "DELETE" && path === "/exchange") return (table.cancelExchange(), ok());
     if (m === "DELETE" && (match = path.match(/^\/players\/([\w-]+)$/))) return (table.removePlayer(match[1], "evicted"), ok());
@@ -533,24 +555,24 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
       // Play from the board (D-175): the board and one player's deck side by side, only on the table PC itself.
       if (path === "/board/play.html") {
         if (!boardAllowed(req)) return json(res, 403, { error: "the board is only served on the table PC" });
-        return await serveFile(res, "board/play.html", (s) => s.replace("__TABLE_KEY__", opts.tableKey));
+        return await serveFile(req, res, "board/play.html", (s) => s.replace("__TABLE_KEY__", opts.tableKey));
       }
       if (path === "/board" || path === "/board/" || path === "/board/index.html") {
         // Remote players get the same board, without the key: their channel is their authorisation.
-        if (remoteOf(req)) return await serveFile(res, "board/index.html", (s) => s.replace(`window.TABLE_KEY = "__TABLE_KEY__";`, `window.TABLE_KEY = ""; window.REMOTE_BOARD = true;`));
+        if (remoteOf(req)) return await serveFile(req, res, "board/index.html", (s) => s.replace(`window.TABLE_KEY = "__TABLE_KEY__";`, `window.TABLE_KEY = ""; window.REMOTE_BOARD = true;`));
         if (!boardAllowed(req)) return json(res, 403, { error: "the board is only served on the table PC" });
         // The board page talks to the board control API; it gets the key only on the table PC itself.
-        return await serveFile(res, "board/index.html", (s) => s.replace("__TABLE_KEY__", opts.tableKey));
+        return await serveFile(req, res, "board/index.html", (s) => s.replace("__TABLE_KEY__", opts.tableKey));
       }
-      if (path === "/deck" || path === "/deck/") return await serveFile(res, "deck/index.html");
-      if (path.startsWith("/board/") || path.startsWith("/deck/") || path.startsWith("/shared/")) return await serveFile(res, path.slice(1));
+      if (path === "/deck" || path === "/deck/") return await serveFile(req, res, "deck/index.html");
+      if (path.startsWith("/board/") || path.startsWith("/deck/") || path.startsWith("/shared/")) return await serveFile(req, res, path.slice(1));
       // Browsers ask for these at the root (Safari shows no SVG favicon, iOS looks for its home-screen icon): D-212.
-      if (path === "/favicon.ico" || path === "/apple-touch-icon.png") return await serveFile(res, `shared${path}`);
+      if (path === "/favicon.ico" || path === "/apple-touch-icon.png") return await serveFile(req, res, `shared${path}`);
       if ((match = path.match(/^\/games\/([a-z0-9-]+)\/((?:board|deck)\.(?:js|css)|how-to-play\.md|assets\/[\w./-]+)$/))) {
         // A game's own board and deck UI and its assets; rules and manifest are not served.
         const g = table.games.get(match[1]);
         if (!g || match[2].includes("..")) return json(res, 404, { error: "not found" });
-        return await serveFile(res, match[2], undefined, g.dir);
+        return await serveFile(req, res, match[2], undefined, g.dir);
       }
       json(res, 404, { error: "not found" });
     } catch (err) {
@@ -619,6 +641,8 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
       } catch {
         return reply("error", { message: "invalid JSON" });
       }
+      // `null`, a number or a list parses too: only an object is a message (anyone on the network can send one).
+      if (!msg || typeof msg !== "object" || Array.isArray(msg)) return reply("error", { message: "a message is a JSON object" });
       const c = client as any; // the hello turns it into a board or a deck
       try {
         if (msg.ch === "system" && msg.type === "hello") {
@@ -672,12 +696,14 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
             }, 1500);
             return;
           } else if (p.sessionToken) {
+            // Room first: a refused hello must not mark the player as back (they would be "connected" with no phone).
+            assertDeckRoom(table.playerIdFor(String(p.sessionToken)));
             const info = table.resume(String(p.sessionToken));
-            // One deck per player (D-133): the player's newest window replaces the older one, which is told so.
-            [...clients].filter((o) => o !== client && o.role === "deck" && o.playerId === info.id).forEach((o) => replaceClient(o));
-            assertDeckRoom();
             c.role = "deck";
             c.playerId = info.id;
+            // One deck per player (D-133): the player's newest window replaces the older one, which is told so. This
+            // window is the player's deck first, so the older one's close never counts the player as gone.
+            [...clients].filter((o) => o !== client && o.role === "deck" && o.playerId === info.id).forEach((o) => replaceClient(o));
             reply("welcome", { role: "deck", playerId: info.id }, msg.seq);
           } else {
             assertDeckRoom();
@@ -691,6 +717,8 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
                 : table.join(String(p.joinToken ?? ""), p.name);
             c.role = "deck";
             c.playerId = playerId;
+            // A remote player's newest window replaces their older ones too (D-133): one browser can't hold every slot.
+            [...clients].filter((o) => o !== client && o.role === "deck" && o.playerId === playerId).forEach((o) => replaceClient(o));
             reply("welcome", { role: "deck", playerId, sessionToken }, msg.seq);
           }
           send(ws, envelope("lobby", "state", forClient(remote, table.state(), c.session)));

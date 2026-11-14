@@ -277,32 +277,41 @@ export function startCloud(o: CloudOptions) {
   /** Whether a hello or heartbeat body presents an access code at all. */
   const presentsCode = (v: unknown) => v !== undefined && v !== null && v !== "";
   /**
-   * A per-address map grows by one entry per address between the 10-minute prunes; past a size many addresses could
-   * reach (an IPv6 range), entries whose minute is over go at once (D-202).
+   * Hits per key (a client address) in a one-minute window, for the rate limits. The map grows by one entry per address
+   * between the 10-minute prunes; past a size many addresses could reach (an IPv6 range), entries whose minute is over
+   * go at once (D-202), at most once a second (D-279): a flood from many addresses keeps every entry fresh, and
+   * scanning them all on each request would make the limiter the hot spot.
    */
-  /**
-   * Drops expired entries once a map is large. At most once a second per map (D-279): a flood from many addresses
-   * keeps every entry fresh, and scanning them all on each request would make the limiter the hot spot.
-   */
-  const swept = new WeakMap<Map<string, { reset: number }>, number>();
-  const sweep = (m: Map<string, { reset: number }>) => {
-    const now = Date.now();
-    if (m.size < 50_000 || now - (swept.get(m) ?? 0) < 1000) return;
-    swept.set(m, now);
-    for (const [k, v] of m) if (v.reset < now) m.delete(k);
+  const perMinute = () => {
+    const m = new Map<string, { n: number; reset: number }>();
+    let swept = 0;
+    const prune = (now = Date.now()) => {
+      for (const [k, v] of m) if (v.reset < now) m.delete(k);
+    };
+    return {
+      prune,
+      /** Counts one more for the key; returns the count in its current minute. */
+      hit(key: string) {
+        const now = Date.now();
+        if (m.size >= 50_000 && now - swept >= 1000) {
+          swept = now;
+          prune(now);
+        }
+        const e = m.get(key);
+        if (!e || e.reset <= now) return m.set(key, { n: 1, reset: now + 60_000 }), 1;
+        return ++e.n;
+      },
+      /** The key's count in its current minute, without counting. */
+      count(key: string) {
+        const e = m.get(key);
+        return e && e.reset > Date.now() ? e.n : 0;
+      },
+    };
   };
   /** Wrong codes per client address; a hello with a code is refused once a client has too many in a minute. */
-  const codeFailures = new Map<string, { n: number; reset: number }>();
-  const codeBlocked = (ip: string) => {
-    const f = codeFailures.get(ip);
-    return !!f && f.reset > Date.now() && f.n >= MAX_CODE_FAILURES;
-  };
-  const codeFailed = (ip: string) => {
-    sweep(codeFailures);
-    const f = codeFailures.get(ip);
-    if (!f || f.reset <= Date.now()) codeFailures.set(ip, { n: 1, reset: Date.now() + 60_000 });
-    else f.n++;
-  };
+  const codeFailures = perMinute();
+  const codeBlocked = (ip: string) => codeFailures.count(ip) >= MAX_CODE_FAILURES;
+  const codeFailed = (ip: string) => void codeFailures.hit(ip);
   /** Disconnect: the table stops using the service until an admin reconnects it. */
   const disconnect = (t: TableRecord) => {
     t.status = "revoked";
@@ -395,7 +404,7 @@ export function startCloud(o: CloudOptions) {
     if (!vol || !use) return null;
     return { ...vol, reserve: reserveFor(vol.total), ...use, logCap: maxLogBytes, logBytes: logBytes(), low: vol.free < reserveFor(vol.total) * 1.5 };
   };
-  const lookups = new Map<string, { n: number; reset: number }>(); // invite lookup rate limit per IP
+  const lookups = perMinute(); // invite lookup rate limit per IP
   /** Each table's remote players and watchers from its last heartbeat (D-214); not stored. */
   const presence = new Map<string, { remote: number; remoteConnected: number; watchers: number }>();
   const iceFor = iceProvider(o.iceServers ?? [{ urls: "stun:stun.l.google.com:19302" }], o.cloudflareTurn ?? null);
@@ -430,14 +439,7 @@ export function startCloud(o: CloudOptions) {
     const xff = fromProxy(req.socket.remoteAddress) ? String(req.headers["x-forwarded-for"] ?? "").split(",").map((x) => x.trim()).filter(Boolean).pop() : "";
     return xff || req.socket.remoteAddress || "?";
   };
-  const limited = (ip: string, max = 20) => {
-    sweep(lookups);
-    const l = lookups.get(ip) ?? { n: 0, reset: Date.now() + 60_000 };
-    if (Date.now() > l.reset) Object.assign(l, { n: 0, reset: Date.now() + 60_000 });
-    l.n++;
-    lookups.set(ip, l);
-    return l.n > max;
-  };
+  const limited = (ip: string, max = 20) => lookups.hit(ip) > max;
 
   const json = (res: ServerResponse, status: number, body: unknown) => {
     res.writeHead(status, { "content-type": "application/json", "cache-control": "no-store" });
@@ -515,8 +517,8 @@ export function startCloud(o: CloudOptions) {
     for (const [k, i] of invites) if (i.expiresAt < now) (invites.delete(k), store.delete("invite", k));
     for (const [k, d] of downloadTokens) if (d.expiresAt < now) (downloadTokens.delete(k), store.delete("download", k));
     for (const [k, r] of remoteSessions) if (r.expiresAt < now) (r.ws?.close(4002, "expired"), remoteSessions.delete(k), store.delete("session", k));
-    for (const [ip, l] of lookups) if (l.reset < now) lookups.delete(ip);
-    for (const [ip, f] of codeFailures) if (f.reset < now) codeFailures.delete(ip);
+    lookups.prune(now);
+    codeFailures.prune(now);
     // Codes expired or revoked more than a year ago go, unless a table still uses one (D-113).
     for (const c of [...codes.values()]) {
       const t = c.tableId ? tables.get(c.tableId) : undefined;
@@ -708,10 +710,20 @@ export function startCloud(o: CloudOptions) {
         return json(res, 200, withCode({ status: "approved", tableToken: bearer(req), config: tableConfig(t) }));
       }
       if (m === "POST" && p === "/api/tables/heartbeat") {
-        const t = requireTable(req);
+        requireTable(req);
         const b = await jsonBody(req);
+        // Looked up again after the body: the table may have been disconnected or deleted while it arrived, and must
+        // not be written back or given a code then.
+        const t = requireTable(req);
         t.lastSeen = Date.now();
-        if (b.metrics && typeof b.metrics === "object") t.metrics = b.metrics;
+        // Numbers only (the console shows them, D-214): a table can't put text, let alone markup, on the console.
+        if (b.metrics && typeof b.metrics === "object" && !Array.isArray(b.metrics)) {
+          t.metrics = Object.fromEntries(
+            Object.entries(b.metrics as Record<string, unknown>)
+              .filter(([k, v]) => /^\w{1,40}$/.test(k) && typeof v === "number" && Number.isFinite(v) && v >= 0)
+              .slice(0, 20),
+          ) as Record<string, number>;
+        }
         // Who plays from elsewhere right now (D-214): counts only, kept in memory, shown while the table is online.
         const count = (v: unknown) => (Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 1000 ? (v as number) : 0);
         if (b.presence && typeof b.presence === "object") presence.set(t.tableId, { remote: count(b.presence.remote), remoteConnected: count(b.presence.remoteConnected), watchers: count(b.presence.watchers) });
@@ -740,10 +752,14 @@ export function startCloud(o: CloudOptions) {
         return res.end(data);
       }
       if (m === "PUT" && (match = p.match(/^\/api\/tables\/logs\/([\w-]+)$/))) {
+        const owner = requireTable(req);
+        if (logs.get(match[1]) && logs.get(match[1])!.meta.tableId !== owner.tableId) return json(res, 409, { error: "a log with this id belongs to another table" });
+        const data = await body(req, 50 * 1024 * 1024);
+        // Checked again once the body is here: another table may have uploaded this id meanwhile, or this one been
+        // disconnected.
         const t = requireTable(req);
         const existing = logs.get(match[1]);
         if (existing && existing.meta.tableId !== t.tableId) return json(res, 409, { error: "a log with this id belongs to another table" });
-        const data = await body(req, 50 * 1024 * 1024);
         const gameId = String(url.searchParams.get("gameId") ?? "");
         // Bounded in total, and on disk by the volume's free space: the oldest logs make room for the new one, and the
         // reserve stays free for the database (D-114). Re-uploading the same id replaces it.
@@ -758,14 +774,17 @@ export function startCloud(o: CloudOptions) {
           console.warn(`[cloud] log ${match[1]} (${data.length} bytes) refused: not enough room on the volume`);
           return json(res, 507, { error: "the service's storage is full; the table keeps its own copy" });
         }
+        // The earlier copy of this log is replaced by the new file; the oldest others make room. Nothing goes until the
+        // new file is written: a write that fails (a full or failing disk) loses no log (D-279).
         if (existing) {
-          dropLog(match[1]);
           total -= existing.meta.bytes;
           free += existing.meta.bytes;
         }
+        const evict: string[] = [];
         for (const l of [...logs.values()].sort((a, b) => a.meta.uploadedAt - b.meta.uploadedAt)) {
           if (fits()) break;
-          dropLog(l.meta.id);
+          if (l.meta.id === match[1]) continue;
+          evict.push(l.meta.id);
           total -= l.meta.bytes;
           free += l.meta.bytes;
         }
@@ -782,6 +801,7 @@ export function startCloud(o: CloudOptions) {
           uploadedAt: Date.now(),
         };
         if (store.persistent) await store.writeLog(meta.id, data); // the file first: a record never points at a missing file
+        for (const id of evict) dropLog(id);
         store.put("log", meta.id, meta);
         logs.set(meta.id, { meta, data: store.persistent ? null : data });
         return json(res, 201, { ok: true });
@@ -1034,14 +1054,15 @@ export function startCloud(o: CloudOptions) {
           const holds = bound && bound.codeId === c.id ? bound : undefined;
           if (m === "PATCH" && !match[2]) {
             const b = await jsonBody(req);
-            if (b.label !== undefined) c.label = labelFrom(b.label);
+            // Every field checked before any changes: a refused edit leaves the code as it was.
+            const label = b.label !== undefined ? labelFrom(b.label) : c.label;
+            const validity = b.validity !== undefined ? validityFrom(b.validity) : undefined;
+            const scope = b.scope !== undefined ? scopeFrom(b.scope) : c.scope;
+            c.label = label;
             // A new validity counts from now: "one more month" for a code that is about to run out.
-            if (b.validity !== undefined) {
-              const validity = validityFrom(b.validity);
-              Object.assign(c, { validity, expiresAt: expiryFor(validity) });
-            }
+            if (validity !== undefined) Object.assign(c, { validity, expiresAt: expiryFor(validity) });
             // The bound table follows a new scope at its next heartbeat (within 15 s, between games).
-            if (b.scope !== undefined) c.scope = scopeFrom(b.scope);
+            c.scope = scope;
             saveCode(c);
             return json(res, 200, codeView(c));
           }

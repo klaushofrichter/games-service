@@ -112,9 +112,10 @@ function toast(msg) {
 }
 
 function connect(hello) {
-  ws = openTableSocket(REMOTE);
+  const own = (ws = openTableSocket(REMOTE));
   ws.onopen = () => send("system", "hello", hello);
   ws.onmessage = (ev) => {
+    if (ws !== own) return; // an older socket's last words: this window has moved on to a newer one
     const m = JSON.parse(ev.data);
     if (m.ch === "system") {
       const resolve = m.seq !== undefined && pending.get(m.seq);
@@ -172,6 +173,7 @@ function connect(hello) {
     render();
   };
   ws.onclose = (ev) => {
+    if (ws !== own) return; // an older socket closing (replaced by this window's newer one) changes nothing
     for (const r of pending.values()) r({ ok: false, reason: "connection lost" });
     pending.clear();
     if (removed || ev.code === 4003) return render();
@@ -381,6 +383,7 @@ async function openRules() {
 // The deck back in this window (D-133): reconnect with the saved session, which moves the deck away from the other one.
 body.addEventListener("click", (e) => {
   if (!e.target.closest("[data-action=deck-here]")) return;
+  if (ws && ws.readyState <= 1) return; // a second tap while this window's deck is already connecting or open
   const token = storage.get();
   replaced = false;
   if (!token) return render();
@@ -630,7 +633,7 @@ function info() {
     seatEdges: state.seatEdges ?? [],
     ...boardView(),
     players: state.players,
-    seatColors: state.seatColors ?? {}, // seats whose player left keep their colour (D-125)
+    seatColors: state.seatColors ?? {}, // always empty since D-159 (no seat loses its player); kept for the game UI contract
     settings: state.game?.settings ?? {},
     prefs: state.game?.prefs ?? {},
     timers: gameMsg?.timers ?? {},

@@ -207,6 +207,24 @@ describe("HTTP hardening", () => {
     }
   });
 
+  it("answers an unchanged file with 304, and always sends the pages it fills in (D-293)", async () => {
+    const t = await host();
+    const first = await fetch(`${t.base}/board/board.js`);
+    expect(first.status).toBe(200);
+    expect(first.headers.get("cache-control")).toBe("no-cache");
+    const etag = first.headers.get("etag")!;
+    expect(etag).toMatch(/^"[0-9a-z]+-[0-9a-z]+"$/);
+    const again = await fetch(`${t.base}/board/board.js`, { headers: { "if-none-match": etag } });
+    expect(again.status).toBe(304);
+    expect(await again.text()).toBe("");
+    expect((await fetch(`${t.base}/board/board.js`, { headers: { "if-none-match": '"other"' } })).status).toBe(200);
+    // As browsers and proxies send it: weak, in a list.
+    expect((await fetch(`${t.base}/board/board.js`, { headers: { "if-none-match": `"other", W/${etag}` } })).status).toBe(304);
+    // The board's page carries the table key: filled in on every request, no ETag.
+    const page = await fetch(`${t.base}/board/`);
+    expect(page.headers.get("etag")).toBeNull();
+  });
+
   it("answers unknown endpoints, bad JSON and oversized bodies with clear errors", async () => {
     const t = await host();
     expect((await t.api("GET", "/nope")).status).toBe(404);
@@ -249,6 +267,10 @@ describe("deck socket robustness", () => {
     const s = await rawSocket(t.base);
     s.ws.send("{ not json");
     await s.until((m) => m.type === "error" && /JSON/.test(m.payload.message));
+    // JSON that isn't an object (D-293): it once crashed the Table Host.
+    for (const v of ["null", "42", "[1]", '"x"']) s.ws.send(v);
+    await s.until((m) => m.type === "error" && /JSON object/.test(m.payload.message));
+    expect((await fetch(`${t.base}/health`)).status).toBe(200);
     s.ws.send(JSON.stringify({ v: 1, ch: "game", type: "intent", seq: 1, payload: { name: "x" } }));
     expect((await s.until((m) => m.seq === 1)).payload.message).toMatch(/hello first/);
     expect(s.closed()).toBeNull();

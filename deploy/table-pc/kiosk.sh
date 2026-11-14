@@ -1,6 +1,7 @@
 #!/bin/sh
 # Opens the board full screen once the Table Host answers. Run by gametable-kiosk.service inside cage.
-PORT=$(grep -E '^PORT=' /opt/gametable/.env 2>/dev/null | cut -d= -f2)
+# The port from kiosk.env (install.sh and update.sh copy it from .env, which only root can read: it holds the key).
+PORT=$(grep -E '^PORT=' /opt/gametable/kiosk.env 2>/dev/null | cut -d= -f2)
 PORT=${PORT:-8080}
 until curl -fs "http://127.0.0.1:${PORT}/health" >/dev/null 2>&1; do sleep 2; done
 CHROME=$(command -v chromium || command -v chromium-browser || command -v google-chrome)

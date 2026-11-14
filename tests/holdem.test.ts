@@ -259,6 +259,29 @@ describe("regressions from review", () => {
     expect(s.currentBet).toBe(12);
     expect(s.needToAct).not.toContain(sb);
     expect(legalActions(s, s.toAct!)?.call).toBe(2);
+    // The big blind had not acted yet: it keeps its raise. The caller who had acted may only call (D-293).
+    const bb = s.toAct!;
+    expect(bb).not.toBe(utg);
+    expect(legalActions(s, bb)?.raise).not.toBeNull();
+    rt.submit(bb, { name: "call" }, "human");
+    const t = state() as State;
+    expect(t.toAct).toBe(utg);
+    expect(legalActions(t, utg)?.raise).toBeNull();
+    expect(legalActions(t, utg)?.call).toBe(2);
+    expect(rt.submit(utg, { name: "raise" }, "human").ok).toBe(false);
+  });
+
+  it("heads-up, a big blind all-in for less than the small blind ends the betting (D-293)", () => {
+    const { rt, state } = start(game, 2, { turnSeconds: 0, smallBet: 10 });
+    const s0 = state() as State;
+    // The next hand: the dealer posts the small blind (5), the other is all-in for 3 as the big blind.
+    const other = s0.seats.find((x) => x !== s0.dealer)!;
+    rt.state = fixed(s0, { phase: "handOver", toAct: null, needToAct: [], stacks: { [s0.dealer]: 200, [other]: 3 } });
+    rt.fireTimer("next");
+    const s = state() as State;
+    // Nobody can act any more: the board is dealt and the hand is shown down, nobody is asked to call 5.
+    expect(s.toAct).toBeNull();
+    expect(s.result).not.toBeNull();
   });
 
   it("passes the turn to the next seat after a player who leaves on their turn", () => {

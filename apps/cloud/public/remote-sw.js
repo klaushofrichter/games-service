@@ -1,7 +1,8 @@
 // Service worker for remote players (phase 1c, D-020). The invite page (/i/CODE) holds a WebRTC data
 // channel to the table; this worker routes the board's and deck's requests (/board, /deck, /shared,
 // /games, /api/v1) to that page, which sends them over the channel. Nothing else is touched.
-const ROUTED = /^\/(board|deck|shared|games|api\/v1)(\/|$)/;
+// /qr.svg too: the QR code of an open exchange on a remote board (D-166), as the table's gateway allows (remote.ts).
+const ROUTED = /^\/(board|deck|shared|games|api\/v1)(\/|$)|^\/qr\.svg$/;
 const pages = new Map(); // page id -> client id of its invite page
 const owners = new Map(); // client id of a board/deck frame -> page id
 

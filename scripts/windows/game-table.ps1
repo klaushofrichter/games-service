@@ -272,6 +272,7 @@ $saved = Join-Path $InstallDir "private-repos.txt"
 $known = @()
 if (Test-Path $saved) { $known = @(Get-Content $saved | Where-Object { $_.Trim() -ne "" }) }
 $answer = $null
+$asked = $false
 if ($PSBoundParameters.ContainsKey("Repos")) {
   $answer = ($Repos -join " ")
 } elseif ($NoUpdate) {
@@ -287,6 +288,7 @@ if ($PSBoundParameters.ContainsKey("Repos")) {
   }
   $answer = Read-Host "Repositories"
   if ($answer.Trim() -eq "" -and $known.Count -gt 0) { $answer = ($known -join " ") }
+  $asked = $true
 }
 $private = @()
 if ($answer -and $answer.Trim() -ne "-" -and $answer.Trim() -ne "none") {
@@ -296,7 +298,8 @@ if ($answer -and $answer.Trim() -ne "-" -and $answer.Trim() -ne "none") {
     if (($PublicRepos + $private) -notcontains $r) { $private += $r }
   }
 }
-[IO.File]::WriteAllLines($saved, [string[]]$private)
+# Saved only when asked: -Repos for one start keeps the saved list, as the packages' starter does (D-270).
+if ($asked) { [IO.File]::WriteAllLines($saved, [string[]]$private) }
 
 # --- Tools -------------------------------------------------------------------------------------------------------
 $nodeDir = Initialize-Node

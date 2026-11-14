@@ -364,9 +364,12 @@ export default defineGame<State>({
     const outside: BetType[] = ["red", "black", "odd", "even", "low", "high"];
     const pet = outside[seat % outside.length];
     const lucky = (seat * 7 + 11) % 37;
-    const outsideBet = () => ({ name: "placeBet", payload: { type: ctx.random() < 0.5 ? pet : outside[ctx.randomInt(0, 5)], amount } });
-    const numberBet = (stake: number) => ({ name: "placeBet", payload: { type: "straight", target: ctx.random() < 0.4 ? lucky : ctx.randomInt(0, 36), amount: stake } });
-    const groupBet = () => ({ name: "placeBet", payload: { type: ctx.random() < 0.5 ? "dozen" : "column", target: ctx.randomInt(1, 3), amount } });
+    // A spot already holding a stake takes only what is left of the maximum: a top-up past it would be refused.
+    const on = (type: BetType, target?: number) => v.myBets.find((b) => betKey(b) === betKey({ type, target }))?.amount ?? 0;
+    const bet = (type: BetType, target: number | undefined, stake: number) => (on(type, target) + stake <= v.maxBet ? { name: "placeBet", payload: { type, ...(target === undefined ? {} : { target }), amount: stake } } : { name: "done" });
+    const outsideBet = () => bet(ctx.random() < 0.5 ? pet : outside[ctx.randomInt(0, 5)], undefined, amount);
+    const numberBet = (stake: number) => bet("straight", ctx.random() < 0.4 ? lucky : ctx.randomInt(0, 36), stake);
+    const groupBet = () => bet(ctx.random() < 0.5 ? "dozen" : "column", ctx.randomInt(1, 3), amount);
     const r = ctx.random();
     if (style === "conservative") {
       // Mostly even money, now and then a dozen or a small flutter on a number.
