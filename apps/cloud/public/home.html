@@ -1079,7 +1079,7 @@ gesture(seat, data) { sling.gesture(seat, data); }</code>
       <div class="dbg-head">
         <p class="eyebrow rv">A second screen</p>
         <h3 class="rv" style="--d:.06s">For electric guitar players: GE150 Pro.</h3>
-        <p class="rv" style="--d:.1s">Plug a Mooer GE150 Pro multi-effects pedal into the table's computer and the board becomes its editor, big enough to read from where you stand with the guitar. Your phone is the second screen: it sits on the music stand and does what you need between two songs, while your hands stay on the strings. It is an example of what a phone can be besides a hand of cards.</p>
+        <p class="rv" style="--d:.1s">Plug a Mooer GE150 Pro multi-effects pedal into the table's computer and the board becomes its editor, big enough to read from where you stand with the guitar. Your phone is the second screen: it sits on the music stand and does what you need between two songs, while your hands stay on the strings. It is an example of what a phone can be besides a hand of cards. The game has its own public repository: <a href="https://github.com/klaushofrichter/ge150pro-game" target="_blank" rel="noopener noreferrer">github.com/klaushofrichter/ge150pro-game</a>.</p>
       </div>
       <div class="show-grid">
         <figure class="dbg-shot rv sling-real" style="--d:.05s">
@@ -1094,7 +1094,7 @@ gesture(seat, data) { sling.gesture(seat, data); }</code>
           <li><b>The board is the editor.</b> The signal chain, each module on or off, its model and every parameter on a large fader; banks and presets; save a sound to its slot (it asks first).</li>
           <li><b>The phone is the second screen.</b> Play: the current preset, the next and previous, eight quick slots. Rhythm: the pedal's drum machine and a click from the table's speakers with tap tempo. Pedal: the connection and your saved configurations.</li>
           <li><b>One player.</b> Like FM-1 Synth, it takes the table's single seat; the lobby, the QR code and the phone work as for any game.</li>
-          <li><b>Open source, unofficial.</b> The game is in <a href="https://github.com/klaushofrichter/ge150pro-game" target="_blank" rel="noopener noreferrer">ge150pro-game</a> (MIT), on the hosted service for the tables that tick it in the console. Not affiliated with or endorsed by Mooer; "Mooer" and "GE150" are trademarks of their owners.</li>
+          <li><b>Open source, unofficial.</b> The game, its pedal library and its browser tests are in <a href="https://github.com/klaushofrichter/ge150pro-game" target="_blank" rel="noopener noreferrer">klaushofrichter/ge150pro-game</a> (MIT), on the hosted service for the tables that tick it in the console. Not affiliated with or endorsed by Mooer; "Mooer" and "GE150" are trademarks of their owners.</li>
         </ul>
       </div>
     </div>
@@ -1459,7 +1459,7 @@ docker compose -f deploy/local/docker-compose.yml up -d --build">Copy</button></
     { id: "fm1-synth", name: "FM-1 Synth", players: "1 player", src: "synth", solo: true, phone: "fm1-synth-phone",
       text: "Not quite a game: a pocket synthesizer, the M-VAVE FM-1 or its big sibling the SMK-37, emulated on the board. One player plays its keys, knobs and pads by touch, with as many fingers as they like, and picks one of the community's firmwares on their phone. Built on fm1-emu by Joakim Eriksson." },
     { id: "ge150-pro", name: "GE150 Pro", players: "1 player", src: "ge150", solo: true, phone: "ge150-pro-phone",
-      text: "Not a game either: remote control for a Mooer GE150 Pro multi-effects pedal, for electric guitar players. It needs the pedal, connected to the table's computer by USB. The board shows the signal chain, every module's settings and the presets; the phone is a second screen on the music stand that switches sounds and runs a click while you play. Unofficial, not affiliated with Mooer." },
+      text: "Not a game either: remote control for a Mooer GE150 Pro multi-effects pedal, for electric guitar players. It needs the pedal, connected to the table's computer by USB. The board shows the signal chain, every module's settings and the presets; the phone is a second screen on the music stand that switches sounds and runs a click while you play. From the repository klaushofrichter/ge150pro-game; unofficial, not affiliated with Mooer." },
     { id: "coin-flip", name: "Coin Flip", players: "1–8 players", src: "built-in", phone: "coin-flip-phone",
       text: "Everyone guesses heads or tails, then the coin flips. The smallest complete game, and the one to copy when you start your own." },
   ];
