@@ -8,6 +8,7 @@ history.
 
 ## [Unreleased]
 
+- The website shows GE150 Pro, a guitar pedal's remote control for electric guitar players, with the phone as a second screen (D-292).
 - The extra-game repository ge150pro-game (GE150 Pro) is listed for tables (D-291).
 - A local table's notice shows each game's version instead of commit hashes (D-290).
 - A local table's notice also lists the repositories its other games come from (the service's, or downloaded at start), with branch and commit (D-289).
