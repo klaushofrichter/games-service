@@ -710,10 +710,20 @@ export function startCloud(o: CloudOptions) {
         return json(res, 200, withCode({ status: "approved", tableToken: bearer(req), config: tableConfig(t) }));
       }
       if (m === "POST" && p === "/api/tables/heartbeat") {
-        const t = requireTable(req);
+        requireTable(req);
         const b = await jsonBody(req);
+        // Looked up again after the body: the table may have been disconnected or deleted while it arrived, and must
+        // not be written back or given a code then.
+        const t = requireTable(req);
         t.lastSeen = Date.now();
-        if (b.metrics && typeof b.metrics === "object") t.metrics = b.metrics;
+        // Numbers only (the console shows them, D-214): a table can't put text, let alone markup, on the console.
+        if (b.metrics && typeof b.metrics === "object" && !Array.isArray(b.metrics)) {
+          t.metrics = Object.fromEntries(
+            Object.entries(b.metrics as Record<string, unknown>)
+              .filter(([k, v]) => /^\w{1,40}$/.test(k) && typeof v === "number" && Number.isFinite(v) && v >= 0)
+              .slice(0, 20),
+          ) as Record<string, number>;
+        }
         // Who plays from elsewhere right now (D-214): counts only, kept in memory, shown while the table is online.
         const count = (v: unknown) => (Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 1000 ? (v as number) : 0);
         if (b.presence && typeof b.presence === "object") presence.set(t.tableId, { remote: count(b.presence.remote), remoteConnected: count(b.presence.remoteConnected), watchers: count(b.presence.watchers) });
@@ -742,10 +752,14 @@ export function startCloud(o: CloudOptions) {
         return res.end(data);
       }
       if (m === "PUT" && (match = p.match(/^\/api\/tables\/logs\/([\w-]+)$/))) {
+        const owner = requireTable(req);
+        if (logs.get(match[1]) && logs.get(match[1])!.meta.tableId !== owner.tableId) return json(res, 409, { error: "a log with this id belongs to another table" });
+        const data = await body(req, 50 * 1024 * 1024);
+        // Checked again once the body is here: another table may have uploaded this id meanwhile, or this one been
+        // disconnected.
         const t = requireTable(req);
         const existing = logs.get(match[1]);
         if (existing && existing.meta.tableId !== t.tableId) return json(res, 409, { error: "a log with this id belongs to another table" });
-        const data = await body(req, 50 * 1024 * 1024);
         const gameId = String(url.searchParams.get("gameId") ?? "");
         // Bounded in total, and on disk by the volume's free space: the oldest logs make room for the new one, and the
         // reserve stays free for the database (D-114). Re-uploading the same id replaces it.
@@ -760,14 +774,17 @@ export function startCloud(o: CloudOptions) {
           console.warn(`[cloud] log ${match[1]} (${data.length} bytes) refused: not enough room on the volume`);
           return json(res, 507, { error: "the service's storage is full; the table keeps its own copy" });
         }
+        // The earlier copy of this log is replaced by the new file; the oldest others make room. Nothing goes until the
+        // new file is written: a write that fails (a full or failing disk) loses no log (D-279).
         if (existing) {
-          dropLog(match[1]);
           total -= existing.meta.bytes;
           free += existing.meta.bytes;
         }
+        const evict: string[] = [];
         for (const l of [...logs.values()].sort((a, b) => a.meta.uploadedAt - b.meta.uploadedAt)) {
           if (fits()) break;
-          dropLog(l.meta.id);
+          if (l.meta.id === match[1]) continue;
+          evict.push(l.meta.id);
           total -= l.meta.bytes;
           free += l.meta.bytes;
         }
@@ -784,6 +801,7 @@ export function startCloud(o: CloudOptions) {
           uploadedAt: Date.now(),
         };
         if (store.persistent) await store.writeLog(meta.id, data); // the file first: a record never points at a missing file
+        for (const id of evict) dropLog(id);
         store.put("log", meta.id, meta);
         logs.set(meta.id, { meta, data: store.persistent ? null : data });
         return json(res, 201, { ok: true });
@@ -1036,14 +1054,15 @@ export function startCloud(o: CloudOptions) {
           const holds = bound && bound.codeId === c.id ? bound : undefined;
           if (m === "PATCH" && !match[2]) {
             const b = await jsonBody(req);
-            if (b.label !== undefined) c.label = labelFrom(b.label);
+            // Every field checked before any changes: a refused edit leaves the code as it was.
+            const label = b.label !== undefined ? labelFrom(b.label) : c.label;
+            const validity = b.validity !== undefined ? validityFrom(b.validity) : undefined;
+            const scope = b.scope !== undefined ? scopeFrom(b.scope) : c.scope;
+            c.label = label;
             // A new validity counts from now: "one more month" for a code that is about to run out.
-            if (b.validity !== undefined) {
-              const validity = validityFrom(b.validity);
-              Object.assign(c, { validity, expiresAt: expiryFor(validity) });
-            }
+            if (validity !== undefined) Object.assign(c, { validity, expiresAt: expiryFor(validity) });
             // The bound table follows a new scope at its next heartbeat (within 15 s, between games).
-            if (b.scope !== undefined) c.scope = scopeFrom(b.scope);
+            c.scope = scope;
             saveCode(c);
             return json(res, 200, codeView(c));
           }

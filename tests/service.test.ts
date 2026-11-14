@@ -59,6 +59,10 @@ describe("table authentication", () => {
     const t = await pairedTable();
     expect((await call("POST", "/api/tables/heartbeat", {}, { authorization: "Bearer nope" })).status).toBe(401);
     expect((await t.as("POST", "/api/tables/heartbeat", {})).status).toBe(200);
+    // Metrics are numbers only: text from a table never reaches the console's page.
+    await t.as("POST", "/api/tables/heartbeat", { metrics: { gamesPlayed: "<img src=x onerror=alert(1)>", simulations: 3, "bad key": 1 } });
+    const listed = (await admin("GET", "/admin/api/tables")).body.find((x: { tableId: string }) => x.tableId === t.id);
+    expect(listed.metrics).toEqual({ simulations: 3 });
     expect((await admin("POST", `/admin/api/tables/${t.id}/revoke`)).status).toBe(200);
     expect((await t.as("POST", "/api/tables/heartbeat", {})).status).toBe(401);
     expect((await t.as("POST", "/api/tables/invites", {})).status).toBe(401);

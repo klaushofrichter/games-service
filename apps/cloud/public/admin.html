@@ -291,7 +291,7 @@ async function refresh() {
       <td><div>${esc(t.name)}</div><div class="mono faint">${esc(t.tableId)}</div></td>
       <td><span class="pill ${t.status}"${pillTip("table", t.status)}>${t.status}</span>${t.status === "pending" ? ` <span class="mono">${esc(t.pairingCode)}</span>` : ""}${t.code?.pastValidity ? ` <span class="pill past" title="Its access code has run out; disconnect it if it should stop">code past validity</span>` : ""}</td>
       <td><span class="dot ${t.online ? "on" : ""}"></span>${t.online ? "online" : `last seen ${ago(t.lastSeen)}`}${presenceLine(t.presence)}</td>
-      <td>${t.metrics.gamesPlayed ?? 0}</td>
+      <td>${esc(String(t.metrics.gamesPlayed ?? 0))}</td>
       <td>${t.status === "pending" ? `<span class="faint">ticked when approving</span>`
         : t.reposFrom === "code" ? `<div class="faint" style="font-size:13px">from access code <span class="codehint">${esc(t.code.hint)}••</span>${t.code.label ? ` ${esc(t.code.label)}` : ""}</div>${repos.length ? `<span class="checks" title="Change the code's games under Access codes">${repoChecks(t.repos ?? [], "disabled")}</span>` : ""}`
         : repos.length ? `<span class="checks" data-table-repos="${esc(t.tableId)}">${repoChecks(t.repos ?? [], "")}</span>` : `<span class="faint">no repositories</span>`}</td>
