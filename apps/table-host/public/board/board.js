@@ -824,11 +824,12 @@ function settleFinal() {
  * its Back to game shows that last screen again, with Awards and Results still in the corner (D-233).
  */
 function showStatistics(fromEnd = false) {
-  if (!state?.summary || overlayRoot.querySelector(".overlay.statistics")) return;
+  if (!state?.summary || overlayRoot.querySelector(".overlay.statistics.of-game")) return;
   const onClose = fromEnd ? () => ((holdFinal = false), render()) : undefined;
   // Award holders in their players' colours, as the table has them now (D-239); render() recolours an open window.
   const colorOf = (seat) => state?.players?.find((p) => p.seat === seat)?.color ?? null;
-  openStatistics({ summary: state.summary, gameName: state.game?.name, overlayRoot, edge: overlayEdge(), turnable: !REMOTE, onClose, backToGame: fromEnd, colorOf });
+  // Marked as the game's own: the Game Viewer's Awards and Results (same window) stays when a game starts (D-293).
+  openStatistics({ summary: state.summary, gameName: state.game?.name, overlayRoot, edge: overlayEdge(), turnable: !REMOTE, onClose, backToGame: fromEnd, colorOf }).classList.add("of-game");
 }
 statsBtn.addEventListener("click", () => showStatistics(true));
 resultBtn.addEventListener("click", () => {
@@ -1451,7 +1452,7 @@ function render() {
   resultBtn.className = `primary ${gameCorner}`;
   statsBtn.hidden = !atEnd || !stats;
   statsBtn.className = `primary ${gameCorner}`;
-  if (state.phase !== "finished") overlayRoot.querySelector(".overlay.statistics")?.remove();
+  if (state.phase !== "finished") overlayRoot.querySelector(".overlay.statistics.of-game")?.remove();
 
   renderPause();
   renderAway();
@@ -1579,7 +1580,7 @@ function joinPanel() {
 /** Seat layout buttons: only the layouts that may be chosen now (the chosen game's, or any visible game's). */
 function seatButtons() {
   const layouts = state.layouts?.length ? state.layouts : [2, 4, 6, 8];
-  return `<span class="seg" title="Seats around the table">${layouts.map((n) => `<button data-layout="${n}" class="${state.layout === n ? "on" : ""}">${n}</button>`).join("")}</span>`;
+  return `<span class="seg" title="Seats around the table">${layouts.map((n) => `<button data-layout="${n}" class="${state.layout === n ? "on" : ""}"${viewOnly() ? " disabled" : ""}>${n}</button>`).join("")}</span>`;
 }
 
 function toolbar() {
@@ -1734,7 +1735,7 @@ function renderFinished() {
       <div class="summary"><div class="eyebrow">${esc(state.game?.name ?? "Game")} · finished</div>
       <div class="big">${esc(s?.text ?? "Game over")}</div>
       ${s?.table ? `<div class="summary-scroll">${summaryTable(s.table, s)}</div>` : ""}
-      <div class="toolbar"><button class="primary" data-again>Play again</button>${hasStatistics(s) ? `<button data-stats>Awards and Results</button>` : ""}<button data-close>Back to lobby</button></div></div>
+      <div class="toolbar">${viewOnly() ? "" : `<button class="primary" data-again>Play again</button>`}${hasStatistics(s) ? `<button data-stats>Awards and Results</button>` : ""}${viewOnly() ? "" : `<button data-close>Back to lobby</button>`}</div></div>
     </section>${joinPanel()}`;
 }
 
@@ -1752,9 +1753,9 @@ function renderPause() {
     <h2>${online ? "Connection is back" : "Game paused"}</h2>
     <p>${online ? "Continue where you left off." : "The table lost its connection to the Game Table service. The game continues by itself when the connection returns."}</p>
     <div class="row">
-      ${online ? `<button class="primary" data-pause="resume">Continue</button>` : `<button disabled>Waiting…</button>`}
-      ${p.canSave ? `<button data-pause="save">Save and exit</button>` : ""}
-      <button class="danger" data-pause="end">End game</button></div></div>`;
+      ${REMOTE ? "" : online ? `<button class="primary" data-pause="resume">Continue</button>` : `<button disabled>Waiting…</button>`}
+      ${p.canSave && !REMOTE ? `<button data-pause="save">Save and exit</button>` : ""}
+      ${viewOnly() ? "" : `<button class="danger" data-pause="end">End game</button>`}</div></div>`;
 }
 
 /** Where a waiting card goes: from the seat a little toward the middle, so it covers the seat's corner of the game, not the table's edge. */
@@ -2151,10 +2152,11 @@ function openLobbyOverlay() {
       <div class="group">${REMOTE ? "" : `<div class="row"><span>Remote players${state.remote?.players ? ` · ${state.remote.players} joined` : ""}${state.watchers?.length ? ` · ${state.watchers.length} watching` : ""}</span>${inviteButton("Invite…")}</div>`}
         <div class="row"><span>Terms of service</span><button data-terms>Open</button></div></div>
       <div class="actions" style="display:flex;justify-content:space-between;margin-top:20px">
-        <button class="danger" data-end>End game</button><button class="primary" data-close-overlay>Back to game</button></div></div>`);
+        ${viewOnly() ? "<span></span>" : `<button class="danger" data-end>End game</button>`}<button class="primary" data-close-overlay>Back to game</button></div></div>`);
   };
   draw();
-  const unsub = onState(draw);
+  // The game ended meanwhile (its last move, End game elsewhere): the overlay goes, its buttons no longer apply.
+  const unsub = onState(() => (inRunningGame() ? draw() : (unsub(), o.remove())));
   o.addEventListener("click", async (e) => {
     const b = e.target.closest("button");
     if (e.target === o || b?.dataset.closeOverlay !== undefined) return (unsub(), o.remove());
@@ -2580,6 +2582,7 @@ async function openInvite(watch = false) {
   } catch {
     return close();
   }
+  if (!o.isConnected) return; // closed while the invite was being made
   let qr = "";
   const until = new Date(inv.expiresAt).toLocaleString([], { weekday: "short", hour: "2-digit", minute: "2-digit" });
   // An optional name for the player (D-155): it travels in the link (?name=) and fills in their name field, which they
@@ -2597,6 +2600,7 @@ async function openInvite(watch = false) {
     } catch {}
   };
   await loadQr(); // with the name it starts with, if any (without one, the link is the invite's own)
+  if (!o.isConnected) return; // closed meanwhile: no listener for a window that is gone
   o.addEventListener("click", (e) => {
     const b = e.target.closest("button");
     if (b?.dataset.x === "name") openNamePad(guest, async (n) => ((guest = n), await loadQr(), draw()));

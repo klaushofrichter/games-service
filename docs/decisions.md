@@ -2417,6 +2417,31 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   A review of the pass: the ETag also matches weak tags and lists of tags; the own checkout is compared as a path
   (Windows spells it two ways); a skip that can't reach the table says "Could not skip" again; the seats' dead "in a
   game" branch went.
+  **Then a correctness review of the whole repository** (table server, board and phone, service, games and scripts),
+  fixed here:
+  - **Service:** a table's metrics are numbers only, so no table can put markup into the console (it could run script
+    there); an access code's edit is checked whole before anything changes; a log upload checks its owner again once
+    its body is there and drops nothing (the earlier copy, the oldest logs) until the new file is written; a heartbeat
+    looks its table up again after its body, so a table deleted meanwhile is not written back or given a code.
+  - **Table Host:** a socket message that is JSON but not an object (`null`) no longer crashes the host; a game's error
+    in a timer step is logged instead of ending the process; Save and exit gives up when the game ended while it saved;
+    a phone's hello checks for room before its player counts as back, and a remote player's newer window replaces
+    their older one (one deck per player, D-133, also for remote players); a refused exchange leaves *Allow games
+    without a player at the table* as it was.
+  - **Board and phone:** a remote board's exchange QR code loads (the service worker routes `/qr.svg`); the Game
+    Viewer's Awards and Results no longer vanish at the next lobby message; a remote board shows no Continue or Save
+    and exit (only the table's board may), and a view-only one no End game, Play again, Back to lobby or seat layout;
+    the Lobby window closes when the game ends meanwhile; an invite window closed while its invite was being made
+    leaves no listener behind; a double tap on *Use this window* opens one connection, and an older socket's close no
+    longer says "open in another window".
+  - **Games:** Roulette accepts only its own bet types (`constructor` was one) and its AI no longer tops a spot up past
+    the maximum; Hold'em asks nobody to call a big blind that went all-in for less than the small blind (heads-up),
+    and after a short all-in, players who had already acted may call but not raise again.
+  - **Scripts:** the table PC's kiosk reads its port from `kiosk.env` (`.env` is root's, it holds the key); the
+    Windows starter keeps the saved private repositories when `-Repos` is given for one start.
+  *Not fixed:* a game whose own `onSeatJoined`/`onSeatChanged` throws can leave a seat with a player but no phone (the
+  table changes its players before asking the game); a conditional enum or bool setting in the board's form (no game
+  has one yet).
   *Not done, larger than a cleanup (each its own change if wanted):* one route table for what a remote board may do
   (server and board each keep a list now); one place where a game's origin is set (`source`, `from`); a game list
   fetched only when it can change; one replay at game over for the check and the move list, and a kept replay for
