@@ -267,6 +267,10 @@ describe("deck socket robustness", () => {
     const s = await rawSocket(t.base);
     s.ws.send("{ not json");
     await s.until((m) => m.type === "error" && /JSON/.test(m.payload.message));
+    // JSON that isn't an object (D-293): it once crashed the Table Host.
+    for (const v of ["null", "42", "[1]", '"x"']) s.ws.send(v);
+    await s.until((m) => m.type === "error" && /JSON object/.test(m.payload.message));
+    expect((await fetch(`${t.base}/health`)).status).toBe(200);
     s.ws.send(JSON.stringify({ v: 1, ch: "game", type: "intent", seq: 1, payload: { name: "x" } }));
     expect((await s.until((m) => m.seq === 1)).payload.message).toMatch(/hello first/);
     expect(s.closed()).toBeNull();

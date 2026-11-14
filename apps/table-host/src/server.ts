@@ -300,8 +300,9 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
     }
   };
 
-  const assertDeckRoom = () => {
-    if ([...clients].filter((o) => o.role === "deck").length >= MAX_DECKS) throw new TableError(409, "the table serves eight phones at most");
+  /** Room for one more deck; the windows of `replacing` (a player whose newest window replaces them) don't count. */
+  const assertDeckRoom = (replacing?: string) => {
+    if ([...clients].filter((o) => o.role === "deck" && (replacing === undefined || o.playerId !== replacing)).length >= MAX_DECKS) throw new TableError(409, "the table serves eight phones at most");
   };
 
   /** A new invite from the service (remote play), for a player, a watcher or an exchange. */
@@ -404,9 +405,16 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
       table.assertExchange(seat, kind); // before asking the service for an invite that could not be used
       // The last player at the table goes (D-223): the board asked, and games without one are allowed from now on. The
       // developer setting is the table's own board's to change, not a remote one's.
+      // A refused exchange leaves the setting as it was.
+      const before = table.allowNoLocalPlayer;
       if (body.allowNoLocalPlayer === true && !remote) table.setDeveloper({ allowNoLocalPlayer: true });
-      const url = kind === "remote" ? (await newInvite()).url : undefined;
-      return json(res, 200, { ...table.exchange(seat, kind, url, body.watcher), state: table.state() });
+      try {
+        const url = kind === "remote" ? (await newInvite()).url : undefined;
+        return json(res, 200, { ...table.exchange(seat, kind, url, body.watcher), state: table.state() });
+      } catch (e) {
+        if (table.allowNoLocalPlayer !== before) table.setDeveloper({ allowNoLocalPlayer: before });
+        throw e;
+      }
     }
     if (m === "DELETE" && path === "/exchange") return (table.cancelExchange(), ok());
     if (m === "DELETE" && (match = path.match(/^\/players\/([\w-]+)$/))) return (table.removePlayer(match[1], "evicted"), ok());
@@ -633,6 +641,8 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
       } catch {
         return reply("error", { message: "invalid JSON" });
       }
+      // `null`, a number or a list parses too: only an object is a message (anyone on the network can send one).
+      if (!msg || typeof msg !== "object" || Array.isArray(msg)) return reply("error", { message: "a message is a JSON object" });
       const c = client as any; // the hello turns it into a board or a deck
       try {
         if (msg.ch === "system" && msg.type === "hello") {
@@ -686,12 +696,14 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
             }, 1500);
             return;
           } else if (p.sessionToken) {
+            // Room first: a refused hello must not mark the player as back (they would be "connected" with no phone).
+            assertDeckRoom(table.playerIdFor(String(p.sessionToken)));
             const info = table.resume(String(p.sessionToken));
-            // One deck per player (D-133): the player's newest window replaces the older one, which is told so.
-            [...clients].filter((o) => o !== client && o.role === "deck" && o.playerId === info.id).forEach((o) => replaceClient(o));
-            assertDeckRoom();
             c.role = "deck";
             c.playerId = info.id;
+            // One deck per player (D-133): the player's newest window replaces the older one, which is told so. This
+            // window is the player's deck first, so the older one's close never counts the player as gone.
+            [...clients].filter((o) => o !== client && o.role === "deck" && o.playerId === info.id).forEach((o) => replaceClient(o));
             reply("welcome", { role: "deck", playerId: info.id }, msg.seq);
           } else {
             assertDeckRoom();
@@ -705,6 +717,8 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
                 : table.join(String(p.joinToken ?? ""), p.name);
             c.role = "deck";
             c.playerId = playerId;
+            // A remote player's newest window replaces their older ones too (D-133): one browser can't hold every slot.
+            [...clients].filter((o) => o !== client && o.role === "deck" && o.playerId === playerId).forEach((o) => replaceClient(o));
             reply("welcome", { role: "deck", playerId, sessionToken }, msg.seq);
           }
           send(ws, envelope("lobby", "state", forClient(remote, table.state(), c.session)));

@@ -376,7 +376,10 @@ export class Table extends EventEmitter {
       // The log replays to the saved state exactly (D-032), so it is the whole save.
       log: [...this.runtime.log],
     };
+    const rt = this.runtime;
     await this.logs.saveGame(id, save);
+    // The game may have ended while the save was written (a timer, an AI move, End game): then there is nothing to end.
+    if (this.runtime !== rt || rt.over || (this.phase !== "active" && this.phase !== "paused")) throw new TableError(409, "the game ended while it was being saved");
     this.phase = "terminating";
     this.runtime.finish("terminated", { text: `The game was saved (${id}) and can be resumed later.`, highlights: { saveId: id } });
     return id;
@@ -788,6 +791,11 @@ export class Table extends EventEmitter {
     if (v) v.name = n;
     this.changed();
     return p;
+  }
+
+  /** The player a session token belongs to, without resuming them (the server checks room first). */
+  playerIdFor(sessionToken: string): string | undefined {
+    return [...this.players.values()].find((x) => x.sessionToken && x.sessionToken === sessionToken)?.id;
   }
 
   resume(sessionToken: string): PlayerInfo {
