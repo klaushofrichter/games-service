@@ -6,6 +6,7 @@ import { realpath } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename } from "node:path";
 import { promisify } from "node:util";
+import { fileURLToPath } from "node:url";
 import type { InstalledGame } from "./games.ts";
 
 const run = promisify(execFile);
@@ -23,7 +24,12 @@ export interface Checkout {
   changed: boolean;
   /** The ids of the games from it. */
   games: string[];
+  /** It is this Table Host's own checkout (games-service, whatever its folder is called): its games are built in. */
+  platform?: boolean;
 }
+
+/** This Table Host's own checkout: apps/table-host/src is three folders below it. */
+const OWN_ROOT = realpath(fileURLToPath(new URL("../../..", import.meta.url))).catch(() => "");
 
 async function git(dir: string, ...args: string[]): Promise<string> {
   const { stdout } = await run("git", ["-C", dir, ...args], { timeout: 5000 });
@@ -51,7 +57,7 @@ export async function checkoutsOf(games: Map<string, InstalledGame>): Promise<Ch
         ]);
         const home = homedir();
         const path = home && (root === home || root.startsWith(`${home}/`)) ? `~${root.slice(home.length)}` : root;
-        c = { name: basename(root), path, branch: branch === "HEAD" ? "detached" : branch, commit, changed: status !== "", games: [] };
+        c = { name: basename(root), path, branch: branch === "HEAD" ? "detached" : branch, commit, changed: status !== "", games: [], ...(root === (await OWN_ROOT) ? { platform: true } : {}) };
         byRoot.set(root, c);
       }
       c.games.push(g.manifest.id);

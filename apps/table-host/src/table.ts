@@ -1909,7 +1909,9 @@ export class Table extends EventEmitter {
         this.endAiMove(p.id, mv);
         if (intent) this.submitAi(p, intent, meta, retried);
         else if (waitedFor) this.scheduleAi(); // the others were stopped for the pause
-        this.changed();
+        // The lobby state changed only if the board showed it thinking or the game waited for it; the move itself
+        // reaches the boards as a game message.
+        if (mv.shown || waitedFor) this.changed();
       },
       (e) => {
         if (e instanceof AiCancelled || this.aiMoves.get(p.id) !== mv) return;

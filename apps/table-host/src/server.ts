@@ -1,6 +1,6 @@
 // HTTP + WebSocket server of the Table Host: board and deck pages, board control API, live updates.
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { readFile } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import { extname, join, normalize, sep } from "node:path";
 import { createHash, timingSafeEqual } from "node:crypto";
 import { WebSocketServer, type WebSocket } from "ws";
@@ -271,15 +271,27 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
     }
   };
 
-  const serveFile = async (res: ServerResponse, rel: string, transform?: (s: string) => string, root = opts.publicDir) => {
+  const serveFile = async (req: IncomingMessage, res: ServerResponse, rel: string, transform?: (s: string) => string, root = opts.publicDir) => {
     const file = normalize(join(root, rel));
     // Inside root, not merely starting like it (a sibling folder "chess2" starts like "chess", D-202).
     if (!file.startsWith(root.endsWith(sep) ? root : root + sep)) return json(res, 404, { error: "not found" });
     try {
+      const asset = root !== opts.publicDir && !/\.(js|css)$/.test(file);
+      const headers = { "content-type": MIME[extname(file)] ?? "application/octet-stream", "cache-control": "no-cache", ...(asset ? ASSET_HEADERS : {}) };
+      // A file as it is on disk has an ETag (size and change time): a browser asks again on every load (no-cache) and
+      // gets 304 while it is unchanged. Pages filled in here (transform) are always sent.
+      let etag: string | undefined;
+      if (!transform) {
+        const st = await stat(file);
+        etag = `"${st.size.toString(36)}-${Math.trunc(st.mtimeMs).toString(36)}"`;
+        if (req.headers["if-none-match"] === etag) {
+          res.writeHead(304, { ...headers, etag });
+          return res.end();
+        }
+      }
       let data: Buffer | string = await readFile(file);
       if (transform) data = transform(data.toString("utf8"));
-      const asset = root !== opts.publicDir && !/\.(js|css)$/.test(file);
-      res.writeHead(200, { "content-type": MIME[extname(file)] ?? "application/octet-stream", "cache-control": "no-cache", ...(asset ? ASSET_HEADERS : {}) });
+      res.writeHead(200, { ...headers, ...(etag ? { etag } : {}) });
       res.end(data);
     } catch {
       json(res, 404, { error: "not found" });
@@ -533,24 +545,24 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
       // Play from the board (D-175): the board and one player's deck side by side, only on the table PC itself.
       if (path === "/board/play.html") {
         if (!boardAllowed(req)) return json(res, 403, { error: "the board is only served on the table PC" });
-        return await serveFile(res, "board/play.html", (s) => s.replace("__TABLE_KEY__", opts.tableKey));
+        return await serveFile(req, res, "board/play.html", (s) => s.replace("__TABLE_KEY__", opts.tableKey));
       }
       if (path === "/board" || path === "/board/" || path === "/board/index.html") {
         // Remote players get the same board, without the key: their channel is their authorisation.
-        if (remoteOf(req)) return await serveFile(res, "board/index.html", (s) => s.replace(`window.TABLE_KEY = "__TABLE_KEY__";`, `window.TABLE_KEY = ""; window.REMOTE_BOARD = true;`));
+        if (remoteOf(req)) return await serveFile(req, res, "board/index.html", (s) => s.replace(`window.TABLE_KEY = "__TABLE_KEY__";`, `window.TABLE_KEY = ""; window.REMOTE_BOARD = true;`));
         if (!boardAllowed(req)) return json(res, 403, { error: "the board is only served on the table PC" });
         // The board page talks to the board control API; it gets the key only on the table PC itself.
-        return await serveFile(res, "board/index.html", (s) => s.replace("__TABLE_KEY__", opts.tableKey));
+        return await serveFile(req, res, "board/index.html", (s) => s.replace("__TABLE_KEY__", opts.tableKey));
       }
-      if (path === "/deck" || path === "/deck/") return await serveFile(res, "deck/index.html");
-      if (path.startsWith("/board/") || path.startsWith("/deck/") || path.startsWith("/shared/")) return await serveFile(res, path.slice(1));
+      if (path === "/deck" || path === "/deck/") return await serveFile(req, res, "deck/index.html");
+      if (path.startsWith("/board/") || path.startsWith("/deck/") || path.startsWith("/shared/")) return await serveFile(req, res, path.slice(1));
       // Browsers ask for these at the root (Safari shows no SVG favicon, iOS looks for its home-screen icon): D-212.
-      if (path === "/favicon.ico" || path === "/apple-touch-icon.png") return await serveFile(res, `shared${path}`);
+      if (path === "/favicon.ico" || path === "/apple-touch-icon.png") return await serveFile(req, res, `shared${path}`);
       if ((match = path.match(/^\/games\/([a-z0-9-]+)\/((?:board|deck)\.(?:js|css)|how-to-play\.md|assets\/[\w./-]+)$/))) {
         // A game's own board and deck UI and its assets; rules and manifest are not served.
         const g = table.games.get(match[1]);
         if (!g || match[2].includes("..")) return json(res, 404, { error: "not found" });
-        return await serveFile(res, match[2], undefined, g.dir);
+        return await serveFile(req, res, match[2], undefined, g.dir);
       }
       json(res, 404, { error: "not found" });
     } catch (err) {

@@ -630,7 +630,7 @@ function info() {
     seatEdges: state.seatEdges ?? [],
     ...boardView(),
     players: state.players,
-    seatColors: state.seatColors ?? {}, // seats whose player left keep their colour (D-125)
+    seatColors: state.seatColors ?? {}, // always empty since D-159 (no seat loses its player); kept for the game UI contract
     settings: state.game?.settings ?? {},
     prefs: state.game?.prefs ?? {},
     timers: gameMsg?.timers ?? {},

@@ -2396,3 +2396,29 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   `home.html` (`solo` flag on a game, the `solo` filter, `ge150` source); the pictures `ge150-pro.webp`,
   `ge150-pro-phone.webp` (Rhythm) and `ge150-pro-phone-play.webp` are screenshots of the game's own browser check with
   its simulated pedal; the Play tab with six saved sounds on its quick slots ("this one is pretty empty", Klaus). Check: `scripts/e2e/website.py` (the Solo filter and the close-up's link).
+- **D-293 · 2026-11-14 · Klaus** — **A simplify pass over the whole repository.** "Do a /simplify … on the whole
+  games-service repository." Four reviews (reuse, simplification, efficiency, altitude); the contained findings are
+  fixed, nothing a player sees changes:
+  - **The table's files have an ETag** (size and change time): boards and phones ask on every load as before
+    (`no-cache`) and get 304 while a file is unchanged, instead of downloading `board.js`, `deck.js` and every game's
+    files again. Pages the table fills in (the board's and Play from the board's) are always sent.
+  - **An AI's answer redraws the lobby only when the board showed it thinking or the game waited for it**; the move
+    itself reaches the boards as a game message, so an AI move no longer draws the board twice.
+  - **The board leaves its seats alone during a game** (they are hidden), instead of rebuilding them on every lobby
+    message.
+  - **A local table knows its own checkout** (`platform` on a checkout, by its path), not by the folder name
+    "games-service": a clone in another folder no longer labels the built-in games as another repository's (D-287,
+    D-289).
+  - **The service's rate limits share one per-minute counter** (`perMinute()`: invite lookups, hellos, wrong codes), with
+    one sweep and one prune; a stale comment about the sweep went.
+  - Smaller: the console's two copy buttons share `copyWith()`; the board's `skipTimer` uses `api()` with a quiet 409;
+    `LogStore.finish` reuses `saveInterrupted`; the move texts name a seat through one `who()`; two comments about
+    `seatColors` say it is always empty since D-159.
+  *Not done, larger than a cleanup (each its own change if wanted):* one route table for what a remote board may do
+  (server and board each keep a list now); one place where a game's origin is set (`source`, `from`); a game list
+  fetched only when it can change; one replay at game over for the check and the move list, and a kept replay for
+  stepping in the Game Viewer; a sidecar file for log metadata; the service's disk usage from its own log sizes and
+  heartbeats that write only what changed; shared server helpers and access-code rules between the table and the
+  service; the starter asking GitHub whether a repository is private. *Kept as it is:* an empty name still gets
+  "Player N" counted from the number at the table (D-148; the suggestion of D-244 counts from 1), as the tests pin.
+

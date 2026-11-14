@@ -73,7 +73,7 @@ export async function startHost(o: HostOptions = {}) {
   if (table.localTable) {
     table.checkouts = await checkoutsOf(games); // games from local clones (D-251): the board says which branches
     // The lobby names a clone's games by its folder (D-287); whether it is private, git can't tell.
-    for (const c of table.checkouts) if (c.name !== "games-service") for (const id of c.games) { const g = games.get(id); if (g && !g.from) g.from = { repo: c.name }; }
+    for (const c of table.checkouts) if (!c.platform) for (const id of c.games) { const g = games.get(id); if (g && !g.from) g.from = { repo: c.name }; }
   }
   const server = await startServer(table, logs, {
     port: o.port ?? 8080,

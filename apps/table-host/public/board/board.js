@@ -47,7 +47,8 @@ let gameMsg = null; // last game.board message
 let selectedPlayer = null;
 
 // ---------- API ----------
-async function api(method, path, body) {
+/** A call to the table's API; a refusal shows its reason as a toast (except for the statuses in `quiet`) and throws. */
+async function api(method, path, body, { quiet = [] } = {}) {
   const res = await fetch(`/api/v1${path}`, {
     method,
     headers: { ...(KEY ? { "x-table-key": KEY } : {}), ...(body ? { "content-type": "application/json" } : {}) },
@@ -55,7 +56,7 @@ async function api(method, path, body) {
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    toast(data.error ?? `Request failed (${res.status})`);
+    if (!quiet.includes(res.status)) toast(data.error ?? `Request failed (${res.status})`);
     throw new Error(data.error);
   }
   return data;
@@ -165,7 +166,7 @@ function noticeDialog(title, text, okLabel = "OK") {
 const LOCAL_NOTICE_KEY = "gametable.localNotice";
 let localNoticeShown = false;
 let localNotice = null; // the open notice's body, refreshed with each state while it is open
-let localNoticePlatform = null; // the platform's version for the games-service clone (GET /version), when it has one: not "dev"
+let localNoticePlatform = null; // the platform's version for its own clone (GET /version), when it has one: not "dev"
 function localNoticeBody() {
   const noService = state.cloud?.status === "disabled";
   const checkouts = state.checkouts ?? [];
@@ -179,7 +180,7 @@ function localNoticeBody() {
         by the QR code on this network. Remote players and watchers can't join, and there are no invites.</p>`
     : "";
   const repoLine = (r) =>
-    `<li><b>${esc(r.name)}</b>${r.name === "games-service" && localNoticePlatform ? ` ${esc(localNoticePlatform)}` : ""}${r.branch ? ` · branch <code>${esc(r.branch)}</code>` : ""}${r.changed ? ", with changes not committed" : ""}<br><span class="faint">${r.games.map(named).join(", ")}</span></li>`;
+    `<li><b>${esc(r.name)}</b>${r.platform && localNoticePlatform ? ` ${esc(localNoticePlatform)}` : ""}${r.branch ? ` · branch <code>${esc(r.branch)}</code>` : ""}${r.changed ? ", with changes not committed" : ""}<br><span class="faint">${r.games.map(named).join(", ")}</span></li>`;
   const clones = checkouts.length
     ? `<p><b>Games from the clones on this computer</b>, not from GitHub: each runs as its checkout is now.</p>
        <ul class="local-checkouts">${checkouts.map((c) => repoLine({ ...c, games: c.games.filter((id) => games.some((g) => g.id === id)) })).join("")}</ul>`
@@ -1417,7 +1418,7 @@ function render() {
   // Dialogs too (D-252): a pad opened from one turns with the board, and the window behind it must turn with it.
   for (const d of overlayRoot.querySelectorAll(".dialog-backdrop > .dialog")) faceFront(d);
   gameEdge(); // keeps the last north/south facing current, so a game starts facing the way the lobby last did
-  renderSeats();
+  if (lobbyPhase()) renderSeats(); // hidden while a game runs: no rebuild on every lobby message then
   if (REMOTE) fit();
   renderViewButton();
   const front = viewEdge();
@@ -1997,15 +1998,10 @@ function boardAct(seat, name, payload) {
  * fired meanwhile (a second tap, the wait ran out) answers 409 and is not worth a toast.
  */
 async function skipTimer(id) {
-  const res = await fetch("/api/v1/game/skip-timer", {
-    method: "POST",
-    headers: { ...(KEY ? { "x-table-key": KEY } : {}), "content-type": "application/json" },
-    body: JSON.stringify({ id }),
-  }).catch(() => null);
-  if (res?.ok) return { ok: true };
-  const data = await res?.json().catch(() => ({}));
-  if (res?.status !== 409) toast(data?.error ?? "Could not skip");
-  return { ok: false, reason: data?.error };
+  return api("POST", "/game/skip-timer", { id }, { quiet: [409] }).then(
+    () => ({ ok: true }),
+    (e) => ({ ok: false, reason: e.message || undefined }),
+  );
 }
 
 function gameInfo() {
@@ -2015,7 +2011,7 @@ function gameInfo() {
     // remote board only while the table gives remote players board control.
     boardControl: !REMOTE || !!state.remote?.boardControl,
     players: state.players,
-    seatColors: state.seatColors ?? {}, // seats whose player left keep their colour (D-125)
+    seatColors: state.seatColors ?? {}, // always empty since D-159 (no seat loses its player); kept for the game UI contract
     seatEdges: state.seatEdges,
     seatPositions: seatPositions(state.seatEdges),
     frontEdge: gameEdge(),

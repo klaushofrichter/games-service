@@ -207,6 +207,22 @@ describe("HTTP hardening", () => {
     }
   });
 
+  it("answers an unchanged file with 304, and always sends the pages it fills in (D-293)", async () => {
+    const t = await host();
+    const first = await fetch(`${t.base}/board/board.js`);
+    expect(first.status).toBe(200);
+    expect(first.headers.get("cache-control")).toBe("no-cache");
+    const etag = first.headers.get("etag")!;
+    expect(etag).toMatch(/^"[0-9a-z]+-[0-9a-z]+"$/);
+    const again = await fetch(`${t.base}/board/board.js`, { headers: { "if-none-match": etag } });
+    expect(again.status).toBe(304);
+    expect(await again.text()).toBe("");
+    expect((await fetch(`${t.base}/board/board.js`, { headers: { "if-none-match": '"other"' } })).status).toBe(200);
+    // The board's page carries the table key: filled in on every request, no ETag.
+    const page = await fetch(`${t.base}/board/`);
+    expect(page.headers.get("etag")).toBeNull();
+  });
+
   it("answers unknown endpoints, bad JSON and oversized bodies with clear errors", async () => {
     const t = await host();
     expect((await t.api("GET", "/nope")).status).toBe(404);

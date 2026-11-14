@@ -277,32 +277,40 @@ export function startCloud(o: CloudOptions) {
   /** Whether a hello or heartbeat body presents an access code at all. */
   const presentsCode = (v: unknown) => v !== undefined && v !== null && v !== "";
   /**
-   * A per-address map grows by one entry per address between the 10-minute prunes; past a size many addresses could
-   * reach (an IPv6 range), entries whose minute is over go at once (D-202).
+   * Hits per key (a client address) in a one-minute window, for the rate limits. The map grows by one entry per address
+   * between the 10-minute prunes; past a size many addresses could reach (an IPv6 range), entries whose minute is over
+   * go at once (D-202), at most once a second (D-279): a flood from many addresses keeps every entry fresh, and
+   * scanning them all on each request would make the limiter the hot spot.
    */
-  /**
-   * Drops expired entries once a map is large. At most once a second per map (D-279): a flood from many addresses
-   * keeps every entry fresh, and scanning them all on each request would make the limiter the hot spot.
-   */
-  const swept = new WeakMap<Map<string, { reset: number }>, number>();
-  const sweep = (m: Map<string, { reset: number }>) => {
-    const now = Date.now();
-    if (m.size < 50_000 || now - (swept.get(m) ?? 0) < 1000) return;
-    swept.set(m, now);
-    for (const [k, v] of m) if (v.reset < now) m.delete(k);
+  const perMinute = () => {
+    const m = new Map<string, { n: number; reset: number }>();
+    let swept = 0;
+    return {
+      /** Counts one more for the key; returns the count in its current minute. */
+      hit(key: string) {
+        const now = Date.now();
+        if (m.size >= 50_000 && now - swept >= 1000) {
+          swept = now;
+          this.prune(now);
+        }
+        const e = m.get(key);
+        if (!e || e.reset <= now) return m.set(key, { n: 1, reset: now + 60_000 }), 1;
+        return ++e.n;
+      },
+      /** The key's count in its current minute, without counting. */
+      count(key: string) {
+        const e = m.get(key);
+        return e && e.reset > Date.now() ? e.n : 0;
+      },
+      prune(now = Date.now()) {
+        for (const [k, v] of m) if (v.reset < now) m.delete(k);
+      },
+    };
   };
   /** Wrong codes per client address; a hello with a code is refused once a client has too many in a minute. */
-  const codeFailures = new Map<string, { n: number; reset: number }>();
-  const codeBlocked = (ip: string) => {
-    const f = codeFailures.get(ip);
-    return !!f && f.reset > Date.now() && f.n >= MAX_CODE_FAILURES;
-  };
-  const codeFailed = (ip: string) => {
-    sweep(codeFailures);
-    const f = codeFailures.get(ip);
-    if (!f || f.reset <= Date.now()) codeFailures.set(ip, { n: 1, reset: Date.now() + 60_000 });
-    else f.n++;
-  };
+  const codeFailures = perMinute();
+  const codeBlocked = (ip: string) => codeFailures.count(ip) >= MAX_CODE_FAILURES;
+  const codeFailed = (ip: string) => void codeFailures.hit(ip);
   /** Disconnect: the table stops using the service until an admin reconnects it. */
   const disconnect = (t: TableRecord) => {
     t.status = "revoked";
@@ -395,7 +403,7 @@ export function startCloud(o: CloudOptions) {
     if (!vol || !use) return null;
     return { ...vol, reserve: reserveFor(vol.total), ...use, logCap: maxLogBytes, logBytes: logBytes(), low: vol.free < reserveFor(vol.total) * 1.5 };
   };
-  const lookups = new Map<string, { n: number; reset: number }>(); // invite lookup rate limit per IP
+  const lookups = perMinute(); // invite lookup rate limit per IP
   /** Each table's remote players and watchers from its last heartbeat (D-214); not stored. */
   const presence = new Map<string, { remote: number; remoteConnected: number; watchers: number }>();
   const iceFor = iceProvider(o.iceServers ?? [{ urls: "stun:stun.l.google.com:19302" }], o.cloudflareTurn ?? null);
@@ -430,14 +438,7 @@ export function startCloud(o: CloudOptions) {
     const xff = fromProxy(req.socket.remoteAddress) ? String(req.headers["x-forwarded-for"] ?? "").split(",").map((x) => x.trim()).filter(Boolean).pop() : "";
     return xff || req.socket.remoteAddress || "?";
   };
-  const limited = (ip: string, max = 20) => {
-    sweep(lookups);
-    const l = lookups.get(ip) ?? { n: 0, reset: Date.now() + 60_000 };
-    if (Date.now() > l.reset) Object.assign(l, { n: 0, reset: Date.now() + 60_000 });
-    l.n++;
-    lookups.set(ip, l);
-    return l.n > max;
-  };
+  const limited = (ip: string, max = 20) => lookups.hit(ip) > max;
 
   const json = (res: ServerResponse, status: number, body: unknown) => {
     res.writeHead(status, { "content-type": "application/json", "cache-control": "no-store" });
@@ -515,8 +516,8 @@ export function startCloud(o: CloudOptions) {
     for (const [k, i] of invites) if (i.expiresAt < now) (invites.delete(k), store.delete("invite", k));
     for (const [k, d] of downloadTokens) if (d.expiresAt < now) (downloadTokens.delete(k), store.delete("download", k));
     for (const [k, r] of remoteSessions) if (r.expiresAt < now) (r.ws?.close(4002, "expired"), remoteSessions.delete(k), store.delete("session", k));
-    for (const [ip, l] of lookups) if (l.reset < now) lookups.delete(ip);
-    for (const [ip, f] of codeFailures) if (f.reset < now) codeFailures.delete(ip);
+    lookups.prune(now);
+    codeFailures.prune(now);
     // Codes expired or revoked more than a year ago go, unless a table still uses one (D-113).
     for (const c of [...codes.values()]) {
       const t = c.tableId ? tables.get(c.tableId) : undefined;

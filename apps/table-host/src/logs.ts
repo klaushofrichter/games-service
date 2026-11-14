@@ -176,9 +176,7 @@ export class LogStore {
   /** The game ended: pack its log and remove the running file. */
   async finish(running: RunningLog, meta: RunMeta, records: LogRecord[], state: unknown, moves?: MoveRow[]): Promise<string> {
     running.close();
-    const file = await this.save(meta, [records], [state], [moves]);
-    if (running.dir) await rm(running.dir, { recursive: true, force: true });
-    return file;
+    return this.saveInterrupted(running.dir, meta, records, state, moves);
   }
 
   /** Games the table stopped in the middle of: what their running files hold. */
