@@ -2456,4 +2456,17 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   the player's own browser and keeps its menu; the phone is unchanged. A menu drawn by the desktop itself (outside the
   browser) would need a setting on that PC; the kiosk of `deploy/table-pc` has no desktop. *Implementation (Claude):*
   `board.js`, `play.html`. Checks: `scripts/e2e/board_screen.py` (cancelled), `scripts/e2e/remote.py` (kept).
+- **D-295 · 2026-11-15 · Klaus** — **Swipe through the games in the lobby, round and round.** "Enable a swipe left/right
+  gesture to change the games … the next three, ideally with an animation … an endless carousel, wrapping around. We
+  keep the groups of three. Honour the board orientation." A swipe across the game tiles turns the page of three:
+  toward the left the next three, toward the right the three before. The tiles follow the finger; let go past a fifth
+  of their width (at most 80 px) and the next page slides in from that side, short of it they spring back. The pages
+  go round: after the last page comes the first, by a swipe or the arrows (which are never greyed out now); a dot jumps
+  to its page and slides the same way. The groups stay as they were (the last may hold fewer than three). Left and
+  right are the lobby's own however it is turned, at the table's front edge or on a remote board turned to its player:
+  the finger's movement is taken back through the tiles' on-screen transform. A swipe never chooses the tile it starts
+  on; a tap still does. On every board, the table's and remote ones (paging is only looking). No slide with *reduce
+  motion*. *Implementation (Claude):* `turnPage()`, the swipe handlers and `inLocalFrame()` in `board.js`; `.games`
+  slide keyframes in `board.css`. Checks: `scripts/e2e/layout.py` (a swipe on a board facing west, across it no turn,
+  round the ends); the paging helpers in `play.py` and `extra.py` go by the dots.
 
