@@ -137,19 +137,20 @@ try:
         board.wait_for_selector("text=Pick a game")
 
         def tile_on_board(page_or_frame, gid="dice-duel"):
-            """Page through the game tiles looking for gid; True if found (ends on page 1)."""
+            """Page through the game tiles looking for gid; True if found (it stays shown), else back on page 1."""
             loc = page_or_frame.locator
-            for _ in range(2):  # the pager may need to wrap around from wherever it was
-                while loc(".pager button[data-page='-1']").count() and loc(".pager button[data-page='-1']").is_enabled():
-                    loc(".pager button[data-page='-1']").click()
-                for _ in range(10):
-                    if loc(f"button.tile[data-game={gid}]").count():
-                        return True
-                    nxt = loc(".pager button[data-page='1']")
-                    if not nxt.count() or not nxt.is_enabled():
-                        break
-                    nxt.click()
-            return False
+            # Every page once, by its dot (the pages go round, D-295); not found: back to the first.
+            pages = loc(".pager .dot").count()
+            found = False
+            for i in range(max(1, pages)):
+                if pages:
+                    loc(f".pager .dot[data-page-to='{i}']").click()
+                if loc(f"button.tile[data-game={gid}]").count():
+                    found = True
+                    break
+            if pages and not found:
+                loc(".pager .dot[data-page-to='0']").click()
+            return found
 
         assert wait(lambda: tile_on_board(board), 10, "the Dice Duel tile on the local board")
         # D-287: the tile names its repository, and a private one has a red border.

@@ -74,6 +74,14 @@ html, body { overflow: hidden; }
 .main .sub { color: var(--ink-soft); margin-bottom: 18px; }
 
 .games { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-auto-rows: min-content; gap: 14px; padding: 4px; }
+/* The pages of games go round by a swipe (D-295): the finger's movement is the board's, not the browser's to pan. The
+   page just turned slides in from the side it came from. */
+.games[data-swipe] { touch-action: none; }
+.games.slide-next { animation: games-in-next .3s ease-out; }
+.games.slide-prev { animation: games-in-prev .3s ease-out; }
+@keyframes games-in-next { from { transform: translateX(18%); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes games-in-prev { from { transform: translateX(-18%); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .games.slide-next, .games.slide-prev { animation: none; } }
 .pager { display: flex; align-items: center; gap: 10px; font-size: .7em; margin-top: -4px; }
 .pager button { min-width: 0; padding: .2em .7em; font-size: 1.4em; line-height: 1; }
 .pager button[disabled] { opacity: .25; }

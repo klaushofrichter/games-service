@@ -155,6 +155,32 @@ with sync_playwright() as p:
         page.wait_for_timeout(200)
         if page.locator(".games .tile").first.get_attribute("data-game") == first:
             problems.append("board: the next-page button did not change the games shown")
+        # A swipe turns the pages too (D-295), in the lobby's own left and right: facing west the lobby is turned a
+        # quarter, so its "toward the left" is a finger moving up the screen (or down: it is checked both ways).
+        def swipe(dx, dy):
+            box = page.locator(".games").bounding_box()
+            x, y = box["x"] + box["width"] / 2, box["y"] + box["height"] / 2
+            page.mouse.move(x, y)
+            page.mouse.down()
+            page.mouse.move(x + dx, y + dy, steps=8)
+            page.mouse.up()
+            page.wait_for_timeout(450)
+            return page.evaluate("() => document.querySelector('.pager .dot.on').dataset.pageTo")
+        pages = page.locator(".pager .dot").count()
+        at = page.evaluate("() => document.querySelector('.pager .dot.on').dataset.pageTo")
+        moved = {swipe(0, -200), swipe(0, 200)}  # one of them is "next", the other back
+        if len(moved) < 2 or at not in moved:
+            problems.append(f"board facing west: swiping along the lobby's left-right did not turn the pages ({at} -> {moved})")
+        before = page.evaluate("() => document.querySelector('.pager .dot.on').dataset.pageTo")
+        swipe(200, 0)  # across the lobby's up-down: no page turn
+        if page.evaluate("() => document.querySelector('.pager .dot.on').dataset.pageTo") != before:
+            problems.append("board facing west: a swipe across the lobby's up and down turned the page")
+        # Round the ends: from the last page, "next" is the first.
+        page.locator(f".pager .dot[data-page-to='{pages - 1}']").click()
+        page.locator(".pager button[data-page='1']").click()
+        page.wait_for_timeout(400)
+        if page.evaluate("() => document.querySelector('.pager .dot.on').dataset.pageTo") != "0":
+            problems.append("board: the next page after the last is not the first")
     elif page.locator(".games .tile").count() > 3:
         problems.append("board: more than three games but no pager")
     page.locator("#corners button[data-face='south']").click()

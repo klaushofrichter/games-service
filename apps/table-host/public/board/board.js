@@ -1611,9 +1611,20 @@ function renderLobby() {
   sizeTiles();
 }
 
-// The lobby shows the games a page at a time (three tiles fit beside the join panel), with arrows and dots.
+// The lobby shows the games a page at a time (three tiles fit beside the join panel), with arrows and dots. The pages
+// go round (D-295): after the last comes the first again, by the arrows or by a swipe across the tiles.
 const PAGE_SIZE = 3;
 let gamePage = 0;
+let slideIn = ""; // "next" or "prev": the page just turned slides in from that side, once
+const gamePages = () => Math.max(1, Math.ceil(games.length / PAGE_SIZE));
+/** Turn the games page by `step` (±1), round the end to the other end, with the slide. */
+function turnPage(step) {
+  const pages = gamePages();
+  if (pages < 2) return;
+  gamePage = (((gamePage + step) % pages) + pages) % pages;
+  slideIn = step > 0 ? "next" : "prev";
+  render();
+}
 /** A remote board that may not operate the table: a watcher, or board control switched off (D-167, D-170). */
 /**
  * A remote board that may only watch: the table's board, or a remote board with board control, may operate the table.
@@ -1632,16 +1643,74 @@ const tileHtml = (g) => `<button class="tile ${g.selectable ? "selectable" : ""}
           <span class="faint" style="font-size:.66em">${playersLabel(g.players)}${g.ai ? " · AI" : ""}</span>${g.extra ? `<span class="repo" style="font-size:.66em">${esc(g.repo ?? "added")}${g.private ? " · private" : ""}</span>` : ""}
           ${g.selectable ? `<span class="hint">${esc(tileHint(g))}</span>` : `<span class="why">${esc(g.reasons[0][0].toUpperCase() + g.reasons[0].slice(1))}${roomTile(g) ? " · tap to make room" : ""}</span>`}</button>`;
 function gameTiles() {
-  const pages = Math.max(1, Math.ceil(games.length / PAGE_SIZE));
+  const pages = gamePages();
   gamePage = Math.min(gamePage, pages - 1);
   const tiles = games.slice(gamePage * PAGE_SIZE, (gamePage + 1) * PAGE_SIZE).map(tileHtml).join("");
   const pager = pages < 2 ? "" : `<div class="pager">
-      <button data-page="-1" ${gamePage === 0 ? "disabled" : ""} aria-label="Previous games">‹</button>
+      <button data-page="-1" aria-label="Previous games">‹</button>
       ${Array.from({ length: pages }, (_, i) => `<button class="dot ${i === gamePage ? "on" : ""}" data-page-to="${i}" aria-label="Games page ${i + 1}"></button>`).join("")}
-      <button data-page="1" ${gamePage === pages - 1 ? "disabled" : ""} aria-label="More games">›</button>
+      <button data-page="1" aria-label="More games">›</button>
       <span class="faint">${games.length} games</span></div>`;
-  return `<div class="games">${tiles}</div>${pager}`;
+  const slide = slideIn ? ` slide-${slideIn}` : "";
+  slideIn = ""; // the slide plays once: a redraw for a lobby message shows the page as it is
+  return `<div class="games${slide}"${pages > 1 ? " data-swipe" : ""}>${tiles}</div>${pager}`;
 }
+
+/**
+ * A swipe across the game tiles turns the page (D-295): toward the left the next three, toward the right the ones
+ * before, round the ends. Left and right are the lobby's own, however the board turns it (the table's front edge, a
+ * remote board turned to its player): the finger's movement is taken back through the tiles' on-screen transform.
+ * The tiles follow the finger; let go past a fifth of their width (or 80 px) and the next page slides in, short of it
+ * they spring back. A swipe is not a tap: the tile under the finger is not chosen.
+ */
+function inLocalFrame(el, dx, dy) {
+  // The linear part of every transform from the tiles up to the page (rotation and scale; moves don't turn a vector).
+  let m = new DOMMatrix();
+  for (let n = el; n && n !== document.documentElement; n = n.parentElement) {
+    const t = getComputedStyle(n).transform;
+    if (t && t !== "none") m = new DOMMatrix(t).multiply(m);
+  }
+  const det = m.a * m.d - m.b * m.c || 1;
+  return { x: (m.d * dx - m.c * dy) / det, y: (-m.b * dx + m.a * dy) / det };
+}
+let swipe = null; // { id, x, y, grid, dx, moving }
+let swallowClick = false;
+center.addEventListener("pointerdown", (e) => {
+  const grid = e.target.closest?.(".games[data-swipe]");
+  if (!grid || swipe) return;
+  swipe = { id: e.pointerId, x: e.clientX, y: e.clientY, dx: 0, moving: false };
+});
+addEventListener("pointermove", (e) => {
+  if (!swipe || e.pointerId !== swipe.id) return;
+  const grid = center.querySelector(".games[data-swipe]");
+  if (!grid) return void (swipe = null);
+  const d = inLocalFrame(grid, e.clientX - swipe.x, e.clientY - swipe.y);
+  if (!swipe.moving && Math.abs(d.x) > 12 && Math.abs(d.x) > Math.abs(d.y) * 1.2) swipe.moving = true;
+  if (!swipe.moving) return;
+  swipe.dx = d.x;
+  grid.style.transition = "none";
+  grid.style.transform = `translateX(${d.x}px)`;
+  grid.style.opacity = String(Math.max(0.35, 1 - Math.abs(d.x) / (grid.clientWidth || 1)));
+});
+const endSwipe = (e) => {
+  if (!swipe || e.pointerId !== swipe.id) return;
+  const { moving, dx } = swipe;
+  swipe = null;
+  if (!moving) return;
+  swallowClick = true; // the click that follows the lifted finger
+  setTimeout(() => (swallowClick = false), 400);
+  const grid = center.querySelector(".games[data-swipe]");
+  if (e.type !== "pointercancel" && Math.abs(dx) > Math.min(80, (grid?.clientWidth ?? 400) / 5)) return turnPage(dx < 0 ? 1 : -1);
+  if (!grid) return;
+  grid.style.transition = "transform .2s ease-out, opacity .2s ease-out";
+  grid.style.transform = "";
+  grid.style.opacity = "";
+};
+addEventListener("pointerup", endSwipe);
+addEventListener("pointercancel", endSwipe);
+center.addEventListener("click", (e) => {
+  if (swallowClick) (e.stopImmediatePropagation(), e.preventDefault(), (swallowClick = false));
+}, true);
 
 /**
  * Every tile as tall as the tallest of all the games, on any page (D-228), so paging doesn't move the pager or what
@@ -2083,8 +2152,8 @@ center.addEventListener("click", async (e) => {
   const d = b.dataset;
   if (d.game) chooseGame(d.game);
   else if (d.room) makeRoom(d.room);
-  else if (d.page) ((gamePage = Math.max(0, gamePage + Number(d.page))), render());
-  else if (d.pageTo) ((gamePage = Number(d.pageTo)), render());
+  else if (d.page) turnPage(Number(d.page));
+  else if (d.pageTo && Number(d.pageTo) !== gamePage) ((slideIn = Number(d.pageTo) > gamePage ? "next" : "prev"), (gamePage = Number(d.pageTo)), render());
   else if (d.config) configureAi(d.config);
   else if (d.layout) act("POST", "/layout", { seats: Number(d.layout) });
   else if ("addAi" in d) act("POST", "/ai", {});
