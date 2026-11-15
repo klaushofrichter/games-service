@@ -2489,3 +2489,18 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   *Implementation (Claude):* `setMasterVolume()` in `board.js`. Check: `scripts/e2e/board_screen.py` (a constant
   signal rendered offline comes out at the slider's value).
 
+- **D-298 · 2026-11-15 · Klaus** — **A screensaver for the board.** "A screensaver option for the board. It should be on
+  one hour before starting and it can be turned off in the settings. This is not for the full screen, but for the board
+  window. When an input happens, the timer is reset … a dark fade of the whole board, perhaps with a large digital clock
+  slowly floating … It should not increase power draw." After an hour without input the board's window fades to black
+  (3 s) and shows a large, dim clock with the date, drifting slowly and turning back at the edges (it also keeps a still
+  picture off the screen). The next touch, click, key, wheel or mouse movement brings the board back at once, and that
+  input does nothing else: the tap that wakes the board presses no button under it (a mouse wakes it as it moves, so a
+  press within 0.7 s after is part of waking). A move in the game, from a phone or an AI player, counts as input too, so
+  a game played on the phones never goes dark. Light on power: once black, the board underneath is not painted
+  (`visibility: hidden`), and the clock moves a few pixels once a second, with no animation. Settings › Display ›
+  *Screensaver*, on by default, kept per screen in its browser (`gametable.screensaver`) like the pointer and volume;
+  also in a watcher's window. Not inside Play from the board, where input on the deck beside it is not seen. It covers
+  the board's window only; the computer's own screen blanking is its own setting.
+  *Implementation (Claude):* `scheduleSaver()`/`showSaver()` in `board.js`. Check: `scripts/e2e/screensaver.py` (the
+  page's clock is run forward).

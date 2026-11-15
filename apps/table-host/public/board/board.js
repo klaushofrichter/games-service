@@ -1019,6 +1019,7 @@ async function watcherAction(b) {
 /** The settings' Fullscreen row, also in a watcher's window (D-221): the whole page where it applies (D-184). */
 function fullscreenRow() {
   return `<div class="row"><span>Fullscreen</span>${fsDoc.fullscreenEnabled ? `<button data-fs class="${fsDoc.fullscreenElement ? "on" : ""}">${fsDoc.fullscreenElement ? "Leave fullscreen" : "Fullscreen"}</button>` : `<span class="faint">not available in this browser</span>`}</div>
+    ${IN_PLAY ? "" : `<div class="row"><span>Screensaver <span class="faint">· after an hour without input this window goes dark with a clock; a touch brings it back</span></span><button data-screensaver class="${saverOn ? "on" : ""}" role="switch" aria-checked="${saverOn}">${saverOn ? "On" : "Off"}</button></div>`}
     ${fsDoc.fullscreenEnabled ? `<div class="row"><span>Hide the mouse pointer in fullscreen <span class="faint">· for a touchscreen; Esc leaves fullscreen and shows it again</span></span><button data-hide-pointer class="${hidePointer ? "on" : ""}" role="switch" aria-checked="${hidePointer}">${hidePointer ? "On" : "Off"}</button></div>` : ""}`;
 }
 function toggleFullscreen() {
@@ -1054,6 +1055,7 @@ function openWatchers() {
     if (e.target === o || b?.dataset.closeOverlay !== undefined) return close();
     if (b?.dataset.fs !== undefined) return toggleFullscreen();
     if (b?.dataset.hidePointer !== undefined) return (setHidePointer(!hidePointer), draw());
+    if (b?.dataset.screensaver !== undefined) return (setScreensaver(!saverOn), draw());
     if (b?.dataset.watcherName !== undefined) {
       const me = watcherSelf();
       return openNamePad(me?.name === "Guest" ? "" : (me?.name ?? ""), (n) => n && act("POST", "/watching/name", { name: n }), "Your name");
@@ -1271,6 +1273,7 @@ function openSettings() {
     if (!b) return;
     if (b.dataset.fs !== undefined) toggleFullscreen();
     if (b.dataset.hidePointer !== undefined) (setHidePointer(!hidePointer), draw());
+    if (b.dataset.screensaver !== undefined) (setScreensaver(!saverOn), draw());
     if (b.dataset.sound !== undefined) return void act("POST", "/display", { sound: state.display?.sound === false });
     if (b.dataset.ruleAway !== undefined) return void act("POST", "/rules", { awayToAi: Number(b.dataset.ruleAway) });
     if (b.dataset.ruleDistinct !== undefined) return void act("POST", "/rules", { distinctAiStyles: !(state.rules?.distinctAiStyles ?? true) });
@@ -2819,6 +2822,117 @@ const gameViewListeners = new Set();
 function onGameView(fn) {
   gameViewListeners.add(fn);
   return () => gameViewListeners.delete(fn);
+}
+
+// ---------- screensaver ----------
+/**
+ * The screensaver (D-298): after an hour without input the board's window fades to black and a large, dim clock
+ * drifts slowly across it; the next touch, click, key or mouse movement brings the board back, and that input does
+ * nothing else. A move in the game (a phone's turn, an AI player's) counts as input too, so a game played on the
+ * phones is never hidden. Light on the screen and the graphics: once dark, the board underneath is not painted at all
+ * (`visibility: hidden`), and the clock moves a few pixels once a second instead of animating. On by default, kept per
+ * screen in this browser (Settings › Display). Not inside Play from the board, whose deck is input the board can't see.
+ */
+const SAVER_KEY = "gametable.screensaver";
+const SAVER_AFTER_MS = 60 * 60 * 1000;
+let saverOn = (() => {
+  try {
+    return localStorage.getItem(SAVER_KEY) !== "0";
+  } catch {
+    return true;
+  }
+})();
+let lastInput = Date.now();
+let saverTimer = null;
+let saverEl = null; // the black layer while it shows
+let saverTick = null;
+let swallowUntil = 0; // the rest of the input that woke the board: its pointerup and click
+function scheduleSaver() {
+  clearTimeout(saverTimer);
+  saverTimer = null;
+  if (!saverOn || IN_PLAY || saverEl) return;
+  saverTimer = setTimeout(() => (Date.now() - lastInput >= SAVER_AFTER_MS ? showSaver() : scheduleSaver()), Math.max(1000, lastInput + SAVER_AFTER_MS - Date.now()));
+}
+function showSaver() {
+  saverEl = document.createElement("div");
+  saverEl.id = "gt-saver";
+  saverEl.innerHTML = `<div class="clock"><div class="time"></div><div class="date"></div></div>`;
+  document.body.appendChild(saverEl);
+  const clock = saverEl.firstElementChild;
+  const rot = state ? ROT[overlayEdge()] : 0;
+  const pos = { x: window.innerWidth / 2, y: window.innerHeight / 2, vx: 2, vy: 1.5 };
+  let shown = "";
+  const tick = () => {
+    const now = new Date();
+    const text = now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    if (text !== shown) {
+      shown = text;
+      clock.firstElementChild.textContent = text;
+      clock.lastElementChild.textContent = now.toLocaleDateString([], { weekday: "long", day: "numeric", month: "long" });
+    }
+    // Drift, turning back at the window's edges; a quarter turn swaps the clock's width and height.
+    const side = Math.abs(rot) === 90;
+    const hw = (side ? clock.offsetHeight : clock.offsetWidth) / 2;
+    const hh = (side ? clock.offsetWidth : clock.offsetHeight) / 2;
+    const maxX = Math.max(hw, window.innerWidth - hw);
+    const maxY = Math.max(hh, window.innerHeight - hh);
+    pos.x += pos.vx;
+    pos.y += pos.vy;
+    if (pos.x <= hw || pos.x >= maxX) pos.vx = -pos.vx;
+    if (pos.y <= hh || pos.y >= maxY) pos.vy = -pos.vy;
+    pos.x = Math.min(maxX, Math.max(hw, pos.x));
+    pos.y = Math.min(maxY, Math.max(hh, pos.y));
+    clock.style.transform = `translate(${Math.round(pos.x)}px, ${Math.round(pos.y)}px) translate(-50%, -50%) rotate(${rot}deg)`;
+  };
+  tick();
+  saverTick = setInterval(tick, 1000);
+  saverEl.getBoundingClientRect(); // start the fade from transparent
+  saverEl.classList.add("on");
+  // Once black, stop painting the board underneath (its animations, a game's canvas).
+  saverEl.addEventListener("transitionend", () => saverEl && document.documentElement.classList.add("gt-saver-dark"), { once: true });
+}
+function hideSaver() {
+  clearInterval(saverTick);
+  saverEl?.remove();
+  saverEl = null;
+  document.documentElement.classList.remove("gt-saver-dark");
+}
+function noteInput(e) {
+  lastInput = Date.now();
+  if (saverEl) {
+    hideSaver();
+    // The input that wakes the board is only that: it presses no button and moves no piece. A mouse wakes it as it
+    // moves to the button, so the press that follows right away is part of waking too.
+    if (e) {
+      swallowUntil = Date.now() + 700;
+      if (e.type !== "pointermove") e.preventDefault();
+      e.stopImmediatePropagation();
+    }
+  } else if (e && swallowUntil > Date.now() && e.type !== "pointermove") {
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    return;
+  }
+  if (!saverTimer) scheduleSaver();
+}
+function setScreensaver(on) {
+  saverOn = on;
+  try {
+    localStorage.setItem(SAVER_KEY, on ? "1" : "0");
+  } catch {}
+  lastInput = Date.now();
+  scheduleSaver();
+}
+if (!IN_PLAY) {
+  for (const type of ["pointerdown", "pointermove", "pointerup", "mousedown", "mouseup", "click", "keydown", "wheel", "touchstart", "touchend"]) {
+    window.addEventListener(type, (e) => {
+      // A release or click doesn't wake the board on its own; it ends an input that did, or is swallowed after one.
+      if (/^(pointerup|mouse|click|touchend)/.test(type) && !saverEl && swallowUntil <= Date.now()) return;
+      noteInput(e);
+    }, { capture: true, passive: false });
+  }
+  onGameView(() => noteInput(null));
+  scheduleSaver();
 }
 
 async function refreshGames() {
