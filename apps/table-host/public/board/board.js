@@ -23,6 +23,10 @@ const cornersEl = document.getElementById("corners");
 const settingsBtn = document.getElementById("settings-button");
 const flipBtn = document.getElementById("flip-button");
 const toolsBtn = document.getElementById("tools-button");
+// No context menu on the table's board (D-294): on a touchscreen, a long press or a two-finger tap (which the system
+// may turn into a right click) opened the browser's menu over the game. A remote board is someone's own browser:
+// its menu stays.
+if (!REMOTE) document.addEventListener("contextmenu", (e) => e.preventDefault());
 /** The board inside "Play from the board" (D-175, board/play.html), beside one player's deck. */
 const IN_PLAY = new URLSearchParams(location.search).get("in") === "play" && window.parent !== window;
 /**
