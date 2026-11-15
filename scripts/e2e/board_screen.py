@@ -81,6 +81,36 @@ try:
         prevented = home.evaluate("""() => { const e = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
           document.querySelector('button.tile').dispatchEvent(e); return e.defaultPrevented; }""")
         assert prevented, "the board lets the browser open its context menu"
+        # The mouse pointer in fullscreen (D-296): hidden only in fullscreen with the setting on; Esc (leaving
+        # fullscreen) always brings it back.
+        cursor = lambda: home.evaluate("() => getComputedStyle(document.querySelector('button.tile')).cursor")
+        home.click("#settings-button")
+        home.click(".overlay.settings button[data-hide-pointer]")
+        assert home.locator(".overlay.settings button[data-hide-pointer].on").count() == 1, "the switch shows On"
+        assert cursor() != "none", "the pointer is hidden outside fullscreen"
+        home.evaluate("() => document.documentElement.requestFullscreen()")
+        home.wait_for_function("document.documentElement.classList.contains('gt-pointer-hidden')")
+        assert cursor() == "none", f"the pointer shows in fullscreen with the setting on: {cursor()}"
+        home.evaluate("() => document.exitFullscreen()")
+        home.wait_for_function("!document.documentElement.classList.contains('gt-pointer-hidden')")
+        assert cursor() != "none", "the pointer stays hidden after leaving fullscreen"
+        home.click(".overlay.settings button[data-hide-pointer]")  # back to Off
+        home.evaluate("() => document.documentElement.requestFullscreen()")
+        home.wait_for_function("document.documentElement.classList.contains('gt-pointer-full')")
+        assert cursor() != "none", "the pointer is hidden in fullscreen with the setting off"
+        home.evaluate("() => document.exitFullscreen()")
+        home.wait_for_function("!document.fullscreenElement")
+        # The master volume of this screen (D-297): every sound the page sends to the speakers is scaled by it, also a
+        # game's own Web Audio. A constant 1.0 rendered offline comes out at the slider's value.
+        level = """async () => { const c = new OfflineAudioContext(1, 256, 8000); const s = c.createConstantSource();
+          s.connect(c.destination); s.start(); const b = await c.startRendering(); return b.getChannelData(0)[200]; }"""
+        home.locator(".overlay.settings input[data-volume]").fill("30")
+        got = home.evaluate(level)
+        assert abs(got - 0.3) < 0.01, f"at 30 % a full-scale signal comes out at {got}"
+        assert "30 %" in home.inner_text(".overlay.settings [data-volume-value]")
+        home.locator(".overlay.settings input[data-volume]").fill("100")
+        assert abs(home.evaluate(level) - 1) < 0.01, "back at 100 % the signal is not full scale"
+        home.click(".overlay.settings [data-close-overlay]")
 
         # The link and its QR code in the board's settings.
         home.click("#settings-button")
