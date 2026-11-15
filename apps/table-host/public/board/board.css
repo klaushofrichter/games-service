@@ -579,3 +579,12 @@ button.pad-value { min-width: 120px; font: 600 1em var(--mono); letter-spacing: 
 /* The master volume of this screen (D-297): a slider wide enough for a finger. */
 .volume-row input[type="range"] { width: min(16em, 45%); height: 2.2em; accent-color: var(--brass); cursor: pointer; touch-action: none; }
 
+
+/* The screensaver (D-298): black over the whole window, a dim clock that moves once a second (no animation). Once
+   black, the board underneath is not painted. */
+#gt-saver { position: fixed; inset: 0; z-index: 2147483647; background: #000; opacity: 0; transition: opacity 3s ease-in; cursor: none; touch-action: none; }
+#gt-saver.on { opacity: 1; }
+#gt-saver .clock { position: absolute; left: 0; top: 0; color: #5a6470; text-align: center; white-space: nowrap; font-variant-numeric: tabular-nums; user-select: none; }
+#gt-saver .time { font: 300 min(14vw, 24vh)/1 system-ui, sans-serif; letter-spacing: .02em; }
+#gt-saver .date { font: 400 min(3vw, 4vh)/1.2 system-ui, sans-serif; margin-top: .4em; }
+html.gt-saver-dark body > :not(#gt-saver) { visibility: hidden; }
