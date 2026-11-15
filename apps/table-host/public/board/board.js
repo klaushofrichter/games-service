@@ -40,6 +40,92 @@ const fsDoc = (() => {
     return document;
   }
 })();
+/**
+ * The mouse pointer in fullscreen (D-296): on a touchscreen it only gets in the way, so a setting next to Fullscreen
+ * hides it, in fullscreen only. Out of fullscreen (Esc leaves it) it always shows, so a screen without touch is never
+ * left without a pointer; in fullscreen without the setting it shows as the usual arrow. Kept per screen in this
+ * browser: it depends on whether that screen is touched.
+ */
+const POINTER_KEY = "gametable.hidePointer";
+let hidePointer = (() => {
+  try {
+    return localStorage.getItem(POINTER_KEY) === "1";
+  } catch {
+    return false;
+  }
+})();
+function applyPointer() {
+  const full = !!fsDoc.fullscreenElement;
+  // The page fullscreen applies to too: inside Play from the board, the frame around the board and the deck.
+  for (const doc of new Set([document, fsDoc])) {
+    if (!doc.getElementById("gt-pointer-style")) {
+      const st = doc.createElement("style");
+      st.id = "gt-pointer-style";
+      st.textContent = "html.gt-pointer-hidden, html.gt-pointer-hidden * { cursor: none !important; } html.gt-pointer-full { cursor: default; }";
+      doc.head.appendChild(st);
+    }
+    doc.documentElement.classList.toggle("gt-pointer-hidden", full && hidePointer);
+    doc.documentElement.classList.toggle("gt-pointer-full", full && !hidePointer);
+  }
+}
+function setHidePointer(on) {
+  hidePointer = on;
+  try {
+    localStorage.setItem(POINTER_KEY, on ? "1" : "0");
+  } catch {}
+  applyPointer();
+}
+fsDoc.addEventListener("fullscreenchange", applyPointer);
+applyPointer();
+/**
+ * Master volume of this screen (D-297): every sound the board page makes, the platform's effects and a game's own
+ * Web Audio (some games connect straight to the speakers, FM-1 Synth's emulator too) or <audio>, goes through one
+ * gain per audio context in front of the speakers, set by a slider in the settings. Kept per screen in this browser,
+ * like the pointer: the table's speaker and a remote player's laptop want different levels. Sound effects On/Off
+ * (D-092) stays the table's.
+ */
+const VOLUME_KEY = "gametable.volume";
+let masterVolume = (() => {
+  try {
+    const raw = localStorage.getItem(VOLUME_KEY);
+    const v = Number(raw);
+    return raw !== null && Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : 1;
+  } catch {
+    return 1;
+  }
+})();
+const masterGains = new Map(); // a context's speakers -> the gain in front of them
+if (typeof AudioNode === "function" && typeof AudioDestinationNode === "function") {
+  const connect = AudioNode.prototype.connect;
+  const disconnect = AudioNode.prototype.disconnect;
+  const masterFor = (dest) => {
+    let g = masterGains.get(dest);
+    if (!g) {
+      g = dest.context.createGain();
+      g.gain.value = masterVolume;
+      connect.call(g, dest);
+      masterGains.set(dest, g);
+    }
+    return g;
+  };
+  AudioNode.prototype.connect = function (dest, ...rest) {
+    return connect.call(this, dest instanceof AudioDestinationNode ? masterFor(dest) : dest, ...rest);
+  };
+  AudioNode.prototype.disconnect = function (dest, ...rest) {
+    if (dest === undefined) return disconnect.call(this);
+    return disconnect.call(this, dest instanceof AudioDestinationNode ? masterFor(dest) : dest, ...rest);
+  };
+}
+// <audio> and <video> a game plays: their own volume, set when they start.
+document.addEventListener("play", (e) => e.target instanceof HTMLMediaElement && (e.target.volume = masterVolume), true);
+function setMasterVolume(v) {
+  masterVolume = Math.min(1, Math.max(0, v));
+  try {
+    localStorage.setItem(VOLUME_KEY, String(masterVolume));
+  } catch {}
+  for (const g of masterGains.values()) g.gain.setTargetAtTime(masterVolume, g.context.currentTime, 0.02);
+  for (const m of document.querySelectorAll("audio, video")) m.volume = masterVolume;
+}
 const watchBtn = document.getElementById("watchers-button");
 const viewBtn = document.getElementById("view-button");
 const resultBtn = document.getElementById("result-button");
@@ -932,7 +1018,8 @@ async function watcherAction(b) {
 }
 /** The settings' Fullscreen row, also in a watcher's window (D-221): the whole page where it applies (D-184). */
 function fullscreenRow() {
-  return `<div class="row"><span>Fullscreen</span>${fsDoc.fullscreenEnabled ? `<button data-fs class="${fsDoc.fullscreenElement ? "on" : ""}">${fsDoc.fullscreenElement ? "Leave fullscreen" : "Fullscreen"}</button>` : `<span class="faint">not available in this browser</span>`}</div>`;
+  return `<div class="row"><span>Fullscreen</span>${fsDoc.fullscreenEnabled ? `<button data-fs class="${fsDoc.fullscreenElement ? "on" : ""}">${fsDoc.fullscreenElement ? "Leave fullscreen" : "Fullscreen"}</button>` : `<span class="faint">not available in this browser</span>`}</div>
+    ${fsDoc.fullscreenEnabled ? `<div class="row"><span>Hide the mouse pointer in fullscreen <span class="faint">· for a touchscreen; Esc leaves fullscreen and shows it again</span></span><button data-hide-pointer class="${hidePointer ? "on" : ""}" role="switch" aria-checked="${hidePointer}">${hidePointer ? "On" : "Off"}</button></div>` : ""}`;
 }
 function toggleFullscreen() {
   (fsDoc.fullscreenElement ? fsDoc.exitFullscreen() : fsDoc.documentElement.requestFullscreen()).catch(() => toast("Fullscreen was refused by the browser"));
@@ -966,6 +1053,7 @@ function openWatchers() {
     const b = e.target.closest("button");
     if (e.target === o || b?.dataset.closeOverlay !== undefined) return close();
     if (b?.dataset.fs !== undefined) return toggleFullscreen();
+    if (b?.dataset.hidePointer !== undefined) return (setHidePointer(!hidePointer), draw());
     if (b?.dataset.watcherName !== undefined) {
       const me = watcherSelf();
       return openNamePad(me?.name === "Guest" ? "" : (me?.name ?? ""), (n) => n && act("POST", "/watching/name", { name: n }), "Your name");
@@ -1124,6 +1212,7 @@ function openSettings() {
     setPanel(o, `<div class="panel"><h2>Settings</h2>
       <div class="group"><div class="eyebrow">Display</div>
         <div class="row"><span>Sound effects</span><button data-sound class="${state.display?.sound !== false ? "on" : ""}" role="switch" aria-checked="${state.display?.sound !== false}">${state.display?.sound !== false ? "On" : "Off"}</button></div>
+        <div class="row volume-row"><span>Volume of this screen <span class="faint" data-volume-value></span></span><input type="range" data-volume min="0" max="100" step="1" aria-label="Master volume of this screen"></div>
         ${REMOTE || IN_PLAY ? "" : `<div class="row"><span>Another screen on this LAN, such as an iPad or a TV, shows the board instead</span><button data-screen>Board on another screen…</button></div>`}
         ${fullscreenRow()}</div>
       <div class="group"><div class="eyebrow">Joining</div>
@@ -1139,6 +1228,11 @@ function openSettings() {
         return `<div class="row ${hint ? "with-hint" : ""}"><span>${esc(it.label)}${hint ? `<small class="row-hint">${esc(hint)}</small>` : ""}</span>${control(it, k)}</div>`;
       }).join("")}</div>` : ""}
       <div class="actions settings-actions"><button class="primary" data-close-overlay>Done</button></div></div>`);
+    // The slider's value is set here, not in the markup: a lobby message while it is dragged must not rebuild it.
+    const vol = o.querySelector("input[data-volume]");
+    if (vol && document.activeElement !== vol) vol.value = String(Math.round(masterVolume * 100));
+    const shown = o.querySelector("[data-volume-value]");
+    if (shown) shown.textContent = `· ${Math.round(masterVolume * 100)} %`;
   };
   const close = () => {
     unsub();
@@ -1153,6 +1247,12 @@ function openSettings() {
   // game update, not a lobby state, so redraw on those too (D-215).
   const unsubView = onGameView(draw);
   fsDoc.addEventListener("fullscreenchange", draw);
+  o.addEventListener("input", (e) => {
+    if (e.target.dataset?.volume === undefined) return;
+    setMasterVolume(Number(e.target.value) / 100);
+    const shown = o.querySelector("[data-volume-value]");
+    if (shown) shown.textContent = `· ${e.target.value} %`;
+  });
   // Choices with more options than fit as buttons are pulldowns (D-129b).
   o.addEventListener("change", (e) => {
     const sel = e.target.closest("select");
@@ -1170,6 +1270,7 @@ function openSettings() {
     if (e.target === o || b?.dataset.closeOverlay !== undefined) return close();
     if (!b) return;
     if (b.dataset.fs !== undefined) toggleFullscreen();
+    if (b.dataset.hidePointer !== undefined) (setHidePointer(!hidePointer), draw());
     if (b.dataset.sound !== undefined) return void act("POST", "/display", { sound: state.display?.sound === false });
     if (b.dataset.ruleAway !== undefined) return void act("POST", "/rules", { awayToAi: Number(b.dataset.ruleAway) });
     if (b.dataset.ruleDistinct !== undefined) return void act("POST", "/rules", { distinctAiStyles: !(state.rules?.distinctAiStyles ?? true) });
