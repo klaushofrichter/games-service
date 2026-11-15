@@ -2449,4 +2449,11 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   heartbeats that write only what changed; shared server helpers and access-code rules between the table and the
   service; the starter asking GitHub whether a repository is private. *Kept as it is:* an empty name still gets
   "Player N" counted from the number at the table (D-148; the suggestion of D-244 counts from 1), as the tests pin.
+- **D-294 · 2026-11-15 · Klaus** — **No context menu on the table's board.** With the touch monitor on a Debian 13 PC, a
+  two-finger touch opened a context menu. The table's board (and *Play from the board*'s page) cancels the browser's
+  `contextmenu` event, which a long press, a right click or a two-finger tap the system turns into a right click all
+  raise: no menu opens over a game. Nothing on the board needs that menu (links have copy buttons). A remote board is
+  the player's own browser and keeps its menu; the phone is unchanged. A menu drawn by the desktop itself (outside the
+  browser) would need a setting on that PC; the kiosk of `deploy/table-pc` has no desktop. *Implementation (Claude):*
+  `board.js`, `play.html`. Checks: `scripts/e2e/board_screen.py` (cancelled), `scripts/e2e/remote.py` (kept).
 

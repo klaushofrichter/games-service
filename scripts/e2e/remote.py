@@ -57,6 +57,9 @@ try:
         deck.locator("text=Rita").first.wait_for(timeout=20000)
         rboard.locator("text=Pick a game").wait_for(timeout=20000)
         assert rboard.locator("aside.join").count() == 0, "remote board must not show the local join code"
+        # A remote board is the player's own browser: its context menu stays (D-294).
+        assert not rboard.locator("body").evaluate("""() => { const e = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
+          document.body.dispatchEvent(e); return e.defaultPrevented; }"""), "a remote board keeps its context menu"
         assert rboard.locator("button[data-sim], button[data-adv=sim]").count() == 0, "remote board must not offer simulations"
         players = wait(lambda: [x for x in state()["players"] if x["name"] == "Rita"])
         assert players[0]["location"] == "remote" and players[0]["seat"] is not None, players

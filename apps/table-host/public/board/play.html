@@ -39,6 +39,8 @@
   <div id="deck-wrap"><div id="deck-bar"><span>Your deck · played from the board</span><button id="deck-min" type="button">Hide</button></div><iframe id="deck" title="Your deck" src="/deck/?board=1"></iframe></div>
 </div>
 <script>
+  // No context menu on the touchscreen, as on the board itself (D-294).
+  document.addEventListener("contextmenu", (e) => e.preventDefault());
 (() => {
   "use strict";
   // The deck joins with this key (the table's own PC only; this page is served like the board).

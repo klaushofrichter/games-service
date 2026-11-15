@@ -77,6 +77,10 @@ try:
         watch(home, "table's window")
         home.goto(HOME + "/board/")
         home.wait_for_selector("button.tile")
+        # No context menu on the table's board (D-294): a long press or a two-finger tap opened the browser's menu.
+        prevented = home.evaluate("""() => { const e = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
+          document.querySelector('button.tile').dispatchEvent(e); return e.defaultPrevented; }""")
+        assert prevented, "the board lets the browser open its context menu"
 
         # The link and its QR code in the board's settings.
         home.click("#settings-button")
