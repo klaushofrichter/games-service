@@ -2469,4 +2469,23 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   motion*. *Implementation (Claude):* `turnPage()`, the swipe handlers and `inLocalFrame()` in `board.js`; `.games`
   slide keyframes in `board.css`. Checks: `scripts/e2e/layout.py` (a swipe on a board facing west, across it no turn,
   round the ends); the paging helpers in `play.py` and `extra.py` go by the dots.
+- **D-296 · 2026-11-15 · Klaus** — **The mouse pointer can be hidden in fullscreen.** For the touchscreen: "disable the
+  pointer when on the touchscreen in Fullscreen … but we want to be able to see the cursor when there is no touch
+  screen, so we need an escape from the invisible cursor (ESC)". Settings › Display has *Hide the mouse pointer in
+  fullscreen* (On/Off) right under Fullscreen. On: the pointer is hidden while the board is fullscreen, nowhere else;
+  Esc leaves fullscreen and the pointer is back. Off: in fullscreen the pointer shows as the usual arrow. The setting
+  belongs to the screen, kept in its browser (`gametable.hidePointer`): it depends on whether that screen is touched.
+  Inside *Play from the board* it covers the page around the board and the deck's frame, not the deck's own page.
+  *Implementation (Claude):* `applyPointer()` in `board.js` (`cursor: none` for every element while fullscreen and
+  on). Check: `scripts/e2e/board_screen.py`.
+- **D-297 · 2026-11-15 · Klaus** — **A master volume for each screen.** "We also need a master volume control slider in
+  the settings." Settings › Display has *Volume of this screen*, 0–100 %, under *Sound effects*. It scales everything
+  the board page plays: the platform's sound effects, a game's own Web Audio (several games connect straight to the
+  speakers, FM-1 Synth's emulator too) and its `<audio>`: one gain in front of the speakers of every audio context the
+  page makes (the board wraps `AudioNode.connect`/`disconnect` for the speakers), and the volume of media elements.
+  Kept per screen in its browser (`gametable.volume`), like the pointer: the table's speaker and a remote player's
+  laptop want different levels. *Sound effects* On/Off stays the table's (D-092); phones keep the phone's volume. The
+  slider's value is set after a redraw, not in the markup, so a lobby message never interrupts a drag.
+  *Implementation (Claude):* `setMasterVolume()` in `board.js`. Check: `scripts/e2e/board_screen.py` (a constant
+  signal rendered offline comes out at the slider's value).
 

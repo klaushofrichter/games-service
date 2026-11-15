@@ -8,6 +8,7 @@ history.
 
 ## [Unreleased]
 
+- Board settings: hide the mouse pointer in fullscreen (D-296), and a master volume for the screen (D-297).
 - Lobby: swipe across the game tiles to see the next or previous three, with a slide; the pages go round (D-295).
 - Board: no context menu on the table's touchscreen (long press, two-finger tap) (D-294).
 - Review fixes: no markup from a table in the console, the Table Host survives a malformed socket message and a game's timer error, log uploads never lose a log, remote boards show only what they may do, Hold'em short all-ins and Roulette bet types (D-293).
