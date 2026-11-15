@@ -8,6 +8,7 @@ history.
 
 ## [Unreleased]
 
+- Lobby: swipe across the game tiles to see the next or previous three, with a slide; the pages go round (D-295).
 - Board: no context menu on the table's touchscreen (long press, two-finger tap) (D-294).
 - Review fixes: no markup from a table in the console, the Table Host survives a malformed socket message and a game's timer error, log uploads never lose a log, remote boards show only what they may do, Hold'em short all-ins and Roulette bet types (D-293).
 - Simplify pass: the table's files are cached by the browser until they change, an AI move draws the board once, a local table recognises its own checkout by path, shared rate limiting in the service (D-293).

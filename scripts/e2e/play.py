@@ -795,17 +795,14 @@ def pages(browser, board):
     move the pager; again after a player sits down (the tiles' hints change, so the tiles are measured again)."""
     def walk(label):
         board.wait_for_selector(".pager")
-        while board.locator(".pager button[data-page='-1']:not([disabled])").count():
-            board.click(".pager button[data-page='-1']")
+        # The pages go round (D-295): from the first page, once through every page by its dot.
         seen = []
-        while True:
-            board.wait_for_timeout(150)
+        for i in range(board.locator(".pager .dot").count()):
+            board.click(f".pager .dot[data-page-to='{i}']")
+            board.wait_for_timeout(400)  # after the slide
             heights = board.evaluate("() => [...document.querySelectorAll('.games .tile')].map((t) => t.offsetHeight)")
             pager = board.evaluate("() => document.querySelector('.pager').offsetTop")
             seen.append((heights, pager))
-            if not board.locator(".pager button[data-page='1']:not([disabled])").count():
-                break
-            board.click(".pager button[data-page='1']")
         tiles = {h for hs, _ in seen for h in hs}
         pagers = {p for _, p in seen}
         assert len(seen) > 1, f"{label}: only one page of games"
