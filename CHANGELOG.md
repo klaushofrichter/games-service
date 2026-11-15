@@ -8,6 +8,7 @@ history.
 
 ## [Unreleased]
 
+- Board: a screensaver after an hour without input, a dark window with a slowly drifting clock; a touch brings the board back. Settings › Display, on by default (D-298).
 - Board settings: hide the mouse pointer in fullscreen (D-296), and a master volume for the screen (D-297).
 - Lobby: swipe across the game tiles to see the next or previous three, with a slide; the pages go round (D-295).
 - Board: no context menu on the table's touchscreen (long press, two-finger tap) (D-294).
