@@ -2521,3 +2521,8 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   itself." The heading on the website (`apps/cloud/public/home.html`, #games) is now "Nine games, and more, and room for yours."
   (Klaus: "We could say Nine games, and more, and room for yours");
   the lede still introduces synth-game and ge150pro-game, and their cards stay in the grid (D-292).
+
+- **D-301 · 2026-11-16 · Klaus** — **The GE150 Pro card without its last line.** "In the landing page … remove 'From
+  the repository klaushofrichter/ge150pro-game; unofficial, not affiliated with Mooer.'" The card's text on the website
+  (`apps/cloud/public/home.html`) ends with "…runs a click while you play." The section's lede still links
+  ge150pro-game (D-292, D-300).
