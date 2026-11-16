@@ -8,7 +8,7 @@ history.
 
 ## [Unreleased]
 
-- Website: the games section's heading is "Nine games, and room for yours."; the synthesizer and the guitar pedal stay in the section (D-300).
+- Website: the games section's heading is "Nine games, and more, and room for yours."; the synthesizer and the guitar pedal stay in the section (D-300).
 - Board: switching Play from the board on or off in fullscreen asks for one tap to return to fullscreen; that tap does nothing else (D-299).
 - Board: a screensaver after an hour without input, a dark window with a slowly drifting clock; a touch brings the board back. Settings › Display, on by default (D-298).
 - Board settings: hide the mouse pointer in fullscreen (D-296), and a master volume for the screen (D-297).
