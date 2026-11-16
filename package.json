@@ -15,11 +15,11 @@
     "typecheck": "tsc -p tsconfig.check.json"
   },
   "dependencies": {
-    "google-auth-library": "^11.3.3",
+    "google-auth-library": "^11.3.4",
     "jszip": "^3.10.1",
     "qrcode": "^1.5.4",
-    "werift": "^0.26.0",
-    "ws": "^8.22.1",
+    "werift": "^0.27.0",
+    "ws": "^8.23.0",
     "zod": "^4.6.7"
   },
   "devDependencies": {
