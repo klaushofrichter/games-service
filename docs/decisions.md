@@ -2515,3 +2515,8 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   browser started in kiosk mode keeps its fullscreen across pages and never needs the tap.
   *Implementation (Claude):* `noteFullscreenForNextPage()` and the hint in `board.js`, `refullscreen()` in `play.html`.
   Check: `scripts/e2e/board_deck.py` (on and off in fullscreen).
+
+- **D-300 · 2026-11-16 · Klaus** — **The games section's heading names the games only.** "Remove the synth and ge150 from
+  the title 'Nine games, a synthesizer, a guitar pedal, and room for yours.' The items should stay in the section
+  itself." The heading on the website (`apps/cloud/public/home.html`, #games) is now "Nine games, and room for yours.";
+  the lede still introduces synth-game and ge150pro-game, and their cards stay in the grid (D-292).
