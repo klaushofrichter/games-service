@@ -2504,3 +2504,14 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   the board's window only; the computer's own screen blanking is its own setting.
   *Implementation (Claude):* `scheduleSaver()`/`showSaver()` in `board.js`. Check: `scripts/e2e/screensaver.py` (the
   page's clock is run forward).
+
+- **D-299 · 2026-11-16 · Klaus** — **Fullscreen comes back after Play from the board is switched.** "When the board is
+  on Full Screen and we activate or deactivate the Play from the board option … we lose the fullscreen. I would like to
+  keep full screen or re-establish fullscreen." Switching it moves the board to another page (`board/play.html` and back,
+  D-175), and a browser leaves fullscreen on every page change and lets a page enter it only on a tap or a key, so it
+  can't simply be kept. The page that leaves in fullscreen notes it for this browser tab (`sessionStorage`
+  `gametable.refullscreen`); the new page shows "⛶ Tap to return to fullscreen", and the next tap or key, on the board or
+  on the deck beside it, goes fullscreen again and does nothing else (the layout changes size under the finger). A
+  browser started in kiosk mode keeps its fullscreen across pages and never needs the tap.
+  *Implementation (Claude):* `noteFullscreenForNextPage()` and the hint in `board.js`, `refullscreen()` in `play.html`.
+  Check: `scripts/e2e/board_deck.py` (on and off in fullscreen).
