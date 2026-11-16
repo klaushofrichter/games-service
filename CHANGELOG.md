@@ -8,6 +8,7 @@ history.
 
 ## [Unreleased]
 
+- Website: the GE150 Pro card no longer ends with its repository line and the Mooer disclaimer (D-301).
 - Website: the games section's heading is "Nine games, and more, and room for yours."; the synthesizer and the guitar pedal stay in the section (D-300).
 - Board: switching Play from the board on or off in fullscreen asks for one tap to return to fullscreen; that tap does nothing else (D-299).
 - Board: a screensaver after an hour without input, a dark window with a slowly drifting clock; a touch brings the board back. Settings › Display, on by default (D-298).
