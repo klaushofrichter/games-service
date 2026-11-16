@@ -2,7 +2,7 @@
 board moves into a page with one player's deck beside it, laid out like a remote player's page; the deck takes a seat
 without a phone or join code, also with a stale session saved (no warning, D-218); the QR code goes and a phone with the code is turned away; the player plays a game of
 Coin Flip from the deck against an AI, handed to an AI player mid-game and taking the seat back as before (D-222); Hide and Show fold the deck; Fullscreen takes the whole page, deck included
-(D-184); switched off, the board is alone again and the
+(D-184), and switching it on or off in fullscreen asks for a tap to return to fullscreen (D-299); switched off, the board is alone again and the
 player stays at the table.
 A Table Host of its own (port 8139), without the cloud service.
   python3 scripts/e2e/board_deck.py out/
@@ -37,13 +37,25 @@ try:
         # without "session expired; scan the QR code" (D-218).
         page.evaluate("() => localStorage.setItem('gametable.board-deck.' + location.host, 'from-an-earlier-run')")
 
-        # Developer settings › Play from the board: the board moves into the page with the deck beside it.
+        # Developer settings › Play from the board: the board moves into the page with the deck beside it. Switched on in
+        # fullscreen, the new page asks for a tap to return to fullscreen, and that tap does nothing else (D-299).
+        page.evaluate("() => document.documentElement.requestFullscreen()")
+        wait(lambda: page.evaluate("() => !!document.fullscreenElement"), 5, "the board to go fullscreen")
         page.click("#tools-button")
         page.click(".overlay.advanced [data-adv=board-deck]")
         page.wait_for_url("**/board/play.html", timeout=10000)
         board = page.frame_locator("#board")
         deck = page.frame_locator("#deck")
         board.locator("text=Pick a game").wait_for(timeout=15000)
+        board.locator("#fullscreen-hint").wait_for(timeout=5000)
+        assert page.evaluate("() => document.fullscreenElement") is None
+        board.locator("button.tile").first.click()
+        wait(lambda: page.evaluate("() => document.fullscreenElement === document.documentElement"), 5, "a tap to bring fullscreen back")
+        assert board.locator("#fullscreen-hint").count() == 0, "the hint stays in fullscreen"
+        page.wait_for_timeout(300)
+        assert board.locator("#overlay-root > *").count() == 0, "the tap that returned to fullscreen also chose a game"
+        page.evaluate("() => document.exitFullscreen()")
+        wait(lambda: page.evaluate("() => document.fullscreenElement === null"), 5, "the page to leave fullscreen")
         assert board.locator("aside.join img").count() == 0, "no QR code while played from the board"
         board.locator("aside.join.board-deck").wait_for()
         assert board.locator("aside.join.board-deck button").count() == 0, "the lobby's own invite is enough (D-240)"
@@ -127,10 +139,17 @@ try:
         wait(lambda: page.evaluate("() => document.fullscreenElement === null"), 5, "the page to leave fullscreen")
         board.locator(".overlay.settings [data-close-overlay]").first.click()
 
-        # Switched off: the board is alone again, with its QR code; the player stays.
+        # Switched off in fullscreen: the board is alone again, with its QR code, and a key returns to fullscreen; the
+        # player stays.
+        page.evaluate("() => document.documentElement.requestFullscreen()")
+        wait(lambda: page.evaluate("() => !!document.fullscreenElement"), 5, "the page to go fullscreen")
         a("POST", "/developer", {"boardDeck": False})
         page.wait_for_url("**/board/", timeout=10000)
         page.wait_for_selector("aside.join img", timeout=15000)
+        page.wait_for_selector("#fullscreen-hint")
+        page.keyboard.press("Space")
+        wait(lambda: page.evaluate("() => document.fullscreenElement === document.documentElement"), 5, "a key to bring fullscreen back")
+        assert page.locator("#fullscreen-hint").count() == 0
         assert players()["Dev"]["location"] == "local"
         b.close()
 finally:

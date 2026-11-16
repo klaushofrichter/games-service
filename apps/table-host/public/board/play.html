@@ -50,8 +50,22 @@
   // Back to the board alone when the setting is switched off (the board inside says so).
   window.addEventListener("message", (e) => {
     if (e.origin !== location.origin || e.source !== $("board").contentWindow) return;
-    if (e.data && e.data.type === "gt-board-deck" && e.data.on === false) location.replace("/board/");
+    if (e.data && e.data.type === "gt-board-deck" && e.data.on === false) {
+      // In fullscreen, the board alone asks for it back with a tap (D-299): a new page always leaves fullscreen.
+      try { if (document.fullscreenElement) sessionStorage.setItem("gametable.refullscreen", "1"); } catch {}
+      location.replace("/board/");
+    }
   });
+  // Come from the board alone in fullscreen (D-299): the board inside shows "Tap to return to fullscreen"; a tap on the
+  // deck beside it does that too.
+  function refullscreen(e) {
+    let pending = false;
+    try { pending = sessionStorage.getItem("gametable.refullscreen") === "1"; } catch {}
+    if (!pending || document.fullscreenElement) return;
+    try { sessionStorage.removeItem("gametable.refullscreen"); } catch {}
+    document.documentElement.requestFullscreen().catch(() => {});
+  }
+  for (const t of ["pointerdown", "keydown"]) window.addEventListener(t, refullscreen, true);
 
   $("deck-min").addEventListener("click", () => {
     const w = $("deck-wrap");
@@ -90,6 +104,7 @@
     try { doc = $("deck").contentDocument; } catch { return; }
     const app = doc && doc.getElementById("app");
     if (!app) return;
+    for (const t of ["pointerdown", "keydown"]) doc.defaultView.addEventListener(t, refullscreen, true);
     new MutationObserver(fitDeckSoon).observe(app, { childList: true, subtree: true, characterData: true, attributes: true });
     if (doc.fonts) doc.fonts.ready.then(fitDeckSoon);
     fitDeckSoon();

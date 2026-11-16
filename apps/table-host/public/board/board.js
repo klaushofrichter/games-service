@@ -78,6 +78,51 @@ function setHidePointer(on) {
 fsDoc.addEventListener("fullscreenchange", applyPointer);
 applyPointer();
 /**
+ * Fullscreen across Play from the board (D-299): switching it on or off moves the board to another page (board/play.html
+ * and back), and a browser leaves fullscreen on every page change; it lets a page enter fullscreen only on a tap or key.
+ * So the page that leaves in fullscreen notes it for this tab (`gametable.refullscreen`), and the new page shows "Tap to
+ * return to fullscreen": the next tap or key anywhere, on the board or on the deck beside it, goes fullscreen again,
+ * and does nothing else.
+ */
+const REFULL_KEY = "gametable.refullscreen";
+function noteFullscreenForNextPage() {
+  try {
+    if (fsDoc.fullscreenElement) sessionStorage.setItem(REFULL_KEY, "1");
+  } catch {}
+}
+(() => {
+  let pending = false;
+  try {
+    pending = sessionStorage.getItem(REFULL_KEY) === "1";
+  } catch {}
+  if (!pending || !fsDoc.fullscreenEnabled || fsDoc.fullscreenElement) return;
+  const hint = document.createElement("button");
+  hint.id = "fullscreen-hint";
+  hint.textContent = "⛶ Tap to return to fullscreen";
+  document.getElementById("surface").appendChild(hint);
+  let swallowUntil = 0;
+  const types = ["pointerdown", "pointerup", "mousedown", "mouseup", "click", "keydown", "touchstart", "touchend"];
+  const done = () => {
+    pending = false;
+    hint.remove();
+    try {
+      sessionStorage.removeItem(REFULL_KEY);
+    } catch {}
+  };
+  const onInput = (e) => {
+    if (pending && (e.type === "pointerdown" || e.type === "keydown" || e.type === "touchstart")) {
+      fsDoc.documentElement.requestFullscreen().catch(() => {});
+      done();
+      swallowUntil = Date.now() + 700; // the rest of this tap: the layout changes size under the finger
+    } else if (Date.now() >= swallowUntil) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+  };
+  for (const t of types) window.addEventListener(t, onInput, { capture: true, passive: false });
+  // Back in fullscreen another way (a tap on the deck beside the board, or the settings): nothing left to do.
+  fsDoc.addEventListener("fullscreenchange", () => fsDoc.fullscreenElement && pending && done());
+})();
+/**
  * Master volume of this screen (D-297): every sound the board page makes, the platform's effects and a game's own
  * Web Audio (some games connect straight to the speakers, FM-1 Synth's emulator too) or <audio>, goes through one
  * gain per audio context in front of the speakers, set by a slider in the settings. Kept per screen in this browser,
@@ -3083,7 +3128,7 @@ function connect() {
       // Play from the board (D-175): the board moves into the page that shows the deck beside it, and back when it is
       // switched off (that page listens).
       else if (IN_PLAY) tellPage({ type: "gt-board-deck", on: !!state.developer?.boardDeck });
-      else if (state.developer?.boardDeck && window.parent === window) location.replace("/board/play.html");
+      else if (state.developer?.boardDeck && window.parent === window) (noteFullscreenForNextPage(), location.replace("/board/play.html"));
     } else if (m.ch === "game" && m.type === "gesture") {
       // A phone's live sling gesture (D-189), for the game's board to show at once.
       game?.inst?.gesture?.(m.payload.seat, m.payload.data);
