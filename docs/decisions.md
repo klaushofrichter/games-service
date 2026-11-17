@@ -2526,3 +2526,35 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   the repository klaushofrichter/ge150pro-game; unofficial, not affiliated with Mooer.'" The card's text on the website
   (`apps/cloud/public/home.html`) ends with "…runs a click while you play." The section's lede still links
   ge150pro-game (D-292, D-300).
+
+- **D-302 · 2026-11-17 · Klaus** — **Games keep data on the table: a store offered by the Table Host.** "There is a
+  growing need for games to store some preferences, e.g. the favorite presets … per game PC … not per authentication
+  code. I am not in favor to use the games-service, because it creates dependencies, and we want to be able to run
+  local games without the games-service … a generic service offered by the local board, which games can use. The
+  lobby may add a window to manage the local stored data per game … delete it or export it." Until now GE150 Pro and
+  Synth kept such things in a phone's browser, where they went with the phone.
+  - **Where:** the Table Host, the program on the table's computer, keeps one JSON file per game in
+    `<DATA_DIR>/game-data/<gameId>.json` (`game-data.ts`). No cloud service is involved; nothing is uploaded; it
+    follows the board to another screen and outlives a browser's storage. Written whole (a temporary file, then
+    renamed); a file that can't be read is set aside as `….broken-<time>` and the game starts without data.
+  - **For games:** a manifest with `storage: true` gets `ctx.store` in `board.js` and `deck.js`: `get`, `set` (null
+    removes), `keys`, `all`, `onChange`. Messages on a `store` channel of the table's socket, one entry at a time, so
+    each fits a message also over a remote player's connection; a change is told to every board and phone.
+  - **Shared store only** (Klaus: "let's do shared store only at this time; if there is a strong need, we may
+    expand"): one per game and table, no per-player part.
+  - **Phones can write** (Klaus): the table's board and the phones of players with a seat; a remote board reads only.
+  - **JSON/text only, 256 KB a game** (Klaus: "we don't do audio and images … 256 KB seems plenty"): 64 entries, 48 KB
+    an entry (a message is at most 64 KB, D-202).
+  - **Never in the rules:** rules stay deterministic and replayable; what they need comes as an intent and is logged.
+  - **Advanced › Game data** on the table's own board: the games that keep something (entries, size, last change;
+    "not installed", "in use by the running game"), **Export** as a download named with the date and time for
+    uniqueness (`gametable-<gameId>-YYYY-MM-DD-HHMMSS.json`; Klaus: storing it elsewhere is up to the operator),
+    **Import** of such a file ("if we have Export, we might as well do Import"), which replaces that game's data after
+    showing what the file holds, and **Delete** after asking. A running game's data is neither replaced nor deleted.
+  - **Display choices** (`prefs`, D-088) are kept in the same file, so they survive a restart; they were in memory.
+  - **Older tables:** games use `ctx.store?.` and do without where it is missing.
+  - Migration of GE150 Pro's configurations and Synth's favourites is each game's own change, on top of this.
+  *Implementation (Claude):* `apps/table-host/src/game-data.ts`, `Table.storeSet` and the `gameData…` methods,
+  `/api/v1/game-data`, `gameStore()` in `board-kit.js`, `openGameData()` in `board.js`. Checks:
+  `tests/game-data.test.ts`, `tests/remote.test.ts` (a remote board), `scripts/e2e/game_data.py` with the test games
+  Keeper and Forgetful (`tests/fixtures/store-games`).

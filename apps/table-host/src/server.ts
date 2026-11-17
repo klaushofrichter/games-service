@@ -12,6 +12,7 @@ import { runSimulation } from "./simulation.ts";
 import { platformMeta, verifyStoredLog } from "./game-log.ts";
 import { History } from "./history.ts";
 import type { LogStore } from "./logs.ts";
+import { GAME_DATA_LIMITS } from "./game-data.ts";
 
 export interface ServerOptions {
   port: number;
@@ -79,7 +80,7 @@ export function cleanGesture(p: unknown): Record<string, unknown> | null {
 }
 
 /** Reads a remote client may make: lobby and game state, never logs, saves, simulations or local join codes. */
-const REMOTE_DENIED = /^\/(join|simulation|logs|saves|invites|remote|qr|cloud|developer)(\/|$)/;
+const REMOTE_DENIED = /^\/(join|simulation|logs|saves|game-data|invites|remote|qr|cloud|developer)(\/|$)/;
 /**
  * Changes a remote client may make (an allowlist): seat layout, running games, and players' colours and AI options
  * (D-159). Never turn the table's board (remote boards face their own seat), remove or move players, add AI seats,
@@ -198,6 +199,11 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
     }
   };
   table.on("game", (events: GameEvent[]) => sendGame(clients, events));
+  // A game's data on the table changed (D-302): its board and its players' phones keep their copies in step.
+  table.on("store", (change: unknown) => {
+    const text = JSON.stringify(envelope("store", "changed", change));
+    for (const c of clients) if (c.role === "board" || c.role === "deck") sendText(c.ws, text);
+  });
 
   // ---------- decks follow the board (D-143) ----------
   const held = new Map<Client, { seq: number; at: number; text: string }[]>();
@@ -254,12 +260,12 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
     res.end(svg);
   };
 
-  const readBody = async (req: IncomingMessage): Promise<Record<string, unknown>> => {
+  const readBody = async (req: IncomingMessage, limit = 64 * 1024): Promise<Record<string, unknown>> => {
     const chunks: Buffer[] = [];
     let size = 0;
     for await (const c of req) {
       size += (c as Buffer).length;
-      if (size > 64 * 1024) throw new TableError(413, "body too large");
+      if (size > limit) throw new TableError(413, "body too large");
       chunks.push(c as Buffer);
     }
     if (!chunks.length) return {};
@@ -333,7 +339,8 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
         if (!table.remoteControlAllowed(remote.session)) return json(res, 403, { error: noControl(remote.session) });
       }
     } else if (!keyOk(req.headers["x-table-key"])) return json(res, 401, { error: "missing or wrong X-Table-Key" });
-    const body = m === "GET" || m === "DELETE" ? {} : await readBody(req);
+    // A game data file to import (D-302) is larger than anything else the board sends: 256 KB of entries, as JSON.
+    const body = m === "GET" || m === "DELETE" ? {} : await readBody(req, path.startsWith("/game-data/") ? 2 * GAME_DATA_LIMITS.bytes : undefined);
     let match: RegExpMatchArray | null;
     /** The answer to most actions: the lobby state after them. */
     const ok = () => json(res, 200, table.state());
@@ -435,6 +442,16 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
     // Skip a game's wait, e.g. Hold'em's "Next hand" (D-136): fire a timer the manifest lists in skipTimers now.
     if (m === "POST" && path === "/game/skip-timer") return (table.skipTimer(body.id), ok());
     if (m === "POST" && path === "/game/save") return json(res, 200, { saveId: await table.saveAndExit(), state: table.state() });
+    // Game data (D-302): what games keep on this table, for the board's Game data window. The table's own board only.
+    if (path === "/game-data" || path.startsWith("/game-data/")) {
+      if (m === "GET" && path === "/game-data") return json(res, 200, { games: table.gameDataList(), limits: GAME_DATA_LIMITS });
+      if (m === "POST" && path === "/game-data/inspect") return json(res, 200, table.gameDataInspect(body.file));
+      if (m === "POST" && path === "/game-data/import") return json(res, 200, { gameId: table.gameDataImport(body.file), games: table.gameDataList() });
+      if ((match = path.match(/^\/game-data\/([a-z0-9][a-z0-9-]{0,63})$/))) {
+        if (m === "GET") return json(res, 200, table.gameDataExport(match[1]));
+        if (m === "DELETE") return (table.gameDataDelete(match[1]), json(res, 200, { games: table.gameDataList() }));
+      }
+    }
     if (m === "GET" && path === "/saves") return json(res, 200, await logs.listSaves());
     if (m === "GET" && path === "/game/board") {
       if (!table.runtime) throw new TableError(409, "no game loaded");
@@ -769,6 +786,20 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
           const text = `{"v":1,"ch":"game","type":"gesture","payload":{"seat":${seat},"data":${data}}}`;
           for (const o of clients) if (o.role === "board") sendText(o.ws, text);
           return;
+        }
+        if (msg.ch === "store") {
+          // A game's data on this table (D-302), for its board and its players' phones: the keys, one entry, or a
+          // change. Only the table's own board and players with a seat change it; a remote board reads.
+          const who = c.role === "deck" ? (c.playerId as string) : undefined;
+          const p = msg.payload ?? {};
+          if (msg.type === "keys") return reply("ack", table.storeKeys(who), msg.seq);
+          if (msg.type === "get") return reply("ack", table.storeGet(p.key, who), msg.seq);
+          if (msg.type === "set") {
+            if (c.role === "board" && c.remote) throw new TableError(403, "a remote board does not change the game's data");
+            if (!intentAllowed()) return reply("reject", { reason: "Too many changes at once" }, msg.seq);
+            table.storeSet(c.role === "deck" ? c.playerId : null, p.key, p.value);
+            return reply("ack", {}, msg.seq);
+          }
         }
         if (c.role === "deck" && msg.ch === "game" && msg.type === "intent") {
           if (!intentAllowed()) return reply("reject", { reason: "Too many moves at once" }, msg.seq);

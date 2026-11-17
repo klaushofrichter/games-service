@@ -133,6 +133,7 @@ the SDK by path (`../../packages/sdk/src/index.ts`); games in other repositories
 | `lobbyButton` | Corner of the board's *Lobby* button during the game: `top-left`, `top-right`, `bottom-left`, `bottom-right` (default). |
 | `facing` | `north-south` (default): a running game faces north or south, the turn button flips it. `any`: for games played from all four edges; the lobby's corner arrows stay during the game and face it toward any edge, there is no turn button, and the *Lobby* button sits beside its corner (D-227). |
 | `viewer` | `{ columns: [{ key, label }] }`: up to four extra columns in the Game Viewer, filled by `describe` (section 12). |
+| `storage` | `true`: the game keeps data on the table between games, such as favourites; its board and phones get `ctx.store` (section 10, *Data the game keeps on the table*). |
 | `remoteBoardControl`, `saveGame`, `deck`, `permissions`, `seatConstraints`, `test` | Rarely needed; see the schema. `test: true` hides a game unless the table shows test games. |
 
 ## 5. The rules (`rules.ts`)
@@ -340,7 +341,7 @@ import { esc, html, playerColor, seatPlates, remainingMs, playSound, useStyles }
 
 export function mount(root, ctx) {
   useStyles("/games/my-game/board.css");
-  // ctx: { gameId, assetUrl(path), act(seat, name, payload), skipTimer(id) }
+  // ctx: { gameId, assetUrl(path), act(seat, name, payload), skipTimer(id), store? }
   return {
     update(view, events, info) { /* draw boardView; animate events */ },
     destroy() { /* stop timers, remove listeners */ },
@@ -438,7 +439,7 @@ places itself on the plate.
 
 ```js
 export function mount(root, ctx) {
-  // ctx: { gameId, seat, send(name, payload) → Promise<{ ok, reason? }>, gesture(data), toast(text), vibrate(ms), assetUrl(path) }
+  // ctx: { gameId, seat, send(name, payload) → Promise<{ ok, reason? }>, gesture(data), toast(text), vibrate(ms), assetUrl(path), store? }
   return { update(view, events, info) { … }, destroy() { … } };
 }
 ```
@@ -498,6 +499,37 @@ the move means. The test game `games/card-sling` is the smallest example; Last C
 | `viewEdge`, `boardEdge` | How this player sees the board. |
 | `settings`, `prefs`, `timers`, `now`, `receivedAt`, `over`, `aiThinking` | As on the board. |
 | `shownOnBoard` | This update's moves have been shown on the board already. |
+
+### Data the game keeps on the table
+
+Favourites, saved configurations, the last chosen instrument: what should still be there in the next game. A game
+whose manifest says `"storage": true` gets `ctx.store` in `board.js` and in `deck.js`. The data lives on the table's
+own computer (one JSON file per game in the Table Host's data folder), works without the Game Table service, is never
+uploaded, and is **shared by everyone at that table**: it belongs to the table, not to a player or a phone.
+
+```js
+const favs = (await ctx.store?.get("favourites")) ?? [];        // an entry, or undefined
+await ctx.store.set("favourites", [...favs, preset]);            // → { ok, reason? }; null removes the entry
+const stop = ctx.store.onChange((key, value) => { … });         // another screen changed it; key null: read everything again
+await ctx.store.keys();  await ctx.store.all();                  // the keys; everything as { key: value }
+```
+
+- **JSON only**, under keys such as `favourites` or `configs` (a letter, then letters, digits, `.`, `-`, `_`; up to 64
+  characters): 64 entries per game, 48 KB an entry, 256 KB in all. No audio, no images. A refused `set` says why.
+- **Who writes:** the table's board, and the phones of players with a seat. A remote player's board reads only.
+- **The rules never see it.** `rules.ts` stays deterministic and replayable: what the rules need from the store, the
+  board or a phone sends as an intent (a chosen preset, a configuration), and it is logged like any move.
+- **`ctx.store` is missing** on a table whose platform is older than this, and in a game without `storage`: write
+  `ctx.store?.…` and fall back to doing without, so the game still plays there.
+- **Keep your own format in step:** the store is per game id, across versions. Read old shapes, or keep a version
+  number in an entry of your own.
+- The table's people manage it under *Advanced › Game data*: export to a file, import, delete. After an import or a
+  delete `onChange` is called with `key` `null`.
+- `localStorage` on a phone is still right for what belongs to that one phone (a hint already shown).
+- The game's display choices (`prefs`, `setPrefs` in the board's settings) are kept in the same file and survive a
+  restart of the table too.
+
+In tests, `ctx.store` is a small object: pass your own with `get`, `set`, `keys`, `all` and `onChange` over a `Map`.
 
 ## 11. Rules for players (`how-to-play.md`)
 

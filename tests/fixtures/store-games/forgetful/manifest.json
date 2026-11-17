@@ -1,0 +1,20 @@
+{
+  "id": "forgetful",
+  "name": "Forgetful",
+  "version": "1.0.0",
+  "sdk": "^0.1",
+  "description": "Test game for game data (D-302): it keeps nothing on the table, so it gets no store.",
+  "players": [
+    1,
+    2
+  ],
+  "turnModel": "sequential",
+  "seatLayouts": [
+    2
+  ],
+  "edges": [
+    "north",
+    "south"
+  ],
+  "test": true
+}

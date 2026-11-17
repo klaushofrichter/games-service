@@ -18,6 +18,7 @@ import {
   type CloudStatus,
 } from "../../../packages/protocol/src/index.ts";
 import { count, createRng, list, type GameEvent, type Intent, type SeatInfo } from "../../../packages/sdk/src/index.ts";
+import { GameData, GameDataError, type GameRef } from "./game-data.ts";
 import { HOW_TO_PLAY, settingsWithDefaults, type InstalledGame } from "./games.ts";
 import { withStatistics } from "./stats.ts";
 import { GameRuntime, realClock, type AiMoveMeta, type LogRecord, type PauseReason, type ResumeReason } from "./runtime.ts";
@@ -127,8 +128,10 @@ export class Table extends EventEmitter {
   private awayToAi: 0 | 3 | 5 = 0;
   private distinctAiStyles = true;
   private awayToAiTimers = new Map<string, ReturnType<typeof setTimeout>>();
-  /** Display choices per game id (D-088), set from the board's settings; in memory, so they last until a restart. */
+  /** Display choices per game id (D-088), set from the board's settings; kept with the game's data (D-302). */
   private prefs = new Map<string, Record<string, unknown>>();
+  /** What games keep on this table between games (D-302); in memory unless the host gives a folder. */
+  readonly data: GameData;
   runtime: GameRuntime | null = null;
   private summary: GameSummary | null = null;
   private stateRev = 0;
@@ -150,9 +153,11 @@ export class Table extends EventEmitter {
   readonly games: Map<string, InstalledGame>;
   readonly logs: LogStore;
 
-  constructor(config: TableConfig, games: Map<string, InstalledGame>, logs: LogStore) {
+  constructor(config: TableConfig, games: Map<string, InstalledGame>, logs: LogStore, data: GameData = new GameData()) {
     super();
     this.config = config;
+    this.data = data;
+    for (const [id, prefs] of data.allPrefs()) this.prefs.set(id, prefs);
     this.allowNoLocalPlayer = config.allowNoLocalPlayer;
     this.boardDeck = config.boardDeck;
     this.games = games;
@@ -225,6 +230,7 @@ export class Table extends EventEmitter {
             players: allowedPlayerCounts(this.selected.game.manifest),
             needs: this.needsFor(this.selected.game.manifest),
             prefs: this.prefs.get(this.selected.game.manifest.id) ?? {},
+            storage: this.selected.game.manifest.storage,
             howToPlay: howToPlayUrl(this.selected.game),
             settingsShown: this.selected.game.manifest.settings.map((s) => ({ label: s.label ?? s.key, value: this.selected!.settings[s.key] })),
           }
@@ -1380,8 +1386,104 @@ export class Table extends EventEmitter {
     }
     if (Object.keys(next).length > 20 || JSON.stringify(next).length > 4096) throw new TableError(413, "prefs are limited to 20 keys and 4 KB");
     this.prefs.set(id, JSON.parse(JSON.stringify(next)));
+    this.data.setPrefs(this.gameRef(this.selected.game.manifest), this.prefs.get(id)!);
     this.changed();
     return this.prefs.get(id)!;
+  }
+
+  // ---------- game data (D-302) ----------
+  private gameRef(m: Manifest): GameRef {
+    return { id: m.id, name: m.name, version: m.version };
+  }
+
+  /** The chosen game, if it keeps data on the table (its manifest says `storage: true`). */
+  private storeGame(): Manifest {
+    const m = this.selected?.game.manifest;
+    if (!m) throw new TableError(409, "choose a game first");
+    if (!m.storage) throw new TableError(409, `${m.name} keeps no data on the table`);
+    return m;
+  }
+
+  private dataCall<T>(fn: () => T): T {
+    try {
+      return fn();
+    } catch (err) {
+      if (err instanceof GameDataError) throw new TableError(err.status, err.message);
+      throw err;
+    }
+  }
+
+  /** The keys of what the chosen game keeps on this table, for its board and its players' phones. */
+  storeKeys(playerId?: string): { gameId: string; keys: string[] } {
+    const m = this.storeGame();
+    if (playerId !== undefined && !this.players.has(playerId)) throw new TableError(403, "only players at the table read the game's data");
+    return { gameId: m.id, keys: Object.keys(this.data.data(m.id)) };
+  }
+
+  /** One entry of the chosen game's data, or null. Entries travel one at a time: each fits a message. */
+  storeGet(key: unknown, playerId?: string): { gameId: string; key: string; value: unknown } {
+    const m = this.storeGame();
+    if (playerId !== undefined && !this.players.has(playerId)) throw new TableError(403, "only players at the table read the game's data");
+    if (typeof key !== "string") throw new TableError(400, "which key?");
+    return { gameId: m.id, key, value: this.data.data(m.id)[key] ?? null };
+  }
+
+  /**
+   * Set one entry of the chosen game's data (`null` removes it): from the table's board, or from the phone of a player
+   * with a seat. Everyone showing the game hears of it (`store` event).
+   */
+  storeSet(playerId: string | null, key: unknown, value: unknown) {
+    const m = this.storeGame();
+    if (playerId !== null) {
+      const p = this.players.get(playerId);
+      if (!p || p.kind !== "human" || p.seat === null) throw new TableError(403, "only players with a seat change the game's data");
+    }
+    const kept = this.dataCall(() => this.data.set(this.gameRef(m), key, value));
+    this.emit("store", { gameId: m.id, key, value: kept });
+  }
+
+  /** The games that keep something on this table (the board's Game data window), with whether each is installed. */
+  gameDataList() {
+    const running = this.phase === "active" || this.phase === "paused" || this.phase === "terminating" ? this.selected?.game.manifest.id : undefined;
+    return this.data.list().map((e) => ({ ...e, installed: this.games.has(e.gameId), gameName: this.games.get(e.gameId)?.manifest.name ?? e.gameName, running: e.gameId === running }));
+  }
+
+  gameDataExport(gameId: string) {
+    const f = this.data.export(gameId, this.config.tableName);
+    if (!f) throw new TableError(404, "this game keeps no data here");
+    return f;
+  }
+
+  /** What an export file would replace, before it does. */
+  gameDataInspect(raw: unknown) {
+    const f = this.dataCall(() => this.data.inspect(raw));
+    const now = this.data.list().find((e) => e.gameId === f.gameId) ?? null;
+    return { gameId: f.gameId, gameName: this.games.get(f.gameId)?.manifest.name ?? f.gameName, installed: this.games.has(f.gameId), updatedAt: f.updatedAt, entries: Object.keys(f.data).length, prefs: Object.keys(f.prefs).length, now };
+  }
+
+  /** A game's data is not swapped or removed under a game that is using it. */
+  private assertNotRunning(gameId: string) {
+    const busy = this.phase === "active" || this.phase === "paused" || this.phase === "terminating";
+    if (busy && this.selected?.game.manifest.id === gameId) throw new TableError(409, "end the game first: it is using this data", "game-running");
+  }
+
+  gameDataImport(raw: unknown) {
+    const seen = this.dataCall(() => this.data.inspect(raw));
+    this.assertNotRunning(seen.gameId);
+    const f = this.dataCall(() => this.data.import(raw));
+    if (Object.keys(f.prefs).length) this.prefs.set(f.gameId, JSON.parse(JSON.stringify(f.prefs)));
+    else this.prefs.delete(f.gameId);
+    this.emit("store", { gameId: f.gameId, reset: true });
+    this.changed();
+    return f.gameId;
+  }
+
+  gameDataDelete(gameId: string) {
+    this.assertNotRunning(gameId);
+    if (!this.data.delete(gameId)) throw new TableError(404, "this game keeps no data here");
+    this.prefs.delete(gameId);
+    this.emit("store", { gameId, reset: true });
+    this.changed();
   }
 
   /**
