@@ -1396,11 +1396,12 @@ export class Table extends EventEmitter {
     return { id: m.id, name: m.name, version: m.version };
   }
 
-  /** The chosen game, if it keeps data on the table (its manifest says `storage: true`). */
-  private storeGame(): Manifest {
+  /** The chosen game, if it keeps data on the table (its manifest says `storage: true`), for the board or a player's phone. */
+  private storeGame(playerId?: string): Manifest {
     const m = this.selected?.game.manifest;
     if (!m) throw new TableError(409, "choose a game first");
     if (!m.storage) throw new TableError(409, `${m.name} keeps no data on the table`);
+    if (playerId !== undefined && !this.players.has(playerId)) throw new TableError(403, "only players at the table read the game's data");
     return m;
   }
 
@@ -1415,26 +1416,24 @@ export class Table extends EventEmitter {
 
   /** The keys of what the chosen game keeps on this table, for its board and its players' phones. */
   storeKeys(playerId?: string): { gameId: string; keys: string[] } {
-    const m = this.storeGame();
-    if (playerId !== undefined && !this.players.has(playerId)) throw new TableError(403, "only players at the table read the game's data");
-    return { gameId: m.id, keys: Object.keys(this.data.data(m.id)) };
+    const m = this.storeGame(playerId);
+    return { gameId: m.id, keys: this.data.keys(m.id) };
   }
 
   /** One entry of the chosen game's data, or null. Entries travel one at a time: each fits a message. */
   storeGet(key: unknown, playerId?: string): { gameId: string; key: string; value: unknown } {
-    const m = this.storeGame();
-    if (playerId !== undefined && !this.players.has(playerId)) throw new TableError(403, "only players at the table read the game's data");
+    const m = this.storeGame(playerId);
     if (typeof key !== "string") throw new TableError(400, "which key?");
-    return { gameId: m.id, key, value: this.data.data(m.id)[key] ?? null };
+    return { gameId: m.id, key, value: this.data.get(m.id, key) };
   }
 
   /**
    * Set one entry of the chosen game's data (`null` removes it): from the table's board, or from the phone of a player
-   * with a seat. Everyone showing the game hears of it (`store` event).
+   * with a seat (`playerId`). Everyone showing the game hears of it (`store` event).
    */
-  storeSet(playerId: string | null, key: unknown, value: unknown) {
+  storeSet(key: unknown, value: unknown, playerId?: string) {
     const m = this.storeGame();
-    if (playerId !== null) {
+    if (playerId !== undefined) {
       const p = this.players.get(playerId);
       if (!p || p.kind !== "human" || p.seat === null) throw new TableError(403, "only players with a seat change the game's data");
     }
@@ -1444,7 +1443,7 @@ export class Table extends EventEmitter {
 
   /** The games that keep something on this table (the board's Game data window), with whether each is installed. */
   gameDataList() {
-    const running = this.phase === "active" || this.phase === "paused" || this.phase === "terminating" ? this.selected?.game.manifest.id : undefined;
+    const running = this.playing ? this.selected?.game.manifest.id : undefined;
     return this.data.list().map((e) => ({ ...e, installed: this.games.has(e.gameId), gameName: this.games.get(e.gameId)?.manifest.name ?? e.gameName, running: e.gameId === running }));
   }
 
@@ -1463,8 +1462,7 @@ export class Table extends EventEmitter {
 
   /** A game's data is not swapped or removed under a game that is using it. */
   private assertNotRunning(gameId: string) {
-    const busy = this.phase === "active" || this.phase === "paused" || this.phase === "terminating";
-    if (busy && this.selected?.game.manifest.id === gameId) throw new TableError(409, "end the game first: it is using this data", "game-running");
+    if (this.playing && this.selected?.game.manifest.id === gameId) throw new TableError(409, "end the game first: it is using this data", "game-running");
   }
 
   gameDataImport(raw: unknown) {

@@ -58,7 +58,7 @@
   });
   // Come from the board alone in fullscreen (D-299): the board inside shows "Tap to return to fullscreen"; a tap on the
   // deck beside it does that too.
-  function refullscreen(e) {
+  function refullscreen() {
     let pending = false;
     try { pending = sessionStorage.getItem("gametable.refullscreen") === "1"; } catch {}
     if (!pending || document.fullscreenElement) return;

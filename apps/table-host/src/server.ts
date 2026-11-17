@@ -797,7 +797,7 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
           if (msg.type === "set") {
             if (c.role === "board" && c.remote) throw new TableError(403, "a remote board does not change the game's data");
             if (!intentAllowed()) return reply("reject", { reason: "Too many changes at once" }, msg.seq);
-            table.storeSet(c.role === "deck" ? c.playerId : null, p.key, p.value);
+            table.storeSet(p.key, p.value, who);
             return reply("ack", {}, msg.seq);
           }
         }

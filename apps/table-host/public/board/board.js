@@ -23,6 +23,19 @@ const cornersEl = document.getElementById("corners");
 const settingsBtn = document.getElementById("settings-button");
 const flipBtn = document.getElementById("flip-button");
 const toolsBtn = document.getElementById("tools-button");
+/** What this browser keeps for this screen (the pointer, the volume, the screensaver): null where it keeps nothing. */
+function stored(key) {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+function keep(key, value) {
+  try {
+    localStorage.setItem(key, value);
+  } catch {}
+}
 // No context menu on the table's board (D-294): on a touchscreen, a long press or a two-finger tap (which the system
 // may turn into a right click) opened the browser's menu over the game. A remote board is someone's own browser:
 // its menu stays.
@@ -47,13 +60,7 @@ const fsDoc = (() => {
  * browser: it depends on whether that screen is touched.
  */
 const POINTER_KEY = "gametable.hidePointer";
-let hidePointer = (() => {
-  try {
-    return localStorage.getItem(POINTER_KEY) === "1";
-  } catch {
-    return false;
-  }
-})();
+let hidePointer = stored(POINTER_KEY) === "1";
 function applyPointer() {
   const full = !!fsDoc.fullscreenElement;
   // The page fullscreen applies to too: inside Play from the board, the frame around the board and the deck.
@@ -70,9 +77,7 @@ function applyPointer() {
 }
 function setHidePointer(on) {
   hidePointer = on;
-  try {
-    localStorage.setItem(POINTER_KEY, on ? "1" : "0");
-  } catch {}
+  keep(POINTER_KEY, on ? "1" : "0");
   applyPointer();
 }
 fsDoc.addEventListener("fullscreenchange", applyPointer);
@@ -131,13 +136,9 @@ function noteFullscreenForNextPage() {
  */
 const VOLUME_KEY = "gametable.volume";
 let masterVolume = (() => {
-  try {
-    const raw = localStorage.getItem(VOLUME_KEY);
-    const v = Number(raw);
-    return raw !== null && Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : 1;
-  } catch {
-    return 1;
-  }
+  const raw = stored(VOLUME_KEY);
+  const v = Number(raw);
+  return raw !== null && Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : 1;
 })();
 const masterGains = new Map(); // a context's speakers -> the gain in front of them
 if (typeof AudioNode === "function" && typeof AudioDestinationNode === "function") {
@@ -165,9 +166,7 @@ if (typeof AudioNode === "function" && typeof AudioDestinationNode === "function
 document.addEventListener("play", (e) => e.target instanceof HTMLMediaElement && (e.target.volume = masterVolume), true);
 function setMasterVolume(v) {
   masterVolume = Math.min(1, Math.max(0, v));
-  try {
-    localStorage.setItem(VOLUME_KEY, String(masterVolume));
-  } catch {}
+  keep(VOLUME_KEY, String(masterVolume));
   for (const g of masterGains.values()) g.gain.setTargetAtTime(masterVolume, g.context.currentTime, 0.02);
   for (const m of document.querySelectorAll("audio, video")) m.volume = masterVolume;
 }
@@ -756,13 +755,7 @@ function myEdge() {
  * side. Their own choice, remembered on their device. North and south seats have no such choice (no upside-down view).
  */
 const LANDSCAPE_KEY = `gametable.remote.${REMOTE_INV}.landscape`;
-let landscape = (() => {
-  try {
-    return localStorage.getItem(LANDSCAPE_KEY) === "1";
-  } catch {
-    return false;
-  }
-})();
+let landscape = stored(LANDSCAPE_KEY) === "1";
 const sideSeat = (e) => e === "east" || e === "west";
 /** The edge a remote player's view is turned to: their seat's, or upright (south) when they chose the full width. */
 function remoteEdge() {
@@ -797,9 +790,7 @@ function renderViewButton() {
 }
 viewBtn.addEventListener("click", () => {
   landscape = !landscape;
-  try {
-    localStorage.setItem(LANDSCAPE_KEY, landscape ? "1" : "0");
-  } catch {}
+  keep(LANDSCAPE_KEY, landscape ? "1" : "0");
   fit();
   render();
 });
@@ -1812,7 +1803,7 @@ function gameTiles() {
  * The tiles follow the finger; let go past a fifth of their width (or 80 px) and the next page slides in, short of it
  * they spring back. A swipe is not a tap: the tile under the finger is not chosen.
  */
-function inLocalFrame(el, dx, dy) {
+function localFrame(el) {
   // The linear part of every transform from the tiles up to the page (rotation and scale; moves don't turn a vector).
   let m = new DOMMatrix();
   for (let n = el; n && n !== document.documentElement; n = n.parentElement) {
@@ -1820,9 +1811,9 @@ function inLocalFrame(el, dx, dy) {
     if (t && t !== "none") m = new DOMMatrix(t).multiply(m);
   }
   const det = m.a * m.d - m.b * m.c || 1;
-  return { x: (m.d * dx - m.c * dy) / det, y: (-m.b * dx + m.a * dy) / det };
+  return (dx, dy) => ({ x: (m.d * dx - m.c * dy) / det, y: (-m.b * dx + m.a * dy) / det });
 }
-let swipe = null; // { id, x, y, grid, dx, moving }
+let swipe = null; // { id, x, y, dx, moving, frame }
 let swallowClick = false;
 center.addEventListener("pointerdown", (e) => {
   const grid = e.target.closest?.(".games[data-swipe]");
@@ -1833,7 +1824,9 @@ addEventListener("pointermove", (e) => {
   if (!swipe || e.pointerId !== swipe.id) return;
   const grid = center.querySelector(".games[data-swipe]");
   if (!grid) return void (swipe = null);
-  const d = inLocalFrame(grid, e.clientX - swipe.x, e.clientY - swipe.y);
+  // taken once per swipe: the board doesn't turn under a finger, and the tiles' own slide doesn't turn a vector
+  swipe.frame ??= localFrame(grid);
+  const d = swipe.frame(e.clientX - swipe.x, e.clientY - swipe.y);
   if (!swipe.moving && Math.abs(d.x) > 12 && Math.abs(d.x) > Math.abs(d.y) * 1.2) swipe.moving = true;
   if (!swipe.moving) return;
   swipe.dx = d.x;
@@ -2556,6 +2549,7 @@ function fileStamp(d = new Date()) {
  * and Import of such a file, which replaces that game's data after asking. On the table's own board only; a game that
  * is running keeps its data as it is.
  */
+let onGameDataReset = null; // the open Game data window's reload
 function openGameData() {
   const o = document.createElement("div");
   o.className = "overlay game-data";
@@ -2582,8 +2576,15 @@ function openGameData() {
   const load = () => api("GET", "/game-data").then((r) => ((list = r.games), draw())).catch(() => {});
   draw();
   load();
-  const unsub = onState(load); // an import or a delete, also from elsewhere, and the game starting or ending
-  const close = () => (unsub(), o.remove());
+  // Again when a game starts or ends (it holds its data), and after an import or a delete, also from elsewhere; not on
+  // every lobby message, which come several a second in a game of AI players.
+  let shownFor = `${state?.phase}|${state?.game?.id}`;
+  const unsub = onState(() => {
+    const now = `${state?.phase}|${state?.game?.id}`;
+    if (now !== shownFor) ((shownFor = now), load());
+  });
+  onGameDataReset = load;
+  const close = () => (unsub(), (onGameDataReset = null), o.remove());
   const nameOf = (id) => list?.find((g) => g.gameId === id)?.gameName ?? id;
   o.addEventListener("click", async (e) => {
     const b = e.target.closest("button");
@@ -2620,7 +2621,7 @@ function openGameData() {
     }
     const seen = await api("POST", "/game-data/inspect", { file }).catch(() => null);
     if (!seen) return;
-    const has = [seen.entries ? `${seen.entries} ${seen.entries === 1 ? "entry" : "entries"}` : "", seen.prefs ? "display choices" : ""].filter(Boolean).join(" and ") || "nothing";
+    const has = what(seen) || "nothing";
     const text = `The file holds ${has}, last changed ${when(seen.updatedAt)}. ${seen.now ? `It replaces what this table keeps for the game now (${what(seen.now) || "nothing"}).` : "This table keeps nothing for the game yet."}${seen.installed ? "" : " The game is not installed on this table."}`;
     if (!(await confirmDialog(`Import the data of ${seen.gameName}?`, text, "Import"))) return;
     await api("POST", "/game-data/import", { file }).then((r) => ((list = r.games), draw(), toast(`Imported the data of ${seen.gameName}`))).catch(() => {});
@@ -2969,13 +2970,7 @@ function onGameView(fn) {
  */
 const SAVER_KEY = "gametable.screensaver";
 const SAVER_AFTER_MS = 60 * 60 * 1000;
-let saverOn = (() => {
-  try {
-    return localStorage.getItem(SAVER_KEY) !== "0";
-  } catch {
-    return true;
-  }
-})();
+let saverOn = stored(SAVER_KEY) !== "0";
 let lastInput = Date.now();
 let saverTimer = null;
 let saverEl = null; // the black layer while it shows
@@ -3051,9 +3046,7 @@ function noteInput(e) {
 }
 function setScreensaver(on) {
   saverOn = on;
-  try {
-    localStorage.setItem(SAVER_KEY, on ? "1" : "0");
-  } catch {}
+  keep(SAVER_KEY, on ? "1" : "0");
   lastInput = Date.now();
   scheduleSaver();
 }
@@ -3202,7 +3195,10 @@ function connect() {
       return;
     }
     // The game's data on the table changed (D-302): from a phone, or the Game data window.
-    if (m.ch === "store" && m.type === "changed") return void game?.store?.changed(m.payload);
+    if (m.ch === "store" && m.type === "changed") {
+      if (m.payload?.reset) onGameDataReset?.();
+      return void game?.store?.changed(m.payload);
+    }
     if (m.ch === "lobby" && m.type === "state") {
       state = m.payload;
       document.body.classList.remove("offline");

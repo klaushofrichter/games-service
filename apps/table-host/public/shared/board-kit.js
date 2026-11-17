@@ -305,12 +305,10 @@ export function gameStore(send, gameId) {
       return [...known];
     },
     async all() {
-      const out = {};
-      for (const k of await store.keys()) {
-        const v = await store.get(k);
-        if (v !== undefined) out[k] = v;
-      }
-      return out;
+      // asked for together: one round trip's wait, also over a remote player's connection
+      const keys = await store.keys();
+      const values = await Promise.all(keys.map((k) => store.get(k)));
+      return Object.fromEntries(keys.map((k, i) => [k, values[i]]).filter(([, v]) => v !== undefined));
     },
     async set(key, value) {
       const r = await send("set", { key, value: value ?? null });

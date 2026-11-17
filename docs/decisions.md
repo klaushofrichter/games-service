@@ -2466,7 +2466,7 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   right are the lobby's own however it is turned, at the table's front edge or on a remote board turned to its player:
   the finger's movement is taken back through the tiles' on-screen transform. A swipe never chooses the tile it starts
   on; a tap still does. On every board, the table's and remote ones (paging is only looking). No slide with *reduce
-  motion*. *Implementation (Claude):* `turnPage()`, the swipe handlers and `inLocalFrame()` in `board.js`; `.games`
+  motion*. *Implementation (Claude):* `turnPage()`, the swipe handlers and `localFrame()` in `board.js`; `.games`
   slide keyframes in `board.css`. Checks: `scripts/e2e/layout.py` (a swipe on a board facing west, across it no turn,
   round the ends); the paging helpers in `play.py` and `extra.py` go by the dots.
 - **D-296 · 2026-11-15 · Klaus** — **The mouse pointer can be hidden in fullscreen.** For the touchscreen: "disable the
@@ -2558,3 +2558,22 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   `/api/v1/game-data`, `gameStore()` in `board-kit.js`, `openGameData()` in `board.js`. Checks:
   `tests/game-data.test.ts`, `tests/remote.test.ts` (a remote board), `scripts/e2e/game_data.py` with the test games
   Keeper and Forgetful (`tests/fixtures/store-games`).
+
+- **D-303 · 2026-11-17 · Klaus** — **A second simplify pass, over games-service and every game repository.** "Do a
+  /simplify and /code-review over games-service and all *-game repos." Four reviewers (reuse, simplification,
+  efficiency, right depth) read all seven repositories; the game repositories record their own part. Here, mostly in
+  the game data code of D-302:
+  - **Taken:** `Table.gameDataList`/`assertNotRunning` use the `playing` getter; `storeKeys`/`storeGet` read through
+    `GameData.keys`/`get` instead of copying a game's whole store for one entry; the reader's check lives in
+    `storeGame`, and `storeSet(key, value, playerId?)` takes the player the way the readers do; a burst of changes to
+    a game's data is one file write, not one per change; `store.all()` asks for its entries together; the Game data
+    window reloads when a game starts or ends and after an import or delete, not on every lobby message; the lobby
+    swipe takes the board's turn and scale once per swipe, not on every pointer move; the board's per-screen settings
+    (pointer, volume, view, screensaver) share `stored()`/`keep()`; leftovers in `tests/game-data.test.ts` and
+    `scripts/e2e/game_data.py`.
+  - **Left for later, each a change of its own:** one test harness for all game repositories (today a copy in each,
+    reaching into the runtime); the phone layout rule (D-065) of the browser checks in `scripts/e2e/common.py`
+    instead of six copies; one "swallow the rest of this tap" for the screensaver and the return to fullscreen;
+    Roulette's 5.2 s spin stated once.
+  - **Left as it is:** GE150 Pro's and Synth's "the table keeps it, the board brings it" code stays two copies (fifteen
+    common lines, everything else is each game's own); the import checks its file twice (once per import).

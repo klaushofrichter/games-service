@@ -8,6 +8,7 @@ history.
 
 ## [Unreleased]
 
+- Simplify pass: the Game data window no longer asks the table on every lobby message, a game's data is read without copying all of it, changes made in a burst are written once, and the lobby swipe measures the board's turn once per swipe (D-303).
 - Game data: a game can keep data on the table between games (`storage` in the manifest, `ctx.store` on the board and the phones), on the table's own computer, with no service needed. Advanced › Game data exports, imports and deletes it per game. Display choices now survive a restart (D-302).
 - Website: the GE150 Pro card no longer ends with its repository line and the Mooer disclaimer (D-301).
 - Website: the games section's heading is "Nine games, and more, and room for yours."; the synthesizer and the guitar pedal stay in the section (D-300).

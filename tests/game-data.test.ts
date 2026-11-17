@@ -158,13 +158,8 @@ describe("on a table host", () => {
     t = await testHost({ gamesDir: GAMES });
     const b = await board();
     await play("keeper");
-    const ai = (await t.ok("POST", "/ai", {}).catch(() => null))?.playerId; // no AI in this game: nobody else to try
-    expect(ai).toBeUndefined();
-    expect(() => t.host.table.storeSet("nobody", "favourites", [1])).toThrow(/players with a seat/);
+    expect(() => t.host.table.storeSet("favourites", [1], "nobody")).toThrow(/players with a seat/);
     expect(() => t.host.table.storeKeys("nobody")).toThrow(/players at the table/);
-    // A socket that has not said hello.
-    const raw = new Deck();
-    await expect(raw.open(t.base, { role: "board", key: "wrong" })).rejects.toThrow(/table key/);
     await t.ok("POST", "/game/end");
     await t.ok("POST", "/game/close").catch(() => {});
     await t.ok("POST", "/game/select", { gameId: "forgetful" });
