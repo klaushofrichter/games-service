@@ -271,9 +271,14 @@ export function openTableSocket(remote) {
  *   await store.get(key)          the entry, or undefined
  *   await store.keys()            the keys there are
  *   await store.all()             { key: value, … }
+ *                                 These three throw when the table gives no answer (not connected just now): "nothing
+ *                                 there" and "could not ask" must not look alike, or a game would write its empty
+ *                                 start over what the table keeps. Catch it and ask again later.
  *   await store.set(key, value)   { ok, reason? }; null or undefined removes the entry
  *   store.onChange((key, value) => …)   another screen changed an entry (value undefined: removed); key null: all of
- *                                       it was replaced or removed, read again. Returns a function that stops it.
+ *                                       it was replaced or removed, or this screen was away from the table for a
+ *                                       moment and may have missed changes: read again. Returns a function that stops
+ *                                       it. A screen is not told of its own changes.
  *
  * `send(type, payload)` asks the table and resolves to { ok, reason?, payload? }. Returns the store and `changed`,
  * which the page calls with the table's change messages.
@@ -291,7 +296,7 @@ export function gameStore(send, gameId) {
     async get(key) {
       if (!cache.has(key)) {
         const r = await send("get", { key });
-        if (!r.ok) return undefined;
+        if (!r.ok) throw new Error(`the table's game data could not be read: ${r.reason ?? "no answer"}`);
         if (!cache.has(key)) note(key, r.payload?.value ?? null); // unless a change arrived meanwhile
       }
       return copy(cache.get(key));
@@ -299,7 +304,7 @@ export function gameStore(send, gameId) {
     async keys() {
       if (!known) {
         const r = await send("keys", {});
-        if (!r.ok) return [];
+        if (!r.ok) throw new Error(`the table's game data could not be read: ${r.reason ?? "no answer"}`);
         known ??= new Set(r.payload?.keys ?? []);
       }
       return [...known];
@@ -320,6 +325,8 @@ export function gameStore(send, gameId) {
       return () => listeners.delete(fn);
     },
   };
+  /** The page is connected to the table again: changes may have been missed, so nothing kept here counts any more. */
+  const reconnected = () => changed({ gameId, reset: true });
   const changed = (c) => {
     if (!c || c.gameId !== gameId) return;
     if (c.reset) {
@@ -334,5 +341,5 @@ export function gameStore(send, gameId) {
       }
     }
   };
-  return { store, changed };
+  return { store, changed, reconnected };
 }

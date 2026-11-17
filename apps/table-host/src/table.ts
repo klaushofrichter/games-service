@@ -1429,16 +1429,17 @@ export class Table extends EventEmitter {
 
   /**
    * Set one entry of the chosen game's data (`null` removes it): from the table's board, or from the phone of a player
-   * with a seat (`playerId`). Everyone showing the game hears of it (`store` event).
+   * with a seat (`playerId`). Everyone else showing the game hears of it (`store` event, with `from`: whatever the
+   * caller gives to recognise itself by).
    */
-  storeSet(key: unknown, value: unknown, playerId?: string) {
+  storeSet(key: unknown, value: unknown, playerId?: string, from?: unknown) {
     const m = this.storeGame();
     if (playerId !== undefined) {
       const p = this.players.get(playerId);
       if (!p || p.kind !== "human" || p.seat === null) throw new TableError(403, "only players with a seat change the game's data");
     }
     const kept = this.dataCall(() => this.data.set(this.gameRef(m), key, value));
-    this.emit("store", { gameId: m.id, key, value: kept });
+    this.emit("store", { gameId: m.id, key, value: kept }, from);
   }
 
   /** The games that keep something on this table (the board's Game data window), with whether each is installed. */

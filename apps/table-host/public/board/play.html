@@ -58,14 +58,18 @@
   });
   // Come from the board alone in fullscreen (D-299): the board inside shows "Tap to return to fullscreen"; a tap on the
   // deck beside it does that too.
-  function refullscreen() {
+  // A browser takes a mouse press or a key as the person's doing, but a finger only when it lifts: so a touch asks on
+  // pointerup. The note goes once fullscreen has come; refused, the next tap asks again.
+  function refullscreen(e) {
     let pending = false;
     try { pending = sessionStorage.getItem("gametable.refullscreen") === "1"; } catch {}
     if (!pending || document.fullscreenElement) return;
-    try { sessionStorage.removeItem("gametable.refullscreen"); } catch {}
-    document.documentElement.requestFullscreen().catch(() => {});
+    if (e.type === "pointerdown" && e.pointerType !== "mouse") return;
+    if (e.type === "pointerup" && e.pointerType === "mouse") return;
+    document.documentElement.requestFullscreen().then(() => { try { sessionStorage.removeItem("gametable.refullscreen"); } catch {} }, () => {});
   }
-  for (const t of ["pointerdown", "keydown"]) window.addEventListener(t, refullscreen, true);
+  const REFULL_ON = ["pointerdown", "pointerup", "keydown"];
+  for (const t of REFULL_ON) window.addEventListener(t, refullscreen, true);
 
   $("deck-min").addEventListener("click", () => {
     const w = $("deck-wrap");
@@ -104,7 +108,7 @@
     try { doc = $("deck").contentDocument; } catch { return; }
     const app = doc && doc.getElementById("app");
     if (!app) return;
-    for (const t of ["pointerdown", "keydown"]) doc.defaultView.addEventListener(t, refullscreen, true);
+    for (const t of REFULL_ON) doc.defaultView.addEventListener(t, refullscreen, true);
     new MutationObserver(fitDeckSoon).observe(app, { childList: true, subtree: true, characterData: true, attributes: true });
     if (doc.fonts) doc.fonts.ready.then(fitDeckSoon);
     fitDeckSoon();

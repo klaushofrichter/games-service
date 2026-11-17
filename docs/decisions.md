@@ -2577,3 +2577,27 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
     Roulette's 5.2 s spin stated once.
   - **Left as it is:** GE150 Pro's and Synth's "the table keeps it, the board brings it" code stays two copies (fifteen
     common lines, everything else is each game's own); the import checks its file twice (once per import).
+
+- **D-304 · 2026-11-17 · Klaus** — **Fix what the code review of games-service and the game repositories found.** "Do
+  a /simplify and /code-review over games-service and all *-game repos." Ten findings, all confirmed, all in code of
+  the last three days; the games record their own part (GE150 Pro, Synth, Starforge).
+  - **The screensaver came only once per page** (D-298): the timer that showed it was never cleared, so the next
+    input did not start the hour anew. Checked now a second time in `screensaver.py`.
+  - **"Tap to return to fullscreen" did nothing for a finger** (D-299): a browser takes a mouse press or a key as
+    the person's doing, but a touch only when the finger lifts; asked on the touch itself, fullscreen was refused,
+    silently, and the hint went. Now a finger asks on `pointerup` (the board and `play.html`), the hint stays until
+    fullscreen has come, and `board_deck.py` taps with a finger, as at the table.
+  - **A game's data read as empty when it could not be read** (D-302): `store.get`, `keys` and `all` now throw when
+    the table gives no answer, so a game can't write its empty start over what the table keeps; the guide says so.
+  - **A screen that was away kept its old copy:** changes are not replayed to a board or phone that reconnects, so
+    the store forgets what it held on every new connection and tells the game to read again (`onChange` with key
+    null).
+  - **A screen was told of its own change**, against the guide ("another screen changed an entry"): a game answering
+    a change with a change would go round in circles. The table no longer tells the sender.
+  - **An imported file could bring more display choices than the board may set** (20 keys, the key's shape): they
+    could never be changed again. The file is held to the same rule.
+  - **The master volume replaced a game's own audio levels** (D-297) for `<audio>` and `<video>`: every element
+    played at the slider's value. It now multiplies the level the game gave the element, as the Web Audio path does.
+  - **Closed audio contexts were kept** by the master volume for the life of the page; they are dropped when closed.
+  *Checks:* `tests/game-data.test.ts` (no echo to the sender, a file's display choices), `scripts/e2e/screensaver.py`,
+  `board_deck.py`, `game_data.py`.

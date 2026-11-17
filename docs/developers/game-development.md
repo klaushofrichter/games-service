@@ -508,7 +508,7 @@ own computer (one JSON file per game in the Table Host's data folder), works wit
 uploaded, and is **shared by everyone at that table**: it belongs to the table, not to a player or a phone.
 
 ```js
-const favs = (await ctx.store?.get("favourites")) ?? [];        // an entry, or undefined
+const favs = (await ctx.store?.get("favourites")) ?? [];        // an entry, or undefined; throws if the table can't be asked
 await ctx.store.set("favourites", [...favs, preset]);            // → { ok, reason? }; null removes the entry
 const stop = ctx.store.onChange((key, value) => { … });         // another screen changed it; key null: read everything again
 await ctx.store.keys();  await ctx.store.all();                  // the keys; everything as { key: value }
@@ -517,6 +517,13 @@ await ctx.store.keys();  await ctx.store.all();                  // the keys; ev
 - **JSON only**, under keys such as `favourites` or `configs` (a letter, then letters, digits, `.`, `-`, `_`; up to 64
   characters): 64 entries per game, 48 KB an entry, 256 KB in all. No audio, no images. A refused `set` says why.
 - **Who writes:** the table's board, and the phones of players with a seat. A remote player's board reads only.
+- **A read can fail** (the screen is not connected to the table just now): `get`, `keys` and `all` throw then, so
+  that "nothing there" and "could not ask" never look alike. Catch it and ask again later; never write what you
+  would have written for an empty store. A `set` that fails returns `{ ok: false, reason }`: keep the change and try
+  again, or tell the player.
+- **`onChange` is for others' changes:** the screen that made a change is not told of it again. With `key` `null`,
+  read everything again: the data was imported or deleted, or this screen was away from the table for a moment and
+  may have missed changes.
 - **The rules never see it.** `rules.ts` stays deterministic and replayable: what the rules need from the store, the
   board or a phone sends as an intent (a chosen preset, a configuration), and it is logged like any move.
 - **`ctx.store` is missing** on a table whose platform is older than this, and in a game without `storage`: write

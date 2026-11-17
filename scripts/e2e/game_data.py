@@ -46,11 +46,13 @@ try:
     with sync_playwright() as p:
         br = p.chromium.launch()
         board = br.new_page(viewport={"width": 1600, "height": 900})
-        watch(board, "board", ignore=("status of 400",))  # the file that is no game data, refused on purpose
+        # Refused on purpose: the file that is no game data (400). And the table is restarted under both pages.
+        gone = ("ERR_CONNECTION_REFUSED", "WebSocket connection", "Failed to fetch")
+        watch(board, "board", ignore=("status of 400", *gone))
         open_board(board, BASE + "/board/")
         ctx = br.new_context(viewport={"width": 390, "height": 780}, has_touch=True)
         phone = ctx.new_page()
-        watch(phone, "phone")
+        watch(phone, "phone", ignore=gone)
         join_deck(phone, a("GET", "/join")["url"], "Ann")
         blist, plist = board.locator("#game-layer .keeper-list"), phone.locator(".keeper-list")
 

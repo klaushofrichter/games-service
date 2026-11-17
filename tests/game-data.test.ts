@@ -135,13 +135,14 @@ describe("on a table host", () => {
     expect((await ask(ann, "set", { key: "favourites", value: ["board 1", "phone 2"] })).type).toBe("ack");
     expect((await ask(ben, "get", { key: "favourites" })).payload.value).toEqual(["board 1", "phone 2"]);
     expect((await ask(ben, "keys")).payload.keys).toEqual(["favourites"]);
-    for (const d of [b, ann, ben]) {
-      await until(() => changes(d).length === 2);
-      expect(changes(d)).toEqual([
-        { gameId: "keeper", key: "favourites", value: ["board 1"] },
-        { gameId: "keeper", key: "favourites", value: ["board 1", "phone 2"] },
-      ]);
-    }
+    // Everyone else hears of a change; the screen that made it is not told again.
+    const first = { gameId: "keeper", key: "favourites", value: ["board 1"] };
+    const second = { gameId: "keeper", key: "favourites", value: ["board 1", "phone 2"] };
+    await until(() => changes(ben).length === 2);
+    expect(changes(ben)).toEqual([first, second]);
+    await until(() => changes(b).length === 1 && changes(ann).length === 1);
+    expect(changes(b)).toEqual([second]);
+    expect(changes(ann)).toEqual([first]);
     // Removing an entry: null.
     await ask(ann, "set", { key: "favourites", value: null });
     expect((await ask(b, "keys")).payload.keys).toEqual([]);
@@ -222,7 +223,10 @@ describe("on a table host", () => {
     expect(await t.ok("POST", "/game-data/inspect", { file: gone })).toMatchObject({ gameId: "gone-game", gameName: "Gone Game", installed: false, now: null });
     await t.ok("POST", "/game-data/import", { file: gone });
     expect((await t.ok("GET", "/game-data")).games.map((g: any) => [g.gameId, g.installed])).toEqual([["gone-game", false], ["keeper", true]]);
-    for (const bad of [{}, { file: null }, { file: { ...file, format: 9 } }, { file: "text" }]) expect((await t.api("POST", "/game-data/import", bad)).status).toBe(400);
+    for (const bad of [{}, { file: null }, { file: { ...file, format: 9 } }, { file: "text" }, { file: { ...file, prefs: { "bad key": 1 } } }]) expect((await t.api("POST", "/game-data/import", bad)).status).toBe(400);
+    // Display choices in a file keep to the table's own rule for them (20 keys): more could never be changed again.
+    const manyPrefs = { ...file, prefs: Object.fromEntries(Array.from({ length: 21 }, (_, i) => [`k${i}`, i])) };
+    expect((await t.api("POST", "/game-data/import", { file: manyPrefs })).status).toBe(413);
     // A whole store of 256 KB comes back in.
     const full = { ...file, data: Object.fromEntries([0, 1, 2, 3, 4].map((i) => [`part${i}`, "x".repeat(45 * 1024)])) };
     expect((await t.api("POST", "/game-data/import", { file: full })).status).toBe(200);

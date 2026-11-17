@@ -115,10 +115,15 @@ function noteFullscreenForNextPage() {
     } catch {}
   };
   const onInput = (e) => {
-    if (pending && (e.type === "pointerdown" || e.type === "keydown" || e.type === "touchstart")) {
-      fsDoc.documentElement.requestFullscreen().catch(() => {});
-      done();
-      swallowUntil = Date.now() + 700; // the rest of this tap: the layout changes size under the finger
+    if (pending) {
+      // A browser takes a mouse press or a key as the person's doing, but a finger only when it lifts: asked for on
+      // the touch itself, fullscreen is refused. Until it is back, every tap is this one's: it does nothing else.
+      // The hint goes when fullscreen has come (fullscreenchange, below); refused, it stays for the next tap.
+      const go = e.type === "keydown" || (e.type === "pointerdown" && e.pointerType === "mouse") || (e.type === "pointerup" && e.pointerType !== "mouse");
+      if (go) {
+        fsDoc.documentElement.requestFullscreen().catch(done); // refused all the same: the board is not held up for it
+        swallowUntil = Date.now() + 700; // the rest of this tap: the layout changes size under the finger
+      }
     } else if (Date.now() >= swallowUntil) return;
     e.preventDefault();
     e.stopImmediatePropagation();
@@ -151,6 +156,8 @@ if (typeof AudioNode === "function" && typeof AudioDestinationNode === "function
       g.gain.value = masterVolume;
       connect.call(g, dest);
       masterGains.set(dest, g);
+      // A closed context (a game that was left) is forgotten: a table runs for days.
+      dest.context.addEventListener?.("statechange", () => dest.context.state === "closed" && masterGains.delete(dest));
     }
     return g;
   };
@@ -162,13 +169,23 @@ if (typeof AudioNode === "function" && typeof AudioDestinationNode === "function
     return disconnect.call(this, dest instanceof AudioDestinationNode ? masterFor(dest) : dest, ...rest);
   };
 }
-// <audio> and <video> a game plays: their own volume, set when they start.
-document.addEventListener("play", (e) => e.target instanceof HTMLMediaElement && (e.target.volume = masterVolume), true);
+// <audio> and <video> a game plays: the volume the game gave it, times the master volume. A volume other than the one
+// set here is the game's own again (it turned its music down), and is scaled in turn.
+const mediaVolumes = new WeakMap(); // element -> { own: the game's volume, set: what it plays at }
+function scaleMedia(el) {
+  if (!(el instanceof HTMLMediaElement)) return;
+  let v = mediaVolumes.get(el);
+  if (!v || Math.abs(el.volume - v.set) > 1e-4) mediaVolumes.set(el, (v = { own: el.volume, set: el.volume }));
+  v.set = v.own * masterVolume;
+  if (el.volume !== v.set) el.volume = v.set;
+}
+document.addEventListener("play", (e) => scaleMedia(e.target), true);
+document.addEventListener("volumechange", (e) => scaleMedia(e.target), true);
 function setMasterVolume(v) {
   masterVolume = Math.min(1, Math.max(0, v));
   keep(VOLUME_KEY, String(masterVolume));
   for (const g of masterGains.values()) g.gain.setTargetAtTime(masterVolume, g.context.currentTime, 0.02);
-  for (const m of document.querySelectorAll("audio, video")) m.volume = masterVolume;
+  for (const m of document.querySelectorAll("audio, video")) scaleMedia(m);
 }
 const watchBtn = document.getElementById("watchers-button");
 const viewBtn = document.getElementById("view-button");
@@ -2550,6 +2567,7 @@ function fileStamp(d = new Date()) {
  * is running keeps its data as it is.
  */
 let onGameDataReset = null; // the open Game data window's reload
+let freshSocket = false; // the socket to the table has just opened; its first lobby state has not come yet
 function openGameData() {
   const o = document.createElement("div");
   o.className = "overlay game-data";
@@ -2980,7 +2998,11 @@ function scheduleSaver() {
   clearTimeout(saverTimer);
   saverTimer = null;
   if (!saverOn || IN_PLAY || saverEl) return;
-  saverTimer = setTimeout(() => (Date.now() - lastInput >= SAVER_AFTER_MS ? showSaver() : scheduleSaver()), Math.max(1000, lastInput + SAVER_AFTER_MS - Date.now()));
+  saverTimer = setTimeout(() => {
+    saverTimer = null; // fired: the next input after the screensaver starts the hour anew
+    if (Date.now() - lastInput >= SAVER_AFTER_MS) showSaver();
+    else scheduleSaver();
+  }, Math.max(1000, lastInput + SAVER_AFTER_MS - Date.now()));
 }
 function showSaver() {
   saverEl = document.createElement("div");
@@ -3170,6 +3192,7 @@ function tellPage(msg) {
 function connect() {
   ws = openTableSocket(REMOTE);
   ws.onopen = () => {
+    freshSocket = true;
     // A remote board names its browser's person (from the invite page), for the watchers list (D-168).
     const hello = REMOTE ? { role: "board", name: new URLSearchParams(location.search).get("name") ?? "" } : { role: "board", key: KEY, tab: TAB, ...(takeover ? { takeover: true } : {}) };
     takeover = false;
@@ -3200,6 +3223,11 @@ function connect() {
       return void game?.store?.changed(m.payload);
     }
     if (m.ch === "lobby" && m.type === "state") {
+      if (freshSocket) {
+        // Connected (again), and let in: a game still shown may have missed changes to its data on the table (D-302).
+        freshSocket = false;
+        game?.store?.reconnected();
+      }
       state = m.payload;
       document.body.classList.remove("offline");
       if (selectedPlayer && !state.players.some((p) => p.id === selectedPlayer)) selectedPlayer = null;

@@ -104,7 +104,9 @@ export class GameData {
       if (v === null || size(v) > GAME_DATA_LIMITS.entry) throw new GameDataError(413, `the entry "${k}" is empty or larger than ${GAME_DATA_LIMITS.entry / 1024} KB`);
     }
     this.assertRoom(data);
-    if (size(prefs) > 4096) throw new GameDataError(413, "the display choices are limited to 4 KB");
+    // the table's own rules for display choices (setPrefs): a file must not bring in what the board could not set
+    if (Object.keys(prefs).length > 20 || size(prefs) > 4096) throw new GameDataError(413, "the display choices are limited to 20 keys and 4 KB");
+    for (const k of Object.keys(prefs)) if (!/^[A-Za-z][\w-]{0,39}$/.test(k)) throw new GameDataError(400, `bad display choice "${k.slice(0, 40)}"`);
     const date = new Date(String(raw.updatedAt ?? ""));
     return {
       format: GAME_DATA_FORMAT,
