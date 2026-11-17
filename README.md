@@ -303,7 +303,7 @@ feature branch → PR → main → (PR) → production → deploy
 
 | Workflow | Trigger | Does |
 | --- | --- | --- |
-| `production-checks.yml` | PR to `main` or `production` | `test` (game versions, tests, typecheck, `npm audit --audit-level=high`, both images built and run non-root), `e2e` (all browser checks and the local Docker runbook), `codeql` (fails on any finding not in `.github/codeql-accepted.tsv`) |
+| `production-checks.yml` | PR to `main` or `production` | `test` (game versions, tests, typecheck, `scripts/npm-audit.mjs`: `npm audit` at high severity, D-305, both images built and run non-root), `e2e` (all browser checks and the local Docker runbook), `codeql` (fails on any finding not in `.github/codeql-accepted.tsv`) |
 | `build-push.yml` | push to `main` | tests and typecheck, then both images as `:main`, and nothing else |
 | `deploy-production.yml` | push to `production` | on the in-cluster runner: calendar version, images as `:<sha>`, `:v<version>`, `:latest`, the cluster repository's manifest updated (push, then apply), rollout, smoke test until `/health` serves the new version, then a GitHub release with what the deploy verified |
 

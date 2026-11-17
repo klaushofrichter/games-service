@@ -1,6 +1,7 @@
 """Browser check of the board's screensaver (D-298), with the page's clock run forward instead of waiting an hour:
 
   - after an hour without input the window goes black with a clock, and the board underneath stops being painted;
+    again after the next hour without input;
   - an hour less a minute, with a key pressed in between, does not;
   - the tap that wakes the board brings it back and does nothing else (the game tile under it isn't opened);
   - Settings › Display › Screensaver Off: no screensaver, also after hours; the choice is kept after a reload.
@@ -49,6 +50,15 @@ try:
         page.wait_for_timeout(500)
         page.screenshot(path=os.path.join(OUT, "screensaver-woken.png"))
         assert page.locator("#overlay-root > *").count() == 0, "the waking tap also opened " + page.locator("#overlay-root").inner_text()[:200]
+
+        # And again after another hour: it came only once per page before (the timer was never set again).
+        page.clock.run_for("59:00")
+        assert saver.count() == 0, "the screensaver came back before another hour without input"
+        page.clock.run_for("02:00")
+        page.wait_for_selector("#gt-saver.on")
+        page.keyboard.press("Shift")
+        assert saver.count() == 0, "a key did not end the screensaver"
+        page.wait_for_timeout(800)  # the rest of the waking input is swallowed for a moment
 
         # Off in the settings: nothing after hours; kept after a reload.
         page.click("#settings-button")

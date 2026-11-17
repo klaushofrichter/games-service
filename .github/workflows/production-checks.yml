@@ -30,7 +30,8 @@ jobs:
       - run: npm run typecheck
       # Dependabot notices a vulnerable dependency; noticing is not blocking. `high`, so a moderate advisory whose
       # only fix is a major upgrade cannot wedge unrelated merges.
-      - run: npm audit --audit-level=high
+      # High-severity advisories stop the job, except the few let through for a while (scripts/npm-audit-allow.json, D-305).
+      - run: node scripts/npm-audit.mjs
       # Every artifact is built by the PR checks, not only by the deploy: both images, run the way the cluster runs them.
       - name: Build both images
         run: |
