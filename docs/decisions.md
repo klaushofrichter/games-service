@@ -2601,3 +2601,17 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   - **Closed audio contexts were kept** by the master volume for the life of the page; they are dropped when closed.
   *Checks:* `tests/game-data.test.ts` (no echo to the sender, a file's display choices), `scripts/e2e/screensaver.py`,
   `board_deck.py`, `game_data.py`.
+
+- **D-305 · 2026-11-17 · Klaus** — **One advisory is let through the dependency check, for a month.** On 2026-11-17
+  GHSA-fc5q-39xc-vjpf (picomatch, high: a slow regular expression in glob patterns) was published with every version
+  affected and no fixed one; `npm audit --audit-level=high` failed in every repository and stopped every pull request
+  and release. It reaches us through the test tools only (vitest, vite), on our own patterns; nothing a table or the
+  service runs has it (`npm audit --omit=dev` is clean). Asked whether to check the runtime dependencies only, to let
+  this one advisory through, or to wait for a fix, Klaus chose: "Ignore this one advisory."
+  - The test jobs run `scripts/npm-audit.mjs` instead of `npm audit --audit-level=high`: the same check, minus the
+    advisories in `scripts/npm-audit-allow.json`. An entry has the advisory's id, why, and a date (`until`); after it
+    the advisory blocks again, and an entry that is no longer found is reported for removal. Everything else at high
+    severity blocks as before.
+  - One list for all repositories: the game repositories run `.games-service/scripts/npm-audit.mjs` from the
+    checkout their checks already make.
+  - The entry ends on 2026-12-17. Take it out sooner when a fixed picomatch (or a vitest without it) is released.
