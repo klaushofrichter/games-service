@@ -11,6 +11,7 @@ import { Table, type TableConfig } from "./table.ts";
 import { CloudLink } from "./cloud.ts";
 import { RemoteGateway } from "./remote.ts";
 import { ExtraGames } from "./extra-games.ts";
+import { GameData } from "./game-data.ts";
 
 const here = fileURLToPath(new URL(".", import.meta.url));
 
@@ -68,7 +69,9 @@ export async function startHost(o: HostOptions = {}) {
     allowNoLocalPlayer: o.allowNoLocalPlayer ?? false,
     boardDeck: o.boardDeck ?? false,
   };
-  const table = new Table(config, games, logs);
+  // What games keep on this table between games (D-302): on its own computer, with or without the cloud service.
+  const gameData = new GameData(join(dataDir, "game-data"));
+  const table = new Table(config, games, logs, gameData);
   table.localTable = o.localTable ?? false;
   if (table.localTable) {
     table.checkouts = await checkoutsOf(games); // games from local clones (D-251): the board says which branches
@@ -109,6 +112,7 @@ export async function startHost(o: HostOptions = {}) {
     cloud?.stop();
     gateway.close();
     await server.close();
+    await gameData.flush();
   };
   return { table, logs, tableKey, port: server.port, close, cloud, gateway };
 }

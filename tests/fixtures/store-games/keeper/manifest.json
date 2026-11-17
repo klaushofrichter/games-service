@@ -1,0 +1,21 @@
+{
+  "id": "keeper",
+  "name": "Keeper",
+  "version": "1.0.0",
+  "sdk": "^0.1",
+  "description": "Test game for game data (D-302): its board and phones keep a list of favourites on the table.",
+  "players": [
+    1,
+    2
+  ],
+  "turnModel": "sequential",
+  "seatLayouts": [
+    2
+  ],
+  "edges": [
+    "north",
+    "south"
+  ],
+  "test": true,
+  "storage": true
+}

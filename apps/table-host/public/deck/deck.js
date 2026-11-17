@@ -1,6 +1,6 @@
 // Deck UI: join with a name, lobby with Ready, and the game's own private deck view.
 // A game package may ship deck.js exporting mount(root, ctx) -> { update(view, events, info), destroy() }.
-import { esc, claimServiceWorkerPage, inkOn, openTableSocket, playerColor, seatName, seatTitle } from "/shared/board-kit.js";
+import { esc, claimServiceWorkerPage, gameStore, inkOn, openTableSocket, playerColor, seatName, seatTitle } from "/shared/board-kit.js";
 import { renderRules } from "/shared/markdown.js";
 
 const app = document.getElementById("app");
@@ -121,7 +121,7 @@ function connect(hello) {
       const resolve = m.seq !== undefined && pending.get(m.seq);
       if (resolve) {
         pending.delete(m.seq);
-        resolve(m.type === "ack" || m.type === "welcome" ? { ok: true } : { ok: false, reason: m.payload?.reason ?? m.payload?.message });
+        resolve(m.type === "ack" || m.type === "welcome" ? { ok: true, payload: m.payload } : { ok: false, reason: m.payload?.reason ?? m.payload?.message });
       }
       if (m.type === "welcome") {
         me = m.payload.playerId;
@@ -162,6 +162,8 @@ function connect(hello) {
       state = m.payload;
       if (!removed && self()) myName = self().name;
       if (state.phase !== "active" && state.phase !== "paused") gameMsg = null;
+    } else if (m.ch === "store" && m.type === "changed") {
+      game?.store?.changed(m.payload); // the game's data on the table changed (D-302)
     } else if (m.ch === "game" && m.type === "view") {
       gameMsg = { ...m.payload, receivedAt: Date.now() };
       // When it becomes this player's turn the game's tab comes to the front (D-123).
@@ -661,8 +663,11 @@ async function showGame() {
       mod = { mount: genericDeck };
     }
     if (game !== mine) return;
+    // What the game keeps on the table between games (D-302), if its manifest says `storage`.
+    mine.store = state.game.storage ? gameStore((type, payload) => send("store", type, payload), state.game.id) : null;
     mine.inst = mod.mount(body, {
       gameId: state.game.id,
+      store: mine.store?.store,
       seat: gameMsg.seat,
       // A rejected intent shows its reason here, so games need not toast it themselves.
       send: (name, payload) =>

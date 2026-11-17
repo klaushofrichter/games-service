@@ -204,6 +204,10 @@ describe("remote play", { timeout: 60_000 }, () => {
     expect((await rb.next((m) => m.type === "welcome")).payload).toEqual({ role: "board", remote: true });
     await until(() => rb.lastState());
     expect(rb.lastState().joinUrl).toBe("");
+    // Game data (D-302) stays with the table: a remote board changes none of it, and its window is not served.
+    rb.send("store", "set", { key: "favourites", value: [1] }, 7);
+    expect((await rb.next((m) => m.seq === 7)).payload).toMatchObject({ status: 403, message: expect.stringMatching(/remote board/) });
+    expect((await peer.json("GET", "/api/v1/game-data")).status).toBe(403);
 
     // a local deck and the remote deck play a round of coin flip
     const a = await t.joinDeck("Ana");
