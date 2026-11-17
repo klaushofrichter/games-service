@@ -13,7 +13,7 @@ A Table Host of its own (port 8152), without the cloud service.
 """
 import json, os, re, sys, tempfile
 from playwright.sync_api import sync_playwright
-from common import REPO, call, errors, join_deck, open_board, start_table, wait, watch
+from common import REPO, api, errors, join_deck, open_board, start_table, wait, watch
 
 OUT = sys.argv[1] if len(sys.argv) > 1 else "e2e-out"
 os.makedirs(OUT, exist_ok=True)
@@ -25,7 +25,7 @@ GAMES = os.path.join(REPO, "tests", "fixtures", "store-games")
 
 
 def a(method, path, body=None):
-    return call(BASE, method, "/api/v1" + path, body, {"x-table-key": KEY})
+    return api(method, path, body, base=BASE, key=KEY)
 
 
 def start():
@@ -46,11 +46,13 @@ try:
     with sync_playwright() as p:
         br = p.chromium.launch()
         board = br.new_page(viewport={"width": 1600, "height": 900})
-        watch(board, "board", ignore=("status of 400",))  # the file that is no game data, refused on purpose
+        # Refused on purpose: the file that is no game data (400). And the table is restarted under both pages.
+        gone = ("ERR_CONNECTION_REFUSED", "WebSocket connection", "Failed to fetch")
+        watch(board, "board", ignore=("status of 400", *gone))
         open_board(board, BASE + "/board/")
         ctx = br.new_context(viewport={"width": 390, "height": 780}, has_touch=True)
         phone = ctx.new_page()
-        watch(phone, "phone")
+        watch(phone, "phone", ignore=gone)
         join_deck(phone, a("GET", "/join")["url"], "Ann")
         blist, plist = board.locator("#game-layer .keeper-list"), phone.locator(".keeper-list")
 
@@ -110,7 +112,7 @@ try:
         board.click(".dialog-backdrop button[data-x=yes]")
         board.wait_for_selector(".overlay.game-data .game-data-list >> text=No game keeps anything")
         assert a("GET", "/game-data")["games"] == []
-        assert not os.path.exists(os.path.join(DATA, "game-data", "keeper.json")) or wait(lambda: not os.path.exists(os.path.join(DATA, "game-data", "keeper.json")), 5, "the file to go")
+        wait(lambda: not os.path.exists(os.path.join(DATA, "game-data", "keeper.json")), 5, "the file to go")
 
         # A file that is none is refused, in words.
         junk = os.path.join(OUT, "not-game-data.json")

@@ -124,6 +124,7 @@ function connect(hello) {
         resolve(m.type === "ack" || m.type === "welcome" ? { ok: true, payload: m.payload } : { ok: false, reason: m.payload?.reason ?? m.payload?.message });
       }
       if (m.type === "welcome") {
+        game?.store?.reconnected(); // a game still shown may have missed changes to its data on the table (D-302)
         me = m.payload.playerId;
         if (REMOTE) try { localStorage.setItem(`gametable.remote.${params.get("inv") ?? ""}.player`, me); } catch {} // the remote board turns to this seat
         if (m.payload.sessionToken) storage.set(m.payload.sessionToken);

@@ -65,6 +65,8 @@ export class GameData {
   private files = new Map<string, GameDataFile>();
   /** One write at a time per game, the newest last. */
   private writes = new Map<string, Promise<void>>();
+  /** Games with a write waiting its turn: it will write the newest state, so further changes need no write of their own. */
+  private queued = new Set<string>();
 
   /** `dir` null keeps everything in memory (simulations and tests that need no files). */
   constructor(dir: string | null = null) {
@@ -102,7 +104,9 @@ export class GameData {
       if (v === null || size(v) > GAME_DATA_LIMITS.entry) throw new GameDataError(413, `the entry "${k}" is empty or larger than ${GAME_DATA_LIMITS.entry / 1024} KB`);
     }
     this.assertRoom(data);
-    if (size(prefs) > 4096) throw new GameDataError(413, "the display choices are limited to 4 KB");
+    // the table's own rules for display choices (setPrefs): a file must not bring in what the board could not set
+    if (Object.keys(prefs).length > 20 || size(prefs) > 4096) throw new GameDataError(413, "the display choices are limited to 20 keys and 4 KB");
+    for (const k of Object.keys(prefs)) if (!/^[A-Za-z][\w-]{0,39}$/.test(k)) throw new GameDataError(400, `bad display choice "${k.slice(0, 40)}"`);
     const date = new Date(String(raw.updatedAt ?? ""));
     return {
       format: GAME_DATA_FORMAT,
@@ -135,10 +139,12 @@ export class GameData {
 
   /** Write the game's file (or remove it when nothing is left), after any write of it still under way. */
   private save(id: string) {
-    if (!this.dir) return;
+    if (!this.dir || this.queued.has(id)) return;
     const dir = this.dir;
     const file = join(dir, `${id}.json`);
+    this.queued.add(id);
     const next = (this.writes.get(id) ?? Promise.resolve()).then(async () => {
+      this.queued.delete(id); // what changes from here on gets a write of its own
       const f = this.files.get(id);
       try {
         if (!f) return await rm(file, { force: true });
@@ -163,6 +169,17 @@ export class GameData {
   /** The game's entries; a copy. */
   data(gameId: string): Record<string, unknown> {
     return JSON.parse(JSON.stringify(this.files.get(gameId)?.data ?? {}));
+  }
+
+  /** The keys of the game's entries. */
+  keys(gameId: string): string[] {
+    return Object.keys(this.files.get(gameId)?.data ?? {});
+  }
+
+  /** One entry as kept, or null: not a copy, to send or to read only (`set` replaces entries, it never changes one). */
+  get(gameId: string, key: string): unknown {
+    const data = this.files.get(gameId)?.data;
+    return data && Object.hasOwn(data, key) ? data[key] : null;
   }
 
   /** Set one entry; `null` (or undefined) removes it. Returns the value as kept. */

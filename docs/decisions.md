@@ -2466,7 +2466,7 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   right are the lobby's own however it is turned, at the table's front edge or on a remote board turned to its player:
   the finger's movement is taken back through the tiles' on-screen transform. A swipe never chooses the tile it starts
   on; a tap still does. On every board, the table's and remote ones (paging is only looking). No slide with *reduce
-  motion*. *Implementation (Claude):* `turnPage()`, the swipe handlers and `inLocalFrame()` in `board.js`; `.games`
+  motion*. *Implementation (Claude):* `turnPage()`, the swipe handlers and `localFrame()` in `board.js`; `.games`
   slide keyframes in `board.css`. Checks: `scripts/e2e/layout.py` (a swipe on a board facing west, across it no turn,
   round the ends); the paging helpers in `play.py` and `extra.py` go by the dots.
 - **D-296 · 2026-11-15 · Klaus** — **The mouse pointer can be hidden in fullscreen.** For the touchscreen: "disable the
@@ -2558,3 +2558,60 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   `/api/v1/game-data`, `gameStore()` in `board-kit.js`, `openGameData()` in `board.js`. Checks:
   `tests/game-data.test.ts`, `tests/remote.test.ts` (a remote board), `scripts/e2e/game_data.py` with the test games
   Keeper and Forgetful (`tests/fixtures/store-games`).
+
+- **D-303 · 2026-11-17 · Klaus** — **A second simplify pass, over games-service and every game repository.** "Do a
+  /simplify and /code-review over games-service and all *-game repos." Four reviewers (reuse, simplification,
+  efficiency, right depth) read all seven repositories; the game repositories record their own part. Here, mostly in
+  the game data code of D-302:
+  - **Taken:** `Table.gameDataList`/`assertNotRunning` use the `playing` getter; `storeKeys`/`storeGet` read through
+    `GameData.keys`/`get` instead of copying a game's whole store for one entry; the reader's check lives in
+    `storeGame`, and `storeSet(key, value, playerId?)` takes the player the way the readers do; a burst of changes to
+    a game's data is one file write, not one per change; `store.all()` asks for its entries together; the Game data
+    window reloads when a game starts or ends and after an import or delete, not on every lobby message; the lobby
+    swipe takes the board's turn and scale once per swipe, not on every pointer move; the board's per-screen settings
+    (pointer, volume, view, screensaver) share `stored()`/`keep()`; leftovers in `tests/game-data.test.ts` and
+    `scripts/e2e/game_data.py`.
+  - **Left for later, each a change of its own:** one test harness for all game repositories (today a copy in each,
+    reaching into the runtime); the phone layout rule (D-065) of the browser checks in `scripts/e2e/common.py`
+    instead of six copies; one "swallow the rest of this tap" for the screensaver and the return to fullscreen;
+    Roulette's 5.2 s spin stated once.
+  - **Left as it is:** GE150 Pro's and Synth's "the table keeps it, the board brings it" code stays two copies (fifteen
+    common lines, everything else is each game's own); the import checks its file twice (once per import).
+
+- **D-304 · 2026-11-17 · Klaus** — **Fix what the code review of games-service and the game repositories found.** "Do
+  a /simplify and /code-review over games-service and all *-game repos." Ten findings, all confirmed, all in code of
+  the last three days; the games record their own part (GE150 Pro, Synth, Starforge).
+  - **The screensaver came only once per page** (D-298): the timer that showed it was never cleared, so the next
+    input did not start the hour anew. Checked now a second time in `screensaver.py`.
+  - **"Tap to return to fullscreen" did nothing for a finger** (D-299): a browser takes a mouse press or a key as
+    the person's doing, but a touch only when the finger lifts; asked on the touch itself, fullscreen was refused,
+    silently, and the hint went. Now a finger asks on `pointerup` (the board and `play.html`), the hint stays until
+    fullscreen has come, and `board_deck.py` taps with a finger, as at the table.
+  - **A game's data read as empty when it could not be read** (D-302): `store.get`, `keys` and `all` now throw when
+    the table gives no answer, so a game can't write its empty start over what the table keeps; the guide says so.
+  - **A screen that was away kept its old copy:** changes are not replayed to a board or phone that reconnects, so
+    the store forgets what it held on every new connection and tells the game to read again (`onChange` with key
+    null).
+  - **A screen was told of its own change**, against the guide ("another screen changed an entry"): a game answering
+    a change with a change would go round in circles. The table no longer tells the sender.
+  - **An imported file could bring more display choices than the board may set** (20 keys, the key's shape): they
+    could never be changed again. The file is held to the same rule.
+  - **The master volume replaced a game's own audio levels** (D-297) for `<audio>` and `<video>`: every element
+    played at the slider's value. It now multiplies the level the game gave the element, as the Web Audio path does.
+  - **Closed audio contexts were kept** by the master volume for the life of the page; they are dropped when closed.
+  *Checks:* `tests/game-data.test.ts` (no echo to the sender, a file's display choices), `scripts/e2e/screensaver.py`,
+  `board_deck.py`, `game_data.py`.
+
+- **D-305 · 2026-11-17 · Klaus** — **One advisory is let through the dependency check, for a month.** On 2026-11-17
+  GHSA-fc5q-39xc-vjpf (picomatch, high: a slow regular expression in glob patterns) was published with every version
+  affected and no fixed one; `npm audit --audit-level=high` failed in every repository and stopped every pull request
+  and release. It reaches us through the test tools only (vitest, vite), on our own patterns; nothing a table or the
+  service runs has it (`npm audit --omit=dev` is clean). Asked whether to check the runtime dependencies only, to let
+  this one advisory through, or to wait for a fix, Klaus chose: "Ignore this one advisory."
+  - The test jobs run `scripts/npm-audit.mjs` instead of `npm audit --audit-level=high`: the same check, minus the
+    advisories in `scripts/npm-audit-allow.json`. An entry has the advisory's id, why, and a date (`until`); after it
+    the advisory blocks again, and an entry that is no longer found is reported for removal. Everything else at high
+    severity blocks as before.
+  - One list for all repositories: the game repositories run `.games-service/scripts/npm-audit.mjs` from the
+    checkout their checks already make.
+  - The entry ends on 2026-12-17. Take it out sooner when a fixed picomatch (or a vitest without it) is released.

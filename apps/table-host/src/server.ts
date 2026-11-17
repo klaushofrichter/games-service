@@ -200,9 +200,11 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
   };
   table.on("game", (events: GameEvent[]) => sendGame(clients, events));
   // A game's data on the table changed (D-302): its board and its players' phones keep their copies in step.
-  table.on("store", (change: unknown) => {
+  // The screen that made the change knows already: it is not told again (a game that answers a change with a change
+  // would go round in circles).
+  table.on("store", (change: unknown, from?: unknown) => {
     const text = JSON.stringify(envelope("store", "changed", change));
-    for (const c of clients) if (c.role === "board" || c.role === "deck") sendText(c.ws, text);
+    for (const c of clients) if (c !== from && (c.role === "board" || c.role === "deck")) sendText(c.ws, text);
   });
 
   // ---------- decks follow the board (D-143) ----------
@@ -797,7 +799,7 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
           if (msg.type === "set") {
             if (c.role === "board" && c.remote) throw new TableError(403, "a remote board does not change the game's data");
             if (!intentAllowed()) return reply("reject", { reason: "Too many changes at once" }, msg.seq);
-            table.storeSet(c.role === "deck" ? c.playerId : null, p.key, p.value);
+            table.storeSet(p.key, p.value, who, client);
             return reply("ack", {}, msg.seq);
           }
         }

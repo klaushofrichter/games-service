@@ -28,7 +28,7 @@ def players():
 try:
     with sync_playwright() as p:
         b = p.chromium.launch()
-        page = b.new_page(viewport={"width": 1600, "height": 900})
+        page = b.new_page(viewport={"width": 1600, "height": 900}, has_touch=True)  # the table's screen is a touchscreen
         watch(page, "board")
         page.goto(BASE + "/board/")
         page.wait_for_selector("text=Pick a game")
@@ -49,8 +49,10 @@ try:
         board.locator("text=Pick a game").wait_for(timeout=15000)
         board.locator("#fullscreen-hint").wait_for(timeout=5000)
         assert page.evaluate("() => document.fullscreenElement") is None
-        board.locator("button.tile").first.click()
-        wait(lambda: page.evaluate("() => document.fullscreenElement === document.documentElement"), 5, "a tap to bring fullscreen back")
+        # With a finger, as at the table: a browser lets a page go fullscreen when the finger lifts, not when it touches.
+        tile = board.locator("button.tile").first.bounding_box()
+        page.touchscreen.tap(tile["x"] + tile["width"] / 2, tile["y"] + tile["height"] / 2)
+        wait(lambda: page.evaluate("() => document.fullscreenElement === document.documentElement"), 5, "a finger's tap to bring fullscreen back")
         assert board.locator("#fullscreen-hint").count() == 0, "the hint stays in fullscreen"
         page.wait_for_timeout(300)
         assert board.locator("#overlay-root > *").count() == 0, "the tap that returned to fullscreen also chose a game"

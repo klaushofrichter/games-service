@@ -6,11 +6,18 @@ export function mount(root, ctx) {
   let favs = [];
   const load = async () => {
     if (!ctx.store) return void (list.textContent = "no store");
-    favs = (await ctx.store.get("favourites")) ?? [];
+    try {
+      favs = (await ctx.store.get("favourites")) ?? [];
+    } catch {
+      return void setTimeout(load, 500); // the table gave no answer just now: ask again, never take it for "none"
+    }
     list.textContent = favs.length ? favs.join(", ") : "none";
   };
   const off = ctx.store?.onChange(load);
-  root.querySelector(".keeper-add").addEventListener("click", () => ctx.store?.set("favourites", [...favs, `board ${favs.length + 1}`]));
+  root.querySelector(".keeper-add").addEventListener("click", async () => {
+    await ctx.store?.set("favourites", [...favs, `board ${favs.length + 1}`]); // this screen is not told of its own change: it reads again itself
+    load();
+  });
   load();
   return { update() {}, destroy: () => off?.() };
 }
