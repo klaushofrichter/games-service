@@ -5,7 +5,7 @@ export const PROTOCOL_VERSION = 1;
 
 // ---------- Envelope ----------
 
-export type Channel = "system" | "lobby" | "game";
+export type Channel = "system" | "lobby" | "game" | "store";
 
 export interface Envelope<P = unknown> {
   v: number;
@@ -156,6 +156,11 @@ export const manifestSchema = z.object({
   deck: z.object({ minWidth: z.number().optional(), orientation: z.string().optional() }).optional(),
   permissions: z.array(z.string()).default([]),
   /**
+   * The game keeps data on the table between games (D-302), such as favourites: its board and its players' phones get
+   * `ctx.store`. JSON only, 64 entries and 256 KB per game, on the table's own computer; never part of the rules or log.
+   */
+  storage: z.boolean().default(false),
+  /**
    * The Game Viewer's extra columns (D-120), filled from the `columns` of the game's `describe`. Besides these it always
    * shows the move number, time, player and the step's text.
    */
@@ -263,6 +268,8 @@ export interface LobbyState {
      * Kept per game on this table, shared with the board and every deck; never part of the game's rules or log.
      */
     prefs: Record<string, unknown>;
+    /** Whether the game keeps data on the table (its manifest's `storage`, D-302): its board and decks get `ctx.store`. */
+    storage: boolean;
     /** Where the game's rules for players are (`/games/<id>/how-to-play.md`), or null if it ships none (D-099). */
     howToPlay: string | null;
     /** The chosen settings as the rules page lists them: label and value, in the manifest's order. */

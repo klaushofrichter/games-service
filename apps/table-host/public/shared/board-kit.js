@@ -262,3 +262,79 @@ export function openTableSocket(remote) {
     ? window.parent.gameTableSocket()
     : new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`);
 }
+
+/**
+ * A game's data on the table (D-302), as its board and its players' phones get it in `ctx.store` when the manifest
+ * says `storage: true`: favourites and the like, kept on the table's own computer between games. Plain JSON under
+ * keys ("favourites", "configs"); 64 entries, 48 KB each, 256 KB in all. Shared by everyone at the table.
+ *
+ *   await store.get(key)          the entry, or undefined
+ *   await store.keys()            the keys there are
+ *   await store.all()             { key: value, … }
+ *   await store.set(key, value)   { ok, reason? }; null or undefined removes the entry
+ *   store.onChange((key, value) => …)   another screen changed an entry (value undefined: removed); key null: all of
+ *                                       it was replaced or removed, read again. Returns a function that stops it.
+ *
+ * `send(type, payload)` asks the table and resolves to { ok, reason?, payload? }. Returns the store and `changed`,
+ * which the page calls with the table's change messages.
+ */
+export function gameStore(send, gameId) {
+  const cache = new Map(); // key -> value as the table keeps it (null: no such entry)
+  let known = null; // the keys, once asked for
+  const listeners = new Set();
+  const copy = (v) => (v === null || v === undefined ? undefined : JSON.parse(JSON.stringify(v)));
+  const note = (key, value) => {
+    cache.set(key, value ?? null);
+    if (known) value === null || value === undefined ? known.delete(key) : known.add(key);
+  };
+  const store = {
+    async get(key) {
+      if (!cache.has(key)) {
+        const r = await send("get", { key });
+        if (!r.ok) return undefined;
+        if (!cache.has(key)) note(key, r.payload?.value ?? null); // unless a change arrived meanwhile
+      }
+      return copy(cache.get(key));
+    },
+    async keys() {
+      if (!known) {
+        const r = await send("keys", {});
+        if (!r.ok) return [];
+        known ??= new Set(r.payload?.keys ?? []);
+      }
+      return [...known];
+    },
+    async all() {
+      const out = {};
+      for (const k of await store.keys()) {
+        const v = await store.get(k);
+        if (v !== undefined) out[k] = v;
+      }
+      return out;
+    },
+    async set(key, value) {
+      const r = await send("set", { key, value: value ?? null });
+      if (r.ok) note(key, value === undefined ? null : JSON.parse(JSON.stringify(value)));
+      return r.ok ? { ok: true } : { ok: false, reason: r.reason };
+    },
+    onChange(fn) {
+      listeners.add(fn);
+      return () => listeners.delete(fn);
+    },
+  };
+  const changed = (c) => {
+    if (!c || c.gameId !== gameId) return;
+    if (c.reset) {
+      cache.clear();
+      known = null;
+    } else note(c.key, c.value);
+    for (const fn of listeners) {
+      try {
+        fn(c.reset ? null : c.key, c.reset ? undefined : copy(c.value));
+      } catch (err) {
+        console.error(err);
+      }
+    }
+  };
+  return { store, changed };
+}

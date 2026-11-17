@@ -1,7 +1,7 @@
 // Board UI: lobby, seats around the edge, QR join, game surface and the lobby overlay.
 // Talks to the Table Host through the board control API (same API the tests and local AI agents use).
 import { renderRules } from "/shared/markdown.js";
-import { ROT, W, H, SEAT_COLORS, audio, copyText, esc, seatName, seatPositions, claimServiceWorkerPage, openTableSocket } from "/shared/board-kit.js";
+import { ROT, W, H, SEAT_COLORS, audio, copyText, esc, gameStore, seatName, seatPositions, claimServiceWorkerPage, openTableSocket } from "/shared/board-kit.js";
 import { openViewer } from "/board/viewer.js";
 import { hasStatistics, openStatistics, seatsByName, table as statsTable } from "/board/stats.js";
 
@@ -2267,7 +2267,9 @@ async function showGame() {
       mod = { mount: genericBoard };
     }
     if (game !== mine) return; // a newer game replaced this one while loading
-    mine.inst = mod.mount(gameLayer, { gameId: state.game.id, assetUrl: (p) => `/games/${state.game.id}/assets/${p}`, act: boardAct, skipTimer });
+    // What the game keeps on the table between games (D-302), if its manifest says `storage`.
+    mine.store = state.game.storage ? gameStore((type, payload) => wsSend("store", type, payload), state.game.id) : null;
+    mine.inst = mod.mount(gameLayer, { gameId: state.game.id, assetUrl: (p) => `/games/${state.game.id}/assets/${p}`, act: boardAct, skipTimer, store: mine.store?.store });
   }
   if (game.inst && gameMsg) {
     game.inst.update(gameMsg.view, [], gameInfo());
@@ -2498,6 +2500,8 @@ function openAdvanced() {
         <div class="row"><span>Games of AI players only, without the board, for testing and AI training</span><button data-adv="sim">Simulation…</button></div></div>`}
       <div class="group"><div class="eyebrow">Game logs</div>
         <div class="row"><span>Finished games on this table, move by move</span><button data-adv="logs">Game logs…</button></div></div>
+      ${REMOTE ? "" : `<div class="group"><div class="eyebrow">Game data</div>
+        <div class="row"><span>What games keep on this table between games, such as favourites: export, import, delete</span><button data-adv="data">Game data…</button></div></div>`}
       ${REMOTE ? "" : `<div class="group developer"><div class="eyebrow">Developer settings</div>
         <div class="row"><span>Games without a player at the table</span><button data-adv="no-local" data-dev-no-local class="${dev ? "on" : ""}" role="switch" aria-checked="${dev}">${dev ? "On" : "Off"}</button></div>
         <div class="faint" style="font-size:.7em;margin-top:6px">For testing: games with remote and AI players only, or AI players only. Off again when the table restarts.</div>
@@ -2532,9 +2536,94 @@ function openAdvanced() {
     if (a === "sim") return (close(), openSimulation());
     if (a === "logs") return (close(), openGameLogs());
     if (a === "live") return (close(), openLiveStatus());
+    if (a === "data") return (close(), openGameData());
     if (b?.dataset.accessCode !== undefined) return openCodePad();
     if (a === "no-local") act("POST", "/developer", { allowNoLocalPlayer: !state.developer?.allowNoLocalPlayer });
     if (a === "board-deck") act("POST", "/developer", { boardDeck: !state.developer?.boardDeck });
+  });
+  overlayRoot.appendChild(o);
+}
+
+// ---------- game data (D-302) ----------
+/** "2026-11-17-153012": the date and time in a file's name, so that every export is its own file. */
+function fileStamp(d = new Date()) {
+  const p = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
+}
+/**
+ * What games keep on this table between games (favourites and the like, and their display choices): one row per game
+ * that keeps something, with Export (a JSON file in the browser's downloads, named with the date and time), Delete,
+ * and Import of such a file, which replaces that game's data after asking. On the table's own board only; a game that
+ * is running keeps its data as it is.
+ */
+function openGameData() {
+  const o = document.createElement("div");
+  o.className = "overlay game-data";
+  let list = null;
+  const size = (b) => (b < 1024 ? `${b} bytes` : `${(b / 1024).toFixed(1)} KB`);
+  const when = (iso) => new Date(iso).toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
+  const what = (g) => [g.entries ? `${g.entries} ${g.entries === 1 ? "entry" : "entries"}` : "", g.prefs ? "display choices" : ""].filter(Boolean).join(" and ");
+  const draw = () => {
+    setPanel(o, `<div class="panel"><h2>Game data</h2>
+      <p class="muted" style="font-size:.8em;margin-top:-6px">What games keep on this table between games, such as favourites. It stays on this computer; an export is a file in this browser's downloads.</p>
+      <div class="group game-data-list">${
+        list === null
+          ? `<div class="faint">Loading…</div>`
+          : list.length
+            ? list.map((g) => `<div class="row" data-game="${esc(g.gameId)}"><span><b>${esc(g.gameName)}</b>${g.installed ? "" : ` <span class="faint">· not installed</span>`}${g.running ? ` <span class="faint">· in use by the running game</span>` : ""}
+                <small class="row-hint">${esc(what(g))} · ${esc(size(g.bytes))} · changed ${esc(when(g.updatedAt))}</small></span>
+                <span class="seg"><button data-export="${esc(g.gameId)}">Export</button><button data-delete="${esc(g.gameId)}" ${g.running ? "disabled" : ""}>Delete</button></span></div>`).join("")
+            : `<div class="faint">No game keeps anything on this table yet.</div>`
+      }</div>
+      <div class="group"><div class="row"><span>Bring back an exported file: it replaces what the table keeps for that game</span><button data-import>Import…</button></div>
+        <input type="file" accept="application/json,.json" hidden></div>
+      <div class="actions settings-actions"><button class="primary" data-close-overlay>Done</button></div></div>`);
+  };
+  const load = () => api("GET", "/game-data").then((r) => ((list = r.games), draw())).catch(() => {});
+  draw();
+  load();
+  const unsub = onState(load); // an import or a delete, also from elsewhere, and the game starting or ending
+  const close = () => (unsub(), o.remove());
+  const nameOf = (id) => list?.find((g) => g.gameId === id)?.gameName ?? id;
+  o.addEventListener("click", async (e) => {
+    const b = e.target.closest("button");
+    if (e.target === o || b?.dataset.closeOverlay !== undefined) return close();
+    if (!b) return;
+    if (b.dataset.import !== undefined) return o.querySelector("input[type=file]").click();
+    if (b.dataset.export) {
+      const file = await api("GET", `/game-data/${b.dataset.export}`).catch(() => null);
+      if (!file) return;
+      const name = `gametable-${b.dataset.export}-${fileStamp()}.json`;
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(new Blob([JSON.stringify(file, null, 2)], { type: "application/json" }));
+      a.download = name;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+      return toast(`Exported to the downloads: ${name}`);
+    }
+    if (b.dataset.delete) {
+      if (!(await confirmDialog(`Delete the data of ${nameOf(b.dataset.delete)}?`, "Everything this table keeps for the game goes: its entries, such as favourites, and its display choices. Export it first to keep a copy.", "Delete"))) return;
+      await api("DELETE", `/game-data/${b.dataset.delete}`).then((r) => ((list = r.games), draw(), toast(`Deleted the data of ${nameOf(b.dataset.delete)}`))).catch(() => {});
+    }
+  });
+  o.addEventListener("change", async (e) => {
+    const input = e.target.closest("input[type=file]");
+    const picked = input?.files?.[0];
+    if (!picked) return;
+    input.value = ""; // the same file can be chosen again
+    let file;
+    try {
+      if (picked.size > 1024 * 1024) throw new Error("too large");
+      file = JSON.parse(await picked.text());
+    } catch {
+      return toast("This is not a game data file");
+    }
+    const seen = await api("POST", "/game-data/inspect", { file }).catch(() => null);
+    if (!seen) return;
+    const has = [seen.entries ? `${seen.entries} ${seen.entries === 1 ? "entry" : "entries"}` : "", seen.prefs ? "display choices" : ""].filter(Boolean).join(" and ") || "nothing";
+    const text = `The file holds ${has}, last changed ${when(seen.updatedAt)}. ${seen.now ? `It replaces what this table keeps for the game now (${what(seen.now) || "nothing"}).` : "This table keeps nothing for the game yet."}${seen.installed ? "" : " The game is not installed on this table."}`;
+    if (!(await confirmDialog(`Import the data of ${seen.gameName}?`, text, "Import"))) return;
+    await api("POST", "/game-data/import", { file }).then((r) => ((list = r.games), draw(), toast(`Imported the data of ${seen.gameName}`))).catch(() => {});
   });
   overlayRoot.appendChild(o);
 }
@@ -3109,9 +3198,11 @@ function connect() {
     const answer = m.ch === "system" && m.seq !== undefined && wsPending.get(m.seq);
     if (answer) {
       wsPending.delete(m.seq);
-      answer(m.type === "ack" ? { ok: true } : { ok: false, reason: m.payload?.reason ?? m.payload?.message });
+      answer(m.type === "ack" ? { ok: true, payload: m.payload } : { ok: false, reason: m.payload?.reason ?? m.payload?.message });
       return;
     }
+    // The game's data on the table changed (D-302): from a phone, or the Game data window.
+    if (m.ch === "store" && m.type === "changed") return void game?.store?.changed(m.payload);
     if (m.ch === "lobby" && m.type === "state") {
       state = m.payload;
       document.body.classList.remove("offline");
