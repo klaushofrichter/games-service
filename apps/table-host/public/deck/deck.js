@@ -14,6 +14,47 @@ if (REMOTE) claimServiceWorkerPage();
 // Played from the board (D-175, a developer setting): this page sits beside the board on the table PC and joins with
 // the table key the board's page holds, instead of a join code; its session is kept apart from a phone's.
 const BOARD = params.get("board") === "1" && !REMOTE;
+/**
+ * The deck beside the board scrolls for a finger (D-306). A phone scrolls by touch on its own; on the table's
+ * touchscreen a finger may reach the browser as a mouse, which scrolls nothing. So a drag with anything but a touch
+ * scrolls what is under it: the nearest list that scrolls, or the page. No wide bar here. A drag is not a tap; text
+ * fields, sliders and what a game moves by touch itself (`touch-action: none`) keep their own.
+ */
+if (BOARD) {
+  const MOVE = 12;
+  let drag = null;
+  let dragged = false;
+  const target = (n) => {
+    for (; n && n.nodeType === 1 && n !== document.documentElement; n = n.parentElement) {
+      const cs = getComputedStyle(n);
+      if (cs.touchAction === "none") return null;
+      if ((cs.overflowY === "auto" || cs.overflowY === "scroll") && n.scrollHeight > n.clientHeight + 1) return n;
+    }
+    return document.scrollingElement;
+  };
+  addEventListener("pointerdown", (e) => {
+    dragged = false;
+    drag = null;
+    if (e.pointerType === "touch" || e.button > 0 || e.target.closest?.("input, select, textarea, [contenteditable]")) return;
+    const el = target(e.target);
+    if (el) drag = { el, id: e.pointerId, y: e.clientY, top: el.scrollTop };
+  }, true);
+  addEventListener("pointermove", (e) => {
+    if (!drag || e.pointerId !== drag.id) return;
+    if (!e.buttons) return void (drag = null);
+    const dy = e.clientY - drag.y;
+    if (!dragged && Math.abs(dy) < MOVE) return;
+    dragged = true;
+    drag.el.scrollTop = drag.top - dy;
+  }, true);
+  for (const type of ["pointerup", "pointercancel"]) addEventListener(type, () => (drag = null), true);
+  addEventListener("click", (e) => {
+    if (!dragged) return;
+    dragged = false;
+    e.stopImmediatePropagation();
+    e.preventDefault();
+  }, true);
+}
 const boardKey = () => { try { return window.parent !== window ? window.parent.TABLE_KEY : undefined; } catch { return undefined; } };
 const SESSION_KEY = REMOTE ? `gametable.remote.${params.get("inv") ?? ""}` : BOARD ? `gametable.board-deck.${location.host}` : `gametable.session.${location.host}`;
 

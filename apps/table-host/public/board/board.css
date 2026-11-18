@@ -479,7 +479,7 @@ button.copy:hover, button.copy.done { color: var(--brass); border-color: var(--b
 .overlay .panel.stats-panel.sideways { width: min(1100px, 88vh); max-height: 92vw; }
 .stats-head { flex: none; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 16px 28px 12px; background: var(--felt); border-bottom: 1px solid var(--felt-line); }
 .stats-body { flex: 1 1 auto; min-height: 0; overflow: auto; overscroll-behavior: contain; margin: 0 8px 16px 0; padding: 0 20px 10px 28px; scrollbar-width: thin; scrollbar-color: var(--brass-deep) transparent; }
-.stats-body.scrolls { padding-right: 46px; } /* room for the wide bar (D-306) */
+.stats-body.scrolls, .summary-scroll.scrolls, .viewer-panel .step.scrolls, .viewer-panel .scroll.scrolls, pre.raw.scrolls, .overlay.live-status .live-trace.scrolls { padding-right: 46px; } /* room for the wide bar (D-306) */
 .stats-head h2 { margin: 0 auto 0 0; font-size: 30px; }
 .stats-turn { display: flex; align-items: center; gap: 6px; color: var(--ink-soft); font-size: 15px; }
 .stats-turn button { min-width: 44px; padding: 8px 10px; }

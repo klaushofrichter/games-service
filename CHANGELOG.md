@@ -8,6 +8,7 @@ history.
 
 ## [Unreleased]
 
+- Board: every window and list that scrolls has the wide scrollbar and follows one finger or two: all windows, the finished screen's results, the game logs, Live status. The deck beside the board scrolls by dragging (no wide bar); phones scroll by touch as before (D-306).
 - Board: Awards and Results scrolls with the wide scrollbar and by finger, like the settings windows (D-306).
 - Board: "Hide the mouse pointer in fullscreen" also hides it over the deck beside the board (Play from the board) (D-296).
 - Board: the Settings, Advanced and Game data windows show one scrollbar, not the browser's thin one beside the wide one (D-306).
