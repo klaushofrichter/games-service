@@ -1,7 +1,7 @@
 // Board UI: lobby, seats around the edge, QR join, game surface and the lobby overlay.
 // Talks to the Table Host through the board control API (same API the tests and local AI agents use).
 import { renderRules } from "/shared/markdown.js";
-import { ROT, W, H, SEAT_COLORS, audio, copyText, esc, gameStore, seatName, seatPositions, claimServiceWorkerPage, openTableSocket } from "/shared/board-kit.js";
+import { ROT, W, H, SEAT_COLORS, audio, copyText, esc, gameStore, localFrame, seatName, seatPositions, touchScroll, claimServiceWorkerPage, openTableSocket } from "/shared/board-kit.js";
 import { openViewer } from "/board/viewer.js";
 import { hasStatistics, openStatistics, seatsByName, table as statsTable } from "/board/stats.js";
 
@@ -245,7 +245,10 @@ function setPanel(o, html) {
     if (panel) panel.scrollTop = top;
   }
   const panel = o.querySelector(".panel");
-  if (panel) faceFront(panel);
+  if (panel) {
+    faceFront(panel);
+    touchScroll(panel); // a wide bar and the fingers themselves, for the table's touchscreen (D-306)
+  }
 }
 
 // Escape closes the topmost dialog or overlay, as a tap beside it does (each one decides what that means: a
@@ -1820,16 +1823,6 @@ function gameTiles() {
  * The tiles follow the finger; let go past a fifth of their width (or 80 px) and the next page slides in, short of it
  * they spring back. A swipe is not a tap: the tile under the finger is not chosen.
  */
-function localFrame(el) {
-  // The linear part of every transform from the tiles up to the page (rotation and scale; moves don't turn a vector).
-  let m = new DOMMatrix();
-  for (let n = el; n && n !== document.documentElement; n = n.parentElement) {
-    const t = getComputedStyle(n).transform;
-    if (t && t !== "none") m = new DOMMatrix(t).multiply(m);
-  }
-  const det = m.a * m.d - m.b * m.c || 1;
-  return (dx, dy) => ({ x: (m.d * dx - m.c * dy) / det, y: (-m.b * dx + m.a * dy) / det });
-}
 let swipe = null; // { id, x, y, dx, moving, frame }
 let swallowClick = false;
 center.addEventListener("pointerdown", (e) => {

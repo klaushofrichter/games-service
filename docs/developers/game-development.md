@@ -355,6 +355,10 @@ export function settings({ info, setPrefs }) { return []; } // optional: items f
 - **The surface** is 1920 × 1080 logical pixels, scaled to the screen; `root` covers it. Seats sit around the edges
   (`info.seatPositions`), so keep the middle for the game and the edges for seat plates (`seatPlates()` draws them
   with names, colours and whose turn it is).
+- **Lists that scroll:** the table's screen is touched with fingers, and the browser's thin scrollbar is hard to hit.
+  `touchScroll(element)` from the board kit gives an element that scrolls up and down a wide bar of its own and lets
+  one finger or two drag the content, whichever way the board is turned; call it again after drawing the content
+  anew. The platform's own windows use it.
 - **Facing:** a game on the table's board faces `north` or `south` (the turn button switches), or any of the four
   edges with `"facing": "any"` (the corner arrows, D-227); remote boards turn to
   their player. Draw for `info.frontEdge` / `info.rotation` (degrees: south 0, west 90, north 180, east −90). Text
