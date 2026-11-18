@@ -482,6 +482,8 @@ def endings(browser, board):
     board.wait_for_selector(".overlay.statistics", state="detached")
     # Done led on to the results (no Show result any more, D-216)
     board.wait_for_selector("[data-stats]")
+    # D-306: the finished screen's results table scrolls for a finger too.
+    board.wait_for_selector(".summary-scroll.touch-scroll")
     assert board.locator("#stats-button").is_hidden() and board.locator("#result-button").is_hidden()
     # and from the result screen; Escape closes it
     # The result screen's table names the players in their colours (D-253).
