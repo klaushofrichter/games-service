@@ -43,6 +43,19 @@ let joinError = "";
 /** No free seat at the table (D-129): the reason, shown instead of the name form until a seat is free. */
 let noSeat = null;
 let suggested = ""; // "Player N" from the table (D-244)
+/**
+ * The name this phone's player gave themselves (D-307): kept in this phone's browser, and put into the name field
+ * the next time instead of the table's "Player N", without a word. Only a name the player typed and the table took
+ * is kept, never the table's proposal. A phone's own: not for a remote player's page (its invite page keeps the name)
+ * and not for the deck beside the board, which is the table's computer.
+ */
+const NAME_KEY = "gametable.name";
+const PROPOSED = /^Player \d+$/i;
+const ownName = {
+  get: () => { try { return REMOTE || BOARD ? "" : (localStorage.getItem(NAME_KEY) ?? ""); } catch { return ""; } },
+  set: (v) => { try { if (!REMOTE && !BOARD && v && !PROPOSED.test(v)) localStorage.setItem(NAME_KEY, v); } catch {} },
+};
+let keepName = false; // the player typed or changed their name: the one the table takes is kept
 let seatTimer = null;
 
 /** Ask the table whether a seat is free for this join code; look again every few seconds while there is none. */
@@ -162,6 +175,8 @@ function connect(hello) {
     } else if (m.ch === "lobby" && m.type === "state") {
       state = m.payload;
       if (!removed && self()) myName = self().name;
+      // The name the player gave, as the table took it (trimmed, cut to its length).
+      if (keepName && !removed && self()) (ownName.set(self().name), (keepName = false));
       if (state.phase !== "active" && state.phase !== "paused") gameMsg = null;
     } else if (m.ch === "store" && m.type === "changed") {
       game?.store?.changed(m.payload); // the game's data on the table changed (D-302)
@@ -344,6 +359,11 @@ function openRename(back) {
   bodyEl.querySelector("#rename").addEventListener("submit", async (e) => {
     e.preventDefault();
     const r = await send("lobby", "rename", { name: input.value });
+    if (r.ok) {
+      // kept for the next time (D-307): at once as typed, then as the table has it with its next message
+      ownName.set(input.value.trim().slice(0, 12));
+      keepName = true;
+    }
     if (r.ok) modal.querySelector("[data-close]").click();
     else bodyEl.querySelector(".join-error").textContent = r.reason;
   });
@@ -511,7 +531,7 @@ function renderJoin() {
   if (body.querySelector("#join")) return;
   body.innerHTML = `<div><div class="eyebrow">Game Table</div><h1>What should we call you?</h1></div>
     <form id="join" class="card" style="display:flex;flex-direction:column;gap:14px">
-      <input type="text" name="name" maxlength="12" autocomplete="nickname" placeholder="Your name" value="${esc(suggested)}" autofocus>
+      <input type="text" name="name" maxlength="12" autocomplete="nickname" placeholder="Your name" value="${esc(ownName.get() || suggested)}" autofocus>
       <div id="join-error" class="join-error" role="alert">${esc(joinError)}</div>
       <button class="primary big" type="submit">Take a seat</button>
       <div class="faint" style="font-size:.8em">No account needed. Up to 12 characters; each name once at a table.</div>
@@ -523,6 +543,8 @@ function renderJoin() {
     joinError = "";
     body.querySelector("#join-error").textContent = "";
     const name = new FormData(e.target).get("name");
+    // A name the player chose is kept on this phone once the table has taken it; the table's proposal never is.
+    keepName = String(name ?? "").trim() !== "" && name !== suggested;
     connect(BOARD ? { boardKey: boardKey(), name } : { joinToken, name });
   });
 }

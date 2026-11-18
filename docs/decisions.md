@@ -2635,3 +2635,19 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   *Implementation (Claude):* `touchScroll()` in `shared/board-kit.js`, called from `setPanel()`; `.scroll-bar` in
   `shared/theme.css`. Check: `scripts/e2e/touch_scroll.py` (the bar's width and place, thumb and track, one finger,
   two fingers, a drag from a button, the slider, facing north).
+
+- **D-307 · 2026-11-18 · Klaus** — **A phone remembers its player's name.** "Can we use on the phone/deck local storage
+  for the player name? If the player sets a name on the phone, it should be stored. When the platform sends a name
+  suggestion, and there is a local storage name existing, that name should be silently inserted. We do not store the
+  proposed name ever (Player 1, Player 2, …)." And: "the player name would be specific to the phone, which is great."
+  - **Kept:** the name a player types when joining, or sets with *Change name*, once the table has taken it and as
+    the table has it (trimmed, cut to twelve characters): in that phone's browser (`localStorage`
+    `gametable.name`), for that table's address.
+  - **Never kept:** the table's proposal. A player who joins as "Player 2" without touching the field, or names
+    themselves like one, leaves nothing on the phone; what was kept before stays.
+  - **Used:** the join form starts with the kept name instead of "Player N", without saying so; the proposal that
+    arrives a moment later does not replace it. The player can still change it. If someone else at the table has
+    that name, the form says so, as for any taken name (D-148).
+  - **Not for** a remote player's page (the invite page keeps their name already) nor the deck beside the board
+    (D-175: that is the table's computer, not a player's phone).
+  *Implementation (Claude):* `ownName` in `deck.js`. Check: `scripts/e2e/names.py`.

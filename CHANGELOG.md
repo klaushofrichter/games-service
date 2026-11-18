@@ -8,6 +8,7 @@ history.
 
 ## [Unreleased]
 
+- Phone: a name the player gave is kept on that phone and is in the name field the next time, instead of "Player N"; the table's proposal is never kept (D-307).
 - Board: the Settings, Advanced and Game data windows scroll for a finger: a wide scrollbar of their own (twice the old one) and the content follows one finger or two (D-306).
 - The dependency check lets one advisory through until 2026-12-17 (picomatch, test tools only, no fixed version yet); everything else at high severity still blocks (D-305).
 - Review fixes: the screensaver comes back after its first time; "Tap to return to fullscreen" works with a finger; a game's data on the table is never taken for empty when it could not be read, and a screen that was away reads it again; an imported file keeps to the limits for display choices; the master volume scales a game's own audio levels instead of replacing them (D-304).
