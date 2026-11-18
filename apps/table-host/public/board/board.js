@@ -262,6 +262,21 @@ function setPanel(o, html) {
   }
 }
 
+/**
+ * Everything that scrolls in a window of the board scrolls for a finger (D-306): the wide bar and the fingers
+ * themselves, also in windows that are not filled with setPanel and in the lists inside them. Looked for when a window
+ * is drawn; `touchScroll` sets an element up once and only measures after that.
+ */
+const SCROLLERS = ".overlay > .panel:not(.stats-panel):not(.viewer-panel), .viewer-panel .scroll, .viewer-panel .step, pre.raw, .live-trace, .summary-scroll";
+let scrollersDue = 0;
+function findScrollers() {
+  cancelAnimationFrame(scrollersDue);
+  scrollersDue = requestAnimationFrame(() => {
+    for (const el of document.querySelectorAll(SCROLLERS)) touchScroll(el);
+  });
+}
+new MutationObserver(findScrollers).observe(overlayRoot, { childList: true, subtree: true });
+
 // Escape closes the topmost dialog or overlay, as a tap beside it does (each one decides what that means: a
 // confirmation is cancelled, the settings close; their changes are already applied). Their own Escape handlers, where
 // they have one, are not needed as well.
@@ -1973,6 +1988,7 @@ function renderFinished() {
       ${s?.table ? `<div class="summary-scroll">${summaryTable(s.table, s)}</div>` : ""}
       <div class="toolbar">${viewOnly() ? "" : `<button class="primary" data-again>Play again</button>`}${hasStatistics(s) ? `<button data-stats>Awards and Results</button>` : ""}${viewOnly() ? "" : `<button data-close>Back to lobby</button>`}</div></div>
     </section>${joinPanel()}`;
+  findScrollers(); // the results table (D-306)
 }
 
 // ---------- pause screen ----------

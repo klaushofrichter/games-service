@@ -124,6 +124,19 @@ try:
                 page.touchscreen.tap(b["x"] + b["width"] / 2, b["y"] + b["height"] / 2)
                 wait(lambda: a("GET", "/state")["display"].get("sound") is False, 5, "a tap on Sound effects to switch them off")
                 a("POST", "/display", {"sound": True})
+            if which == "advanced":
+                # A list that scrolls inside the window (as Live status has) gets the bar and the fingers too, and
+                # takes them while it has something to scroll: the window around it stays where it is.
+                page.evaluate("""(s) => { const p = document.querySelector(s), l = document.createElement('div');
+                  l.className = 'live-trace'; l.id = 'e2e-inner'; l.style.cssText = 'max-height:200px;overflow:auto';
+                  l.innerHTML = Array.from({ length: 60 }, (_, i) => `<div>line ${i}</div>`).join('');
+                  p.insertBefore(l, p.children[2]); p.scrollTop = 0; }""", sel)
+                page.wait_for_selector("#e2e-inner.touch-scroll.scrolls .scroll-bar:not([hidden])")
+                r = page.locator("#e2e-inner").bounding_box()
+                drag([(r["x"] + r["width"] / 2, r["y"] + r["height"] - 30)], -100)
+                inner = top("#e2e-inner")
+                assert inner >= 80 and top(sel) == 0, f"a drag on a list inside the window: the list scrolled by {inner}, the window by {top(sel)}"
+                page.evaluate("() => document.getElementById('e2e-inner').remove()")
             page.click(f"{sel} [data-close-overlay]")
             wait(lambda: page.locator(sel).count() == 0, 5, f"the {which} window to close")
         br.close()

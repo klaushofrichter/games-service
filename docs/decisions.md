@@ -2646,6 +2646,20 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
     browser's bar takes, which is nothing where bars overlay the content).
   - *2026-11-18, Klaus:* "Use the thicker scrollbar for the Awards and Results screen." Its body (`.stats-body`) gets
     the same bar and finger scrolling, also turned to another edge. Check: `scripts/e2e/play.py`.
+  - *2026-11-18, Klaus:* "Check for any other window that shows on the board with a possible standard scrollbar.
+    Also one/two finger scroll needs to be enabled. We don't need the thick scrollbar on the phone/deck but we need
+    the scroll with the finger."
+    - **Board:** everything of the platform that scrolls gets the bar and the fingers: every window (also those not
+      filled with `setPanel`; `findScrollers()` in `board.js` looks when a window is drawn), the finished screen's
+      results table, the game logs' list, step and raw data, and Live status's trace. A list inside a window takes
+      the fingers while it has something to scroll; wider content also moves sideways.
+    - **Deck:** no wide bar. A phone scrolls by touch on its own, unchanged. The deck beside the board (*Play from
+      the board*) is on the table's touchscreen, where a finger may reach the browser as a mouse and scroll nothing:
+      there a drag scrolls the list under it or the page (`deck.js`), except on what a game moves itself
+      (`touch-action: none`), text fields and sliders. *(Claude's reading of "scroll with the finger" on the deck.)*
+    - **Games' own boards** are their repositories' matter (`touchScroll` from the board kit); Traders' and GE150
+      Pro's lists follow there.
+    Check: `scripts/e2e/touch_scroll.py` (a list inside a window), `board_deck.py` (the deck), `play.py`.
 - **D-307 · 2026-11-18 · Klaus** — **A phone remembers its player's name.** "Can we use on the phone/deck local storage
   for the player name? If the player sets a name on the phone, it should be stored. When the platform sends a name
   suggestion, and there is a local storage name existing, that name should be silently inserted. We do not store the

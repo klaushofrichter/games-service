@@ -84,8 +84,8 @@ try:
         # redrawn (it is polled twice a second; it used to redraw every time, with every "… s ago" changing).
         board.click("#tools-button")
         board.click(".overlay.advanced [data-adv=live]")
-        board.wait_for_selector(".overlay.live-status .live-trace div")
-        first = board.inner_text(".overlay.live-status .live-trace div >> nth=0")
+        board.wait_for_selector(".overlay.live-status .live-trace > div:not(.scroll-rail)")
+        first = board.inner_text(".overlay.live-status .live-trace > div:not(.scroll-rail) >> nth=0")
         assert re.match(r"^\d{1,2}:\d{2}:\d{2}( [AP]M)? · ", first), first
         board.wait_for_timeout(1500)  # the game's last moves settle
         changes = board.evaluate("""() => new Promise((done) => {

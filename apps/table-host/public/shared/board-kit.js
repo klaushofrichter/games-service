@@ -364,7 +364,8 @@ export function localFrame(el) {
  * of its own at the right edge instead of the browser's thin one (drag its thumb, or tap the track above or below it
  * for a page), and the content itself moves with one finger or two dragged across it, whichever way the board is
  * turned. A drag is not a tap: what it started on is not pressed. Sliders, pulldowns and text fields keep their own
- * touch. The mouse wheel and the keyboard scroll as always.
+ * touch. The mouse wheel and the keyboard scroll as always. Wider content also moves sideways with the fingers. A
+ * scrolling element inside another: the inner one takes the fingers while it has something to scroll.
  *
  * Call it again after the element's content was drawn anew (it puts its bar back and measures); it is set up once per
  * element. The element gets the classes `touch-scroll` and, while there is something to scroll, `scrolls`; style the
@@ -426,10 +427,11 @@ export function touchScroll(el) {
   };
   const restart = (t) => {
     const m = middle();
-    drag = { frame: drag?.frame ?? localFrame(el), x: m.x, y: m.y, top: el.scrollTop, last: m.y, lastX: m.x, t, v: 0 };
+    drag = { frame: drag?.frame ?? localFrame(el), x: m.x, y: m.y, top: el.scrollTop, left: el.scrollLeft, last: m.y, lastX: m.x, t, v: 0 };
   };
   el.addEventListener("pointerdown", (e) => {
-    if (e.button > 0 || e.target.closest?.(".scroll-rail, input, select, textarea, [contenteditable]")) return;
+    if (e.button > 0 || e.gtScrolls || e.target.closest?.(".scroll-rail, input, select, textarea, [contenteditable]")) return;
+    if (room() > 1) e.gtScrolls = true; // (not also the scrolling element around this one)
     stop();
     if (!fingers.size) (dragged = false), (drag = null);
     fingers.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -443,12 +445,13 @@ export function touchScroll(el) {
     f.y = e.clientY;
     const m = middle();
     const d = drag.frame(m.x - drag.x, m.y - drag.y);
-    if (!dragged && Math.abs(d.y) < MOVE) return;
+    if (!dragged && Math.abs(d.y) < MOVE && !(el.scrollWidth > el.clientWidth + 1 && Math.abs(d.x) >= MOVE)) return;
     if (!dragged) {
       dragged = true;
       for (const id of fingers.keys()) el.setPointerCapture?.(id);
     }
     el.scrollTop = drag.top - d.y;
+    el.scrollLeft = drag.left - d.x;
     const dt = e.timeStamp - drag.t;
     const step = drag.frame(m.x - drag.lastX, m.y - drag.last).y;
     if (dt > 0) drag.v = (0.8 * step) / dt + 0.2 * drag.v;

@@ -127,6 +127,23 @@ try:
         wait(lambda: a("GET", "/state")["phase"] == "finished", 5, "the game to finish")
         page.screenshot(path=os.path.join(OUT, "board-deck-game.png"))
 
+        # The deck scrolls for a finger (D-306): the table's touchscreen may reach the browser as a mouse, so a drag
+        # with the mouse scrolls the deck's page, and is not a tap on what it started on.
+        size = page.viewport_size
+        page.set_viewport_size({"width": size["width"], "height": 380})
+        frame = page.frame(url=lambda u: "/deck/" in u)
+        frame.evaluate("() => { const f = document.createElement('div'); f.id = 'e2e-tall'; f.style.height = '900px'; document.getElementById('app').appendChild(f); scrollTo(0, 0); }")
+        box = page.locator("#deck").bounding_box()
+        x, y = box["x"] + box["width"] / 2, box["y"] + box["height"] - 40
+        page.mouse.move(x, y)
+        page.mouse.down()
+        page.mouse.move(x, y - 150, steps=6)
+        page.mouse.up()
+        moved = frame.evaluate("() => document.scrollingElement.scrollTop")
+        assert moved >= 100, f"a drag on the deck beside the board scrolled it by {moved}"
+        frame.evaluate("() => { document.getElementById('e2e-tall').remove(); scrollTo(0, 0); }")
+        page.set_viewport_size(size)
+
         # Hide and Show fold the deck, as on a remote player's page.
         page.click("#deck-min")
         page.wait_for_selector("#play.deck-min")
