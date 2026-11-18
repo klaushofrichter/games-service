@@ -343,3 +343,171 @@ export function gameStore(send, gameId) {
   };
   return { store, changed, reconnected };
 }
+
+/**
+ * Screen movement taken into an element's own frame: the linear part of every transform from the element up to the
+ * page (rotation and scale; moves don't turn a vector), inverted. The board is scaled to the screen and turned to an
+ * edge of the table, so "down" for a finger is not always down for what it touches. Returns (dx, dy) => { x, y }.
+ */
+export function localFrame(el) {
+  let m = new DOMMatrix();
+  for (let n = el; n && n !== document.documentElement; n = n.parentElement) {
+    const t = getComputedStyle(n).transform;
+    if (t && t !== "none") m = new DOMMatrix(t).multiply(m);
+  }
+  const det = m.a * m.d - m.b * m.c || 1;
+  return (dx, dy) => ({ x: (m.d * dx - m.c * dy) / det, y: (-m.b * dx + m.a * dy) / det });
+}
+
+/**
+ * Scrolling made for a finger on the table's touchscreen (D-306), for an element that scrolls up and down: a wide bar
+ * of its own at the right edge instead of the browser's thin one (drag its thumb, or tap the track above or below it
+ * for a page), and the content itself moves with one finger or two dragged across it, whichever way the board is
+ * turned. A drag is not a tap: what it started on is not pressed. Sliders, pulldowns and text fields keep their own
+ * touch. The mouse wheel and the keyboard scroll as always.
+ *
+ * Call it again after the element's content was drawn anew (it puts its bar back and measures); it is set up once per
+ * element. The element gets the classes `touch-scroll` and, while there is something to scroll, `scrolls`; style the
+ * room for the bar with those (shared/theme.css has the bar itself).
+ */
+const touchScrolls = new WeakMap(); // element -> its update()
+// Fingers lift anywhere, not only over what they scrolled: the scrollers with a finger down hear of every release.
+const touchReleases = new Set();
+if (typeof window !== "undefined") {
+  for (const type of ["pointerup", "pointercancel"]) window.addEventListener(type, (e) => touchReleases.forEach((fn) => fn(e)), true);
+}
+export function touchScroll(el) {
+  const known = touchScrolls.get(el);
+  if (known) return known();
+  const MOVE = 12; // px a press may wander and still be a tap
+  const rail = document.createElement("div");
+  rail.className = "scroll-rail";
+  rail.innerHTML = `<div class="scroll-bar" hidden><i class="scroll-thumb"></i></div>`;
+  const bar = rail.firstElementChild;
+  const thumb = bar.firstElementChild;
+  const room = () => el.scrollHeight - el.clientHeight;
+  let fling = 0;
+  const stop = () => cancelAnimationFrame(fling);
+
+  function update() {
+    if (rail.parentElement !== el) el.prepend(rail); // (the content was drawn anew)
+    const over = room() > 1;
+    el.classList.toggle("scrolls", over);
+    bar.hidden = !over;
+    if (!over) return;
+    // The rail lies over the element's top padding and stays there while the content scrolls (sticky insets count
+    // from the padding's inner edge, hence the negative ones); the bar hangs from it down the right edge.
+    const cs = getComputedStyle(el);
+    const padTop = parseFloat(cs.paddingTop) || 0;
+    rail.style.height = `${padTop}px`;
+    rail.style.marginTop = rail.style.top = `${-padTop}px`;
+    bar.style.right = `${6 - (parseFloat(cs.paddingRight) || 0)}px`;
+    const track = el.clientHeight - 16;
+    bar.style.height = `${track}px`;
+    const h = Math.max(90, (track * el.clientHeight) / el.scrollHeight);
+    thumb.style.height = `${h}px`;
+    thumb.style.transform = `translateY(${((track - h) * el.scrollTop) / room()}px)`;
+  }
+  el.classList.add("touch-scroll");
+  el.addEventListener("scroll", update, { passive: true });
+  if (typeof ResizeObserver === "function") {
+    const ro = new ResizeObserver(() => (el.isConnected ? update() : ro.disconnect()));
+    ro.observe(el);
+  }
+
+  // The content under one finger or two: it follows the fingers' middle.
+  const fingers = new Map(); // pointerId -> { x, y }
+  let drag = null; // { frame, x, y: the middle at the start, top, last, t, v }
+  let dragged = false;
+  const middle = () => {
+    let x = 0, y = 0;
+    for (const p of fingers.values()) (x += p.x), (y += p.y);
+    return { x: x / fingers.size, y: y / fingers.size };
+  };
+  const restart = (t) => {
+    const m = middle();
+    drag = { frame: drag?.frame ?? localFrame(el), x: m.x, y: m.y, top: el.scrollTop, last: m.y, lastX: m.x, t, v: 0 };
+  };
+  el.addEventListener("pointerdown", (e) => {
+    if (e.button > 0 || e.target.closest?.(".scroll-rail, input, select, textarea, [contenteditable]")) return;
+    stop();
+    if (!fingers.size) (dragged = false), (drag = null);
+    fingers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    touchReleases.add(release);
+    restart(e.timeStamp); // (a second finger: from where the two are now, without a jump)
+  });
+  el.addEventListener("pointermove", (e) => {
+    const f = fingers.get(e.pointerId);
+    if (!f || !drag) return;
+    f.x = e.clientX;
+    f.y = e.clientY;
+    const m = middle();
+    const d = drag.frame(m.x - drag.x, m.y - drag.y);
+    if (!dragged && Math.abs(d.y) < MOVE) return;
+    if (!dragged) {
+      dragged = true;
+      for (const id of fingers.keys()) el.setPointerCapture?.(id);
+    }
+    el.scrollTop = drag.top - d.y;
+    const dt = e.timeStamp - drag.t;
+    const step = drag.frame(m.x - drag.lastX, m.y - drag.last).y;
+    if (dt > 0) drag.v = (0.8 * step) / dt + 0.2 * drag.v;
+    drag.last = m.y;
+    drag.lastX = m.x;
+    drag.t = e.timeStamp;
+  });
+  const release = (e) => {
+    if (!fingers.delete(e.pointerId) || !drag) return;
+    if (fingers.size) return restart(e.timeStamp); // one finger still down: on from there
+    touchReleases.delete(release);
+    let v = dragged && e.timeStamp - drag.t < 100 ? drag.v : 0; // (px per ms; a drag that paused does not run on)
+    drag = null;
+    let t = performance.now();
+    const run = (now) => {
+      el.scrollTop -= v * (now - t);
+      v *= Math.pow(0.995, now - t);
+      t = now;
+      if (Math.abs(v) > 0.02) fling = requestAnimationFrame(run);
+    };
+    if (Math.abs(v) > 0.1) fling = requestAnimationFrame(run);
+  };
+  // a drag is not a tap on what it started on
+  el.addEventListener(
+    "click",
+    (e) => {
+      if (!dragged) return;
+      dragged = false;
+      e.stopImmediatePropagation();
+      e.preventDefault();
+    },
+    true,
+  );
+
+  // The bar: drag its thumb, or tap the track above or below it for a page.
+  let grab = null;
+  bar.addEventListener("pointerdown", (e) => {
+    if (e.button > 0) return;
+    stop();
+    e.preventDefault();
+    e.stopPropagation();
+    const frame = localFrame(bar);
+    if (e.target === thumb) {
+      grab = { id: e.pointerId, x: e.clientX, y: e.clientY, top: el.scrollTop, frame, ratio: room() / Math.max(1, bar.clientHeight - thumb.offsetHeight) };
+      bar.setPointerCapture?.(e.pointerId);
+      return;
+    }
+    const r = thumb.getBoundingClientRect();
+    const below = frame(e.clientX - (r.left + r.width / 2), e.clientY - (r.top + r.height / 2)).y > 0;
+    el.scrollTop += (below ? 1 : -1) * 0.9 * el.clientHeight;
+  });
+  bar.addEventListener("pointermove", (e) => {
+    if (grab && e.pointerId === grab.id) el.scrollTop = grab.top + grab.frame(e.clientX - grab.x, e.clientY - grab.y).y * grab.ratio;
+  });
+  const letGo = (e) => grab && e.pointerId === grab.id && (grab = null);
+  bar.addEventListener("pointerup", letGo);
+  bar.addEventListener("pointercancel", letGo);
+  bar.addEventListener("click", (e) => e.stopPropagation()); // (not a tap on the window behind it)
+
+  touchScrolls.set(el, update);
+  update();
+}
