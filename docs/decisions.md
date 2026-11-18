@@ -2644,6 +2644,8 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
     rule is now `!important`, since a window with the kit's bar never wants the browser's too. *Check:*
     `scripts/e2e/touch_scroll.py` reads the window's computed `scrollbar-width` (the old check measured the width the
     browser's bar takes, which is nothing where bars overlay the content).
+  - *2026-11-18, Klaus:* "Use the thicker scrollbar for the Awards and Results screen." Its body (`.stats-body`) gets
+    the same bar and finger scrolling, also turned to another edge. Check: `scripts/e2e/play.py`.
 - **D-307 · 2026-11-18 · Klaus** — **A phone remembers its player's name.** "Can we use on the phone/deck local storage
   for the player name? If the player sets a name on the phone, it should be stored. When the platform sends a name
   suggestion, and there is a local storage name existing, that name should be silently inserted. We do not store the

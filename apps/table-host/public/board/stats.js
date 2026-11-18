@@ -1,7 +1,7 @@
 // The statistics window (D-140): a finished game's awards and statistics on the board, scrollable. The game sends
 // the data (its summary's `awards` and `table`); the host adds `players` and `play` from the log. Used by the board
 // (after a game, and on the result screen) and by the Game Viewer.
-import { esc, ROT } from "/shared/board-kit.js";
+import { esc, ROT, touchScroll } from "/shared/board-kit.js";
 
 /** Whether a summary has anything for the statistics window. */
 export function hasStatistics(summary) {
@@ -96,5 +96,6 @@ export function openStatistics({ summary, gameName, overlayRoot, edge = "south",
     if (b?.dataset.face) face(b.dataset.face);
   });
   overlayRoot.appendChild(o);
+  touchScroll(o.querySelector(".stats-body")); // a wide bar and the fingers themselves, as in the settings windows (D-306)
   return o;
 }

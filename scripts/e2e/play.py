@@ -359,6 +359,21 @@ def coinflip(browser, board):
     over = board.evaluate("""() => { const p = document.querySelector('.stats-panel'); const b = p.querySelector('.stats-body');
       return [getComputedStyle(p).overflowY, b && getComputedStyle(b).overflowY, !!p.querySelector('.stats-head [data-close-stats]')]; }""")
     assert over == ["hidden", "auto", True], f"Awards and Results scrolling: {over}"
+    # D-306: on a low screen its body scrolls with the wide bar of the settings windows, not the browser's thin one.
+    size = board.viewport_size
+    board.set_viewport_size({"width": size["width"], "height": 420})
+    board.wait_for_selector(".stats-body.touch-scroll.scrolls .scroll-bar:not([hidden])")
+    bar = board.evaluate("""() => { const b = document.querySelector('.stats-body'), r = b.querySelector('.scroll-bar').getBoundingClientRect(), t = b.querySelector('.scroll-thumb').getBoundingClientRect(),
+      last = [...b.querySelectorAll('.award, td, th, p')].reduce((m, e) => Math.max(m, e.getBoundingClientRect().right), 0);
+      return { width: r.width, left: r.left, own: getComputedStyle(b).scrollbarWidth, last, x: t.left + t.width / 2, y: t.top + t.height / 2 }; }""")
+    assert 26 <= bar["width"] <= 32 and bar["own"] == "none", f"Awards and Results has no wide bar of its own: {bar}"
+    assert bar["last"] <= bar["left"], f"Awards and Results lies under its bar: {bar}"
+    board.mouse.move(bar["x"], bar["y"])
+    board.mouse.down()
+    board.mouse.move(bar["x"], bar["y"] + 60, steps=4)
+    board.mouse.up()
+    assert board.evaluate("() => document.querySelector('.stats-body').scrollTop") > 20, "dragging the bar did not scroll Awards and Results"
+    board.set_viewport_size(size)
     # D-233: Back to game shows the last screen again, its way on still in the corner.
     board.click(".overlay.statistics [data-back-stats]")
     board.wait_for_selector(".overlay.statistics", state="detached")
