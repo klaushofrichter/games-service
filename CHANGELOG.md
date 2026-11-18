@@ -8,6 +8,7 @@ history.
 
 ## [Unreleased]
 
+- Board: Awards and Results scrolls with the wide scrollbar and by finger, like the settings windows (D-306).
 - Board: "Hide the mouse pointer in fullscreen" also hides it over the deck beside the board (Play from the board) (D-296).
 - Board: the Settings, Advanced and Game data windows show one scrollbar, not the browser's thin one beside the wide one (D-306).
 - Phone: a name the player gave is kept on that phone and is in the name field the next time, instead of "Player N"; the table's proposal is never kept (D-307).
