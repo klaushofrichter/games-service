@@ -2651,3 +2651,8 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   - **Not for** a remote player's page (the invite page keeps their name already) nor the deck beside the board
     (D-175: that is the table's computer, not a player's phone).
   *Implementation (Claude):* `ownName` in `deck.js`. Check: `scripts/e2e/names.py`.
+  - *Fix, same day:* the browser's thin scrollbar still showed beside the wide one on the table (two bars): the
+    board's own style for its windows (`.overlay .panel`, thin and brass, D-229) won over the kit's "none". The kit's
+    rule is now `!important`, since a window with the kit's bar never wants the browser's too. *Check:*
+    `scripts/e2e/touch_scroll.py` reads the window's computed `scrollbar-width` (the old check measured the width the
+    browser's bar takes, which is nothing where bars overlay the content).

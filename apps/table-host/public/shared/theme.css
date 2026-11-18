@@ -92,8 +92,9 @@ button.danger { border-color: rgba(210, 87, 74, 0.6); color: #f1a197; }
 
 /* Scrolling made for a finger (touchScroll in board-kit.js, D-306): a bar twice as wide as the browser's, with a
    thumb to drag, and the content itself follows one finger or two, so the browser's own bar and touch are off. */
-.touch-scroll { scrollbar-width: none; touch-action: none; }
-.touch-scroll::-webkit-scrollbar { display: none; }
+/* Stronger than a window's own scrollbar style (the board's panels set a thin one): never two bars. */
+.touch-scroll { scrollbar-width: none !important; touch-action: none; }
+.touch-scroll::-webkit-scrollbar { display: none !important; }
 .scroll-rail { position: sticky; top: 0; height: 0; z-index: 5; pointer-events: none; }
 .scroll-bar { position: absolute; top: 8px; right: 0; width: 28px; pointer-events: auto; border-radius: 14px; background: rgba(255, 255, 255, 0.07);
   touch-action: none; cursor: pointer; }

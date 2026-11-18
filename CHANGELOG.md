@@ -8,6 +8,7 @@ history.
 
 ## [Unreleased]
 
+- Board: the Settings, Advanced and Game data windows show one scrollbar, not the browser's thin one beside the wide one (D-306).
 - Phone: a name the player gave is kept on that phone and is in the name field the next time, instead of "Player N"; the table's proposal is never kept (D-307).
 - Board: the Settings, Advanced and Game data windows scroll for a finger: a wide scrollbar of their own (twice the old one) and the content follows one finger or two (D-306).
 - The dependency check lets one advisory through until 2026-12-17 (picomatch, test tools only, no fixed version yet); everything else at high severity still blocks (D-305).
