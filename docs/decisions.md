@@ -2615,3 +2615,23 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   - One list for all repositories: the game repositories run `.games-service/scripts/npm-audit.mjs` from the
     checkout their checks already make.
   - The entry ends on 2026-12-17. Take it out sooner when a fixed picomatch (or a vitest without it) is released.
+
+- **D-306 · 2026-11-18 · Klaus** — **The settings windows scroll for a finger.** "The scrollbar for the Settings and
+  Dev Settings is difficult to use with a touch screen. See the solution for the synth-game: it has a wider scrollbar
+  for the selection of the firmware … 3x width, I think 2x is good enough … Also enable 2 finger scroll, which is
+  intuitive." The board's windows that scroll (Settings, Advanced, Game data, and every other one drawn the same way)
+  get:
+  - **a bar of their own,** 28 px wide (the browser's was 14, the Synth's firmware window has 44), at the right edge
+    inside the window, with a thumb to drag and a track to tap for a page; the browser's own bar is gone there, and
+    the window makes room so that nothing lies under the bar (Done stays clear of it);
+  - **the content follows the fingers:** one finger or two dragged across the window scroll it (two fingers: their
+    middle), with a short run-on after a flick. The board is turned to an edge of the table, so the fingers' movement
+    is taken into the window's own frame: facing north, the content still goes where the fingers go. A drag that
+    starts on a button does not press it; a tap does. Sliders, pulldowns and text fields keep their own touch. A
+    touchscreen that reaches the browser as a mouse drags the same way.
+  - The mouse wheel and the keyboard scroll as before.
+  It is one function for any element, `touchScroll()` in the board kit (with `localFrame()`, which the lobby's swipe
+  used already), so games can use it; the Synth's own bar stays as it is for now ("that is not the main aim here").
+  *Implementation (Claude):* `touchScroll()` in `shared/board-kit.js`, called from `setPanel()`; `.scroll-bar` in
+  `shared/theme.css`. Check: `scripts/e2e/touch_scroll.py` (the bar's width and place, thumb and track, one finger,
+  two fingers, a drag from a button, the slider, facing north).

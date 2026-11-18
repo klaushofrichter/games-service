@@ -452,6 +452,10 @@ button.copy:hover, button.copy.done { color: var(--brass); border-color: var(--b
 .viewer-panel summary { cursor: pointer; color: var(--ink-soft); padding: 6px 0; }
 .viewer-panel details pre.raw { max-height: 420px; margin: 6px 0 0; font-size: .92em; line-height: 1.35; }
 
+/* A panel that scrolls makes room at the right for the wide bar (D-306); the Done row still reaches the edge. */
+.overlay .panel.touch-scroll { clip-path: inset(0 round 18px); }
+.overlay .panel.scrolls { padding-right: 46px; }
+.overlay .panel.scrolls .settings-actions { margin-right: -46px; padding-right: 46px; }
 /* Settings: Done stays at the bottom of the panel, however long the settings get. */
 .overlay.settings .settings-actions, .overlay.advanced .settings-actions, .overlay.join-code .settings-actions {
   position: sticky; bottom: -26px; z-index: 1; display: flex; justify-content: flex-end;
