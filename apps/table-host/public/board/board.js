@@ -63,8 +63,19 @@ const POINTER_KEY = "gametable.hidePointer";
 let hidePointer = stored(POINTER_KEY) === "1";
 function applyPointer() {
   const full = !!fsDoc.fullscreenElement;
-  // The page fullscreen applies to too: inside Play from the board, the frame around the board and the deck.
-  for (const doc of new Set([document, fsDoc])) {
+  // The page fullscreen applies to too: inside Play from the board, the frame around the board and the deck, and
+  // the deck itself (same origin); it is asked again when the deck's page loads.
+  let deckDoc = null;
+  try {
+    const frame = fsDoc === document ? null : fsDoc.getElementById("deck");
+    if (frame && !frame.dataset.gtPointer) {
+      frame.dataset.gtPointer = "1";
+      frame.addEventListener("load", applyPointer);
+    }
+    deckDoc = frame?.contentDocument?.head ? frame.contentDocument : null;
+  } catch {}
+  for (const doc of new Set([document, fsDoc, deckDoc])) {
+    if (!doc) continue;
     if (!doc.getElementById("gt-pointer-style")) {
       const st = doc.createElement("style");
       st.id = "gt-pointer-style";

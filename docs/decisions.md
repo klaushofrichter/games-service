@@ -2478,6 +2478,9 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   Inside *Play from the board* it covers the page around the board and the deck's frame, not the deck's own page.
   *Implementation (Claude):* `applyPointer()` in `board.js` (`cursor: none` for every element while fullscreen and
   on). Check: `scripts/e2e/board_screen.py`.
+  - *2026-11-18, Klaus:* "The mouse pointer should also be hidden in fullscreen mode on the deck, if that is shown on
+    the screen." With Play from the board, the deck's page beside the board follows the same setting (it was left
+    out: the board reached its own page and the frame around both, not the deck's). Check: `scripts/e2e/board_deck.py`.
 - **D-297 · 2026-11-15 · Klaus** — **A master volume for each screen.** "We also need a master volume control slider in
   the settings." Settings › Display has *Volume of this screen*, 0–100 %, under *Sound effects*. It scales everything
   the board page plays: the platform's sound effects, a game's own Web Audio (several games connect straight to the

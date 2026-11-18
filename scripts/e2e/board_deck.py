@@ -39,6 +39,8 @@ try:
 
         # Developer settings › Play from the board: the board moves into the page with the deck beside it. Switched on in
         # fullscreen, the new page asks for a tap to return to fullscreen, and that tap does nothing else (D-299).
+        # With "Hide the mouse pointer in fullscreen" on (D-296), the deck beside the board hides it too.
+        page.evaluate("() => localStorage.setItem('gametable.hidePointer', '1')")
         page.evaluate("() => document.documentElement.requestFullscreen()")
         wait(lambda: page.evaluate("() => !!document.fullscreenElement"), 5, "the board to go fullscreen")
         page.click("#tools-button")
@@ -56,8 +58,11 @@ try:
         assert board.locator("#fullscreen-hint").count() == 0, "the hint stays in fullscreen"
         page.wait_for_timeout(300)
         assert board.locator("#overlay-root > *").count() == 0, "the tap that returned to fullscreen also chose a game"
+        deck_cursor = lambda: page.evaluate("() => { const d = document.getElementById('deck').contentDocument; return getComputedStyle(d.body).cursor; }")
+        wait(lambda: deck_cursor() == "none", 5, "the deck to hide the mouse pointer in fullscreen")
         page.evaluate("() => document.exitFullscreen()")
         wait(lambda: page.evaluate("() => document.fullscreenElement === null"), 5, "the page to leave fullscreen")
+        wait(lambda: deck_cursor() != "none", 5, "the deck to show the mouse pointer again out of fullscreen")
         assert board.locator("aside.join img").count() == 0, "no QR code while played from the board"
         board.locator("aside.join.board-deck").wait_for()
         assert board.locator("aside.join.board-deck button").count() == 0, "the lobby's own invite is enough (D-240)"
