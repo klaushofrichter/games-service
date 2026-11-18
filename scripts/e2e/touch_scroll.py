@@ -54,10 +54,11 @@ try:
             page.wait_for_selector(f"{sel}.touch-scroll.scrolls")
             m = page.evaluate("""(s) => { const p = document.querySelector(s), b = p.querySelector('.scroll-bar').getBoundingClientRect(), r = p.getBoundingClientRect(),
               done = p.querySelector('[data-close-overlay]').getBoundingClientRect();
-              return { bar: b.width, barRight: r.right - b.right, barLeft: b.left, native: p.offsetWidth - p.clientWidth, doneRight: done.right, doneBottom: done.bottom, bottom: r.bottom,
+              return { bar: b.width, barRight: r.right - b.right, barLeft: b.left, native: p.offsetWidth - p.clientWidth, own: getComputedStyle(p).scrollbarWidth, doneRight: done.right, doneBottom: done.bottom, bottom: r.bottom,
                        room: p.scrollHeight - p.clientHeight }; }""", sel)
             assert 26 <= m["bar"] <= 32, f"{which}: the bar is {m['bar']} px wide, not twice the browser's 14"
             assert m["native"] <= 4, f"{which}: the browser's own scrollbar still takes {m['native']} px"
+            assert m["own"] == "none", f"{which}: the browser's own scrollbar shows beside the bar (scrollbar-width {m['own']})"
             assert 0 <= m["barRight"] <= 12, f"{which}: the bar is not at the window's right edge: {m}"
             assert m["doneRight"] <= m["barLeft"] - 4 and m["doneBottom"] <= m["bottom"], f"{which}: Done is under the bar or outside the window: {m}"
             assert m["room"] > 80, f"{which}: the window has nothing to scroll at this size: {m}"
