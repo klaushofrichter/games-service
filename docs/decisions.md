@@ -2791,6 +2791,22 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
     no longer loaded with the first screen. The hero's count of games is ten (FreeCell).
   *Implementation (Claude):* `home.html`, `sitePage()` and `sendHtml()` in `apps/cloud/src/server.ts`. Checks:
   `tests/website.test.ts`, `scripts/e2e/website.py` (both pages at two widths, the top bar both ways, an old link).
+  - *2026-11-21, Klaus:* "Check all links in the landing page, I think /build#about has no target? … Can we build a
+    test that verifies that all clickable links have a valid target?" Four links in the foot (*The table*, *Game
+    service*, *Game repositories*, *About*) were written for the landing page only and led nowhere from `/build`; they
+    are `/#…` now. And every link is checked from now on:
+    - **Within the website**, with every change: `scripts/e2e/website.py` asks the page as the browser has it (so
+      links the script writes count too), on the landing page, `/build` and the terms, at both widths: the page a link
+      leads to answers, and its `#place` exists there. `tests/website.test.ts` checks the same from the pages' text.
+    - **To other websites**, by hand: `node scripts/check-site-links.mjs` asks each one. Not part of the checks a
+      change must pass: they depend on other people's servers and the network (Cluster's rule: no merge past a flaky
+      check). *(Claude: a weekly run of it could be added as a workflow that blocks nothing.)*
+- **D-313 · 2026-11-21 · Klaus** — **The Linux guide says how to make a computer the table's own.** Klaus asked for
+  his game PC (Debian 13) to log in by itself at power-on and after a reboot, never to lock or log out, and to have an
+  icon on the desktop that starts the table in production. Cluster, which reaches that PC, did it with Klaus (the PC
+  runs XFCE with LightDM, not the GNOME this session had assumed) and sent the steps that worked; they are in
+  `docs/install/linux.md` under *A table of its own*. Nothing in the platform changed. The starter plays the
+  `production` branch by default, so the icon needs no option for it.
 - **D-315 · 2026-11-21 · Klaus** — **Quit the table from its board.** "The Cluster agent configured kiosk mode, so we
   will need an 'exit game' in the developer options or some other way to get out of Chrome. Esc does not work
   anymore." A page cannot close a kiosk window it did not open, so the way out ends at the table itself:

@@ -42,6 +42,18 @@ describe("the public website (D-176)", () => {
       expect(page).not.toMatch(/\{\{\w+\}\}/);
       expect(page).toContain('class="version"');
     }
+    // Every link to a place within the website has its place (D-312: the foot is on both pages, its links must work
+    // from both): "#x" on the page itself, "/#x" on the landing page, "/build#x" on the developers' page.
+    const ids = (page: string) => new Set([...page.matchAll(/\sid="([^"]+)"/g)].map((m) => m[1]));
+    const places: Record<string, Set<string | undefined>> = { "/": ids(html), "/build": ids(build) };
+    for (const [path, page] of [["/", html], ["/build", build]] as const) {
+      for (const [, href] of page.matchAll(/<a\b[^>]*\shref="([^"]+)"/g)) {
+        if (/^(https?:|mailto:)/.test(href!) || href!.includes("${")) continue; // (not the links the script writes: the browser check has those)
+        const [to, anchor] = href!.split("#");
+        const target = to === "" ? path : to!;
+        if (anchor && places[target]) expect(places[target]!.has(anchor), `${path}: ${href}`).toBe(true);
+      }
+    }
     // Compressed for a browser that takes it.
     const zipped = await fetch(`${base}/build`, { headers: { "accept-encoding": "gzip" } });
     expect(zipped.headers.get("content-encoding")).toBe("gzip");
