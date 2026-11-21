@@ -47,9 +47,8 @@ describe("the public website (D-176)", () => {
     const ids = (page: string) => new Set([...page.matchAll(/\sid="([^"]+)"/g)].map((m) => m[1]));
     const places: Record<string, Set<string | undefined>> = { "/": ids(html), "/build": ids(build) };
     for (const [path, page] of [["/", html], ["/build", build]] as const) {
-      const body = page.replace(/<script[\s\S]*?<\/script>/g, "");
-      for (const [, href] of body.matchAll(/<a\b[^>]*\shref="([^"]+)"/g)) {
-        if (/^(https?:|mailto:)/.test(href!)) continue;
+      for (const [, href] of page.matchAll(/<a\b[^>]*\shref="([^"]+)"/g)) {
+        if (/^(https?:|mailto:)/.test(href!) || href!.includes("${")) continue; // (not the links the script writes: the browser check has those)
         const [to, anchor] = href!.split("#");
         const target = to === "" ? path : to!;
         if (anchor && places[target]) expect(places[target]!.has(anchor), `${path}: ${href}`).toBe(true);

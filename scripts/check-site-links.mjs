@@ -15,10 +15,10 @@ for (const path of pages) {
     console.error(`${base}${path} answers ${r.status}`);
     process.exit(1);
   }
-  const html = (await r.text()).replace(/<script[\s\S]*?<\/script>/g, "");
+  const html = await r.text();
   for (const [, href] of html.matchAll(/<a\b[^>]*\shref="(https?:\/\/[^"]+)"/g)) {
-    const url = href.replace(/&amp;/g, "&");
-    if (!url.startsWith(base)) found.set(url, [...(found.get(url) ?? []), path]);
+    const url = href.replaceAll("&amp;", "&");
+    if (!url.startsWith(base) && !url.includes("${")) found.set(url, [...(found.get(url) ?? []), path]); // (not a link the script writes)
   }
 }
 const ask = async (url, method) => {

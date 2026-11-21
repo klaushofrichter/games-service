@@ -2801,3 +2801,9 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
     - **To other websites**, by hand: `node scripts/check-site-links.mjs` asks each one. Not part of the checks a
       change must pass: they depend on other people's servers and the network (Cluster's rule: no merge past a flaky
       check). *(Claude: a weekly run of it could be added as a workflow that blocks nothing.)*
+- **D-313 · 2026-11-21 · Klaus** — **The Linux guide says how to make a computer the table's own.** Klaus asked for
+  his game PC (Debian 13) to log in by itself at power-on and after a reboot, never to lock or log out, and to have an
+  icon on the desktop that starts the table in production. Cluster, which reaches that PC, did it with Klaus (the PC
+  runs XFCE with LightDM, not the GNOME this session had assumed) and sent the steps that worked; they are in
+  `docs/install/linux.md` under *A table of its own*. Nothing in the platform changed. The starter plays the
+  `production` branch by default, so the icon needs no option for it.
