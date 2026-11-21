@@ -2675,3 +2675,43 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   - **Not for** a remote player's page (the invite page keeps their name already) nor the deck beside the board
     (D-175: that is the table's computer, not a player's phone).
   *Implementation (Claude):* `ownName` in `deck.js`. Check: `scripts/e2e/names.py`.
+- **D-308 · 2026-11-20 · Klaus** — **FreeCell, a built-in solitaire played on the board.** "A new single player game, to
+  be part of the built-in games, FreeCell Solitaire … including drag-n-drop of the cards. We don't need to show
+  something on the deck, and the game is to be played on the board. We should only have solvable puzzles. A hint
+  button is good, and we want Awards as we have for any game. This is an example of a single player game for the
+  board. Handle the board rotation similar to the GE150 Pro game."
+  - **The game** (`games/freecell`): one seat (layout 1, D-282), north or south; the whole board turns to the player.
+    Four free cells, four foundations, eight columns, all cards open. A card or a run is dragged to its place (the
+    places it may go light up; dropped elsewhere it slides back) or tapped to go where it fits best. Runs move as far
+    as free cells and empty columns allow. Cards nobody needs go to the foundations by themselves, and all of them
+    once every column is in order. Buttons: Undo (unlimited), Hint, Start again, Give up (the last two ask once more).
+    Our own look, with the platform's felt and cards; no other FreeCell's design, numbering or scoring.
+  - **Only deals that can be solved:** a deal is its number (1–999999, from the game's logged random stream, shown on
+    the board). At the start a solver (`engine.ts`: best-first over single-card moves, the same answer every time)
+    looks for a way within 20000 positions, about a third of a second at worst; a deal it finds no way through is
+    passed over for the next number (about one in fifteen: most of those could be solved by a longer search, a few
+    not at all).
+  - **Hint:** the next move of the way the solver found, while the player follows it; otherwise the solver looks again
+    from where the game stands (30000 positions). No way found: the game says so and suggests taking moves back. The
+    search runs in the rules, so it is logged and replays as any move.
+  - **The phone** only says that the game is on the board. Every move is a board intent (D-102), so a remote player's
+    own board plays it too.
+  - **Awards:** sixteen offered, those earned are listed (solved, no undo, no hint, within three or five minutes, few
+    moves, few free cells, …). The platform dropped an award "every player holds"; with one player that was every
+    award, so the rule now applies to games with two or more players.
+  - **Not in this version:** statistics kept on the table.
+  *Implementation (Claude):* `games/freecell/` (`engine.ts`, `rules.ts`, `board.js`, `board.css`, `deck.js`),
+  `checkAward()` in `stats.ts`. Checks: `tests/freecell.test.ts`, `tests/statistics.test.ts`,
+  `scripts/e2e/freecell.py` (drag, tap, undo, hints to a solved game, facing north, awards).
+  - *2026-11-21, Klaus, after trying it:* "Looks ok. Please ship to production. Add it to the landing page as example
+    for a single player game." The website's games show FreeCell (built in, under *Solo* too; no phone picture, the
+    phone shows nothing of the game); the heading counts ten games. And: "The deck's results table has a horizontal
+    scrollbar. We can remove it by eliminating the Player column" — the table has no Player column, and no Result
+    column either (Claude: the headline says who and how it ended), so five columns fit a phone.
+  - *2026-11-21, Klaus:* "In the game settings I would like to enter the seed for the game to repeat one. Use the
+    onscreen keyboard for this entry. Entering a seed will end the current game, please ask for confirmation." The
+    board's settings window (the gear) shows **Deal number** during a game of FreeCell: a tap opens the board's number
+    pad (1–999999); another number asks "Play deal #N? The game that is on ends without a result", and then deals it,
+    with moves, time, undos and hints from zero. A number the solver finds no way through is refused in words (the
+    game deals only what can be solved). For that, a game's `settings()` also gets the board's `confirm(title, text,
+    okLabel)`. Check: `scripts/e2e/freecell.py`, `tests/freecell.test.ts`.

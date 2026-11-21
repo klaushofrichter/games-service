@@ -60,14 +60,20 @@ try:
                 page.click(".filters [data-f=extra]")
                 assert page.locator(".game:not(.hide)").count() == 5, "extra-games has five games"
                 page.click(".filters [data-f=built-in]")
-                assert page.locator(".game:not(.hide)").count() == 4, "four built-in games"
-                # Solo (D-292): FM-1 Synth and GE150 Pro, each linking to its own repository in the close-up.
+                assert page.locator(".game:not(.hide)").count() == 5, "five built-in games"
+                # Solo (D-292): FreeCell, FM-1 Synth and GE150 Pro, each linking to its own repository in the close-up.
                 page.click(".filters [data-f=solo]")
                 solo = page.locator(".game:not(.hide) h3").all_inner_texts()
-                assert solo == ["FM-1 Synth", "GE150 Pro"], solo
-                page.click(".game:not(.hide) >> nth=1")
+                assert solo == ["FreeCell", "FM-1 Synth", "GE150 Pro"], solo
+                page.click(".game:not(.hide) >> nth=2")
                 page.wait_for_selector("#lightbox.open")
                 assert page.get_attribute("#lb-link", "href").endswith("/ge150pro-game/tree/main/games/ge150-pro"), page.get_attribute("#lb-link", "href")
+                page.keyboard.press("Escape")
+                # FreeCell (D-308), the built-in game for one: its close-up has no phone (the phone shows nothing of it).
+                page.click(".game:not(.hide) >> nth=0")
+                page.wait_for_selector("#lightbox.open")
+                assert page.inner_text("#lb-name") == "FreeCell" and page.get_attribute("#lb-link", "href").endswith("/games-service/tree/main/games/freecell")
+                assert not page.locator("#lb-phone").is_visible(), "FreeCell shows a phone picture"
                 page.keyboard.press("Escape")
                 page.click(".filters [data-f=all]")
                 page.click(".game[data-i='0']")

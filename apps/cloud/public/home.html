@@ -711,8 +711,8 @@ footer a.terms { display: inline; margin: 0; }
   <div class="wrap">
     <div class="section-head">
       <p class="eyebrow rv">Free games</p>
-      <h2 class="rv" style="--d:.06s">Nine games, and more, and room for yours.</h2>
-      <p class="lede rv" style="--d:.12s">Four games come with the platform; five more come from <a href="https://github.com/klaushofrichter/extra-games" target="_blank" rel="noopener noreferrer">extra-games</a>, a separate repository that shows how anyone can add games. And from <a href="https://github.com/klaushofrichter/synth-game" target="_blank" rel="noopener noreferrer">synth-game</a>, something for one: a pocket synthesizer to play on the board. Electric guitar players with a Mooer GE150 Pro pedal get its remote control from <a href="https://github.com/klaushofrichter/ge150pro-game" target="_blank" rel="noopener noreferrer">ge150pro-game</a>. All of them are free and play for points, never money.</p>
+      <h2 class="rv" style="--d:.06s">Ten games, and more, and room for yours.</h2>
+      <p class="lede rv" style="--d:.12s">Five games come with the platform, one of them a solitaire for one player on the board; five more come from <a href="https://github.com/klaushofrichter/extra-games" target="_blank" rel="noopener noreferrer">extra-games</a>, a separate repository that shows how anyone can add games. And from <a href="https://github.com/klaushofrichter/synth-game" target="_blank" rel="noopener noreferrer">synth-game</a>, something for one: a pocket synthesizer to play on the board. Electric guitar players with a Mooer GE150 Pro pedal get its remote control from <a href="https://github.com/klaushofrichter/ge150pro-game" target="_blank" rel="noopener noreferrer">ge150pro-game</a>. All of them are free and play for points, never money.</p>
     </div>
     <div class="filters rv" role="tablist">
       <button class="chipbtn on" data-f="all">All games</button>
@@ -1166,7 +1166,7 @@ node scripts/soak.ts 100</pre>
       <p class="lede rv" style="--d:.12s">Any repository with a <code style="color:var(--brass-hi)">games/</code> folder can bring games to a table. These work with the platform today.</p>
     </div>
     <div class="repos">
-      <div class="repo rv"><div class="name">klaushofrichter/games-service<small>The platform, with its built-in games</small></div><div class="gl"><span>Roulette</span><span>Hold'em</span><span>Pachisi</span><span>Coin Flip</span></div><a href="https://github.com/klaushofrichter/games-service" target="_blank" rel="noopener noreferrer">GitHub →</a></div>
+      <div class="repo rv"><div class="name">klaushofrichter/games-service<small>The platform, with its built-in games</small></div><div class="gl"><span>Roulette</span><span>Hold'em</span><span>Pachisi</span><span>FreeCell</span><span>Coin Flip</span></div><a href="https://github.com/klaushofrichter/games-service" target="_blank" rel="noopener noreferrer">GitHub →</a></div>
       <div class="repo rv" style="--d:.05s"><div class="name">klaushofrichter/extra-games<small>Example game repository, MIT</small></div><div class="gl"><span>Chess</span><span>Liar's Dice</span><span>Backgammon</span><span>Mexican Train</span><span>Last Card</span></div><a href="https://github.com/klaushofrichter/extra-games" target="_blank" rel="noopener noreferrer">GitHub →</a></div>
       <div class="repo add rv" style="--d:.1s"><div class="name">your-name/your-games<small>Built a game? Tell us about it</small></div><div class="gl faint" style="font-size:15px">Open an issue with a link to your repository and we'll list it here.</div><a href="https://github.com/klaushofrichter/games-service/issues/new?title=Game%20repository%3A%20" target="_blank" rel="noopener noreferrer">Add yours →</a></div>
     </div>
@@ -1456,6 +1456,8 @@ docker compose -f deploy/local/docker-compose.yml up -d --build">Copy</button></
       text: "Dominoes up to double twelve: grow your own train from the hub, or the Mexican train everyone shares. Your tiles stay on your phone. A demo game for developers that customises nearly everything." },
     { id: "last-card", name: "Last Card", players: "2–8 players", src: "extra", phone: "last-card-phone",
       text: "Match the colour or the number, and push your card off the top of your phone: it lands on the pile in the middle. Skips, reverses, draw cards and wilds; shout your last card and be first to 200 points." },
+    { id: "freecell", name: "FreeCell", players: "1 player", src: "built-in", solo: true,
+      text: "A solitaire for one, played on the board itself: drag the cards with a finger, or tap them. Every deal can be solved, a hint shows the way, and undo takes anything back. The example of a single-player game for the board; the phone only joins." },
     { id: "fm1-synth", name: "FM-1 Synth", players: "1 player", src: "synth", solo: true, phone: "fm1-synth-phone",
       text: "Not quite a game: a pocket synthesizer, the M-VAVE FM-1 or its big sibling the SMK-37, emulated on the board. One player plays its keys, knobs and pads by touch, with as many fingers as they like, and picks one of the community's firmwares on their phone. Built on fm1-emu by Joakim Eriksson." },
     { id: "ge150-pro", name: "GE150 Pro", players: "1 player", src: "ge150", solo: true, phone: "ge150-pro-phone",

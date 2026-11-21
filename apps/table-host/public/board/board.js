@@ -1173,7 +1173,7 @@ toolsBtn.addEventListener("click", () => openAdvanced());
 
 /**
  * The settings modal: the board's own settings (Fullscreen), then whatever the chosen game adds. A game adds
- * items by exporting settings({ info, setPrefs }) from its board.js; each item is
+ * items by exporting settings({ info, setPrefs, confirm }) from its board.js; each item is
  *   { type: "toggle", label, value, onChange(next) }   { type: "choice", label, value, options: [{ value, label }], onChange }
  *   { type: "swatches", label, value, options: ["#rrggbb", …], onChange }   { type: "button", label, onChange() }
  * setPrefs(patch) stores display choices for this game on the table; board and decks get them as info.prefs.
@@ -1218,7 +1218,7 @@ function openSettings() {
     if (!state) return;
     loadGame();
     try {
-      items = (state.game && mod?.settings?.({ info: gameInfo(), setPrefs })) || [];
+      items = (state.game && mod?.settings?.({ info: gameInfo(), setPrefs, confirm: confirmDialog })) || [];
     } catch (err) {
       console.error("game settings failed", err);
       items = [];

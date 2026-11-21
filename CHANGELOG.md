@@ -8,6 +8,12 @@ history.
 
 ## [Unreleased]
 
+- FreeCell: the board's settings show the deal's number during a game; type another on the number pad to play that deal (asked first: the game that is on ends) (D-308).
+- A game's board settings can ask in the board's own dialog (`confirm`).
+- Website: FreeCell among the games, as the example of a single-player game on the board; "Ten games, and more" (D-308).
+- FreeCell: the results table has no Player and Result columns (one player, and the headline says both), so it fits a phone without scrolling sideways (D-308).
+- New built-in game: FreeCell, a solitaire for one player played on the board: drag cards or tap them, undo, a hint, only deals that can be solved, awards at the end (D-308).
+- Awards and Results: a game for one player keeps the awards its player earned (D-308).
 - Board: every window and list that scrolls has the wide scrollbar and follows one finger or two: all windows, the finished screen's results, the game logs, Live status. The deck beside the board scrolls by dragging (no wide bar); phones scroll by touch as before (D-306).
 - Board: Awards and Results scrolls with the wide scrollbar and by finger, like the settings windows (D-306).
 - Board: "Hide the mouse pointer in fullscreen" also hides it over the deck beside the board (Play from the board) (D-296).
