@@ -8,6 +8,7 @@ history.
 
 ## [Unreleased]
 
+- Website: a section on FreeCell's card designs, the six fading into each other, with how to ask your AI for more and the image model that drew them (D-311).
 - FreeCell: six card designs, chosen on the phone with a preview and changed at any time (Classic, Plain, Mosaic, Botanical, Linea, Speakeasy); the table keeps the choice (D-310).
 - FreeCell: a house rule, on by default, lets a foundation's top card be taken back to a column or a free cell; a switch in the board's settings, kept on the table (D-310).
 - Phone: an old or wrong join code no longer ends in a refusal: the page says the code is not current and takes the code the board shows now, typed; so does a page opened without a code (D-309).

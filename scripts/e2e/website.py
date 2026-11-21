@@ -7,7 +7,7 @@ Starts its own cloud service (port 8189).
 """
 import os, sys
 from playwright.sync_api import sync_playwright
-from common import errors, start_cloud, watch
+from common import errors, start_cloud, wait, watch
 
 OUT = sys.argv[1] if len(sys.argv) > 1 else "e2e-out"
 os.makedirs(OUT, exist_ok=True)
@@ -97,6 +97,20 @@ try:
                 page.wait_for_selector("#mini-deck.on")
                 page.locator("#demo").screenshot(path=os.path.join(OUT, "website-lobby.png"))
                 # The demo game (D-185): Mexican Train, its board and what it customises.
+                # FreeCell's card designs (D-311): six pictures, one on at a time; the round moves on by itself, and a
+                # tap on a name shows that design and stops it.
+                page.locator("#cards").scroll_into_view_if_needed()
+                page.wait_for_function("document.querySelector('#cards-stage img').complete && document.querySelector('#cards-stage img').naturalWidth > 0")
+                assert page.locator("#cards-stage img").count() == 6 and page.locator("#cards-pick button").count() == 6
+                assert page.locator("#cards-stage img.on").count() == 1
+                first = page.locator("#cards-pick button.on").inner_text()
+                wait(lambda: page.locator("#cards-pick button.on").inner_text() != first, 8, "the card designs to move on by themselves")
+                page.click("#cards-pick button >> text=Botanical")
+                assert page.get_attribute("#cards-stage img.on", "data-design") == "Botanical"
+                page.wait_for_timeout(4500)
+                assert page.get_attribute("#cards-stage img.on", "data-design") == "Botanical", "the round went on after a design was chosen"
+                page.wait_for_function("document.querySelector('#cards-stage img.on').complete && document.querySelector('#cards-stage img.on').naturalWidth > 0")
+                page.locator("#cards").screenshot(path=os.path.join(OUT, "website-cards.png"))
                 page.locator("#showcase").scroll_into_view_if_needed()
                 page.wait_for_function("document.querySelector('#showcase img').complete && document.querySelector('#showcase img').naturalWidth > 0")
                 assert page.locator("#showcase .show-list li").count() == 6

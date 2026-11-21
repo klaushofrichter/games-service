@@ -2752,3 +2752,17 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   `assets/cards.js` and `cards.css` (shared by board and phone), `deck.js`, `deck.css`. Checks:
   `tests/freecell.test.ts`, `scripts/e2e/freecell.py` (each design on the board, kept across a reload; a card taken
   back, undone, refused with the rule off).
+- **D-311 · 2026-11-21 · Klaus** — **The website shows FreeCell's card designs.** "A section in the landing page showing
+  these cards as 'customized card designs can be selected in FreeCell', and that users can ask their LLM to add more.
+  Mention [the model] … Show the designs in a soft and smooth animation, either time based or synced with scrolling."
+  A showcase under *Build* (`#cards`), after the two single-player ones: five cards of each design as a fan, the six
+  in one place, fading and settling into each other every 3.8 s while the section is in view (time based: it also
+  runs for a reader who has stopped scrolling). The designs' names below it are buttons: a tap shows that one and
+  stops the round. With reduced motion nothing moves by itself. Beside it: chosen on the phone, kept by the table,
+  "ask your AI for more", and how the pictures were made.
+  - **The model named** is *GPT Image 2.6*, as the generator's service (Higgsfield) reported for every picture
+    (`gpt_image_2_6`); the service itself is not named, as Klaus asked.
+  - The fans are drawn by the game's own card module (`scripts/site-screenshots.py freecell`), with transparency, so
+    the website's pictures cannot drift from the game's cards.
+  *Implementation (Claude):* `home.html` (`#cards`, `.cards-stage`), `apps/cloud/public/site/freecell-cards-*.webp`.
+  Check: `scripts/e2e/website.py`.
