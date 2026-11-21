@@ -2726,3 +2726,29 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
     table is reached as `http://…` on the home network. A photo of the code read by a bundled library would work, but
     takes longer than the phone's own camera, which scans the board in one step; the page says to do that.
   *Implementation (Claude):* `renderCode()` in `deck.js`, on the seat check's 403. Check: `scripts/e2e/join_restart.py`.
+- **D-310 · 2026-11-21 · Klaus** — **FreeCell: a house rule and six card designs, both kept on the table.**
+  - **House rule** ("allow to take cards back from the foundations to the other stacks; default is on"): a
+    foundation's top card may be dragged to a column (where it fits) or a free cell. It is a move like any other, and
+    Undo returns it; nothing goes to the foundations by itself after that move, so the card stays where it was put.
+    A switch in the board's settings (the gear) during a game, *Cards may be taken back from the foundations*; it
+    holds for the deals that follow. The solver and the hint never use it. A card taken back counts for a new award,
+    *Second Look*.
+  - **Card designs** ("five other card designs, with the current one as the default … selectable on the deck, with
+    preview, and changeable during the game"): *Classic* (the table's own), *Plain* (large, no serifs, no decoration),
+    *Mosaic* (after a green-and-gold deck Klaus showed: geometric letters, gold-edged pips, tiled court cards),
+    *Botanical* (after a flower deck: a hand-coloured flower for every rank, its name below), *Linea* (after a
+    line-art deck: a colour for each suit, outlined pips, court cards as line drawings; blue and green are the
+    "black" suits, pink and orange the red ones) and *Speakeasy* (after a twenties caricature deck: old paper, slab
+    letters, sketched court cards). Our own drawings in those manners, no deck copied, no maker's name. The phone
+    shows the six, each with a king, a queen, an ace and a seven; a tap changes the board at once.
+  - **The pictures** (22: thirteen flowers, three court figures each for Mosaic, Linea and Speakeasy) were made with
+    an image generator from Klaus's Higgsfield account, as he offered, then trimmed and shrunk
+    (`games/freecell/assets/designs/`, 0.7 MB). Number cards are drawn by the page. In every design the rank and suit
+    stand side by side in the card's top strip, which is all a column shows of a covered card.
+  - **Kept on the table** ("stored in the game's storage"): the game's data (D-302) holds `design` (the phone writes
+    it, the board hears of it) and `rules` (`{ takeBack }`, written by the board's switch; the playing board applies
+    it to a new game before the first move).
+  *Implementation (Claude):* `isFoundation()` and places 12–15 in `engine.ts`, the `rule` intent in `rules.ts`,
+  `assets/cards.js` and `cards.css` (shared by board and phone), `deck.js`, `deck.css`. Checks:
+  `tests/freecell.test.ts`, `scripts/e2e/freecell.py` (each design on the board, kept across a reload; a card taken
+  back, undone, refused with the rule off).

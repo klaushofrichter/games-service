@@ -2,7 +2,8 @@
 // "only deals that can be solved" and the hint.
 //
 // A card is a number 0–51: rank = card >> 2 (0 = ace … 12 = king), suit = card & 3 (0 ♠, 1 ♥, 2 ♦, 3 ♣).
-// A place is a number: 0–7 the columns, 8–11 the free cells, 12 the foundations.
+// A place is a number: 0–7 the columns, 8–11 the free cells, 12 the foundations (as where a card goes: its own suit's).
+// A card taken back from a foundation (a house rule) comes from 12 + its suit: 12 ♠, 13 ♥, 14 ♦, 15 ♣.
 
 export const COLUMNS = 8;
 export const CELLS = 4;
@@ -32,6 +33,8 @@ const SUITS = ["♠", "♥", "♦", "♣"];
 export const cardName = (c: number) => `${RANKS[rank(c)]}${SUITS[suit(c)]}`;
 export const isColumn = (p: number) => p >= 0 && p < COLUMNS;
 export const isCell = (p: number) => p >= COLUMNS && p < COLUMNS + CELLS;
+/** A foundation as where a card is taken from: 12 + suit. */
+export const isFoundation = (p: number) => p >= HOME && p < HOME + 4;
 
 /** `upper` may lie on `lower` in a column: one rank lower, the other colour. */
 export const stacks = (lower: number, upper: number) => rank(upper) === rank(lower) - 1 && red(upper) !== red(lower);
@@ -79,6 +82,10 @@ export function capacity(p: Position, to: number): number {
 
 /** The cards a move takes, bottom first; null if there are none to take. */
 function taken(p: Position, m: Move): number[] | null {
+  if (isFoundation(m.from)) {
+    const s = m.from - HOME;
+    return p.home[s]! > 0 && m.n === 1 ? [(p.home[s]! - 1) * 4 + s] : null;
+  }
   if (isCell(m.from)) {
     const c = p.cells[m.from - COLUMNS];
     return c === null || c === undefined || m.n !== 1 ? null : [c];
@@ -95,6 +102,7 @@ export function refusal(p: Position, m: Move): string | null {
   if (!cards) return "There is no such card to move";
   if (m.from === m.to) return "The card is already there";
   const first = cards[0]!;
+  if (isFoundation(m.from) && !(isColumn(m.to) || isCell(m.to))) return "A card from the foundations goes to a column or a free cell";
   if (m.to === HOME) {
     if (cards.length !== 1) return "Cards go to the foundations one at a time";
     return p.home[suit(first)] === rank(first) ? null : `${cardName(first)} can't go to its foundation yet`;
@@ -114,7 +122,11 @@ export function refusal(p: Position, m: Move): string | null {
 export function apply(p: Position, m: Move): Position {
   const q = copy(p);
   let cards: number[];
-  if (isCell(m.from)) {
+  if (isFoundation(m.from)) {
+    const s = m.from - HOME;
+    cards = [(q.home[s]! - 1) * 4 + s];
+    q.home[s]!--;
+  } else if (isCell(m.from)) {
     cards = [q.cells[m.from - COLUMNS] as number];
     q.cells[m.from - COLUMNS] = null;
   } else {
@@ -141,7 +153,8 @@ export function unapply(p: Position, m: Move, card: number): Position {
     const col = q.cols[m.to]!;
     cards = col.splice(col.length - m.n, m.n);
   }
-  if (isCell(m.from)) q.cells[m.from - COLUMNS] = cards[0]!;
+  if (isFoundation(m.from)) q.home[m.from - HOME]!++;
+  else if (isCell(m.from)) q.cells[m.from - COLUMNS] = cards[0]!;
   else q.cols[m.from]!.push(...cards);
   return q;
 }
@@ -201,8 +214,14 @@ export function bestTarget(p: Position, from: number, n: number): Move | null {
   return null;
 }
 
-/** Is any move left (other than shuffling a card between free cells)? */
-export function anyMove(p: Position): boolean {
+/** Is any move left (other than shuffling a card between free cells)? With `takeBack`, a card from a foundation counts. */
+export function anyMove(p: Position, takeBack = false): boolean {
+  if (takeBack) {
+    for (let s = 0; s < 4; s++) {
+      if (!p.home[s]) continue;
+      for (let to = 0; to < COLUMNS + CELLS; to++) if (refusal(p, { from: HOME + s, to, n: 1 }) === null) return true;
+    }
+  }
   for (let from = 0; from < COLUMNS + CELLS; from++) {
     const has = isCell(from) ? p.cells[from - COLUMNS] !== null : p.cols[from]!.length > 0;
     if (!has) continue;

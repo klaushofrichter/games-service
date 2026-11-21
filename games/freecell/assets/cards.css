@@ -1,0 +1,63 @@
+/* FreeCell's cards (D-310): 140 × 196, the corner on top (the strip that shows in a column), a pip or a picture below.
+   A design is the class fc-d-<id> on an element around the cards; without one, or with fc-d-classic, the table's own. */
+.fc-card { width: 140px; height: 196px; box-sizing: border-box; border-radius: 14px; overflow: hidden;
+  background: linear-gradient(160deg, #fffdf7, #efe8d6); color: #1b1a17; border: 1px solid rgba(0, 0, 0, 0.35);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.35); font-family: var(--display); font-weight: 700; }
+.fc-card.red { color: #b3261e; }
+.fc-ix { position: absolute; left: 10px; top: 5px; font-size: 32px; line-height: 1; display: flex; align-items: baseline; gap: 4px; pointer-events: none; z-index: 1; }
+.fc-ix i { font-style: normal; font-size: 28px; }
+.fc-pip { position: absolute; left: 0; right: 0; top: 62px; text-align: center; font-size: 96px; line-height: 1; pointer-events: none; }
+.fc-art { position: absolute; pointer-events: none; -webkit-user-drag: none; }
+.fc-caption { display: none; }
+
+/* Plain: nothing but what is needed, large and without serifs. */
+.fc-d-plain .fc-card { background: #fff; color: #000; border: 1px solid #555; border-radius: 10px; font-family: var(--text); font-weight: 800; box-shadow: 0 2px 5px rgba(0, 0, 0, 0.4); }
+.fc-d-plain .fc-card.red { color: #d40000; }
+.fc-d-plain .fc-ix { left: 8px; top: 3px; font-size: 38px; gap: 3px; }
+.fc-d-plain .fc-ix i { font-size: 34px; }
+.fc-d-plain .fc-pip { top: 70px; font-size: 92px; }
+
+/* Mosaic: white cards, green and gold; geometric letters, pips with a gold edge, tiled court cards. */
+.fc-d-mosaic .fc-card { background: #fbfaf6; color: #3a2616; border: 1px solid #8d7a52; font-family: "Futura", "Century Gothic", "Avenir Next", var(--text); font-weight: 600;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.35), inset 0 0 0 4px #fbfaf6, inset 0 0 0 5px rgba(176, 141, 62, 0.55); }
+.fc-d-mosaic .fc-card.red { color: #a8452e; }
+.fc-d-mosaic .fc-ix { font-size: 30px; top: 7px; }
+.fc-d-mosaic .fc-pip { font-size: 92px; top: 66px; -webkit-text-stroke: 2px #b08d3e; paint-order: stroke fill; text-shadow: 0 0 0 currentColor; }
+.fc-d-mosaic .fc-ace .fc-pip { font-size: 112px; top: 56px; }
+.fc-d-mosaic .fc-court { left: 24px; right: 8px; top: 30px; width: 108px; height: 160px; object-fit: contain; }
+
+/* Botanical: cream cards, a hand-coloured flower for every rank, its name below. */
+.fc-d-botanical .fc-card { background: #f3f0da; color: #3c4640; border: 1px solid #b9b394; font-family: var(--display); font-weight: 600; }
+.fc-d-botanical .fc-card.red { color: #c0503a; }
+/* (rank and suit side by side: in a column only a card's top strip shows) */
+.fc-d-botanical .fc-ix { left: 9px; top: 6px; font-size: 30px; gap: 3px; }
+.fc-d-botanical .fc-ix i { font-size: 24px; }
+.fc-d-botanical .fc-flower { left: 22px; top: 34px; width: 110px; height: 140px; object-fit: contain; }
+.fc-d-botanical .fc-caption { display: block; position: absolute; left: 0; right: 0; bottom: 6px; text-align: center; font: 500 11px var(--display); color: #4a4a3c; pointer-events: none; }
+
+/* Linea: rounder white cards, one colour for each suit (the blue and green suits are the "black" ones), outlined pips,
+   court cards as line drawings in the suit's colour. */
+.fc-d-linea .fc-card { background: #fff; border: 1px solid #c9cfd6; border-radius: 22px; font-family: var(--text); font-weight: 800; }
+.fc-d-linea .fc-card.fc-s0 { color: #1565a8; }
+.fc-d-linea .fc-card.fc-s1 { color: #d83a62; }
+.fc-d-linea .fc-card.fc-s2 { color: #e8821e; }
+.fc-d-linea .fc-card.fc-s3 { color: #14806a; }
+.fc-d-linea .fc-ix { left: 13px; top: 8px; font-size: 30px; }
+.fc-d-linea .fc-pip { font-size: 100px; top: 60px; color: transparent; -webkit-text-stroke: 4px currentColor; }
+.fc-d-linea .fc-card.fc-s0 .fc-pip { -webkit-text-stroke-color: #1565a8; }
+.fc-d-linea .fc-card.fc-s1 .fc-pip { -webkit-text-stroke-color: #d83a62; }
+.fc-d-linea .fc-card.fc-s2 .fc-pip { -webkit-text-stroke-color: #e8821e; }
+.fc-d-linea .fc-card.fc-s3 .fc-pip { -webkit-text-stroke-color: #14806a; }
+.fc-d-linea .fc-mask { left: 26px; top: 30px; width: 104px; height: 158px; background: currentColor;
+  -webkit-mask: var(--art) center / contain no-repeat; mask: var(--art) center / contain no-repeat; }
+
+/* Speakeasy: old paper with a stamp's edge, tall slab letters, pencil-and-wash sketches on the court cards. */
+.fc-d-speakeasy .fc-card { background: radial-gradient(circle at 50% 45%, #f0d2a2, #e2b77c); color: #2a211a; border: 1px solid #7d5f37; border-radius: 10px;
+  font-family: "Rockwell", "Roboto Slab", Georgia, serif; font-weight: 800;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.4), inset 0 0 0 5px #e9c48d, inset 0 0 0 6px rgba(90, 62, 30, 0.55); }
+.fc-d-speakeasy .fc-card.red { color: #9c3526; }
+.fc-d-speakeasy .fc-ix { left: 12px; top: 9px; font-size: 30px; gap: 3px; }
+.fc-d-speakeasy .fc-ix i { font-size: 26px; }
+.fc-d-speakeasy .fc-pip { font-size: 90px; top: 68px; opacity: 0.88; text-shadow: 1px 2px 0 rgba(90, 62, 30, 0.25); }
+.fc-d-speakeasy .fc-scene { left: 7px; top: 7px; width: 126px; height: 182px; object-fit: cover; border-radius: 5px;
+  -webkit-mask-image: linear-gradient(105deg, transparent 22%, #000 40%); mask-image: linear-gradient(105deg, transparent 22%, #000 40%); }

@@ -34,7 +34,7 @@ try:
         board = br.new_page(viewport={"width": 1920, "height": 1080})
         watch(board, "board")
         open_board(board, BASE + "/board/")
-        phone = br.new_context(viewport={"width": 390, "height": 844}, has_touch=True).new_page()
+        phone = br.new_context(viewport={"width": 320, "height": 568}, has_touch=True).new_page()  # the narrowest phone
         watch(phone, "phone")
         join_deck(phone, a("GET", "/join")["url"], "Klaus")
         a("POST", "/game/select", {"gameId": "freecell"})
@@ -56,6 +56,30 @@ try:
         assert len(s["cards"]) == 52 and s["moves"] == 0 and s["home"].startswith("0"), s["home"]
         assert board.locator(".fc-slot.fc-cell").count() == 4 and board.locator(".fc-slot.fc-found").count() == 4 and board.locator(".fc-slot.fc-col").count() == 8
         assert "played on the board" in phone.inner_text("#game, #app"), "the phone does not say where the game is"
+
+        # The cards' design (D-310) is chosen on the phone, each shown with a few of its cards; the board changes at
+        # once, in the middle of a game, and the table keeps the choice: a board loaded anew shows it again.
+        phone.wait_for_selector(".fcd-design[data-design=classic].on")
+        assert phone.locator(".fcd-design").count() == 6 and phone.locator(".fcd-preview .fc-card").count() == 24
+        loaded = "() => [...document.querySelectorAll('.fc-card img')].every((i) => i.complete && i.naturalWidth > 0)"
+        phone.wait_for_function(loaded)
+        wide = phone.evaluate("() => document.documentElement.scrollWidth - innerWidth")
+        assert wide <= 0, f"the phone's page is {wide} px wider than the screen"
+        phone.screenshot(path=os.path.join(OUT, "freecell-phone-designs.png"), full_page=True)
+        for d in ("plain", "mosaic", "botanical", "linea", "speakeasy"):
+            phone.click(f".fcd-design[data-design={d}]")
+            board.wait_for_selector(f".fc-root.fc-d-{d}")
+            board.wait_for_function(loaded)
+            assert board.locator(".fc-root .fc-card .fc-ix").count() == 52, f"{d}: a card lost its corner"
+            board.wait_for_timeout(300)
+            board.screenshot(path=os.path.join(OUT, f"freecell-design-{d}.png"))
+        assert board.locator(".fc-d-botanical").count() == 0 and board.locator(".fc-card img.fc-scene").count() == 12, "the speakeasy court cards"
+        board.reload()
+        board.wait_for_selector(".fc-root.fc-d-speakeasy")
+        phone.click(".fcd-design[data-design=classic]")
+        board.wait_for_selector(".fc-root.fc-d-classic")
+        phone.wait_for_selector(".fcd-design[data-design=classic].on")
+        board.wait_for_timeout(1800)
 
         def drag(x0, y0, x1, y1):
             board.mouse.move(x0, y0)
@@ -152,6 +176,46 @@ try:
         a("POST", "/rotate", {"degrees": 180})
         board.wait_for_selector(".fc-root:not(.fc-north)")
         board.wait_for_timeout(600)
+
+        # The house rule (D-310, on by default): a foundation's top card may be dragged back to a free cell or a
+        # column; that is a move, and Undo takes it back. Switched off in the board's settings, the card stays; the
+        # table keeps the choice.
+        FOUND = """() => { const r = (e) => e.getBoundingClientRect(); const slots = [...document.querySelectorAll('.fc-found')].map(r);
+          const cards = [...document.querySelectorAll('.fc-card')].map((e) => ({ e, b: r(e), z: Number(e.style.zIndex) }));
+          const at = (s) => cards.filter((c) => Math.abs(c.b.left - s.left) < 2 && Math.abs(c.b.top - s.top) < 2).sort((a, b) => b.z - a.z)[0];
+          const top = slots.map(at).find(Boolean);
+          const cell = [...document.querySelectorAll('.fc-cell')].map(r).find((s) => !at(s));
+          return top && cell ? { x: top.b.left + top.b.width / 2, y: top.b.top + top.b.height / 2, movable: top.e.classList.contains('fc-movable'), cx: cell.left + cell.width / 2, cy: cell.top + cell.height / 2 } : null; }"""
+        for _ in range(60):
+            f = board.evaluate(FOUND)
+            if f:
+                break
+            follow_hint()
+        assert f and f["movable"], f"no foundation card to take back, or it can't be picked up: {f}"
+        before = state()
+        drag(f["x"], f["y"], f["cx"], f["cy"])
+        wait(lambda: state()["moves"] == before["moves"] + 1, 5, "a card taken back from a foundation to be a move")
+        settle()
+        assert int(state()["home"].split("/")[0]) == int(before["home"].split("/")[0]) - 1, (before["home"], state()["home"])
+        board.click(".fc-btn[data-do=undo]")
+        settle()
+        assert state()["home"] == before["home"], "Undo did not put the card back on its foundation"
+        def house_rule(want):
+            board.click("#settings-button")
+            row = board.locator(".overlay.settings .row", has_text="taken back from the foundations")
+            assert row.locator("button[role=switch]").get_attribute("aria-checked") == ("false" if want else "true")
+            row.locator("button[role=switch]").click()
+            wait(lambda: row.locator("button[role=switch]").get_attribute("aria-checked") == ("true" if want else "false"), 5, "the house rule's switch to turn")
+            board.click(".overlay.settings [data-close-overlay]")
+        house_rule(False)
+        f = board.evaluate(FOUND)
+        assert f and not f["movable"], "with the house rule off a foundation card can still be picked up"
+        drag(f["x"], f["y"], f["cx"], f["cy"])
+        settle()
+        assert state()["home"] == before["home"], "with the house rule off a card left its foundation"
+        assert a("GET", "/game-data/freecell")["data"].get("rules") == {"takeBack": False}, "the table does not keep the house rule"
+        house_rule(True)
+        assert board.evaluate(FOUND)["movable"]
 
         # Follow the hints to the end: the game solves.
         for k in range(400):
