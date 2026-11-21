@@ -2807,6 +2807,22 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   runs XFCE with LightDM, not the GNOME this session had assumed) and sent the steps that worked; they are in
   `docs/install/linux.md` under *A table of its own*. Nothing in the platform changed. The starter plays the
   `production` branch by default, so the icon needs no option for it.
+- **D-314 · 2026-11-21 · Klaus** — **The starter's `--repos all`.** Asked by Klaus in Cluster's session and passed on:
+  the Game Table PC starts from a desktop icon with a fixed list of repositories (`--repos "traders-game loopy-game
+  …"`), so a new game repository would be missed. `--repos all` asks GitHub, at every start, for the repositories of
+  `klaushofrichter` the sign-in can read and takes those named `…-game` or `…-games` (the convention all of them
+  follow: traders-game, loopy-game, starforge-game, ge150pro-game, synth-game, extra-games), without the archived
+  ones and without the public ones every table has anyway.
+  - **By name, not by content:** telling a game repository by its `games/` folder would mean downloading every
+    repository of the account at each start. One that carries the name but has no games on the branch is left out
+    with a line, and is not a failure (also not for `--smoke-test`, which fails only for repositories named).
+  - **Without GitHub** (no sign-in, no network, `--no-update`): the game repositories downloaded before.
+  - It is for this start, like every `--repos`: the saved list (the answer to the question) stays as it is.
+  - **Not changed:** `ge150pro-game` is public but not among the repositories every table downloads (extra-games,
+    synth-game, D-284): it needs a pedal. `--repos all` brings it; so does naming it.
+  *Implementation (Claude):* `allGameRepos()`, `downloadedGameRepos()` in `scripts/package/launch.ts`, which now starts
+  a table only when run as the program (`import.meta.main`), so its parts can be tested. Check:
+  `tests/launcher.test.ts`. The packages on the release *local-table* have it once they are built again.
 - **D-315 · 2026-11-21 · Klaus** — **Quit the table from its board.** "The Cluster agent configured kiosk mode, so we
   will need an 'exit game' in the developer options or some other way to get out of Chrome. Esc does not work
   anymore." A page cannot close a kiosk window it did not open, so the way out ends at the table itself:
