@@ -1,0 +1,20 @@
+/* FreeCell on the phone (D-310): where the game is, and the cards' designs to choose from, each shown with four of
+   its cards at a third of their size. */
+.fcd-on-board { font-size: 1.1em; margin: 0.6em 0 0.2em; }
+.fcd-state { margin: 0; }
+.fcd-lede { margin: 0.3em 0 0.8em; font-size: 0.9em; }
+.fcd-list { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.fcd-design { display: flex; flex-direction: column; gap: 8px; align-items: stretch; padding: 10px 8px 9px; border-radius: 14px; text-align: left;
+  border: 2px solid var(--felt-line); background: rgba(255, 255, 255, 0.03); color: var(--ink); min-width: 0; }
+.fcd-design.on { border-color: var(--brass); background: rgba(214, 169, 74, 0.12); }
+/* four cards side by side, overlapping a little: 140 × 196 each, shown small */
+.fcd-preview { display: flex; justify-content: center; zoom: 0.36; height: 196px; pointer-events: none; }
+.fcd-preview .fc-card { position: relative; flex: none; margin-left: -42px; }
+.fcd-preview .fc-card:first-child { margin-left: 0; }
+.fcd-name { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.fcd-name b { font-family: var(--display); font-size: 1.05em; }
+.fcd-design.on .fcd-name b::after { content: " ✓"; color: var(--brass); }
+.fcd-name small { color: var(--ink-soft); font-size: 0.74em; line-height: 1.25; }
+.fcd-note { margin: 8px 0 0; min-height: 1.2em; font-size: 0.85em; color: var(--ruby, #e8735f); }
+/* the narrowest phones: one design to a row */
+@media (max-width: 359px) { .fcd-list { grid-template-columns: 1fr; } }

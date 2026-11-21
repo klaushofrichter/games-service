@@ -53,7 +53,26 @@ try:
         phone = b.new_page(viewport={"width": 390, "height": 844})
         phone.goto(old)
         wait(lambda: "restarted" in phone.locator("body").inner_text(), 10, "the phone to say the code is old")
+        if "no longer current" not in phone.inner_text("h1"):
+            problems.append(f"the phone's heading for an old code: {phone.inner_text('h1')!r}")
         phone.screenshot(path=os.path.join(OUT, "join-restart-phone.png"))
+        # It takes the code the board shows now, typed (D-309): a wrong one is said and the field stays; the right
+        # one (in small letters too) leads to the name form, and the phone takes a seat.
+        phone.fill("#code input[name=code]", "ZZZZ9999")
+        phone.click("#code button[type=submit]")
+        wait(lambda: "not the board's current code" in phone.inner_text("#code-error"), 5, "a wrong code to be refused")
+        phone.fill("#code input[name=code]", new.rsplit("/", 1)[-1].lower())
+        phone.click("#code button[type=submit]")
+        phone.wait_for_selector("#join input[name=name]", timeout=10000)
+        phone.fill("#join input[name=name]", "Late")
+        phone.click("#join button[type=submit]")
+        phone.wait_for_selector(".who h1")
+        # Without any code, the page asks for it the same way.
+        bare = b.new_page(viewport={"width": 390, "height": 844})
+        bare.goto(old.split("/j/")[0] + "/deck/")
+        bare.wait_for_selector("#code input[name=code]")
+        if "Join the table" not in bare.inner_text("h1"):
+            problems.append(f"the page without a code: {bare.inner_text('h1')!r}")
         b.close()
 finally:
     host.terminate()

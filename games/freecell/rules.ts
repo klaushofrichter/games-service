@@ -2,7 +2,7 @@
 // finds no way through is passed over for the next number. The rules of the cards are in engine.ts.
 import { count, defineGame, type GameAward, type GameContext, type GameEvent, type StepDescription, type StepInfo } from "../../packages/sdk/src/index.ts";
 import {
-  CELLS, COLUMNS, HOME, anyMove, apply, autoMoves, bestTarget, cardName, cardsHome, deal, isCell, isColumn, refusal, runLength, solve, solved, unapply,
+  CELLS, COLUMNS, HOME, anyMove, apply, autoMoves, bestTarget, cardName, cardsHome, deal, isCell, isColumn, isFoundation, refusal, runLength, solve, solved, unapply,
   type Move, type Position,
 } from "./engine.ts";
 
@@ -48,13 +48,18 @@ interface State {
   mostCells: number;
   bestSweep: number;
   over: null | "won" | "gaveUp";
+  /** House rule (D-310): a card may be taken back from a foundation to a column or a free cell. On unless switched off. */
+  takeBack: boolean;
+  /** Cards taken back from the foundations so far. */
+  takenBack: number;
 }
 
-const place = (p: number) => (p === HOME ? "the foundations" : isCell(p) ? `free cell ${p - COLUMNS + 1}` : `column ${p + 1}`);
+const place = (p: number) => (isFoundation(p) ? "the foundations" : isCell(p) ? `free cell ${p - COLUMNS + 1}` : `column ${p + 1}`);
 const cellsUsed = (p: Position) => p.cells.filter((c) => c !== null).length;
 const sameMove = (a: Move, b: Move) => a.from === b.from && a.to === b.to && a.n === b.n;
 
 function firstCard(p: Position, m: Move): number {
+  if (isFoundation(m.from)) return (p.home[m.from - HOME]! - 1) * 4 + (m.from - HOME);
   if (isCell(m.from)) return p.cells[m.from - COLUMNS] as number;
   const col = p.cols[m.from]!;
   return col[col.length - m.n]!;
@@ -69,7 +74,7 @@ function solvable(from: number): { n: number; passed: number; plan: Move[] } {
   }
 }
 
-function fresh(state: Pick<State, "seat" | "name" | "deal" | "passed">, plan: Move[]): State {
+function fresh(state: Pick<State, "seat" | "name" | "deal" | "passed" | "takeBack">, plan: Move[]): State {
   // (the first cards never go home by themselves before the player's first move: the plan starts with them if any)
   return {
     ...state,
@@ -87,13 +92,17 @@ function fresh(state: Pick<State, "seat" | "name" | "deal" | "passed">, plan: Mo
     mostCells: 0,
     bestSweep: 0,
     over: null,
+    takenBack: 0,
   };
 }
 
 /** Make a move that is allowed, with what follows by itself. */
 function play(state: State, m: Move, ctx: GameContext): { state: State; events: GameEvent[] } {
   const card = firstCard(state.pos, m);
-  const after = autoMoves(apply(state.pos, m));
+  // A card taken back from a foundation stays where it was put: nothing goes home by itself after that move.
+  const back = isFoundation(m.from);
+  const moved = apply(state.pos, m);
+  const after = back ? { moves: [], cards: [], position: moved } : autoMoves(moved);
   // The plan goes on if this was its next move (what follows by itself is in it, in the same order).
   const plan = state.plan && state.plan[0] && sameMove(state.plan[0], m) ? state.plan.slice(1 + after.moves.length) : null;
   const now = ctx.now();
@@ -109,6 +118,7 @@ function play(state: State, m: Move, ctx: GameContext): { state: State; events: 
     lastAt: now,
     mostCells: Math.max(state.mostCells, cellsUsed(after.position)),
     bestSweep: Math.max(state.bestSweep, after.cards.length + (m.to === HOME ? 1 : 0)),
+    takenBack: state.takenBack + (back ? 1 : 0),
     over: solved(after.position) ? "won" : null,
   };
   const events: GameEvent[] = [{ name: "moved", data: { from: m.from, to: m.to, n: m.n, card } }];
@@ -126,7 +136,7 @@ function clock(s: number): string {
 }
 
 /** What can go where right now: "from:n" → the places those cards may go, for the board's drag and drop. */
-function legalMoves(p: Position): Record<string, number[]> {
+function legalMoves(p: Position, takeBack: boolean): Record<string, number[]> {
   const out: Record<string, number[]> = {};
   const targets = (from: number, n: number) => {
     const to: number[] = [];
@@ -135,6 +145,7 @@ function legalMoves(p: Position): Record<string, number[]> {
   };
   for (let c = 0; c < COLUMNS; c++) for (let n = 1; n <= runLength(p.cols[c]!); n++) targets(c, n);
   for (let c = 0; c < CELLS; c++) if (p.cells[c] !== null) targets(COLUMNS + c, 1);
+  if (takeBack) for (let s = 0; s < 4; s++) if (p.home[s]! > 0) targets(HOME + s, 1);
   return out;
 }
 
@@ -152,10 +163,11 @@ function publicView(state: State) {
     hints: state.hints,
     hint: state.hint,
     noWay: state.noWay,
-    legal: state.over ? {} : legalMoves(state.pos),
+    legal: state.over ? {} : legalMoves(state.pos, state.takeBack),
+    takeBack: state.takeBack,
     canUndo: state.history.length > 0 && !state.over,
     /** Nothing can be moved: only Undo, Start again or Give up are left. */
-    stuck: !state.over && !anyMove(state.pos),
+    stuck: !state.over && !anyMove(state.pos, state.takeBack),
     firstAt: state.firstAt,
     lastAt: state.lastAt,
     over: state.over,
@@ -183,6 +195,7 @@ function awards(state: State): GameAward[] {
     won && state.undos >= 10 && { id: "second-thoughts", icon: "↩️", title: "Second Thoughts", blurb: "Took back ten moves or more on the way.", seats, value: count(state.undos, "undo") },
     won && state.restarts > 0 && { id: "fresh-start", icon: "🔁", title: "Fresh Start", blurb: "Started the deal again, and solved it.", seats },
     won && state.hints >= 5 && { id: "good-advice", icon: "💡", title: "Good Advice", blurb: "Asked for five hints or more.", seats, value: count(state.hints, "hint") },
+    won && state.takenBack > 0 && { id: "second-look", icon: "🪃", title: "Second Look", blurb: "Took a card back from the foundations, and solved it.", seats, value: count(state.takenBack, "card") },
     !won && home >= 26 && { id: "so-close", icon: "🥈", title: "So Close", blurb: "Half the cards or more were home.", seats, value: `${home} of 52` },
   ];
   return all.filter((a): a is GameAward => !!a);
@@ -204,6 +217,7 @@ function describeStep(step: StepInfo<State>): StepDescription | null {
       ...(done.autoCards.length ? { steps: [{ text: `${done.autoCards.map(cardName).join(", ")} to the foundations`, auto: true }] } : {}),
     };
   }
+  if (name === "rule") return { text: `house rule: cards ${after.takeBack ? "may" : "may not"} be taken back from the foundations`, columns };
   if (name === "deal") return { text: `starts deal ${after.deal}`, columns };
   const text: Record<string, string> = { undo: "takes a move back", restart: "starts the deal again", hint: after.hint ? `asks for a hint: ${cardName(firstCard(after.pos, after.hint))} to ${place(after.hint.to)}` : "asks for a hint: no way found from here", giveUp: "gives up" };
   return { text: text[name] ?? name, columns };
@@ -213,7 +227,7 @@ export default defineGame<State>({
   setup(ctx) {
     const found = solvable(ctx.randomInt(1, MAX_DEAL));
     const seat = ctx.seats[0]!;
-    return fresh({ seat: seat.seat, name: seat.name, deal: found.n, passed: found.passed }, found.plan);
+    return fresh({ seat: seat.seat, name: seat.name, deal: found.n, passed: found.passed, takeBack: true }, found.plan);
   },
 
   onIntent(state, seat, intent, ctx) {
@@ -225,6 +239,7 @@ export default defineGame<State>({
       case "move": {
         const m = { from: int(data.from), to: int(data.to), n: data.n === undefined ? 1 : int(data.n) };
         if ([m.from, m.to, m.n].some(Number.isNaN)) return { reject: "That is not a move" };
+        if (isFoundation(m.from) && !state.takeBack) return { reject: "Cards on the foundations stay there (the house rule that lets them back is off)" };
         const why = refusal(state.pos, m);
         return why ? { reject: why } : play(state, m, ctx);
       }
@@ -244,14 +259,14 @@ export default defineGame<State>({
         for (let i = last.auto.length - 1; i >= 0; i--) pos = unapply(pos, last.auto[i]!, last.autoCards[i]!);
         pos = unapply(pos, last.m, last.card);
         return {
-          state: { ...state, pos, history: state.history.slice(0, -1), undos: state.undos + 1, hint: null, noWay: false, plan: null, lastAt: ctx.now() },
+          state: { ...state, pos, history: state.history.slice(0, -1), takenBack: state.takenBack - (isFoundation(last.m.from) ? 1 : 0), undos: state.undos + 1, hint: null, noWay: false, plan: null, lastAt: ctx.now() },
           events: [{ name: "undone", data: { from: last.m.from, to: last.m.to, n: last.m.n, card: last.card, home: last.autoCards } }],
         };
       }
       case "restart": {
         if (!state.history.length) return { reject: "The deal is as it was dealt" };
         return {
-          state: { ...state, pos: deal(state.deal), history: [], restarts: state.restarts + 1, hint: null, noWay: false, plan: null, lastAt: ctx.now() },
+          state: { ...state, pos: deal(state.deal), history: [], takenBack: 0, restarts: state.restarts + 1, hint: null, noWay: false, plan: null, lastAt: ctx.now() },
           events: [{ name: "restarted" }],
         };
       }
@@ -260,6 +275,12 @@ export default defineGame<State>({
         if (!plan || !plan.length) return { state: { ...state, hint: null, noWay: true, plan: null }, events: [{ name: "noWay" }] };
         return { state: { ...state, hint: plan[0]!, noWay: false, plan, hints: state.hints + 1 }, events: [{ name: "hint", data: plan[0] }] };
       }
+      case "rule": {
+        // The house rule, from the board's settings; it holds from now on, also for the deals that follow.
+        if (typeof data.takeBack !== "boolean") return { reject: "That is not a house rule" };
+        if (data.takeBack === state.takeBack) return { reject: `Taking cards back from the foundations is ${state.takeBack ? "on" : "off"} already` };
+        return { state: { ...state, takeBack: data.takeBack }, events: [{ name: "rule", data: { takeBack: data.takeBack } }] };
+      }
       case "deal": {
         // Another deal by its number (to play one again): the game that is on ends without a result.
         const n = int(data.n);
@@ -267,7 +288,7 @@ export default defineGame<State>({
         if (n === state.deal) return { reject: `This is deal ${n} already; Start again deals it anew` };
         const plan = solve(deal(n), DEAL_BUDGET);
         if (!plan) return { reject: `No way through deal ${n} was found, so it is not played here. Try another number.` };
-        return { state: { ...fresh({ seat: state.seat, name: state.name, deal: n, passed: 0 }, plan), lastAt: ctx.now() }, events: [{ name: "dealt", data: { deal: n } }] };
+        return { state: { ...fresh({ seat: state.seat, name: state.name, deal: n, passed: 0, takeBack: state.takeBack }, plan), lastAt: ctx.now() }, events: [{ name: "dealt", data: { deal: n } }] };
       }
       case "giveUp":
         return { state: { ...state, over: "gaveUp", hint: null, lastAt: ctx.now() }, events: [{ name: "gaveUp" }] };

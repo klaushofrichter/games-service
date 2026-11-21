@@ -12,7 +12,7 @@ Sort all 52 cards onto the four foundations. A solitaire for 1 player, played on
 ## What you see
 
 - **The board** is where you play: four free cells top left, four foundations top right, eight columns below. All cards lie face up.
-- **Your phone** only says that the game is on the board.
+- **Your phone** says that the game is on the board, and lets you choose how the cards look: six designs, each shown with a few of its cards. Tap one and the board changes at once, also in the middle of a game. The table remembers it.
 
 ## Moving cards
 
@@ -20,7 +20,7 @@ Sort all 52 cards onto the four foundations. A solitaire for 1 player, played on
 - **Tap** a card and it goes where it fits best: a foundation first, then a column, then a free cell.
 - A **run** of cards in order (one lower, colours alternating) moves in one go: drag or tap its highest card. How many cards can move at once depends on the room you have: (empty free cells + 1), doubled for every empty column.
 - Any card, or a run, may go to an **empty column**.
-- Cards on the foundations stay there.
+- **House rule, on by default:** a foundation's top card may be dragged back to a column or a free cell. Switch it off in the board's settings (the gear) for the strict game, where cards on the foundations stay there. The table remembers your choice.
 
 Cards that are not needed in the columns any more go to the foundations by themselves. Once every column is in order, the game finishes itself.
 

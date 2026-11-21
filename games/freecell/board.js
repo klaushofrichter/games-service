@@ -3,6 +3,7 @@
 // go where it fits best. The 52 cards are 52 elements that stay: a move only changes where they lie, so every move,
 // undo and card going home slides there by itself.
 import { html, ping, playSound, seatPlates, useStyles } from "/shared/board-kit.js";
+import { DEFAULT_DESIGN, DESIGNS, RANKS, SUITS, cardClass, face, isDesign } from "/games/freecell/assets/cards.js";
 
 const W = 140, H = 196, GAP = 22; // a card, and the gap between columns
 const X0 = (1920 - (8 * W + 7 * GAP)) / 2;
@@ -14,11 +15,8 @@ const HOME = 12;
 const SLIDE = 230; // ms a card takes to slide to its place
 const DRAG_START = 8; // px a press may wander and still be a tap
 
-const RANKS = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
-const SUITS = ["♠", "♥", "♦", "♣"];
 const rank = (c) => c >> 2;
 const suit = (c) => c & 3;
-const red = (c) => suit(c) === 1 || suit(c) === 2;
 const cardName = (c) => `${RANKS[rank(c)]}${SUITS[suit(c)]}`;
 const colX = (i) => X0 + i * (W + GAP);
 const placeName = (p) => (p === HOME ? "its foundation" : p >= 8 ? "a free cell" : `column ${p + 1}`);
@@ -37,6 +35,7 @@ function winSound(ctx, t, out) {
 let live = null;
 
 export function mount(root, ctx) {
+  useStyles("/games/freecell/assets/cards.css");
   useStyles("/games/freecell/board.css");
   const box = html(`<div class="fc-root">
     <div class="fc-slots"></div>
@@ -71,7 +70,7 @@ export function mount(root, ctx) {
 
   const cards = [];
   for (let c = 0; c < 52; c++) {
-    const el = html(`<div class="fc-card ${red(c) ? "red" : ""}" data-card="${c}"><span class="fc-ix">${RANKS[rank(c)]}<i>${SUITS[suit(c)]}</i></span><span class="fc-pip">${SUITS[suit(c)]}</span></div>`);
+    const el = html(`<div class="${cardClass(c)}" data-card="${c}">${face(c, DEFAULT_DESIGN)}</div>`);
     layer.appendChild(el);
     cards.push(el);
   }
@@ -84,6 +83,37 @@ export function mount(root, ctx) {
   let confirm = null; // { what, timer }: "Start again" and "Give up" ask once more
   let received = 0; // performance.now() when the latest view came
   let dealt = false;
+
+  // The cards' design (D-310): chosen on the phone, kept on the table (`design` in the game's data), changed at any
+  // time. This screen reads it at the start and hears of every change.
+  let design = DEFAULT_DESIGN;
+  function setDesign(id) {
+    const next = isDesign(id) ? id : DEFAULT_DESIGN;
+    if (next === design && box.dataset.design) return;
+    design = next;
+    box.dataset.design = design;
+    for (const d of DESIGNS) box.classList.toggle(`fc-d-${d.id}`, d.id === design);
+    for (let c = 0; c < 52; c++) cards[c].innerHTML = face(c, design);
+  }
+  setDesign(DEFAULT_DESIGN);
+  const readDesign = () => ctx.store?.get("design").then(setDesign, () => setTimeout(readDesign, 3000));
+  readDesign();
+  const stopStore = ctx.store?.onChange((key, value) => {
+    if (key === "design") setDesign(value);
+    else if (key === null) readDesign();
+  });
+  // The house rule kept on the table (D-310) holds for a new game: asked for once, before the first move.
+  let ruleRead = false;
+  async function applyKeptRule() {
+    if (ruleRead || !ctx.store || !mine() || view.moves > 0) return;
+    ruleRead = true;
+    try {
+      const kept = await ctx.store.get("rules");
+      if (typeof kept?.takeBack === "boolean" && kept.takeBack !== view.takeBack && mine()) ctx.act(view.seat, "rule", { takeBack: kept.takeBack });
+    } catch {
+      ruleRead = false; // the table gave no answer: with the next update
+    }
+  }
 
   const mine = () => !!view && !!info && info.controlSeats?.includes(view.seat) && !view.over;
   const north = () => info?.rotation === 180;
@@ -143,7 +173,8 @@ export function mount(root, ctx) {
     const movable = new Set();
     if (mine()) for (const key of Object.keys(view.legal ?? {})) {
       const [from, n] = key.split(":").map(Number);
-      if (from >= 8) movable.add(view.cells[from - 8]);
+      if (from >= HOME) movable.add((view.home[from - HOME] - 1) * 4 + (from - HOME));
+      else if (from >= 8) movable.add(view.cells[from - 8]);
       else movable.add(view.cols[from][view.cols[from].length - n]);
     }
     for (let c = 0; c < 52; c++) cards[c].classList.toggle("fc-movable", movable.has(c));
@@ -234,7 +265,9 @@ export function mount(root, ctx) {
   /** The cards a press on this card would take: itself and what lies on it, if they can move together. */
   function grab(card) {
     const p = where.get(card);
-    if (!p || p.place === HOME) return null;
+    if (!p) return null;
+    // a foundation's top card, where the house rule lets it back: dragged only (a tap has no best place for it)
+    if (p.place === HOME) return p.index === view.home[suit(card)] - 1 && view.legal?.[`${HOME + suit(card)}:1`] ? { from: HOME + suit(card), n: 1, cards: [card], dragOnly: true } : null;
     if (p.place >= 8) return view.legal?.[`${p.place}:1`] ? { from: p.place, n: 1, cards: [card] } : null;
     const col = view.cols[p.place];
     const n = col.length - p.index;
@@ -301,7 +334,7 @@ export function mount(root, ctx) {
     drag = null;
     for (const el of box.querySelectorAll(".fc-target, .fc-over")) el.classList.remove("fc-target", "fc-over");
     if (!d.moved) {
-      if (!cancelled) act("tap", { from: d.from, n: d.n });
+      if (!cancelled && !d.dragOnly) act("tap", { from: d.from, n: d.n });
       return;
     }
     const at = local(e);
@@ -322,7 +355,7 @@ export function mount(root, ctx) {
       const first = !view;
       view = v;
       info = i;
-      live = { view: v, act: (name, payload) => ctx.act(v.seat, name, payload) };
+      live = { view: v, act: (name, payload) => ctx.act(v.seat, name, payload), store: ctx.store };
       received = performance.now();
       box.classList.toggle("fc-north", north());
       seatPlates(root, info).classList.toggle("fc-north", north());
@@ -351,6 +384,7 @@ export function mount(root, ctx) {
       }
       draw(delays);
       status();
+      applyKeptRule();
     },
     whenIdle() {
       const wait = idleAt - performance.now();
@@ -358,6 +392,7 @@ export function mount(root, ctx) {
     },
     destroy() {
       live = null;
+      stopStore?.();
       clearInterval(ticking);
       clearTimeout(confirm?.timer);
       box.remove();
@@ -373,6 +408,16 @@ export function settings({ info, confirm }) {
   const v = live?.view;
   if (!v || v.over || !info?.controlSeats?.includes(v.seat)) return v ? [{ type: "text", label: "Deal number", value: `#${v.deal}` }] : [];
   return [
+    {
+      type: "toggle",
+      label: "Cards may be taken back from the foundations",
+      hint: "A house rule: drag a foundation's top card to a column or a free cell. Kept for the next games.",
+      value: v.takeBack,
+      onChange: async (on) => {
+        const r = await live?.act("rule", { takeBack: !!on });
+        if (r?.ok) live?.store?.set("rules", { takeBack: !!on });
+      },
+    },
     {
       type: "number",
       label: "Deal number",

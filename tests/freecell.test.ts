@@ -214,6 +214,37 @@ describe("FreeCell: the game", () => {
     expect(JSON.stringify(rt.state)).toBe(before);
   });
 
+  it("house rule, on by default: a foundation's top card may go back to a column or a free cell, and Undo returns it", () => {
+    const { rt } = start(game, 1, {}, 7);
+    expect(view(rt).takeBack).toBe(true);
+    let guard = 0;
+    while (view(rt).home.every((n: number) => n === 0) && guard++ < 200) {
+      send(rt, "hint");
+      send(rt, "move", view(rt).hint);
+    }
+    const s = view(rt).home.findIndex((n: number) => n > 0);
+    const from = HOME + s;
+    const targets = view(rt).legal[`${from}:1`] as number[];
+    expect(targets.length).toBeGreaterThan(0);
+    expect(targets.every((t) => t < HOME)).toBe(true);
+    const before = JSON.stringify([view(rt).cols, view(rt).cells, view(rt).home]);
+    const homeBefore = view(rt).home[s];
+    expect(send(rt, "move", { from, to: targets[0], n: 1 })).toEqual({ ok: true });
+    expect(view(rt).home[s]).toBe(homeBefore - 1); // and it stays there: nothing goes home by itself after this move
+    expect(send(rt, "move", { from, to: HOME, n: 1 }).ok).toBe(false);
+    expect(send(rt, "undo")).toEqual({ ok: true });
+    expect(JSON.stringify([view(rt).cols, view(rt).cells, view(rt).home])).toBe(before);
+    // switched off: the card stays, in words; the rule holds for the deals that follow
+    expect(send(rt, "rule", { takeBack: false })).toEqual({ ok: true });
+    expect(view(rt).legal[`${from}:1`]).toBeUndefined();
+    expect(send(rt, "move", { from, to: targets[0], n: 1 }).reason).toMatch(/stay there/);
+    expect(send(rt, "rule", { takeBack: false }).reason).toMatch(/off already/);
+    expect(send(rt, "rule", { takeBack: "yes" }).ok).toBe(false);
+    const other = [11, 12, 13, 14, 15].find((n) => n !== view(rt).deal && solve(deal(n), 20000))!;
+    send(rt, "deal", { n: other });
+    expect(view(rt).takeBack).toBe(false);
+  });
+
   it("the phone and the board see the same open cards", () => {
     const { rt } = start(game, 1, {}, 7);
     expect(game.def.view(rt.state, 0)).toEqual(game.def.boardView!(rt.state));
