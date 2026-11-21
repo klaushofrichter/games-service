@@ -385,6 +385,15 @@ html.lb-open, html.lb-open body { overflow: hidden; }
 .show-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
 .show-list li { color: var(--soft); font-size: 15.5px; padding-left: 18px; border-left: 2px solid var(--brass-deep); }
 .show-list b { color: var(--ink); font-weight: 600; }
+/* FreeCell's card designs (D-311): six pictures in one place; the one that is on fades and settles in softly. */
+.cards-fig { background: radial-gradient(ellipse at 50% 60%, rgba(47, 100, 87, .35), transparent 70%); border-radius: 20px; }
+.cards-stage { position: relative; aspect-ratio: 1100 / 560; }
+.cards-stage img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; opacity: 0; transform: translateY(14px) scale(.965) rotate(-1.2deg);
+  transition: opacity 1.5s cubic-bezier(.4, 0, .2, 1), transform 1.9s cubic-bezier(.2, .7, .2, 1); filter: drop-shadow(0 26px 30px rgba(0, 0, 0, .45)); }
+.cards-stage img.on { opacity: 1; transform: none; }
+.cards-pick { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 6px; }
+.cards-pick button { font: inherit; font-size: 13.5px; padding: 6px 14px; border-radius: 999px; border: 1px solid var(--line-2); background: transparent; color: var(--soft); cursor: pointer; transition: color .4s, border-color .4s, background .4s; }
+.cards-pick button.on { color: #1b1407; background: var(--brass); border-color: var(--brass); }
 /* The sling (D-196): the phone and the board side by side, a card looping along the arc between them. */
 .sling-stage { position: relative; display: grid; grid-template-columns: 22% 74%; column-gap: 4%; align-items: center; aspect-ratio: 1000 / 476; }
 .sling-stage img { width: 100%; border-radius: 14px; border: 1px solid var(--line-2); box-shadow: 0 30px 70px rgba(0,0,0,.5); }
@@ -1099,6 +1108,35 @@ gesture(seat, data) { sling.gesture(seat, data); }</code>
       </div>
     </div>
 
+    <!-- FreeCell's card designs (D-311): the six designs fade into each other; ask your AI for a seventh. -->
+    <div class="showcase" id="cards">
+      <div class="dbg-head">
+        <p class="eyebrow rv">Make it yours</p>
+        <h3 class="rv" style="--d:.06s">Customized card designs can be selected in FreeCell.</h3>
+        <p class="rv" style="--d:.1s">The same game, six decks: the table's own cards, a plain one that is easy to read from across the room, and four with a character of their own. A game on Game Table is ordinary web code, so its look is as open as its rules.</p>
+      </div>
+      <div class="show-grid">
+        <figure class="dbg-shot rv cards-fig" style="--d:.05s">
+          <div class="cards-stage" id="cards-stage">
+            <img class="on" data-design="Classic" src="/site/freecell-cards-classic.webp" alt="Five FreeCell cards in the Classic design: cream cards with serif letters" width="1100" height="560">
+            <img data-design="Plain" src="/site/freecell-cards-plain.webp" alt="The same five cards in the Plain design: white, with large letters without serifs" loading="lazy" width="1100" height="560">
+            <img data-design="Mosaic" src="/site/freecell-cards-mosaic.webp" alt="The same five cards in the Mosaic design: green and gold court figures made of small tiles" loading="lazy" width="1100" height="560">
+            <img data-design="Botanical" src="/site/freecell-cards-botanical.webp" alt="The same five cards in the Botanical design: a hand-coloured flower on each, with its name" loading="lazy" width="1100" height="560">
+            <img data-design="Linea" src="/site/freecell-cards-linea.webp" alt="The same five cards in the Linea design: line drawings, each suit in its own colour" loading="lazy" width="1100" height="560">
+            <img data-design="Speakeasy" src="/site/freecell-cards-speakeasy.webp" alt="The same five cards in the Speakeasy design: sketched figures of the twenties on old paper" loading="lazy" width="1100" height="560">
+          </div>
+          <figcaption><div class="cards-pick" id="cards-pick" role="tablist" aria-label="Card design"></div></figcaption>
+        </figure>
+        <ul class="show-list rv" style="--d:.1s">
+          <li><b>Chosen on the phone.</b> The six designs are listed there, each with a few of its cards. Tap one and the board changes at once, also in the middle of a game.</li>
+          <li><b>The table remembers.</b> The design is kept with the game's data on the table's own computer, and is there again for the next game.</li>
+          <li><b>Ask your AI for more.</b> A design is a short stylesheet and, if you like, pictures for the court cards. Tell your AI what you have in mind, a deck for the holidays or one in your club's colours, and it adds a seventh.</li>
+          <li><b>Drawn by an image model.</b> The flowers and the court figures of Mosaic, Linea and Speakeasy were generated with GPT Image 2.6, then trimmed for the table. The number cards are drawn by the page.</li>
+          <li><b>Open source.</b> The designs are part of <a href="https://github.com/klaushofrichter/games-service/tree/main/games/freecell" target="_blank" rel="noopener noreferrer">FreeCell</a> in the platform's repository.</li>
+        </ul>
+      </div>
+    </div>
+
     <!-- Test and debug with your AI (D-180): AI-only simulations, logs an AI can read, references to a move. -->
     <div class="dbg" id="debug">
       <div class="dbg-head">
@@ -1473,6 +1511,23 @@ docker compose -f deploy/local/docker-compose.yml up -d --build">Copy</button></
       <div class="info"><div class="row"><h3>${g.name}</h3><span class="players">${g.players}</span></div><p>${g.text}</p></div>
     </button>`).join("");
   $$("#games-grid .rv").forEach((el) => io.observe(el));
+  // FreeCell's card designs (D-311): one after the other while the section is in view, every 3.8 s; a tap on a name
+  // shows that one and stops the round. Without motion (reduced motion) nothing moves by itself.
+  (() => {
+    const imgs = $$("#cards-stage img"), pick = $("#cards-pick");
+    if (!imgs.length) return;
+    pick.innerHTML = imgs.map((im, i) => `<button type="button" role="tab" data-i="${i}">${im.dataset.design}</button>`).join("");
+    let at = 0, timer = 0, auto = !still;
+    const show = (i) => {
+      at = i;
+      imgs.forEach((im, k) => im.classList.toggle("on", k === i));
+      $$("button", pick).forEach((b, k) => { b.classList.toggle("on", k === i); b.setAttribute("aria-selected", String(k === i)); });
+    };
+    const run = (on) => { clearInterval(timer); if (on && auto) timer = setInterval(() => show((at + 1) % imgs.length), 3800); };
+    pick.addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; auto = false; run(false); show(Number(b.dataset.i)); });
+    new IntersectionObserver((es) => run(es[0].isIntersecting), { threshold: 0.35 }).observe($("#cards-stage"));
+    show(0);
+  })();
   // Statistics and awards (D-178): one game's awards at a time.
   $$("[data-aw]").forEach((b) => b.addEventListener("click", () => {
     $$("[data-aw]").forEach((x) => { x.classList.toggle("on", x === b); x.setAttribute("aria-selected", String(x === b)); });

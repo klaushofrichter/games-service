@@ -62,6 +62,9 @@ PLAN = [
     ("last-card", {"turnSeconds": 0, "tapToPlay": True}, 6, ["Klaus"], 5, 60),
 ]
 
+# FreeCell's card designs, as the game's assets/cards.js names them
+CARD_DESIGNS = ["classic", "plain", "mosaic", "botanical", "linea", "speakeasy"]
+
 # game, seats, AI players, seconds to wait after start: board and phone from one game with Klaus (AI-only above)
 PHONE_ONLY = [("chess", 2, 1, 4), ("backgammon", 2, 1, 4), ("pachisi", 4, 3, 4)]
 
@@ -314,6 +317,26 @@ try:
             board.screenshot(path=os.path.join(OUT, "freecell-board.png"))
             ph.close()
             print("shot freecell")
+            # FreeCell's card designs (D-311): five cards of each as a fan, on nothing (the website puts them on its
+            # own background). Drawn by the game's own card module and stylesheet, served by this table.
+            cards_page = """<!doctype html><meta charset=utf-8><link rel=stylesheet href=/shared/theme.css><link rel=stylesheet href=/games/freecell/assets/cards.css>
+              <style>html, body { background: transparent !important; margin: 0; } #fan { position: relative; width: 560px; height: 330px; }
+              #fan .fc-card { position: absolute; left: 210px; top: 50px; }</style><div id=fan></div>
+              <script type=module>import { cardHtml } from "/games/freecell/assets/cards.js";
+              const SHOW = [6 * 4 + 3, 0 * 4 + 2, 12 * 4 + 0, 11 * 4 + 1, 10 * 4 + 3];
+              window.show = (d) => { const f = document.getElementById("fan"); f.className = "fc-d-" + d; f.innerHTML = SHOW.map((c) => cardHtml(c, d)).join("");
+                [...f.children].forEach((e, i) => (e.style.transform = `translate(${(i - 2) * 84}px, ${(i - 2) ** 2 * 7}px) rotate(${(i - 2) * 7}deg)`)); };</script>"""
+            cp = b.new_page(viewport={"width": 560, "height": 330}, device_scale_factor=2)
+            cp.route("**/__cards.html", lambda route: route.fulfill(content_type="text/html", body=cards_page))
+            cp.goto(BASE + "/__cards.html")
+            cp.wait_for_function("typeof window.show === 'function'")
+            for d in CARD_DESIGNS:
+                cp.evaluate("(d) => window.show(d)", d)
+                cp.wait_for_function("() => [...document.images].every((i) => i.complete && i.naturalWidth > 0)")
+                cp.wait_for_timeout(400)
+                cp.locator("#fan").screenshot(path=os.path.join(OUT, f"cards-{d}.png"), omit_background=True)
+            cp.close()
+            print("shot freecell cards")
         b.close()
         # The admin console (D-186): a service with extra-games, two tables (one approved by its pairing code, one by
         # an access code), a spare code, a download token, and logs of games and simulations from both tables.
@@ -382,6 +405,11 @@ for game, *_ in PLAN:
     save(f"{game}-board.png", f"{game}.webp", (1600, 900))
     save(f"{game}-phone.png", f"{game}-phone.webp", (500, 1100))
 save("freecell-board.png", "freecell.webp", (1600, 900))
+for d in CARD_DESIGNS:  # with their transparency
+    path = os.path.join(OUT, f"cards-{d}.png")
+    if os.path.exists(path):
+        im = Image.open(path).convert("RGBA").crop((10, 40, 1110, 600))  # (the same frame for all six, so they lie on each other)
+        im.save(os.path.join(SITE, f"freecell-cards-{d}.webp"), "WEBP", quality=84, method=6)
 save("mexican-train-lava-board.png", "mexican-train-lava.webp", (1600, 900))
 save("last-card-sling-phone.png", "last-card-sling-phone.webp", (500, 1100))
 # The board around the incoming card: its seat, and toward the middle of the table (the board is 1920 x 1080).
