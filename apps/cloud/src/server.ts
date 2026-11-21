@@ -6,6 +6,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { createHash, randomBytes } from "node:crypto";
 import { readFile } from "node:fs/promises";
+import { gzipSync } from "node:zlib";
 import { fileURLToPath } from "node:url";
 import { BlockList, isIPv4, isIPv6 } from "node:net";
 import { WebSocketServer, type WebSocket } from "ws";
@@ -33,6 +34,32 @@ const ICONS: Record<string, string> = { "/favicon.svg": "image/svg+xml", "/favic
 const PUBLIC_DIR = fileURLToPath(new URL("../public/", import.meta.url));
 // The public website (D-176): one page and its images.
 const HOME_PAGE = fileURLToPath(new URL("../public/home.html", import.meta.url));
+
+/**
+ * One of the website's two pages (D-312), both cut from home.html: what stands between `<!--home-->` and `<!--/home-->`
+ * is the landing page's only, between `<!--build-->` and `<!--/build-->` the developers' page's only.
+ */
+export function sitePage(source: string, page: "home" | "build"): string {
+  const other = page === "home" ? "build" : "home";
+  return source.replace(new RegExp(`<!--${other}-->[\\s\\S]*?<!--/${other}-->`, "g"), "").replace(/<!--\/?(?:home|build)-->/g, "");
+}
+
+/** A page of the website, compressed for a browser that takes it (the landing page is 150 KB of text, 40 KB compressed). */
+const zipped = new Map<string, Buffer>();
+function sendHtml(req: IncomingMessage, res: ServerResponse, html: string) {
+  const headers = { ...HTML_HEADERS, "cache-control": "no-cache", vary: "accept-encoding" };
+  if (!/\bgzip\b/.test(String(req.headers["accept-encoding"] ?? ""))) {
+    res.writeHead(200, headers);
+    return void res.end(html);
+  }
+  let body = zipped.get(html);
+  if (!body) {
+    if (zipped.size >= 16) zipped.clear(); // (a page differs by who is signed in and by its notes: a handful at most)
+    zipped.set(html, (body = gzipSync(html)));
+  }
+  res.writeHead(200, { ...headers, "content-encoding": "gzip" });
+  res.end(body);
+}
 const TERMS_PAGE = fileURLToPath(new URL("../public/terms.html", import.meta.url));
 const SITE_DIR = fileURLToPath(new URL("../public/site/", import.meta.url));
 const SITE_TYPES: Record<string, string> = { webp: "image/webp", png: "image/png", svg: "image/svg+xml", jpg: "image/jpeg" };
@@ -612,8 +639,8 @@ export function startCloud(o: CloudOptions) {
         return res.end();
       }
       if (await auth.handle(req, res, p)) return;
-      if (m === "GET" && p === "/") {
-        // The public website (D-176); also where logout lands (200, never a bounce to Google) when the console has no
+      if (m === "GET" && (p === "/" || p === "/build")) {
+        // The public website (D-176), its landing page and the developers' page (D-312); "/" is also where logout lands (200, never a bounce to Google) when the console has no
         // host of its own. The admin sign-in is a small link in the top right corner; with CONSOLE_URL this host can't
         // see the session, so it is a plain link to the console's host.
         const signedIn = consoleHost ? null : auth.session(req);
@@ -627,9 +654,8 @@ export function startCloud(o: CloudOptions) {
               : `<a id="admin-link" href="/admin">Admin</a>`;
         // The version label is part of the public page (and checked by the deploy's smoke test).
         const preview = o.previewBanner === false ? "" : `<div class="preview-sash" role="note" aria-label="Preview: Game Table is not live yet"><span>PREVIEW / DRAFT<small>NOT LIVE YET</small></span></div>`;
-        const html = (await readFile(HOME_PAGE, "utf8")).replace("{{admin}}", admin).replace("{{note}}", note).replace("{{preview}}", preview).replace("{{version}}", versionLabel());
-        res.writeHead(200, { ...HTML_HEADERS, "cache-control": "no-cache" });
-        return res.end(html);
+        const html = sitePage(await readFile(HOME_PAGE, "utf8"), p === "/build" ? "build" : "home").replace("{{admin}}", admin).replace("{{note}}", note).replace("{{preview}}", preview).replace("{{version}}", versionLabel());
+        return sendHtml(req, res, html);
       }
       if (m === "GET" && (match = p.match(/^\/site\/([a-z0-9-]+)\.(webp|png|svg|jpg)$/))) {
         try {

@@ -3,13 +3,17 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Game Table: board games around one screen</title>
-<meta name="description" content="An open platform for board and card games around a touchscreen lying flat on the table, with phones as private hands. Free, MIT licensed, and made for developers who build games with AI.">
+<!--home--><title>Game Table: board games around one screen</title>
+<meta name="description" content="An open platform for board and card games around a touchscreen lying flat on the table, with phones as private hands. Free, MIT licensed, and made for developers who build games with AI."><!--/home-->
+<!--build--><title>Build a game · Game Table</title>
+<meta name="description" content="Build your own game for Game Table with your AI agent: a game is a folder with a manifest, rules, a board and a phone page. Examples, the developer guide, and how to test and debug."><!--/build-->
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-<!-- The public website (D-176). Served by the cloud service at "/"; server.ts fills in the admin link, the signed-out
-     note and the version label. Images live in site/ (scripts/site-screenshots.py makes them). No external requests. -->
+<!-- The public website (D-176), two pages from this one file (D-312): the landing page at "/" and the developers' page
+     at "/build". What stands between a "home" comment and its closing one is on the landing page only, between "build"
+     comments on the developers' page only; the styles, the top bar, the foot and the script are shared.
+     server.ts cuts the page and fills in the admin link, the signed-out note and the version label. Images live in site/ (scripts/site-screenshots.py makes them). No external requests. -->
 <style>
 :root {
   --felt: #0f2a24; --felt-deep: #0a1d19; --felt-mid: #133a31; --line: #1f4a40; --line-2: #2f6457;
@@ -304,6 +308,9 @@ html.lb-open, html.lb-open body { overflow: hidden; }
 
 /* ---------- build ---------- */
 .build { background: linear-gradient(180deg, var(--felt-deep), #0d241f 30%, var(--felt-deep)); }
+/* The landing page's way in to the developers' page (D-312). */
+.teaser-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
+@media (max-width: 860px) { .teaser-grid { grid-template-columns: 1fr; } }
 .build::before { content: ""; position: absolute; inset: 0; background: radial-gradient(50% 40% at 80% 10%, rgba(214,169,74,.10), transparent 70%); pointer-events: none; }
 .case { display: grid; grid-template-columns: 1.2fr 1fr; gap: 0; border-radius: 26px; overflow: hidden; border: 1px solid var(--brass-deep); background: var(--felt); margin-bottom: 90px; box-shadow: 0 40px 100px rgba(0,0,0,.45); }
 .agent { position: relative; min-height: 460px; background: #050d0a; border-right: 1px solid var(--line); overflow: hidden; display: flex; flex-direction: column; }
@@ -563,16 +570,26 @@ footer a.terms { display: inline; margin: 0; }
 
 <header class="top" id="top">
   <div class="wrap">
-    <a class="logo" href="#"><img src="/favicon.svg" alt="">Game Table</a>
+    <!--home--><a class="logo" href="#"><img src="/favicon.svg" alt="">Game Table</a>
     <nav class="main" aria-label="Sections">
       <a href="#room">How it plays</a>
       <a href="#games">Games</a>
       <a href="#lobby">The lobby</a>
-      <a href="#build">Build a game</a>
+      <a href="/build">Build a game</a>
       <a href="#download">Download</a>
       <a href="#install">Docker</a>
       <a href="#table">The table</a>
-    </nav>
+    </nav><!--/home-->
+    <!--build--><a class="logo" href="/"><img src="/favicon.svg" alt="">Game Table</a>
+    <nav class="main" aria-label="Sections">
+      <a href="/#room">How it plays</a>
+      <a href="/#games">Games</a>
+      <a href="/#lobby">The lobby</a>
+      <a class="on" href="/build" aria-current="page">Build a game</a>
+      <a href="/#download">Download</a>
+      <a href="/#install">Docker</a>
+      <a href="/#table">The table</a>
+    </nav><!--/build-->
     <span class="spacer"></span>
     <a class="gh" href="https://github.com/klaushofrichter/games-service" target="_blank" rel="noopener noreferrer"><svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg><span>GitHub</span></a>
     {{admin}}
@@ -582,6 +599,7 @@ footer a.terms { display: inline; margin: 0; }
 {{preview}}
 
 <main>
+<!--home-->
 <!-- ============ HERO ============ -->
 <section class="hero" id="hero">
   <div class="hero-pin">
@@ -591,7 +609,7 @@ footer a.terms { display: inline; margin: 0; }
       <h1 class="rv" style="--d:.08s">Gather round<br><em>one screen.</em></h1>
       <p class="lede rv" style="--d:.16s">Game Table turns a touchscreen lying flat on the table into a board that everyone in the room shares. Phones are the private hands. And the games? <b style="color:var(--ink)">You build them, with your AI, in hours.</b></p>
       <div class="ctas rv" style="--d:.24s">
-        <a class="btn primary" href="#build">Build a game <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+        <a class="btn primary" href="/build">Build a game <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
         <a class="btn" href="#download">Play at home</a>
       </div>
       <div class="facts rv" style="--d:.32s"><span>1–8 players per table</span><span>No app to install</span><span>AI players built in</span><span>Runs on your own network</span></div>
@@ -634,7 +652,7 @@ footer a.terms { display: inline; margin: 0; }
 
 <div class="numbers wrap">
   <div class="num rv"><b data-count="1" data-suffix=" prompt">0</b><span>to build your own game</span></div>
-  <div class="num rv" style="--d:.06s"><b data-count="9" data-suffix=" games">0</b><span>playable out of the box</span></div>
+  <div class="num rv" style="--d:.06s"><b data-count="10" data-suffix=" games">0</b><span>playable out of the box</span></div>
   <div class="num rv" style="--d:.12s"><b data-count="8" data-suffix=" players">0</b><span>to join</span></div>
   <div class="num rv" style="--d:.18s"><b data-count="0" data-suffix=" lines">0</b><span>of lobby code in your game</span></div>
 </div>
@@ -642,7 +660,7 @@ footer a.terms { display: inline; margin: 0; }
 <!-- ============ PATHS ============ -->
 <section class="paths" id="paths">
   <div class="wrap grid">
-    <a class="path rv spot" href="#build">
+    <a class="path rv spot" href="/build">
       <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 9l-4 3 4 3M16 9l4 3-4 3M13.5 5l-3 14"/></svg></span>
       <h3>Game developers</h3>
       <p>Turn your game idea into something people play together, fast. Describe it to your AI, and the platform supplies the lobby, seats, phones, AI scheduling, remote play, logs and replay.</p>
@@ -827,7 +845,23 @@ awards: [
   </div>
 </section>
 
-<!-- ============ BUILD ============ -->
+<!-- ============ BUILD (D-312): a short way in; the whole of it is the page /build ============ -->
+<section class="build build-teaser" id="build">
+  <div class="wrap">
+    <div class="section-head">
+      <p class="eyebrow rv">For game developers</p>
+      <h2 class="rv" style="--d:.06s">You bring the idea.<br>The platform brings the table.</h2>
+      <p class="lede rv" style="--d:.12s">The platform is made for agentic coding. You describe the game; your AI agent writes it. A game is a folder: a manifest, rules, a board and a phone page. The lobby, the seats, the phones and the logs are the platform's.</p>
+    </div>
+    <div class="teaser-grid">
+      <a class="path rv spot" href="/build"><h3>One prompt to a game</h3><p>How Backgammon was written in one session, the prompt to start your own, and the contract your AI reads.</p></a>
+      <a class="path rv spot" style="--d:.06s" href="/build#showcase"><h3>What a game can do</h3><p>A demo game that customises nearly everything, a card slung from the phone, games for one player, and card designs.</p></a>
+      <a class="path rv spot" style="--d:.12s" href="/build#debug"><h3>Test and debug with your AI</h3><p>Games with nobody at the table, logs an AI can read, and a reference to the very move that went wrong.</p></a>
+    </div>
+    <p class="rv" style="--d:.16s;margin-top:34px"><a class="btn primary" href="/build">Build a game <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></p>
+  </div>
+</section><!--/home-->
+<!--build--><!-- ============ BUILD ============ -->
 <section class="build" id="build">
   <div class="wrap">
     <div class="section-head">
@@ -1121,7 +1155,7 @@ gesture(seat, data) { sling.gesture(seat, data); }</code>
             <img data-design="Classic" src="/site/freecell-cards-classic.webp" alt="Five FreeCell cards in the Classic design: cream cards with serif letters" loading="lazy" width="1100" height="560">
             <img data-design="Plain" src="/site/freecell-cards-plain.webp" alt="The same five cards in the Plain design: white, with large letters without serifs" loading="lazy" width="1100" height="560">
             <img data-design="Mosaic" src="/site/freecell-cards-mosaic.webp" alt="The same five cards in the Mosaic design: green and gold court figures made of small tiles" loading="lazy" width="1100" height="560">
-            <img class="on" data-design="Botanical" src="/site/freecell-cards-botanical.webp" alt="The same five cards in the Botanical design: a hand-coloured flower on each, with its name" width="1100" height="560">
+            <img class="on" data-design="Botanical" src="/site/freecell-cards-botanical.webp" alt="The same five cards in the Botanical design: a hand-coloured flower on each, with its name" loading="lazy" width="1100" height="560">
             <img data-design="Linea" src="/site/freecell-cards-linea.webp" alt="The same five cards in the Linea design: line drawings, each suit in its own colour" loading="lazy" width="1100" height="560">
             <img data-design="Speakeasy" src="/site/freecell-cards-speakeasy.webp" alt="The same five cards in the Speakeasy design: sketched figures of the twenties on old paper" loading="lazy" width="1100" height="560">
           </div>
@@ -1193,7 +1227,8 @@ node scripts/soak.ts 100</pre>
       <a class="lnk rv spot" style="--d:.15s" href="https://github.com/klaushofrichter/extra-games" target="_blank" rel="noopener noreferrer"><b>Example repository</b><span>Chess, Liar's Dice, Backgammon, Mexican Train, Last Card.</span><code>klaushofrichter/extra-games</code></a>
     </div>
   </div>
-</section>
+</section><!--/build-->
+<!--home-->
 
 <!-- ============ REPOSITORIES ============ -->
 <section id="repos" style="padding-top:40px">
@@ -1336,17 +1371,18 @@ docker compose -f deploy/local/docker-compose.yml up -d --build">Copy</button></
     </div>
   </div>
 </section>
+<!--/home-->
 </main>
 
 <footer>
   <div class="wrap">
     <div>
-      <a class="logo" href="#" style="margin:0 0 14px"><img src="/favicon.svg" alt="">Game Table</a>
+      <a class="logo" href="/" style="margin:0 0 14px"><img src="/favicon.svg" alt="">Game Table</a>
       <p>Board and card games around one touchscreen, with phones as private hands. Free and open source under the MIT licence, with no warranty.</p>
       <p style="margin-top:14px">Version {{version}} · <a class="terms" href="/terms">Terms of service</a></p>
     </div>
-    <div><h4>Play</h4><a href="#games">Games</a><a href="#download">Download</a><a href="#install">Docker</a><a href="/docs/local-docker.md">Local runbook</a><a href="#table">The table</a><a href="#service">Game service</a></div>
-    <div><h4>Build</h4><a href="/docs/game-development.md">Developer guide</a><a href="/llms.txt">llms.txt</a><a href="/llms-full.txt">llms-full.txt</a><a href="#repos">Game repositories</a><a href="https://github.com/klaushofrichter/games-service/blob/main/docs/decisions.md" target="_blank" rel="noopener noreferrer">Decision records</a></div>
+    <div><h4>Play</h4><a href="/#games">Games</a><a href="/#download">Download</a><a href="/#install">Docker</a><a href="/docs/local-docker.md">Local runbook</a><a href="#table">The table</a><a href="#service">Game service</a></div>
+    <div><h4>Build</h4><a href="/build">Build a game</a><a href="/docs/game-development.md">Developer guide</a><a href="/llms.txt">llms.txt</a><a href="/llms-full.txt">llms-full.txt</a><a href="#repos">Game repositories</a><a href="https://github.com/klaushofrichter/games-service/blob/main/docs/decisions.md" target="_blank" rel="noopener noreferrer">Decision records</a></div>
     <div><h4>Source</h4><a href="https://github.com/klaushofrichter/games-service" target="_blank" rel="noopener noreferrer">games-service</a><a href="https://github.com/klaushofrichter/extra-games" target="_blank" rel="noopener noreferrer">extra-games</a><a href="https://github.com/klaushofrichter/games-service/releases" target="_blank" rel="noopener noreferrer">Releases</a><a href="https://github.com/klaushofrichter/games-service/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">MIT licence</a><a href="#about">About</a></div>
   </div>
 </footer>
@@ -1374,7 +1410,9 @@ docker compose -f deploy/local/docker-compose.yml up -d --build">Copy</button></
   const io = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); } }), { threshold: 0.12 });
   $$(".rv, #explode").forEach((el) => io.observe(el));
 
+  // What follows is for whichever of the two pages has it (D-312): each part looks for its own elements first.
   // Hero: the board cycles through the games; the table follows the mouse a little.
+  if ($("#hero")) {
   const shots = $$("#hero-shots img");
   let shot = 0;
   if (!still) setInterval(() => { shots[shot].classList.remove("on"); shot = (shot + 1) % shots.length; shots[shot].classList.add("on"); }, 3200);
@@ -1417,6 +1455,7 @@ docker compose -f deploy/local/docker-compose.yml up -d --build">Copy</button></
   addEventListener("resize", heroScroll);
   heroScroll();
   if (!still) addEventListener("mousemove", (e) => { mx = e.clientX / innerWidth - 0.5; my = e.clientY / innerHeight - 0.5; camera(); }, { passive: true });
+  }
 
   // Numbers count up when they come into view.
   const counters = new IntersectionObserver((es) => es.forEach((e) => {
@@ -1461,7 +1500,7 @@ docker compose -f deploy/local/docker-compose.yml up -d --build">Copy</button></
       t += cls === "me" ? 1100 : cls === "dim" ? 750 : 380;
     });
   };
-  new IntersectionObserver(([e], obs) => { if (e.isIntersecting) { obs.disconnect(); play(); } }, { threshold: 0.45 }).observe(agent);
+  if (agent) new IntersectionObserver(([e], obs) => { if (e.isIntersecting) { obs.disconnect(); play(); } }, { threshold: 0.45 }).observe(agent);
 
   // A soft light follows the pointer over cards.
   document.addEventListener("pointermove", (e) => {
@@ -1472,6 +1511,7 @@ docker compose -f deploy/local/docker-compose.yml up -d --build">Copy</button></
   }, { passive: true });
 
   // Games.
+  if ($("#games-grid")) {
   const GS = "https://github.com/klaushofrichter/games-service/tree/main/games/";
   const EX = "https://github.com/klaushofrichter/extra-games/tree/main/games/";
   const SY = "https://github.com/klaushofrichter/synth-game/tree/main/games/";
@@ -1511,6 +1551,34 @@ docker compose -f deploy/local/docker-compose.yml up -d --build">Copy</button></
       <div class="info"><div class="row"><h3>${g.name}</h3><span class="players">${g.players}</span></div><p>${g.text}</p></div>
     </button>`).join("");
   $$("#games-grid .rv").forEach((el) => io.observe(el));
+  // Statistics and awards (D-178): one game's awards at a time.
+  $$("[data-aw]").forEach((b) => b.addEventListener("click", () => {
+    $$("[data-aw]").forEach((x) => { x.classList.toggle("on", x === b); x.setAttribute("aria-selected", String(x === b)); });
+    $$("[data-aw-list]").forEach((l) => { l.hidden = l.dataset.awList !== b.dataset.aw; });
+  }));
+  $$(".filters .chipbtn").forEach((b) => b.addEventListener("click", () => {
+    $$(".filters .chipbtn").forEach((x) => x.classList.toggle("on", x === b));
+    const f = b.dataset.f;
+    $$(".game").forEach((g) => { g.classList.toggle("hide", f !== "all" && (f === "solo" ? g.dataset.solo === undefined : g.dataset.src !== f)); g.classList.toggle("wide", f === "all" && !!GAMES[g.dataset.i].wide); });
+  }));
+  const lb = $("#lightbox");
+  grid.addEventListener("click", (e) => {
+    const card = e.target.closest(".game"); if (!card) return;
+    const g = GAMES[card.dataset.i];
+    $("#lb-img").src = `/site/${g.id}.webp`; $("#lb-img").alt = `${g.name} on the board`;
+    $("#lb-name").textContent = g.name; $("#lb-desc").textContent = `${g.players}. ${g.text}`;
+    const ph = $("#lb-phone"); ph.hidden = !g.phone; if (g.phone) { ph.src = `/site/${g.phone}.webp`; ph.alt = `${g.name} on a phone`; }
+    $("#lb-link").href = ({ extra: EX, synth: SY, ge150: GE }[g.src] ?? GS) + g.id;
+    lb.scrollTop = 0;
+    lb.classList.add("open");
+    document.documentElement.classList.add("lb-open");
+  });
+  const close = () => { lb.classList.remove("open"); document.documentElement.classList.remove("lb-open"); };
+  $("#lb-close").addEventListener("click", close);
+  lb.addEventListener("click", (e) => { if (e.target === lb) close(); });
+  addEventListener("keydown", (e) => { if (e.key === "Escape") close(); });
+  }
+
   // FreeCell's card designs (D-311): one after the other every 3 s while the decks are in view, the flowers first.
   // Where the round stands is kept for this visit (sessionStorage): whoever comes to the section again, by scrolling
   // back or after loading the page anew, sees the next deck, not the first one again. A tap on a name shows that one
@@ -1541,32 +1609,6 @@ docker compose -f deploy/local/docker-compose.yml up -d --build">Copy</button></
     new IntersectionObserver((es) => run(es[0].isIntersecting), { threshold: 0.35 }).observe($("#cards-stage"));
     show(at);
   })();
-  // Statistics and awards (D-178): one game's awards at a time.
-  $$("[data-aw]").forEach((b) => b.addEventListener("click", () => {
-    $$("[data-aw]").forEach((x) => { x.classList.toggle("on", x === b); x.setAttribute("aria-selected", String(x === b)); });
-    $$("[data-aw-list]").forEach((l) => { l.hidden = l.dataset.awList !== b.dataset.aw; });
-  }));
-  $$(".filters .chipbtn").forEach((b) => b.addEventListener("click", () => {
-    $$(".filters .chipbtn").forEach((x) => x.classList.toggle("on", x === b));
-    const f = b.dataset.f;
-    $$(".game").forEach((g) => { g.classList.toggle("hide", f !== "all" && (f === "solo" ? g.dataset.solo === undefined : g.dataset.src !== f)); g.classList.toggle("wide", f === "all" && !!GAMES[g.dataset.i].wide); });
-  }));
-  const lb = $("#lightbox");
-  grid.addEventListener("click", (e) => {
-    const card = e.target.closest(".game"); if (!card) return;
-    const g = GAMES[card.dataset.i];
-    $("#lb-img").src = `/site/${g.id}.webp`; $("#lb-img").alt = `${g.name} on the board`;
-    $("#lb-name").textContent = g.name; $("#lb-desc").textContent = `${g.players}. ${g.text}`;
-    const ph = $("#lb-phone"); ph.hidden = !g.phone; if (g.phone) { ph.src = `/site/${g.phone}.webp`; ph.alt = `${g.name} on a phone`; }
-    $("#lb-link").href = ({ extra: EX, synth: SY, ge150: GE }[g.src] ?? GS) + g.id;
-    lb.scrollTop = 0;
-    lb.classList.add("open");
-    document.documentElement.classList.add("lb-open");
-  });
-  const close = () => { lb.classList.remove("open"); document.documentElement.classList.remove("lb-open"); };
-  $("#lb-close").addEventListener("click", close);
-  lb.addEventListener("click", (e) => { if (e.target === lb) close(); });
-  addEventListener("keydown", (e) => { if (e.key === "Escape") close(); });
 
   // The demo game's picture (D-186): the second look fades in once the picture is above the middle of the window.
   const looks = $$(".show-shot"); // Mexican Train's two looks, and the FM-1 and the SMK-37 (D-284)
@@ -1584,6 +1626,7 @@ docker compose -f deploy/local/docker-compose.yml up -d --build">Copy</button></
   }
 
   // The lobby demo: a little table that acts out what the platform handles.
+  if ($("#demo")) {
   const C = { anna: "#d6a94a", ben: "#63a8e0", otto: "#d2574a", cleo: "#5fbf8f", dana: "#9b7be0", sam: "#e08fb0" };
   const STEPS = [
     { h: "Scan the code, take a seat", p: "One QR code on the board. Each phone that scans it gets a seat, a colour and a private deck.",
@@ -1642,11 +1685,13 @@ docker compose -f deploy/local/docker-compose.yml up -d --build">Copy</button></
   new IntersectionObserver(([e]) => { visible = e.isIntersecting; demo.classList.toggle("paused", !visible); if (visible) show(cur < 0 ? 0 : cur); else clearTimeout(timer); }, { threshold: 0.3 }).observe(demo);
   demo.style.setProperty("--dur", `${STEP_MS / 1000}s`);
   show(0);
+  }
 
   // The prompt types itself once it scrolls into view.
   const say = $("#say");
-  const full = say.dataset.text;
-  if (still) say.textContent = full;
+  const full = say?.dataset.text ?? "";
+  if (!say) {}
+  else if (still) say.textContent = full;
   else new IntersectionObserver(([e], obs) => {
     if (!e.isIntersecting) return;
     obs.disconnect();
@@ -1668,8 +1713,10 @@ docker compose -f deploy/local/docker-compose.yml up -d --build">Copy</button></
   }));
 
   // Highlight the section in the nav.
-  const links = $$("nav.main a");
+  const links = $$("nav.main a").filter((a) => a.getAttribute("href").startsWith("#")); // (not the links to the other page)
   const secs = links.map((a) => $(a.getAttribute("href")));
+  // An old link to a part that now lives on the developers' page (D-312) is taken there.
+  if (location.pathname === "/" && /^#(case|showcase|show-shot|sling|synth|ge150|cards|debug|docs)$/.test(location.hash)) location.replace("/build" + location.hash);
   const navObs = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) links.forEach((a) => a.classList.toggle("on", a.getAttribute("href") === `#${e.target.id}`)); }), { rootMargin: "-45% 0px -50% 0px" });
   secs.forEach((s) => s && navObs.observe(s));
 })();
