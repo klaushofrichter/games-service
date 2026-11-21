@@ -190,6 +190,74 @@ Terminal=true
 Categories=Game;
 ```
 
+### A table of its own: an icon on the desktop, no lock, log in by itself
+
+For a computer that is the table (a mini PC under the touchscreen): it logs in at power-on, never locks or blanks its
+screen, and has an icon on the desktop that starts the table. These are the steps that worked on Debian 13 with XFCE
+and LightDM (D-313); other desktops have the same three settings under other names. Run them as the desktop's user,
+in its session (over SSH: with `DISPLAY=:0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(id -u)/bus` before each
+command).
+
+**The icon.** XFCE shows desktop icons by itself. Save this as `~/Desktop/game-table.desktop`, with your path (and
+`--port` if 8080 is taken):
+
+```ini
+[Desktop Entry]
+Type=Application
+Name=Game Table
+Exec=/home/YOU/apps/game-table/game-table
+Terminal=true
+Icon=applications-games
+```
+
+```sh
+chmod +x ~/Desktop/game-table.desktop
+# XFCE 4.20 asks "untrusted launcher" unless it knows the file:
+gio set -t string ~/Desktop/game-table.desktop metadata::xfce-exe-checksum "$(sha256sum ~/Desktop/game-table.desktop | cut -d' ' -f1)"
+```
+
+A finger's tap is one click, so let one click start it:
+
+```sh
+xfconf-query -c xfce4-desktop -n -t bool -p /desktop-icons/single-click -s true
+```
+
+**The board full screen, without the browser's frame** (a kiosk). Let the icon run a small script instead: the table
+without its own browser window, then the board in Chrome's kiosk mode with a profile of its own. Save it as
+`~/apps/game-table-start.sh`, make it executable, and put its path in the icon's `Exec=`:
+
+```sh
+#!/bin/sh
+~/apps/game-table/game-table --no-open &
+until curl -fs http://localhost:8080/health > /dev/null; do sleep 1; done
+google-chrome --user-data-dir="$HOME/.config/game-table-board" --kiosk --no-first-run --noerrdialogs \
+  --autoplay-policy=no-user-gesture-required http://localhost:8080/board/
+```
+
+**No lock, no blank screen, no sleep.**
+
+```sh
+for p in presentation-mode=true dpms-enabled=false lock-screen-suspend-hibernate=false; do
+  xfconf-query -c xfce4-power-manager -n -t bool -p "/xfce4-power-manager/${p%%=*}" -s "${p#*=}"
+done
+for p in blank-on-ac dpms-on-ac-sleep dpms-on-ac-off inactivity-on-ac; do
+  xfconf-query -c xfce4-power-manager -n -t int -p "/xfce4-power-manager/$p" -s 0
+done
+mkdir -p ~/.config/autostart
+printf '[Desktop Entry]\nType=Application\nName=light-locker\nHidden=true\n' > ~/.config/autostart/light-locker.desktop
+printf '[Desktop Entry]\nType=Application\nName=No blanking\nExec=xset s off -dpms\n' > ~/.config/autostart/no-blanking.desktop
+pkill light-locker; xset s off -dpms
+sudo systemctl mask sleep.target suspend.target hibernate.target hybrid-sleep.target
+```
+
+`xset q` then shows *timeout: 0* and *DPMS is Disabled*.
+
+**Log in by itself** (as root). Anyone at the computer then has this user's session, with its GitHub sign-in:
+
+```sh
+printf '[Seat:*]\nautologin-user=YOU\nautologin-user-timeout=0\n' | sudo tee /etc/lightdm/lightdm.conf.d/50-autologin.conf
+```
+
 ### Running without a terminal (a service)
 
 On a computer without a screen, or to keep the table running after you log out, run it as a `systemd` user service.
