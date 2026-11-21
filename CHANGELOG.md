@@ -8,6 +8,8 @@ history.
 
 ## [Unreleased]
 
+- FreeCell: the board's settings show the deal's number during a game; type another on the number pad to play that deal (asked first: the game that is on ends) (D-308).
+- A game's board settings can ask in the board's own dialog (`confirm`).
 - Website: FreeCell among the games, as the example of a single-player game on the board; "Ten games, and more" (D-308).
 - FreeCell: the results table has no Player and Result columns (one player, and the headline says both), so it fits a phone without scrolling sideways (D-308).
 - New built-in game: FreeCell, a solitaire for one player played on the board: drag cards or tap them, undo, a hint, only deals that can be solved, awards at the end (D-308).

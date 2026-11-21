@@ -34,7 +34,8 @@
     "undo",
     "restart",
     "hint",
-    "giveUp"
+    "giveUp",
+    "deal"
   ],
   "viewer": {
     "columns": [

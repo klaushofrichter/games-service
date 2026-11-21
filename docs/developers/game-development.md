@@ -349,7 +349,7 @@ export function mount(root, ctx) {
     gesture(seat, data) { /* optional: a phone's live gesture, e.g. a card being slung (section 10) */ },
   };
 }
-export function settings({ info, setPrefs }) { return []; } // optional: items for the board's settings window
+export function settings({ info, setPrefs, confirm }) { return []; } // optional: items for the board's settings window
 ```
 
 - **The surface** is 1920 × 1080 logical pixels, scaled to the screen; `root` covers it. Seats sit around the edges
@@ -389,7 +389,8 @@ export function settings({ info, setPrefs }) { return []; } // optional: items f
   `swatches` takes `options: ["#rrggbb", …]`, a `button` shows `action` (or `label`) and calls `onChange()`, a
   `text` only shows its `value` (e.g. a board's seed), and a `number` shows its `value` and opens the board's number pad
   (digits, Clear, Enter; `min`, `max`), calling `onChange(n)`. Any other item may carry a `hint`, shown under its label. During a game the manifest's locked settings show no `hints`: the game's items say what a value means now. `setPrefs(patch)` stores display choices for this game (`info.prefs`), never
-  rules.
+  rules. `confirm(title, text, okLabel)` asks in the board's own dialog and resolves to `true` or `false`, for an item
+  that ends or changes something (FreeCell's deal number).
 - **Sound:** `playSound(info, name, make)` from the board kit plays only when the table's sound is on (`info.sound`).
   A browser other than the table's kiosk plays it only after the board has been touched; the platform wakes it on the
   first tap and shows *Tap to turn the sound on* until then (D-195), so a game does nothing about it.

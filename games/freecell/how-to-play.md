@@ -37,4 +37,4 @@ Cards that are not needed in the columns any more go to the foundations by thems
 
 The game ends when all 52 cards are on the foundations, or when you give up. **Awards and Results** shows your moves, time, undos and hints, and what you earned: solving without a hint or an undo, within three or five minutes, in few moves, and more.
 
-Each deal has a number, shown on the board.
+Each deal has a number, shown on the board. To play a deal again, open the board's settings (the gear) during a game and tap **Deal number**: type the number and confirm. The game that is on ends without a result.

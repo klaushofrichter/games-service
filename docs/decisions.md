@@ -2699,7 +2699,7 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   - **Awards:** sixteen offered, those earned are listed (solved, no undo, no hint, within three or five minutes, few
     moves, few free cells, …). The platform dropped an award "every player holds"; with one player that was every
     award, so the rule now applies to games with two or more players.
-  - **Not in this version:** choosing a deal by its number, statistics kept on the table.
+  - **Not in this version:** statistics kept on the table.
   *Implementation (Claude):* `games/freecell/` (`engine.ts`, `rules.ts`, `board.js`, `board.css`, `deck.js`),
   `checkAward()` in `stats.ts`. Checks: `tests/freecell.test.ts`, `tests/statistics.test.ts`,
   `scripts/e2e/freecell.py` (drag, tap, undo, hints to a solved game, facing north, awards).
@@ -2708,3 +2708,10 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
     phone shows nothing of the game); the heading counts ten games. And: "The deck's results table has a horizontal
     scrollbar. We can remove it by eliminating the Player column" — the table has no Player column, and no Result
     column either (Claude: the headline says who and how it ended), so five columns fit a phone.
+  - *2026-11-21, Klaus:* "In the game settings I would like to enter the seed for the game to repeat one. Use the
+    onscreen keyboard for this entry. Entering a seed will end the current game, please ask for confirmation." The
+    board's settings window (the gear) shows **Deal number** during a game of FreeCell: a tap opens the board's number
+    pad (1–999999); another number asks "Play deal #N? The game that is on ends without a result", and then deals it,
+    with moves, time, undos and hints from zero. A number the solver finds no way through is refused in words (the
+    game deals only what can be solved). For that, a game's `settings()` also gets the board's `confirm(title, text,
+    okLabel)`. Check: `scripts/e2e/freecell.py`, `tests/freecell.test.ts`.

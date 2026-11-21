@@ -6,6 +6,7 @@
   - Hint lights a card and its place; dragging the card there makes the move. Following the hints solves the deal:
     cards go home by themselves, and the game ends with "Solved";
   - turned to face north the board is upside down and dragging still follows the pointer;
+  - a deal's number entered in the board's settings (number pad, asked first) deals that deal;
   - Awards and Results shows what was earned (a game for one keeps its awards).
 
 A Table Host of its own (port 8154).
@@ -93,6 +94,27 @@ try:
         back = next(c for c in state()["cards"] if c["card"] == top["card"])
         assert abs(back["x"] - top["x"]) < 2 and abs(back["y"] - top["y"]) < 2, "Undo did not put the card back"
         assert board.locator(".fc-btn[data-do=undo]").is_disabled(), "Undo is offered with nothing to take back"
+
+        # Another deal by its number, from the board's settings (the gear): typed on the number pad, and asked first,
+        # since the game that is on ends. Cancel keeps the game; the deal's number shows on the board.
+        first = board.inner_text(".fc-deal")
+        def enter_deal(n, answer):
+            board.click("#settings-button")
+            board.click(".overlay.settings button.pad-value")
+            board.click(".number-pad button[data-clear]")
+            for ch in str(n):
+                board.click(f".number-pad .keys button[data-key='{ch}']")
+            board.click(".number-pad button[data-enter]")
+            board.wait_for_selector(f".dialog-backdrop .dialog >> text=Play deal #{n}?")
+            board.click(f".dialog-backdrop button[data-x={answer}]")
+            board.click(".overlay.settings [data-close-overlay]")
+        enter_deal(1, "no")
+        board.wait_for_timeout(400)
+        assert board.inner_text(".fc-deal") == first, "Cancel started another deal"
+        enter_deal(1, "yes")
+        wait(lambda: board.inner_text(".fc-deal") == "#1", 5, "deal 1 to be dealt")
+        settle()
+        assert state()["moves"] == 0 and state()["home"].startswith("0")
 
         def follow_hint(turned=False):
             """Ask for a hint and make the hinted move by dragging the card to its place."""

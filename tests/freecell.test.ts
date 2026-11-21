@@ -195,6 +195,25 @@ describe("FreeCell: the game", () => {
     expect(expectReplay(game, rt)).toBe(true);
   });
 
+  it("another deal by its number ends the game that is on and deals that one; a number without a way is refused", () => {
+    const { rt } = start(game, 1, {}, 7);
+    const first = view(rt).deal;
+    send(rt, "hint");
+    send(rt, "move", view(rt).hint);
+    const want = [11, 12, 13, 14, 15].find((n) => n !== first && solve(deal(n), 20000))!;
+    expect(send(rt, "deal", { n: want })).toEqual({ ok: true });
+    const v = view(rt);
+    expect([v.deal, v.moves, v.hints, v.canUndo, v.firstAt]).toEqual([want, 0, 0, false, null]);
+    expect(v.cols).toEqual(deal(want).cols);
+    expect(rt.summary).toBeNull();
+    expect(send(rt, "deal", { n: want }).reason).toMatch(/already/);
+    expect(send(rt, "deal", { n: 0 }).reason).toMatch(/between 1 and 999999/);
+    const none = [3, 8, 28, 55].find((n) => !solve(deal(n), 20000))!; // (deals the solver finds no way through)
+    const before = JSON.stringify(rt.state);
+    expect(send(rt, "deal", { n: none }).reason).toMatch(/No way through deal/);
+    expect(JSON.stringify(rt.state)).toBe(before);
+  });
+
   it("the phone and the board see the same open cards", () => {
     const { rt } = start(game, 1, {}, 7);
     expect(game.def.view(rt.state, 0)).toEqual(game.def.boardView!(rt.state));

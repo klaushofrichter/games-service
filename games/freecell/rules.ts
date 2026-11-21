@@ -204,6 +204,7 @@ function describeStep(step: StepInfo<State>): StepDescription | null {
       ...(done.autoCards.length ? { steps: [{ text: `${done.autoCards.map(cardName).join(", ")} to the foundations`, auto: true }] } : {}),
     };
   }
+  if (name === "deal") return { text: `starts deal ${after.deal}`, columns };
   const text: Record<string, string> = { undo: "takes a move back", restart: "starts the deal again", hint: after.hint ? `asks for a hint: ${cardName(firstCard(after.pos, after.hint))} to ${place(after.hint.to)}` : "asks for a hint: no way found from here", giveUp: "gives up" };
   return { text: text[name] ?? name, columns };
 }
@@ -258,6 +259,15 @@ export default defineGame<State>({
         const plan = state.plan?.length ? state.plan : solve(state.pos, HINT_BUDGET);
         if (!plan || !plan.length) return { state: { ...state, hint: null, noWay: true, plan: null }, events: [{ name: "noWay" }] };
         return { state: { ...state, hint: plan[0]!, noWay: false, plan, hints: state.hints + 1 }, events: [{ name: "hint", data: plan[0] }] };
+      }
+      case "deal": {
+        // Another deal by its number (to play one again): the game that is on ends without a result.
+        const n = int(data.n);
+        if (Number.isNaN(n) || n < 1 || n > MAX_DEAL) return { reject: `A deal's number is between 1 and ${MAX_DEAL}` };
+        if (n === state.deal) return { reject: `This is deal ${n} already; Start again deals it anew` };
+        const plan = solve(deal(n), DEAL_BUDGET);
+        if (!plan) return { reject: `No way through deal ${n} was found, so it is not played here. Try another number.` };
+        return { state: { ...fresh({ seat: state.seat, name: state.name, deal: n, passed: 0 }, plan), lastAt: ctx.now() }, events: [{ name: "dealt", data: { deal: n } }] };
       }
       case "giveUp":
         return { state: { ...state, over: "gaveUp", hint: null, lastAt: ctx.now() }, events: [{ name: "gaveUp" }] };
