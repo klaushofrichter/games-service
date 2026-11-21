@@ -223,16 +223,27 @@ xfconf-query -c xfce4-desktop -n -t bool -p /desktop-icons/single-click -s true
 ```
 
 **The board full screen, without the browser's frame** (a kiosk). Let the icon run a small script instead: the table
-without its own browser window, then the board in Chrome's kiosk mode with a profile of its own. Save it as
+without a browser window of its own, then the board in Chrome's kiosk mode with a profile of its own. Save it as
 `~/apps/game-table-start.sh`, make it executable, and put its path in the icon's `Exec=`:
 
 ```sh
-#!/bin/sh
-~/apps/game-table/game-table --no-open &
+#!/bin/bash
+PROFILE="$HOME/.local/share/game-table/kiosk-browser"
+~/apps/game-table/game-table --no-open --repos all & TABLE=$!
 until curl -fs http://localhost:8080/health > /dev/null; do sleep 1; done
-google-chrome --user-data-dir="$HOME/.config/game-table-board" --kiosk --no-first-run --noerrdialogs \
-  --autoplay-policy=no-user-gesture-required http://localhost:8080/board/
+# (--password-store=basic: with automatic login the keyring stays locked, and Chrome would ask for its password)
+google-chrome --user-data-dir="$PROFILE" --kiosk --no-first-run --noerrdialogs --password-store=basic \
+  --autoplay-policy=no-user-gesture-required http://localhost:8080/board/ & CHROME=$!
+# The two belong together: when either ends, the other does too.
+wait -n "$TABLE" "$CHROME"
+kill "$TABLE" "$CHROME" 2> /dev/null
+pkill -f -- "--user-data-dir=$PROFILE" 2> /dev/null
 ```
+
+A kiosk browser has no way out of its own: Esc does nothing, and a page cannot close it. The way out is on the board:
+**Advanced › This computer › Quit the table…** stops Game Table, and the script then closes the browser, back to the
+desktop and its icon. With a keyboard, Alt+F4 closes the browser, and the script stops the table. `--repos all`
+brings every game repository of `klaushofrichter` your sign-in can read; name them instead if you prefer.
 
 **No lock, no blank screen, no sleep.**
 
