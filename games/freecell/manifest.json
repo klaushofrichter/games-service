@@ -1,0 +1,46 @@
+{
+  "id": "freecell",
+  "name": "FreeCell",
+  "version": "2026.11.20.1",
+  "sdk": "^0.1",
+  "description": "Solitaire for one, played on the board: sort all 52 cards onto the foundations, with four free cells to help. Every deal can be solved.",
+  "players": {
+    "min": 1,
+    "max": 1
+  },
+  "turnModel": "simultaneous",
+  "seatLayouts": [
+    1
+  ],
+  "edges": [
+    "north",
+    "south"
+  ],
+  "localSeat": "south",
+  "dynamicPlayers": false,
+  "settings": [],
+  "ai": {
+    "supported": false,
+    "options": []
+  },
+  "simulation": {
+    "supported": false,
+    "headless": true
+  },
+  "remoteBoardControl": true,
+  "boardIntents": [
+    "move",
+    "tap",
+    "undo",
+    "restart",
+    "hint",
+    "giveUp"
+  ],
+  "viewer": {
+    "columns": [
+      { "key": "home", "label": "Cards home" },
+      { "key": "moves", "label": "Moves" }
+    ]
+  },
+  "permissions": []
+}

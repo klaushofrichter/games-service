@@ -75,6 +75,7 @@ board moves there; the table's own window says "The board moved to another scree
 | `games/pachisi` | Ludo-style race with dice and captures, 2–4 players, two AI levels |
 | `games/holdem` | Fixed-limit Texas Hold'em, 2–8 players, private hole cards, side pots, two AI styles |
 | `games/coin-flip` | Guess heads or tails, 1–8 players, simultaneous, AI, players can join mid-game, optional time limit, per-player statistics |
+| `games/freecell` | FreeCell solitaire for one player, played on the board by drag and drop or tap; only deals that can be solved, hints, undo |
 | `games/quartet` | Test game (hidden unless `SHOW_TEST_GAMES=1`): exactly 4 humans, no AI, sequential turns, ends if a player leaves |
 | `games/card-sling` | Test game for the sling (hidden unless `SHOW_TEST_GAMES=1`): cards pushed off the phone fly onto a pile, 1–8 players, AI (D-189) |
 | `apps/cloud/src/game-repos.ts`, `apps/table-host/src/extra-games.ts`, `packages/protocol/src/bundle.ts` | Extra-game repositories: fetching and packing on the service, installing on tables, the bundle format |

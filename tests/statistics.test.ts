@@ -86,6 +86,14 @@ describe("withStatistics", () => {
   });
 });
 
+describe("a game for one", () => {
+  it("keeps the awards its player earned (D-308): there is nobody to stand out from", () => {
+    const solo: LogRecord[] = [{ t: "start", at: 0, gameId: "g", version: "1", seed: 1, settings: {}, seats: [seat(0, "Ann")], aiOptions: {}, simulation: false }];
+    const out = withStatistics({ text: "t", highlights: {}, awards: [{ ...A, id: "earned", seats: [0] }, { ...A, id: "none", seats: [] }] }, solo)!;
+    expect(out.awards!.map((a) => [a.id, a.seats])).toEqual([["earned", [0]]]);
+  });
+});
+
 describe("Coin Flip awards", () => {
   let game: Awaited<ReturnType<typeof loadGame>>;
   beforeAll(async () => {

@@ -1,0 +1,54 @@
+/* FreeCell on the board (1920 × 1080), in the platform's look: felt, brass, ink. The free cells and foundations on
+   top, eight columns below; the buttons left and the numbers right, in the middle of the sides, clear of the platform's
+   buttons in the corners whichever way the board is turned; the bottom edge left to the seat plate. */
+.fc-root { position: absolute; inset: 0; color: var(--ink); font: 20px var(--text); -webkit-user-select: none; user-select: none; }
+/* The player sits at the north edge: turn the board to them. */
+.fc-north { transform: rotate(180deg); }
+.fc-slots, .fc-cards { position: absolute; inset: 0; }
+.fc-cards { touch-action: none; }
+
+.fc-slot { position: absolute; width: 140px; height: 196px; border-radius: 14px; border: 2px dashed rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.03); box-sizing: border-box; }
+.fc-found { display: grid; place-items: center; font-size: 84px; line-height: 1; color: rgba(255, 255, 255, 0.14); border-style: solid; border-color: rgba(214, 169, 74, 0.35); }
+.fc-found.red { color: rgba(210, 87, 74, 0.3); }
+.fc-col { border-color: rgba(255, 255, 255, 0.08); background: none; }
+.fc-label { position: absolute; font-size: 15px; font-weight: 700; letter-spacing: 0.22em; text-transform: uppercase; color: var(--brass); }
+
+.fc-card { position: absolute; left: 0; top: 0; width: 140px; height: 196px; box-sizing: border-box; border-radius: 14px;
+  background: linear-gradient(160deg, #fffdf7, #efe8d6); color: #1b1a17; border: 1px solid rgba(0, 0, 0, 0.35);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.35); font-family: var(--display); font-weight: 700;
+  transition: transform 0.23s cubic-bezier(0.2, 0.7, 0.2, 1); will-change: transform; touch-action: none; }
+.fc-card.red { color: #b3261e; }
+.fc-card.fc-movable { cursor: grab; }
+.fc-ix { position: absolute; left: 10px; top: 5px; font-size: 32px; line-height: 1; display: flex; align-items: baseline; gap: 4px; pointer-events: none; }
+.fc-ix i { font-style: normal; font-size: 28px; }
+.fc-pip { position: absolute; left: 0; right: 0; top: 62px; text-align: center; font-size: 96px; line-height: 1; pointer-events: none; }
+/* in the hand: no slide, above everything */
+.fc-card.fc-drag { transition: none; cursor: grabbing; box-shadow: 0 18px 34px rgba(0, 0, 0, 0.55); }
+/* where the cards in the hand may go, and the place they are over */
+.fc-target { box-shadow: 0 0 0 4px rgba(95, 191, 143, 0.75); }
+.fc-slot.fc-target { border-color: transparent; }
+.fc-over { box-shadow: 0 0 0 6px var(--jade), 0 0 26px var(--jade); }
+/* the hint: the card to move and where to */
+.fc-hint { box-shadow: 0 0 0 6px var(--brass), 0 0 30px var(--brass); animation: fc-hint 1.1s ease-in-out 3; }
+.fc-slot.fc-hint { border-color: transparent; }
+@keyframes fc-hint { 50% { box-shadow: 0 0 0 6px var(--brass), 0 0 6px var(--brass); } }
+
+.fc-side { position: absolute; top: 330px; width: 230px; display: flex; flex-direction: column; gap: 16px; }
+.fc-buttons { left: 40px; }
+.fc-buttons[hidden] { display: none; }
+.fc-status { right: 40px; }
+.fc-btn { min-height: 72px; padding: 0 20px; font: 600 24px var(--text); border-radius: 999px; border: 2px solid var(--felt-line);
+  background: rgba(255, 255, 255, 0.04); color: var(--ink); touch-action: manipulation; }
+.fc-btn:disabled { opacity: 0.35; }
+.fc-btn.fc-ask { background: var(--brass); color: #1b1407; border-color: var(--brass); }
+.fc-eyebrow { font-size: 15px; font-weight: 700; letter-spacing: 0.22em; text-transform: uppercase; color: var(--brass); }
+.fc-stat { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--felt-line); }
+.fc-stat span { color: var(--ink-soft); font-size: 20px; }
+.fc-stat b { font-family: var(--display); font-size: 30px; font-weight: 600; }
+
+/* What the game has to say: the hint in words, no card can move, solved. Over the columns' lower end. */
+.fc-note { position: absolute; left: 50%; top: 852px; transform: translateX(-50%); max-width: 1200px; padding: 14px 30px; border-radius: 999px;
+  background: rgba(8, 22, 19, 0.92); border: 2px solid var(--brass-deep); font-size: 26px; white-space: nowrap; z-index: 1000; pointer-events: none; }
+.fc-note[hidden] { display: none; }
+.fc-note.fc-won { font-family: var(--display); font-size: 40px; border-color: var(--brass); color: var(--brass); }

@@ -362,7 +362,7 @@ describe("game selection gating", () => {
   });
 
   it("with no game chosen the seat buttons offer every layout some visible game supports; with one, only its layouts", async () => {
-    expect((await t.ok("GET", "/state")).layouts).toEqual([2, 4, 6, 8]); // the test games include 8
+    expect((await t.ok("GET", "/state")).layouts).toEqual([1, 2, 4, 6, 8]); // FreeCell is for one; the test games include 8
     await t.joinDeck("A");
     await t.ok("POST", "/game/select", { gameId: "roulette" });
     expect((await t.ok("GET", "/state")).layouts).toEqual([2, 4, 6]);
