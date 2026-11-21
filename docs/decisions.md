@@ -2766,3 +2766,8 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
     the website's pictures cannot drift from the game's cards.
   *Implementation (Claude):* `home.html` (`#cards`, `.cards-stage`), `apps/cloud/public/site/freecell-cards-*.webp`.
   Check: `scripts/e2e/website.py`.
+  - *2026-11-21, Klaus:* "Do the card transitions on a timer of perhaps 3 seconds when the decks of cards are in
+    view. Start with the flowers, and remember where you have been in a session, so when someone comes again to the
+    section, other decks are shown." Every 3 s (was 3.8), Botanical first; where the round stands is kept for the
+    visit (`sessionStorage`, `gametable.site.cards`), so coming back to the section, by scrolling or after loading
+    the page anew, goes on to the next deck at once instead of starting over.

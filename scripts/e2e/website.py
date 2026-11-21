@@ -97,20 +97,34 @@ try:
                 page.wait_for_selector("#mini-deck.on")
                 page.locator("#demo").screenshot(path=os.path.join(OUT, "website-lobby.png"))
                 # The demo game (D-185): Mexican Train, its board and what it customises.
-                # FreeCell's card designs (D-311): six pictures, one on at a time; the round moves on by itself, and a
-                # tap on a name shows that design and stops it.
+                # FreeCell's card designs (D-311): six pictures, one on at a time, the flowers first; the round moves on
+                # by itself every 3 s while they are in view, and stands still while they are not. Coming back to the
+                # section shows another deck at once. A tap on a name shows that design and stops the round.
                 page.locator("#cards").scroll_into_view_if_needed()
-                page.wait_for_function("document.querySelector('#cards-stage img').complete && document.querySelector('#cards-stage img').naturalWidth > 0")
+                page.wait_for_function("document.querySelector('#cards-stage img.on').complete && document.querySelector('#cards-stage img.on').naturalWidth > 0")
                 assert page.locator("#cards-stage img").count() == 6 and page.locator("#cards-pick button").count() == 6
-                assert page.locator("#cards-stage img.on").count() == 1
-                first = page.locator("#cards-pick button.on").inner_text()
-                wait(lambda: page.locator("#cards-pick button.on").inner_text() != first, 8, "the card designs to move on by themselves")
+                on = lambda: page.locator("#cards-pick button.on").inner_text()
+                assert page.locator("#cards-stage img.on").count() == 1 and on() == "Botanical", on()
+                wait(lambda: on() == "Linea", 6, "the card designs to move on by themselves")
+                page.evaluate("window.scrollTo(0, 0)")
+                page.wait_for_timeout(600)
+                away = on()
+                page.wait_for_timeout(3600)
+                assert on() == away, "the round went on while the decks were out of view"
+                page.locator("#cards").scroll_into_view_if_needed()
+                wait(lambda: on() != away, 2, "another deck on coming back to the section")
                 page.click("#cards-pick button >> text=Botanical")
                 assert page.get_attribute("#cards-stage img.on", "data-design") == "Botanical"
                 page.wait_for_timeout(4500)
                 assert page.get_attribute("#cards-stage img.on", "data-design") == "Botanical", "the round went on after a design was chosen"
                 page.wait_for_function("document.querySelector('#cards-stage img.on').complete && document.querySelector('#cards-stage img.on').naturalWidth > 0")
                 page.locator("#cards").screenshot(path=os.path.join(OUT, "website-cards.png"))
+                # The page loaded anew in the same visit goes on from there: not the flowers again.
+                page.click("#cards-pick button >> text=Speakeasy")
+                page.reload()
+                page.locator("#cards").scroll_into_view_if_needed()
+                wait(lambda: page.locator("#cards-pick button.on").count() == 1 and on() != "Botanical", 5, "the round to go on after a reload")
+                assert on() in ("Speakeasy", "Classic"), on()
                 page.locator("#showcase").scroll_into_view_if_needed()
                 page.wait_for_function("document.querySelector('#showcase img').complete && document.querySelector('#showcase img').naturalWidth > 0")
                 assert page.locator("#showcase .show-list li").count() == 6
