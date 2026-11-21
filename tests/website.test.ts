@@ -63,7 +63,7 @@ describe("the public website (D-176)", () => {
     await start();
     const html = await readFile(new URL("../apps/cloud/public/home.html", import.meta.url), "utf8");
     const used = new Set([...html.matchAll(/\/site\/([a-z0-9-]+\.(?:webp|svg))/g)].map((m) => m[1]));
-    for (const g of ["holdem", "roulette", "pachisi", "coin-flip", "chess", "liars-dice", "backgammon", "mexican-train"]) used.add(`${g}.webp`);
+    for (const g of ["holdem", "roulette", "pachisi", "coin-flip", "freecell", "chess", "liars-dice", "backgammon", "mexican-train"]) used.add(`${g}.webp`);
     const files = new Set(await readdir(new URL("../apps/cloud/public/site/", import.meta.url)));
     for (const f of used) {
       expect(files.has(f), f).toBe(true);

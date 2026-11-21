@@ -33,6 +33,9 @@ function winSound(ctx, t, out) {
   [1047, 1319, 1568, 2093].forEach((f, i) => ping(ctx, out, t + i * 0.13, { freq: f, decay: 0.5, gain: 0.25 }));
 }
 
+/** The game on this board, for the settings window (which is the platform's, outside `mount`). */
+let live = null;
+
 export function mount(root, ctx) {
   useStyles("/games/freecell/board.css");
   const box = html(`<div class="fc-root">
@@ -319,6 +322,7 @@ export function mount(root, ctx) {
       const first = !view;
       view = v;
       info = i;
+      live = { view: v, act: (name, payload) => ctx.act(v.seat, name, payload) };
       received = performance.now();
       box.classList.toggle("fc-north", north());
       seatPlates(root, info).classList.toggle("fc-north", north());
@@ -353,9 +357,33 @@ export function mount(root, ctx) {
       return wait > 0 ? new Promise((r) => setTimeout(r, wait)) : Promise.resolve();
     },
     destroy() {
+      live = null;
       clearInterval(ticking);
       clearTimeout(confirm?.timer);
       box.remove();
     },
   };
+}
+
+/**
+ * The board's settings window during a game: the deal's number, to play a deal again. Typed on the board's number pad;
+ * another number ends the game that is on, so the board asks first.
+ */
+export function settings({ info, confirm }) {
+  const v = live?.view;
+  if (!v || v.over || !info?.controlSeats?.includes(v.seat)) return v ? [{ type: "text", label: "Deal number", value: `#${v.deal}` }] : [];
+  return [
+    {
+      type: "number",
+      label: "Deal number",
+      hint: "Enter a number to play that deal. The game that is on ends.",
+      value: v.deal,
+      min: 1,
+      max: 999999,
+      onChange: async (n) => {
+        if (!live || n === live.view.deal) return;
+        if (await confirm(`Play deal #${n}?`, `The game that is on (deal #${live.view.deal}) ends without a result.`, `Play deal #${n}`)) live?.act("deal", { n });
+      },
+    },
+  ];
 }

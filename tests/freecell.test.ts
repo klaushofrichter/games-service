@@ -115,7 +115,8 @@ describe("FreeCell: the game", () => {
     const ids = rt.summary!.awards!.map((a) => a.id);
     expect(ids).toEqual(expect.arrayContaining(["solved", "no-undo", "good-advice"]));
     expect(ids).not.toContain("no-hint");
-    expect(rt.summary!.table!.rows[0]![1]).toBe("Solved");
+    expect(rt.summary!.table).toMatchObject({ columns: ["Cards home", "Moves", "Undos", "Hints", "Time"] });
+    expect(rt.summary!.table!.rows[0]![0]).toBe(52);
     expect(expectReplay(game, rt)).toBe(true);
   });
 
@@ -192,6 +193,25 @@ describe("FreeCell: the game", () => {
     expect(rt.summary!.awards!.map((a) => a.id)).not.toContain("solved");
     expect(send(rt, "hint").ok).toBe(false);
     expect(expectReplay(game, rt)).toBe(true);
+  });
+
+  it("another deal by its number ends the game that is on and deals that one; a number without a way is refused", () => {
+    const { rt } = start(game, 1, {}, 7);
+    const first = view(rt).deal;
+    send(rt, "hint");
+    send(rt, "move", view(rt).hint);
+    const want = [11, 12, 13, 14, 15].find((n) => n !== first && solve(deal(n), 20000))!;
+    expect(send(rt, "deal", { n: want })).toEqual({ ok: true });
+    const v = view(rt);
+    expect([v.deal, v.moves, v.hints, v.canUndo, v.firstAt]).toEqual([want, 0, 0, false, null]);
+    expect(v.cols).toEqual(deal(want).cols);
+    expect(rt.summary).toBeNull();
+    expect(send(rt, "deal", { n: want }).reason).toMatch(/already/);
+    expect(send(rt, "deal", { n: 0 }).reason).toMatch(/between 1 and 999999/);
+    const none = [3, 8, 28, 55].find((n) => !solve(deal(n), 20000))!; // (deals the solver finds no way through)
+    const before = JSON.stringify(rt.state);
+    expect(send(rt, "deal", { n: none }).reason).toMatch(/No way through deal/);
+    expect(JSON.stringify(rt.state)).toBe(before);
   });
 
   it("the phone and the board see the same open cards", () => {
