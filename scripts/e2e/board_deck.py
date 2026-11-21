@@ -55,7 +55,7 @@ try:
         tile = board.locator("button.tile").first.bounding_box()
         page.touchscreen.tap(tile["x"] + tile["width"] / 2, tile["y"] + tile["height"] / 2)
         wait(lambda: page.evaluate("() => document.fullscreenElement === document.documentElement"), 5, "a finger's tap to bring fullscreen back")
-        assert board.locator("#fullscreen-hint").count() == 0, "the hint stays in fullscreen"
+        board.locator("#fullscreen-hint").wait_for(state="detached", timeout=5000)  # (it goes on fullscreenchange, a moment later)
         page.wait_for_timeout(300)
         assert board.locator("#overlay-root > *").count() == 0, "the tap that returned to fullscreen also chose a game"
         deck_cursor = lambda: page.evaluate("() => { const d = document.getElementById('deck').contentDocument; return getComputedStyle(d.body).cursor; }")
@@ -173,7 +173,8 @@ try:
         page.wait_for_selector("#fullscreen-hint")
         page.keyboard.press("Space")
         wait(lambda: page.evaluate("() => document.fullscreenElement === document.documentElement"), 5, "a key to bring fullscreen back")
-        assert page.locator("#fullscreen-hint").count() == 0
+        # (the hint goes on the browser's fullscreenchange event, a moment after the page is fullscreen)
+        page.wait_for_selector("#fullscreen-hint", state="detached", timeout=5000)
         assert players()["Dev"]["location"] == "local"
         b.close()
 finally:
