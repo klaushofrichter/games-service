@@ -8,6 +8,7 @@ history.
 
 ## [Unreleased]
 
+- Packages: `--repos all` takes every game repository of klaushofrichter the GitHub sign-in can read (named …-game or …-games), so a new one needs no naming (D-314). In the packages once they are built again.
 - Website: the developers' part is a page of its own, /build, reached from the top bar; the landing page keeps a short way in and is about 30 % shorter. Old links to parts that moved are taken along (D-312).
 - Website: pages are sent compressed (the landing page's text was 150 KB, now about 40 KB on the wire) (D-312).
 - Website: FreeCell's card designs change every 3 seconds while in view, start with the flowers, and go on from where they were when you come back to the section (D-311).
