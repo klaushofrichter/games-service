@@ -12,6 +12,38 @@ from common import errors, start_cloud, wait, watch
 OUT = sys.argv[1] if len(sys.argv) > 1 else "e2e-out"
 os.makedirs(OUT, exist_ok=True)
 BASE = "http://127.0.0.1:8189"
+
+# Every link a visitor can click has a place to go (D-312): asked of the page as the browser has it, so links the
+# script writes count too. A link within the website must answer, and its "#place" must exist on the page it leads
+# to; "/admin" and the sign-in may send on to another page. Links to other websites are not followed here (the
+# network is not this check's to judge): scripts/check-site-links.mjs asks those.
+LINKS = """async () => {
+  const bad = [], pages = new Map();
+  const load = async (path) => { if (!pages.has(path)) { const r = await fetch(path, { redirect: 'manual' });
+      const ok = r.ok || r.type === 'opaqueredirect';
+      pages.set(path, { ok, status: r.status, doc: r.ok && (r.headers.get('content-type') || '').includes('html') ? new DOMParser().parseFromString(await r.text(), 'text/html') : null }); }
+    return pages.get(path); };
+  const seen = new Set();
+  for (const a of document.querySelectorAll('a[href]')) {
+    const href = a.getAttribute('href');
+    if (seen.has(href)) continue;
+    seen.add(href);
+    if (/^mailto:/.test(href)) continue;
+    const u = new URL(href, location.href);
+    if (u.origin !== location.origin) { if (!/^https:$/.test(u.protocol)) bad.push(href + ': not https'); continue; }
+    const same = u.pathname === location.pathname;
+    const page = same ? { ok: true, doc: document } : await load(u.pathname);
+    if (!page.ok) { bad.push(href + ': answers ' + page.status); continue; }
+    const place = decodeURIComponent(u.hash.slice(1));
+    if (place && page.doc && !page.doc.getElementById(place)) bad.push(href + ': no place "' + place + '" on ' + u.pathname);
+  }
+  return { links: seen.size, bad }; }"""
+
+
+def check_links(page, what):
+    r = page.evaluate(LINKS)
+    assert r["links"] > 0, f"{what}: no links found"
+    assert not r["bad"], f"{what}: links without a place to go: {r['bad']}"
 proc = start_cloud(8189, ADMIN_TOKEN="w" * 20, PUBLIC_URL=BASE, APP_VERSION="2026.10.21.9")
 
 try:
@@ -37,6 +69,7 @@ try:
             assert wide <= 0, f"the developers' page scrolls sideways by {wide}px at {width}px"
             hidden = page.evaluate("[...document.querySelectorAll('.rv')].filter((e) => getComputedStyle(e).opacity === '0').length")
             assert hidden == 0, f"build: {hidden} elements never revealed at {width}px"
+            check_links(page, f"/build at {width}px")
             page.screenshot(path=os.path.join(OUT, f"website-build-{width}.png"))
             page.close()
         for width, height in [(1440, 900), (390, 844)]:
@@ -55,6 +88,7 @@ try:
             assert not broken, f"images that did not load: {broken}"
             wide = page.evaluate("document.documentElement.scrollWidth - innerWidth")
             assert wide <= 0, f"the page scrolls sideways by {wide}px at {width}px"
+            check_links(page, f"the landing page at {width}px")
             hidden = page.evaluate("[...document.querySelectorAll('.rv')].filter((e) => getComputedStyle(e).opacity === '0').length")
             assert hidden == 0, f"{hidden} elements never revealed at {width}px"
             # The PREVIEW / DRAFT sash (D-177) stays in the top right corner while one scrolls, and its band covers
@@ -204,6 +238,7 @@ try:
                 foot.click()
                 page.wait_for_url("**/terms")
                 assert page.inner_text("h1") == "Terms of service"
+                check_links(page, "the terms")
                 assert page.locator("a[href='mailto:klaus@skylar.technology']").count() >= 1
                 page.screenshot(path=os.path.join(OUT, "website-terms.png"), full_page=True)
                 page.go_back()
