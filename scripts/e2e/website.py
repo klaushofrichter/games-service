@@ -17,6 +17,28 @@ proc = start_cloud(8189, ADMIN_TOKEN="w" * 20, PUBLIC_URL=BASE, APP_VERSION="202
 try:
     with sync_playwright() as p:
         b = p.chromium.launch()
+        # The developers' page (D-312), at both widths: every picture loads, nothing sticks out sideways, every part
+        # shows itself, and the page's text comes compressed.
+        for width, height in [(1440, 900), (390, 844)]:
+            page = b.new_page(viewport={"width": width, "height": height})
+            watch(page, f"build {width}")
+            r = page.goto(BASE + "/build")
+            assert r.headers.get("content-encoding") == "gzip", f"the page comes uncompressed: {r.headers.get('content-encoding')}"
+            page.wait_for_selector("#build h2")
+            page.evaluate("document.documentElement.style.scrollBehavior = 'auto'")
+            assert page.locator("text=2026.10.21.9").count() == 1, "the version label"
+            for y in range(0, page.evaluate("document.body.scrollHeight"), 500):
+                page.evaluate(f"window.scrollTo(0, {y})")
+                page.wait_for_timeout(120)
+            page.wait_for_timeout(800)
+            broken = page.evaluate("[...document.images].filter((i) => i.complete && i.naturalWidth === 0 && i.getAttribute('src')).map((i) => i.src)")
+            assert not broken, f"build: images that did not load: {broken}"
+            wide = page.evaluate("document.documentElement.scrollWidth - innerWidth")
+            assert wide <= 0, f"the developers' page scrolls sideways by {wide}px at {width}px"
+            hidden = page.evaluate("[...document.querySelectorAll('.rv')].filter((e) => getComputedStyle(e).opacity === '0').length")
+            assert hidden == 0, f"build: {hidden} elements never revealed at {width}px"
+            page.screenshot(path=os.path.join(OUT, f"website-build-{width}.png"))
+            page.close()
         for width, height in [(1440, 900), (390, 844)]:
             page = b.new_page(viewport={"width": width, "height": height})
             watch(page, f"website {width}")
@@ -96,6 +118,20 @@ try:
                 page.click(".step[data-i='6']")
                 page.wait_for_selector("#mini-deck.on")
                 page.locator("#demo").screenshot(path=os.path.join(OUT, "website-lobby.png"))
+                # The developers' part is a page of its own (D-312): the landing page keeps a short way in, the top
+                # bar's "Build a game" leads there, and an old link to a part that moved is taken along.
+                assert page.locator("#build.build-teaser .teaser-grid a").count() == 3 and page.locator("#showcase, #debug, #cards").count() == 0
+                old = b.new_page(viewport={"width": width, "height": height})
+                old.goto(BASE + "/#debug")
+                old.wait_for_url("**/build#debug")
+                old.wait_for_selector("#debug")
+                old.close()
+                page.click("nav.main a >> text=Build a game")
+                page.wait_for_url("**/build")
+                page.wait_for_selector("#build h2")
+                page.evaluate("document.documentElement.style.scrollBehavior = 'auto'")
+                assert page.title().startswith("Build a game") and page.locator("#hero, #games-grid, #demo").count() == 0
+                assert page.get_attribute("nav.main a.on", "href") == "/build" and page.get_attribute("nav.main a >> text=Games", "href") == "/#games"
                 # The demo game (D-185): Mexican Train, its board and what it customises.
                 # FreeCell's card designs (D-311): six pictures, one on at a time, the flowers first; the round moves on
                 # by itself every 3 s while they are in view, and stands still while they are not. Coming back to the
@@ -142,13 +178,21 @@ try:
                 page.wait_for_function("[...document.querySelectorAll('#sling img')].every((i) => i.complete && i.naturalWidth > 0)")
                 ph, bd = (page.locator(f"#sling {c}").bounding_box() for c in (".sl-phone", ".sl-board"))
                 assert ph["x"] + ph["width"] < bd["x"] and abs((ph["y"] + ph["height"] / 2) - (bd["y"] + bd["height"] / 2)) < 4, "the phone beside the board"
-                assert page.locator("text=An iPad makes a small game board").count() == 1, "the iPad as a board"
                 # The schematic above them: the card on the phone and on the board move, and the three steps take turns.
                 assert page.locator("#sling .slx-steps li").count() == 3
                 moving = page.evaluate("document.getAnimations().filter((a) => a.animationName?.startsWith('slx-')).length")
                 assert moving >= 6, f"the sling schematic does not move ({moving} animations)"
                 page.wait_for_timeout(1300)
                 page.locator("#sling").screenshot(path=os.path.join(OUT, "website-sling.png"))
+                page.locator("#debug").scroll_into_view_if_needed()
+                page.wait_for_timeout(600)
+                page.screenshot(path=os.path.join(OUT, "website-debug.png"))
+                # back on the landing page, by the top bar
+                page.click("nav.main a >> text=The lobby")
+                page.wait_for_url("**/#lobby")
+                page.wait_for_selector("#demo")
+                page.evaluate("document.documentElement.style.scrollBehavior = 'auto'")
+                assert page.locator("text=An iPad makes a small game board").count() == 1, "the iPad as a board"
                 for sid in ["build", "install", "table", "service", "about"]:
                     page.locator(f"#{sid}").scroll_into_view_if_needed()
                     page.wait_for_timeout(600)

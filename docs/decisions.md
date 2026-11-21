@@ -2771,3 +2771,23 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
     section, other decks are shown." Every 3 s (was 3.8), Botanical first; where the round stands is kept for the
     visit (`sessionStorage`, `gametable.site.cards`), so coming back to the section, by scrolling or after loading
     the page anew, goes on to the next deck at once instead of starting over.
+- **D-312 · 2026-11-21 · Klaus** — **The website's developers' part is a page of its own, `/build`.** "The landing page
+  gets a bit full and heavy … Yes, separate the developer section to a second page. I think we have navigation on the
+  top." Measured first: the page loaded fast (first content in 0.4–0.9 s, no layout shift, smooth scrolling), but was
+  25,600 px tall on a desktop and 41,900 px on a phone. So the split is for reading, not for speed.
+  - **`/build`** holds everything under *For game developers*: the one-prompt story, the three steps, the demo game,
+    the sling, FM-1 Synth, GE150 Pro, FreeCell's card designs, *Test and debug*, the documents. Its own title and
+    description. **The landing page** keeps a short way in at `#build` (the heading, three cards, a button) and is
+    about 30 % shorter (17,900 px and 28,700 px).
+  - **The top bar** is the same on both: *Build a game* leads to `/build` and is marked there; the other entries lead
+    to the landing page's sections from either page. The foot too.
+  - **Old links** to a part that moved (`/#debug`, `/#showcase`, `/#cards`, …) are taken to `/build` with their
+    anchor; `/#build` shows the way in.
+  - **One source file.** Both pages are cut from `home.html` by the service (`sitePage()`): comments mark what is the
+    landing page's only and what the developers' page's only; the styles, the top bar, the foot and the script are
+    shared, and each part of the script looks for its own elements first. No second copy of the look to keep in step.
+  - **With it:** the service sends its pages' text compressed (gzip) to browsers that take it: the landing page was
+    150 KB of text sent as it is, about 40 KB compressed. And the card designs' first picture, far down the page, is
+    no longer loaded with the first screen. The hero's count of games is ten (FreeCell).
+  *Implementation (Claude):* `home.html`, `sitePage()` and `sendHtml()` in `apps/cloud/src/server.ts`. Checks:
+  `tests/website.test.ts`, `scripts/e2e/website.py` (both pages at two widths, the top bar both ways, an old link).

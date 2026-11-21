@@ -29,7 +29,23 @@ describe("the public website (D-176)", () => {
     expect(r.status).toBe(200);
     expect(r.headers.get("content-type")).toMatch(/^text\/html/);
     const html = await r.text();
-    for (const id of ["room", "games", "awards", "lobby", "build", "showcase", "debug", "repos", "install", "table", "service", "about"]) expect(html).toContain(`id="${id}"`);
+    for (const id of ["room", "games", "awards", "lobby", "build", "repos", "install", "table", "service", "about"]) expect(html).toContain(`id="${id}"`);
+    // The developers' part is a page of its own (D-312), cut from the same file; neither page carries the other's.
+    const build = await (await get("/build")).text();
+    for (const id of ["build", "case", "showcase", "sling", "synth", "ge150", "cards", "debug"]) expect(build).toContain(`id="${id}"`);
+    for (const id of ["showcase", "debug", "cards"]) expect(html).not.toContain(`id="${id}"`);
+    for (const id of ["hero", "games-grid", "demo", "repos"]) expect(build).not.toContain(`id="${id}"`);
+    expect(build).toContain("<title>Build a game · Game Table</title>");
+    expect(html).toContain("<title>Game Table: board games around one screen</title>");
+    for (const page of [html, build]) {
+      expect(page).not.toMatch(/<!--\/?(home|build)-->/);
+      expect(page).not.toMatch(/\{\{\w+\}\}/);
+      expect(page).toContain('class="version"');
+    }
+    // Compressed for a browser that takes it.
+    const zipped = await fetch(`${base}/build`, { headers: { "accept-encoding": "gzip" } });
+    expect(zipped.headers.get("content-encoding")).toBe("gzip");
+    expect(await zipped.text()).toBe(build);
     expect(html).toContain('<a id="admin-link" href="/admin">Admin</a>'); // without Google sign-in: the portal itself
     expect(html).toContain('class="version"');
     expect(html).not.toMatch(/\{\{\w+\}\}/);
