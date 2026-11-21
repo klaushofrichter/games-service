@@ -1118,10 +1118,10 @@ gesture(seat, data) { sling.gesture(seat, data); }</code>
       <div class="show-grid">
         <figure class="dbg-shot rv cards-fig" style="--d:.05s">
           <div class="cards-stage" id="cards-stage">
-            <img class="on" data-design="Classic" src="/site/freecell-cards-classic.webp" alt="Five FreeCell cards in the Classic design: cream cards with serif letters" width="1100" height="560">
+            <img data-design="Classic" src="/site/freecell-cards-classic.webp" alt="Five FreeCell cards in the Classic design: cream cards with serif letters" loading="lazy" width="1100" height="560">
             <img data-design="Plain" src="/site/freecell-cards-plain.webp" alt="The same five cards in the Plain design: white, with large letters without serifs" loading="lazy" width="1100" height="560">
             <img data-design="Mosaic" src="/site/freecell-cards-mosaic.webp" alt="The same five cards in the Mosaic design: green and gold court figures made of small tiles" loading="lazy" width="1100" height="560">
-            <img data-design="Botanical" src="/site/freecell-cards-botanical.webp" alt="The same five cards in the Botanical design: a hand-coloured flower on each, with its name" loading="lazy" width="1100" height="560">
+            <img class="on" data-design="Botanical" src="/site/freecell-cards-botanical.webp" alt="The same five cards in the Botanical design: a hand-coloured flower on each, with its name" width="1100" height="560">
             <img data-design="Linea" src="/site/freecell-cards-linea.webp" alt="The same five cards in the Linea design: line drawings, each suit in its own colour" loading="lazy" width="1100" height="560">
             <img data-design="Speakeasy" src="/site/freecell-cards-speakeasy.webp" alt="The same five cards in the Speakeasy design: sketched figures of the twenties on old paper" loading="lazy" width="1100" height="560">
           </div>
@@ -1511,22 +1511,35 @@ docker compose -f deploy/local/docker-compose.yml up -d --build">Copy</button></
       <div class="info"><div class="row"><h3>${g.name}</h3><span class="players">${g.players}</span></div><p>${g.text}</p></div>
     </button>`).join("");
   $$("#games-grid .rv").forEach((el) => io.observe(el));
-  // FreeCell's card designs (D-311): one after the other while the section is in view, every 3.8 s; a tap on a name
-  // shows that one and stops the round. Without motion (reduced motion) nothing moves by itself.
+  // FreeCell's card designs (D-311): one after the other every 3 s while the decks are in view, the flowers first.
+  // Where the round stands is kept for this visit (sessionStorage): whoever comes to the section again, by scrolling
+  // back or after loading the page anew, sees the next deck, not the first one again. A tap on a name shows that one
+  // and stops the round. Without motion (reduced motion) nothing moves by itself.
   (() => {
     const imgs = $$("#cards-stage img"), pick = $("#cards-pick");
     if (!imgs.length) return;
     pick.innerHTML = imgs.map((im, i) => `<button type="button" role="tab" data-i="${i}">${im.dataset.design}</button>`).join("");
-    let at = 0, timer = 0, auto = !still;
+    const KEY = "gametable.site.cards";
+    const kept = () => { try { const n = Number(sessionStorage.getItem(KEY)); return sessionStorage.getItem(KEY) !== null && Number.isInteger(n) && n >= 0 && n < imgs.length ? n : null; } catch { return null; } };
+    const first = Math.max(0, imgs.findIndex((im) => im.dataset.design === "Botanical"));
+    let at = kept() ?? first, timer = 0, auto = !still, seen = kept() !== null;
     const show = (i) => {
       at = i;
+      try { sessionStorage.setItem(KEY, String(i)); } catch {}
       imgs.forEach((im, k) => im.classList.toggle("on", k === i));
       $$("button", pick).forEach((b, k) => { b.classList.toggle("on", k === i); b.setAttribute("aria-selected", String(k === i)); });
     };
-    const run = (on) => { clearInterval(timer); if (on && auto) timer = setInterval(() => show((at + 1) % imgs.length), 3800); };
+    const next = () => show((at + 1) % imgs.length);
+    const run = (on) => {
+      clearInterval(timer);
+      if (!on || !auto) return;
+      if (seen) next(); // back at the section: on to another deck at once
+      seen = true;
+      timer = setInterval(next, 3000);
+    };
     pick.addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; auto = false; run(false); show(Number(b.dataset.i)); });
     new IntersectionObserver((es) => run(es[0].isIntersecting), { threshold: 0.35 }).observe($("#cards-stage"));
-    show(0);
+    show(at);
   })();
   // Statistics and awards (D-178): one game's awards at a time.
   $$("[data-aw]").forEach((b) => b.addEventListener("click", () => {
