@@ -8,6 +8,8 @@ history.
 
 ## [Unreleased]
 
+- New built-in game: FreeCell, a solitaire for one player played on the board: drag cards or tap them, undo, a hint, only deals that can be solved, awards at the end (D-308).
+- Awards and Results: a game for one player keeps the awards its player earned (D-308).
 - Board: every window and list that scrolls has the wide scrollbar and follows one finger or two: all windows, the finished screen's results, the game logs, Live status. The deck beside the board scrolls by dragging (no wide bar); phones scroll by touch as before (D-306).
 - Board: Awards and Results scrolls with the wide scrollbar and by finger, like the settings windows (D-306).
 - Board: "Hide the mouse pointer in fullscreen" also hides it over the deck beside the board (Play from the board) (D-296).

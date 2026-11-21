@@ -98,7 +98,7 @@ buttons turn them to north, east, south or west (D-080). In code: `seatEdges(lay
 | Term | What it is | In the code | Avoid |
 | --- | --- | --- | --- |
 | **Game** | A folder with a manifest, rules, a board UI, a deck UI and rules for players. | `games/<id>/` | app, plugin |
-| **Built-in game** | A game in this repository (Coin Flip, Hold'em, Pachisi, Roulette). | `games/` | core game |
+| **Built-in game** | A game in this repository (Coin Flip, FreeCell, Hold'em, Pachisi, Roulette). | `games/` | core game |
 | **Extra-game repository** | Another repository whose `games/` folder a table installs, like `extra-games`. | `GAME_REPOS`, `deploy/game-repos.json` | plugin repo, add-on |
 | **Test game** | A game hidden unless the table shows test games, like Card Sling. | `"test": true` | — |
 | **Rules** | The game's logic: pure functions on a JSON state, run by the Table Host. | `rules.ts`, `defineGame` | engine, server code |

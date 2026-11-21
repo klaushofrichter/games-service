@@ -47,7 +47,8 @@ function playersOf(log: readonly LogRecord[]) {
 function checkAward(a: GameAward, seats: Set<number>): GameAward | null {
   if (!a || typeof a !== "object") return null;
   const holders = [...new Set((Array.isArray(a.seats) ? a.seats : []).filter((s) => Number.isInteger(s) && seats.has(s)))];
-  if (holders.length === 0 || holders.length >= seats.size) return null;
+  // An award everybody holds says nothing; in a game for one it is what the player earned (D-308).
+  if (holders.length === 0 || (seats.size > 1 && holders.length >= seats.size)) return null;
   const title = clip(a.title, 60);
   if (!title) return null;
   return {

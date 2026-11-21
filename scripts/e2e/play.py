@@ -691,6 +691,11 @@ def rules(browser, board):
     for g in games:
         if g["id"] == "quartet":
             continue  # needs four humans; its rules are checked by tests/rules.test.ts
+        solo = g["players"] == [1]  # a game for one player (FreeCell): without the AI player for a moment
+        if solo:
+            for pl in api("GET", "/state")["players"]:
+                if pl["kind"] == "ai":
+                    api("DELETE", f"/players/{pl['id']}")
         api("POST", "/game/select", {"gameId": g["id"]})
         d.locator("[data-rules]").click()
         d.locator(".rules-modal .md h3").first.wait_for()
@@ -713,6 +718,10 @@ def rules(browser, board):
         else:
             d.locator(".rules-modal .rules-close").click()
         d.wait_for_selector(".rules-modal", state="detached")
+        if solo:
+            api("POST", "/game/close", {})
+            api("POST", "/layout", {"seats": 4})  # (the game took the one-seat layout)
+            api("POST", "/ai", {})
     api("POST", "/game/close", {})
     # D-108: the terms open in the same sheet on the phone, with ✕ top right, and the page stays where it is
     url = d.url

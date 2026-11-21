@@ -318,7 +318,7 @@ What this means for a game:
   player's name in the first column, so the platform can mark a seat that changed hands.
 - **`awards`** (optional): the statistics window's trophies. `mostAward(base, scores, value?)` and
   `leastAward(base, scores, value?)` build one from `[{ seat, score }]` and return `null` when nobody stands out: one
-  player or everyone tied, and for `mostAward` also a best score of 0 or less. The platform drops awards that nobody or every player holds.
+  player or everyone tied, and for `mostAward` also a best score of 0 or less. The platform drops awards that nobody or every player holds; in a game for one player an award is what that player earned, and is kept (list only the earned ones, as FreeCell does).
   **Offer 12 or more** (D-231): only those where someone stands out are shown, so a game needs many to have a few
   for every player at the end. There is no limit; the window shows them all.
 - **The platform adds** each seat's final player (`players`), a moves-and-thinking-time table (`play`) read from the
@@ -378,6 +378,10 @@ export function settings({ info, setPrefs }) { return []; } // optional: items f
 - **Moves on the board:** list intent names in `boardIntents`; `ctx.act(seat, name, payload)` sends one for a seat in
   `info.controlSeats` (people at the table on the table's board; a remote board only for its own player) and resolves
   with `{ ok, reason }`; a rejection is shown as a toast by the platform. The rules decide as for any intent.
+- **A game played on the board:** a solo game can be played on the board alone, like the built-in FreeCell
+  (`games/freecell`): every move is a board intent, the phone only says where the game is, cards are dragged with
+  pointer events (`touch-action: none`), and the board turns to the player (`info.rotation`), so the pointer's place is
+  turned back before it is used.
 - **Skipping a wait:** list timer ids in `skipTimers`; `ctx.skipTimer(id)` fires it now when `info.boardControl` is
   true (not while the game is paused) and resolves with `{ ok, reason }`. Use it for a pause on a result ("Next hand").
 - **Settings:** `settings({ info, setPrefs })` returns items `{ type: "toggle" | "choice" | "swatches" | "button" |
