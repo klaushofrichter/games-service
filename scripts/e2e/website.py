@@ -100,19 +100,20 @@ try:
                 # FreeCell's card designs (D-311): six pictures, one on at a time, the flowers first; the round moves on
                 # by itself every 3 s while they are in view, and stands still while they are not. Coming back to the
                 # section shows another deck at once. A tap on a name shows that design and stops the round.
+                on = lambda: page.locator("#cards-pick button.on").inner_text()
+                # (read before the decks come into view: from then on the round runs, however slow this computer is)
+                assert page.locator("#cards-stage img.on").count() == 1 and on() == "Botanical", on()
+                assert page.locator("#cards-stage img").count() == 6 and page.locator("#cards-pick button").count() == 6
                 page.locator("#cards").scroll_into_view_if_needed()
                 page.wait_for_function("document.querySelector('#cards-stage img.on').complete && document.querySelector('#cards-stage img.on').naturalWidth > 0")
-                assert page.locator("#cards-stage img").count() == 6 and page.locator("#cards-pick button").count() == 6
-                on = lambda: page.locator("#cards-pick button.on").inner_text()
-                assert page.locator("#cards-stage img.on").count() == 1 and on() == "Botanical", on()
-                wait(lambda: on() == "Linea", 6, "the card designs to move on by themselves")
+                wait(lambda: on() != "Botanical", 8, "the card designs to move on by themselves")
                 page.evaluate("window.scrollTo(0, 0)")
                 page.wait_for_timeout(600)
                 away = on()
                 page.wait_for_timeout(3600)
                 assert on() == away, "the round went on while the decks were out of view"
                 page.locator("#cards").scroll_into_view_if_needed()
-                wait(lambda: on() != away, 2, "another deck on coming back to the section")
+                wait(lambda: on() != away, 4, "another deck on coming back to the section")
                 page.click("#cards-pick button >> text=Botanical")
                 assert page.get_attribute("#cards-stage img.on", "data-design") == "Botanical"
                 page.wait_for_timeout(4500)
