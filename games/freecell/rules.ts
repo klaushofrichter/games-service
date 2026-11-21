@@ -289,8 +289,9 @@ export default defineGame<State>({
         : `${state.name} gives up deal ${state.deal} with ${home} of 52 cards home.`,
       highlights: { winners: won ? [state.name] : [], deal: state.deal, won, moves: state.moves, seconds: s, undos: state.undos, hints: state.hints, cardsHome: home },
       table: {
-        columns: ["Player", "Result", "Cards home", "Moves", "Undos", "Hints", "Time"],
-        rows: [[state.name, won ? "Solved" : "Gave up", home, state.moves, state.undos, state.hints, clock(s)]],
+        // No player or result column: there is one player, and the headline says both (the phone's table stays narrow).
+        columns: ["Cards home", "Moves", "Undos", "Hints", "Time"],
+        rows: [[home, state.moves, state.undos, state.hints, clock(s)]],
       },
       awards: awards(state),
     };

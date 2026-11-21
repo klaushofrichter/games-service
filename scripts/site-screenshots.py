@@ -21,7 +21,7 @@ ONLY = sys.argv[2:] or None
 SITE = os.path.join(REPO, "apps", "cloud", "public", "site")
 OUT = tempfile.mkdtemp(prefix="site-shots-")
 GAMES = tempfile.mkdtemp(prefix="site-games-")
-for g in ["coin-flip", "holdem", "pachisi", "roulette"]:
+for g in ["coin-flip", "freecell", "holdem", "pachisi", "roulette"]:
     os.symlink(os.path.join(REPO, "games", g), os.path.join(GAMES, g))
 for g in ["chess", "liars-dice", "backgammon", "mexican-train", "last-card"]:
     os.symlink(os.path.join(EXTRA, "games", g), os.path.join(GAMES, g))
@@ -280,6 +280,40 @@ try:
             board.screenshot(path=os.path.join(OUT, "viewer-board.png"))
             board.click("button[data-close]")
             print("shot viewer")
+        # FreeCell (D-308): the solo game played on the board. Klaus follows the hints for a while (each hinted card
+        # dragged to its place), then one more hint is on show.
+        if not ONLY or "freecell" in ONLY:
+            reset()
+            ph = b.new_page(viewport={"width": 390, "height": 844}, device_scale_factor=2)
+            ph.goto(a("GET", "/join")["url"].replace("192.168.1.20:8080", f"127.0.0.1:{PORT}"))
+            ph.fill("input[name=name]", "Klaus")
+            ph.click("button[type=submit]")
+            ph.wait_for_selector(".who h1")
+            a("POST", "/game/select", {"gameId": "freecell", "settings": {}})
+            ph.click("#ready")
+            time.sleep(1)
+            a("POST", "/game/start", {})
+            board.wait_for_selector(".fc-root .fc-card")
+            time.sleep(2.5)
+            HINT = """() => { const mid = (e) => { const r = e.getBoundingClientRect(); return [r.left + r.width / 2, r.top, r.top + r.height / 2]; };
+              const from = document.querySelector('.fc-hint-from'), to = [...document.querySelectorAll('.fc-hint')].find((e) => e !== from);
+              return from && to ? { from: mid(from), to: mid(to) } : null; }"""
+            for k in range(14):
+                board.click(".fc-btn[data-do=hint]")
+                board.wait_for_selector(".fc-hint-from")
+                h = board.evaluate(HINT)
+                board.mouse.move(h["from"][0], h["from"][1] + 20)
+                board.mouse.down()
+                board.mouse.move(h["to"][0], h["to"][2] + 30, steps=5)
+                board.mouse.up()
+                board.wait_for_selector(".fc-hint-from", state="detached")
+                time.sleep(0.9)
+            board.click(".fc-btn[data-do=hint]")
+            board.wait_for_selector(".fc-hint-from")
+            time.sleep(0.6)
+            board.screenshot(path=os.path.join(OUT, "freecell-board.png"))
+            ph.close()
+            print("shot freecell")
         b.close()
         # The admin console (D-186): a service with extra-games, two tables (one approved by its pairing code, one by
         # an access code), a spare code, a download token, and logs of games and simulations from both tables.
@@ -347,6 +381,7 @@ def save(name, out, size):
 for game, *_ in PLAN:
     save(f"{game}-board.png", f"{game}.webp", (1600, 900))
     save(f"{game}-phone.png", f"{game}-phone.webp", (500, 1100))
+save("freecell-board.png", "freecell.webp", (1600, 900))
 save("mexican-train-lava-board.png", "mexican-train-lava.webp", (1600, 900))
 save("last-card-sling-phone.png", "last-card-sling-phone.webp", (500, 1100))
 # The board around the incoming card: its seat, and toward the middle of the table (the board is 1920 x 1080).

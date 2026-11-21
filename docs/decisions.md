@@ -2699,7 +2699,12 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   - **Awards:** sixteen offered, those earned are listed (solved, no undo, no hint, within three or five minutes, few
     moves, few free cells, …). The platform dropped an award "every player holds"; with one player that was every
     award, so the rule now applies to games with two or more players.
-  - **Not in this version:** choosing a deal by its number, statistics kept on the table, FreeCell on the website.
+  - **Not in this version:** choosing a deal by its number, statistics kept on the table.
   *Implementation (Claude):* `games/freecell/` (`engine.ts`, `rules.ts`, `board.js`, `board.css`, `deck.js`),
   `checkAward()` in `stats.ts`. Checks: `tests/freecell.test.ts`, `tests/statistics.test.ts`,
   `scripts/e2e/freecell.py` (drag, tap, undo, hints to a solved game, facing north, awards).
+  - *2026-11-21, Klaus, after trying it:* "Looks ok. Please ship to production. Add it to the landing page as example
+    for a single player game." The website's games show FreeCell (built in, under *Solo* too; no phone picture, the
+    phone shows nothing of the game); the heading counts ten games. And: "The deck's results table has a horizontal
+    scrollbar. We can remove it by eliminating the Player column" — the table has no Player column, and no Result
+    column either (Claude: the headline says who and how it ended), so five columns fit a phone.

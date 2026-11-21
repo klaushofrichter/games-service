@@ -115,7 +115,8 @@ describe("FreeCell: the game", () => {
     const ids = rt.summary!.awards!.map((a) => a.id);
     expect(ids).toEqual(expect.arrayContaining(["solved", "no-undo", "good-advice"]));
     expect(ids).not.toContain("no-hint");
-    expect(rt.summary!.table!.rows[0]![1]).toBe("Solved");
+    expect(rt.summary!.table).toMatchObject({ columns: ["Cards home", "Moves", "Undos", "Hints", "Time"] });
+    expect(rt.summary!.table!.rows[0]![0]).toBe(52);
     expect(expectReplay(game, rt)).toBe(true);
   });
 

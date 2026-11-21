@@ -34,7 +34,7 @@ The agent follows the [local runbook](runbooks/local-docker.md): Part A (the tab
 extra games). No cloud service, no DNS entry, no HTTPS. With Node 26 instead of Docker, it can also run
 `CLOUD_URL= scripts/local-table.sh --extra ../extra-games` (README, *A table on your computer*).
 
-**It worked when** the board shows *Pick a game* with nine games (three to a page), and a phone that scans the QR code gets a seat.
+**It worked when** the board shows *Pick a game* with ten games (three to a page), and a phone that scans the QR code gets a seat.
 Without a phone at hand, turn on *Advanced* (hammer and wrench) › *Developer* › *Games without a player at the table*,
 add AI players and press *Start game*; or turn on *Play from the board*; or ask the agent to run a simulation.
 
