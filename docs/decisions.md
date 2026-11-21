@@ -2715,3 +2715,14 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
     with moves, time, undos and hints from zero. A number the solver finds no way through is refused in words (the
     game deals only what can be solved). For that, a game's `settings()` also gets the board's `confirm(title, text,
     okLabel)`. Check: `scripts/e2e/freecell.py`, `tests/freecell.test.ts`.
+- **D-309 · 2026-11-21 · Klaus** — **A phone with an old or wrong join code can type the current one.** "If someone
+  uses an old code or a wrong code … we could show a friendly message on the deck indicating that the code is not
+  current, and offer an entry field for the correct code … Message plus code field only, go ahead." Until now the
+  phone showed the table's refusal and nothing to do (D-241). Now the deck says *This code is no longer current* (the
+  table restarted or made a new code) and takes the code the board shows, typed: the letters and digits at the end of
+  the address under the QR code, in capitals or not. A wrong entry is said under the field, which stays; the right
+  one opens the page as the QR code would, on to the name. A page opened without any code asks the same way.
+  - **No camera in the page** (asked, and left out): a page may open the camera only on a secure address, and the
+    table is reached as `http://…` on the home network. A photo of the code read by a bundled library would work, but
+    takes longer than the phone's own camera, which scans the board in one step; the page says to do that.
+  *Implementation (Claude):* `renderCode()` in `deck.js`, on the seat check's 403. Check: `scripts/e2e/join_restart.py`.

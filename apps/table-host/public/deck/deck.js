@@ -98,14 +98,17 @@ const ownName = {
 };
 let keepName = false; // the player typed or changed their name: the one the table takes is kept
 let seatTimer = null;
+/** The code this page was opened with is not the table's current one (D-309): ask for the current one. */
+let oldCode = false;
 
 /** Ask the table whether a seat is free for this join code; look again every few seconds while there is none. */
 async function checkSeat() {
   try {
     const r = await fetch(`/j/${encodeURIComponent(joinToken)}/seat`, { cache: "no-store" });
     // An old code (the table restarted, or a new code was made): said at once, before the name is typed (D-241).
+    // The page then asks for the code the board shows now (D-309).
     if (r.status === 403 && !me) {
-      banner = (await r.json().catch(() => ({}))).error ?? "This join code no longer works; scan the code the board shows now.";
+      oldCode = true;
       return render();
     }
     if (!r.ok) return;
@@ -535,6 +538,38 @@ function render() {
   body.querySelector("[data-leave]")?.addEventListener("click", () => void leave(false));
 }
 
+/**
+ * No code, or one that is not current (D-309): say so kindly, and take the code the board shows now, typed here. The
+ * phone's own camera scans the board's QR code in one step, so the page only says that; a page on the table's plain
+ * address may not open the camera itself.
+ */
+function renderCode() {
+  if (body.querySelector("#code")) return;
+  body.innerHTML = `<div><div class="eyebrow">Game Table</div><h1>${oldCode ? "This code is no longer current" : "Join the table"}</h1></div>
+    <form id="code" class="card" style="display:flex;flex-direction:column;gap:14px">
+      <p class="muted" style="margin:0">${oldCode ? "The table restarted or made a new code since this one was shown. " : ""}Type the code the board shows now: the letters and digits at the end of the address under its QR code.</p>
+      <input type="text" name="code" maxlength="12" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" placeholder="Code" aria-label="The code the board shows" style="text-transform:uppercase;letter-spacing:.12em;font-family:var(--mono)">
+      <div id="code-error" class="join-error" role="alert"></div>
+      <button class="primary big" type="submit">Join</button>
+      <div class="faint" style="font-size:.8em">Or scan the QR code on the board again with your camera. During a game, the board shows it under Settings › Show join code.</div>
+    </form>`;
+  body.querySelector("#code").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const error = body.querySelector("#code-error");
+    const code = String(new FormData(e.target).get("code") ?? "").replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+    if (code.length < 4) return void (error.textContent = "Type the whole code, as the board shows it.");
+    error.textContent = "";
+    try {
+      const r = await fetch(`/j/${encodeURIComponent(code)}/seat`, { cache: "no-store" });
+      if (r.status === 403) return void (error.textContent = "That is not the board's current code. Check it and try again.");
+      if (!r.ok) throw new Error(String(r.status));
+      location.href = `/j/${encodeURIComponent(code)}`; // as the QR code would: the page opens again with this code
+    } catch {
+      error.textContent = "The table did not answer. Try again in a moment.";
+    }
+  });
+}
+
 function renderJoin() {
   put(top, banner ? `<div class="banner">${esc(banner)}</div>` : "");
   const saved = storage.get();
@@ -557,10 +592,7 @@ function renderJoin() {
     }
     return;
   }
-  if (!joinToken && !BOARD) {
-    body.innerHTML = `<div class="card center"><h1>Join the table</h1><p class="muted">Scan the QR code on the board, or type the address shown below it. During a game, the board shows it under Settings › Show join code.</p></div>`;
-    return;
-  }
+  if ((!joinToken || oldCode) && !BOARD) return renderCode();
   if (noSeat) {
     // No free seat (D-129): instead of the name form, why not and what would help; the page looks again by itself.
     if (body.querySelector("#no-seat")?.dataset.msg === noSeat) return;
