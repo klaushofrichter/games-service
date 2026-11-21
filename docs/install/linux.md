@@ -216,6 +216,24 @@ chmod +x ~/Desktop/game-table.desktop
 gio set -t string ~/Desktop/game-table.desktop metadata::xfce-exe-checksum "$(sha256sum ~/Desktop/game-table.desktop | cut -d' ' -f1)"
 ```
 
+A finger's tap is one click, so let one click start it:
+
+```sh
+xfconf-query -c xfce4-desktop -n -t bool -p /desktop-icons/single-click -s true
+```
+
+**The board full screen, without the browser's frame** (a kiosk). Let the icon run a small script instead: the table
+without its own browser window, then the board in Chrome's kiosk mode with a profile of its own. Save it as
+`~/apps/game-table-start.sh`, make it executable, and put its path in the icon's `Exec=`:
+
+```sh
+#!/bin/sh
+~/apps/game-table/game-table --no-open &
+until curl -fs http://localhost:8080/health > /dev/null; do sleep 1; done
+google-chrome --user-data-dir="$HOME/.config/game-table-board" --kiosk --no-first-run --noerrdialogs \
+  --autoplay-policy=no-user-gesture-required http://localhost:8080/board/
+```
+
 **No lock, no blank screen, no sleep.**
 
 ```sh
