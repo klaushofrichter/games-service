@@ -352,6 +352,7 @@ still keeps every phone out.
 | --- | --- |
 | `--no-update` | Start with the games downloaded last time (offline) |
 | `--repos "a b"` | The private repositories for this start, without asking (`--repos none`: none). The saved list stays as it is; it changes only when you answer the question |
+| `--repos all` | Every game repository of `klaushofrichter` that your GitHub sign-in can read (its name ends in `-game` or `-games`), asked of GitHub at each start: a new one is on the table without naming it. One without games on the branch is left out. Without the network, or with `--no-update`: those downloaded before. The saved list stays as it is. |
 | `--port 8081` | Another port, if 8080 is taken (not remembered: give it at every start) |
 | `--no-open` | Don't open the browser, e.g. on a computer without a screen; [show the board on another screen](#the-board-on-another-screen) |
 | `--branch main` | Another branch of the game repositories (default `production`) |
