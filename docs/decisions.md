@@ -2869,3 +2869,9 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   *Implementation (Claude):* `isFull()`, `browserFull()` in `board.js`. Check: `scripts/e2e/board_screen.py` (a window
   on a larger screen, then a screen exactly its size). The test browser's screen is its window unless told
   otherwise, so the checks that use Fullscreen (`board_deck.py`, `watch.py`) give it a larger one.
+- **D-318 · 2026-11-22 · Klaus** — **"Hide the mouse pointer in fullscreen" is on to begin with.** "The option should
+  be per default on in the settings." It was off (D-296) and had to be switched on once in every browser, as on the
+  game PC's kiosk browser. A board in fullscreen is nearly always a touchscreen; in a window the pointer shows as
+  ever, and Esc leaves fullscreen and brings it back. A browser where it was switched off stays off; one where it was
+  never touched now hides the pointer in fullscreen.
+  *Implementation (Claude):* `hidePointer` in `board.js`. Check: `scripts/e2e/board_screen.py`.
