@@ -28,7 +28,7 @@ def players():
 try:
     with sync_playwright() as p:
         b = p.chromium.launch()
-        page = b.new_page(viewport={"width": 1600, "height": 900}, has_touch=True)  # the table's screen is a touchscreen
+        page = b.new_page(viewport={"width": 1600, "height": 900}, screen={"width": 2560, "height": 1440}, has_touch=True)  # a window on a larger screen (D-317);  # the table's screen is a touchscreen
         watch(page, "board")
         page.goto(BASE + "/board/")
         page.wait_for_selector("text=Pick a game")
@@ -143,6 +143,8 @@ try:
         assert moved >= 100, f"a drag on the deck beside the board scrolled it by {moved}"
         frame.evaluate("() => { document.getElementById('e2e-tall').remove(); scrollTo(0, 0); }")
         page.set_viewport_size(size)
+        # (changing the window's size makes the test browser forget its larger screen: say it again, D-317)
+        page.context.new_cdp_session(page).send("Emulation.setDeviceMetricsOverride", {"width": size["width"], "height": size["height"], "deviceScaleFactor": 1, "mobile": False, "screenWidth": 2560, "screenHeight": 1440})
 
         # Hide and Show fold the deck, as on a remote player's page.
         page.click("#deck-min")
