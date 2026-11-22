@@ -79,7 +79,7 @@ const coversScreen = () => {
 const browserFull = () => !fsDoc.fullscreenElement && (!!kioskMedia?.matches || coversScreen());
 const isFull = () => !!fsDoc.fullscreenElement || browserFull();
 const POINTER_KEY = "gametable.hidePointer";
-let hidePointer = stored(POINTER_KEY) === "1";
+let hidePointer = stored(POINTER_KEY) !== "0"; // on unless switched off (D-318): a table's board is touched, not pointed at
 function applyPointer() {
   const full = isFull();
   // The page fullscreen applies to too: inside Play from the board, the frame around the board and the deck, and
