@@ -2856,3 +2856,16 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   - **The starter** no longer waits without end for the GitHub CLI: after 30 seconds it says that the keyring may be
     locked, names `GH_TOKEN`, and starts with the public games, as for any failed sign-in (D-265).
   *Implementation (Claude):* `githubToken()` in `scripts/package/launch.ts`. In the packages once they are built again.
+- **D-317 · 2026-11-22 · Klaus** — **A browser that shows nothing but the board counts as full screen.** From the game
+  PC, by Klaus through Cluster: in Chrome's kiosk mode the board did not hide the mouse pointer (D-296). The board
+  took "full screen" to mean that the page had asked for it (`fullscreenElement`); a kiosk browser, an installed app
+  or F11 fills the screen without the page asking. The board is full screen now when the page asked, when the
+  browser's display mode says so, or when its window is exactly as large as the screen (a browser with tabs and an
+  address bar never is).
+  - **The pointer** hides there with the setting on, and shows in a window, as before.
+  - **Settings › Fullscreen** says "on: this browser shows nothing but the board" there instead of offering a button
+    that cannot leave it, and the pointer's row no longer promises Esc.
+  - **"Tap to return to fullscreen"** (D-299) is not shown there: the board is full screen already.
+  *Implementation (Claude):* `isFull()`, `browserFull()` in `board.js`. Check: `scripts/e2e/board_screen.py` (a window
+  on a larger screen, then a screen exactly its size). The test browser's screen is its window unless told
+  otherwise, so the checks that use Fullscreen (`board_deck.py`, `watch.py`) give it a larger one.
