@@ -239,6 +239,7 @@ if curl -fs -o /dev/null "$BOARD"; then board; exit; fi
 # A kiosk browser left from an earlier start would take the new window's address and leave this script with nothing.
 pkill -f -- "--user-data-dir=$PROFILE" 2> /dev/null
 ~/apps/game-table/game-table --no-open --repos all & TABLE=$!
+echo "Starting Game Table…"  # (the wait below is quiet: a line of "connection refused" every second reads like a fault)
 until curl -fs -o /dev/null "$BOARD"; do
   if ! kill -0 "$TABLE" 2> /dev/null; then  # it ended before the board was there: keep what it said on screen
     read -r -p "Game Table did not start (see above). Press Enter to close this window. "
@@ -246,6 +247,7 @@ until curl -fs -o /dev/null "$BOARD"; do
   fi
   sleep 1
 done
+echo "Opening the board."
 board & CHROME=$!
 # The two belong together: when either ends, the other does too.
 wait -n "$TABLE" "$CHROME"
