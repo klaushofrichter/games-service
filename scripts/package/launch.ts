@@ -222,8 +222,15 @@ async function githubToken(tools: string): Promise<string | null> {
   const version = spawnSync(gh, ["--version"], { encoding: "utf8" });
   if (version.status !== 0) return skip(`The GitHub CLI (${gh}) does not start.`);
   say(version.stdout.split("\n")[0]);
-  if (process.env.GH_TOKEN) return process.env.GH_TOKEN; // the automated test: no browser
-  if (spawnSync(gh, ["auth", "status", "--hostname", "github.com"], { stdio: "ignore" }).status !== 0) {
+  // A token given from outside: the automated test (no browser), and a table of its own that logs in by itself,
+  // where the keyring the GitHub CLI keeps its sign-in in stays locked (D-316).
+  if (process.env.GH_TOKEN) return process.env.GH_TOKEN;
+  // The GitHub CLI keeps its sign-in in the desktop's keyring. A locked keyring (automatic login) makes it wait for
+  // a password window nobody may see: after 30 s that is said, instead of a start that never comes.
+  const locked = () => skip("The GitHub CLI did not answer within 30 seconds: it may be waiting for the keyring's password (a locked keyring, as after an automatic login). Unlock it, or give a token in GH_TOKEN (see the install guide).");
+  const status = spawnSync(gh, ["auth", "status", "--hostname", "github.com"], { stdio: "ignore", timeout: 30000 });
+  if ((status.error as NodeJS.ErrnoException | undefined)?.code === "ETIMEDOUT") return locked();
+  if (status.status !== 0) {
     say("");
     say("Sign in to GitHub, so the private repositories can be downloaded. The GitHub CLI shows a code, then asks you");
     say("to press Enter: press Enter here (it opens the browser and then waits for you), and enter the code in the");
@@ -232,7 +239,8 @@ async function githubToken(tools: string): Promise<string | null> {
     const login = spawnSync(gh, ["auth", "login", "--hostname", "github.com", "--git-protocol", "ssh", "--skip-ssh-key", "--web"], { stdio: "inherit" });
     if (login.status !== 0) return skip("GitHub sign-in did not finish.");
   }
-  const t = spawnSync(gh, ["auth", "token", "--hostname", "github.com"], { encoding: "utf8" });
+  const t = spawnSync(gh, ["auth", "token", "--hostname", "github.com"], { encoding: "utf8", timeout: 30000 });
+  if ((t.error as NodeJS.ErrnoException | undefined)?.code === "ETIMEDOUT") return locked();
   if (t.status !== 0 || !t.stdout.trim()) return skip("The GitHub CLI is signed in but gives no token.");
   return t.stdout.trim();
 }

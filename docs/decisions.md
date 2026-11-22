@@ -2847,3 +2847,12 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   - **Later, if wanted:** a `--kiosk` option of the starter that opens and closes the kiosk browser itself.
   *Implementation (Claude):* `onQuit` in `HostOptions`/`ServerOptions`, `canQuit` in the lobby state, `quitTable()` in
   `board.js`, `TABLE_QUIT` in `main.ts` and `launch.ts`. Checks: `tests/quit.test.ts`, `scripts/e2e/quit.py`.
+- **D-316 · 2026-11-22 · Klaus** — **A table that logs in by itself reads its private repositories with a token of its
+  own.** Found on the game PC, by Cluster and Klaus: with automatic login the desktop's keyring stays locked, the
+  GitHub CLI keeps its sign-in there, and the start with `--repos all` hung ("Can not connect") until the keyring's
+  password was typed. There the start script now exports `GH_TOKEN` from a fine-grained, read-only token (Contents:
+  read, the private game repositories) kept in a file of mode 600; the starter has always taken `GH_TOKEN` first.
+  - **The guide** (`docs/install/linux.md`, *A table of its own*) says how.
+  - **The starter** no longer waits without end for the GitHub CLI: after 30 seconds it says that the keyring may be
+    locked, names `GH_TOKEN`, and starts with the public games, as for any failed sign-in (D-265).
+  *Implementation (Claude):* `githubToken()` in `scripts/package/launch.ts`. In the packages once they are built again.
