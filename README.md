@@ -115,6 +115,9 @@ board moves there; the table's own window says "The board moved to another scree
 | `LOG_SNAPSHOT_EVERY` | 0 | A snapshot of the whole game state in the log every N moves (D-116); 0: only the final state |
 | `SHOW_TEST_GAMES` | 0 | `1` lists the test games (`quartet`, `card-sling`) in the game menu; the tests and `run-all.sh` turn it on |
 | `TABLE_QUIT` | 0 | `1` lets the table be quit from its own board (Advanced › *Quit the table*, asked first): the way out where the browser shows nothing but the board (a kiosk). The packages' starter sets it; a hosted or Docker table does not (D-315) |
+| `TABLE_SCREENSAVER` | – | Minutes without input until the table's screen goes dark; `0`: never. For this start, not saved; without it the board's settings decide. Also `--screensaver 10` on the command line, which wins (`npm run table -- --screensaver 10`), as in the packages (D-319) |
+| `TABLE_POINTER` | – | `off` hides the mouse pointer on the board (and the deck beside it) in fullscreen, `on` shows it. For this start, not saved. Also `--pointer off` (D-319) |
+| `TABLE_SOUND` | – | The volume of the table's screen in percent (`0` silent, `100` full). For this start, not saved. Also `--sound 50` (D-319) |
 | `DATA_DIR`, `GAMES_DIR` | `<repo>/data`, `<repo>/games` | Logs, saves, the table's identity and a typed access code (`table.json`) and extra-game bundles (`extra-games/`); the built-in games |
 
 ## Board control API

@@ -12,6 +12,7 @@ import { CloudLink } from "./cloud.ts";
 import { RemoteGateway } from "./remote.ts";
 import { ExtraGames } from "./extra-games.ts";
 import { GameData } from "./game-data.ts";
+import type { ScreenOptions } from "./screen-options.ts";
 
 const here = fileURLToPath(new URL(".", import.meta.url));
 
@@ -31,6 +32,8 @@ export interface HostOptions extends Partial<TableConfig> {
   allowRemoteBoard?: boolean;
   /** Quit from the board (TABLE_QUIT=1, D-315): what ends the table when its board asks. Absent: the board can't. */
   onQuit?: () => void;
+  /** What this start asks of the table's own screen (D-319). */
+  screen?: ScreenOptions;
   logRetentionDays?: number;
   cloudUrl?: string;
   cloudPollMs?: number;
@@ -68,6 +71,7 @@ export async function startHost(o: HostOptions = {}) {
     maxRemotePlayers: o.maxRemotePlayers ?? 4,
     showTestGames: o.showTestGames ?? true,
     canQuit: !!o.onQuit,
+    screen: o.screen,
     logSnapshotEvery: o.logSnapshotEvery ?? 0,
     allowNoLocalPlayer: o.allowNoLocalPlayer ?? false,
     boardDeck: o.boardDeck ?? false,

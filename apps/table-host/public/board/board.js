@@ -79,7 +79,7 @@ const coversScreen = () => {
 const browserFull = () => !fsDoc.fullscreenElement && (!!kioskMedia?.matches || coversScreen());
 const isFull = () => !!fsDoc.fullscreenElement || browserFull();
 const POINTER_KEY = "gametable.hidePointer";
-let hidePointer = stored(POINTER_KEY) !== "0"; // on unless switched off (D-318): a table's board is touched, not pointed at
+let hidePointer = stored(POINTER_KEY) === "1"; // off unless switched on, or the table was started with --pointer off (D-319)
 function applyPointer() {
   const full = isFull();
   // The page fullscreen applies to too: inside Play from the board, the frame around the board and the deck, and
@@ -108,6 +108,7 @@ function applyPointer() {
 function setHidePointer(on) {
   hidePointer = on;
   keep(POINTER_KEY, on ? "1" : "0");
+  changedHere("pointer");
   applyPointer();
 }
 fsDoc.addEventListener("fullscreenchange", applyPointer);
@@ -216,6 +217,10 @@ document.addEventListener("volumechange", (e) => scaleMedia(e.target), true);
 function setMasterVolume(v) {
   masterVolume = Math.min(1, Math.max(0, v));
   keep(VOLUME_KEY, String(masterVolume));
+  changedHere("sound");
+  applyMasterVolume();
+}
+function applyMasterVolume() {
   for (const g of masterGains.values()) g.gain.setTargetAtTime(masterVolume, g.context.currentTime, 0.02);
   for (const m of document.querySelectorAll("audio, video")) scaleMedia(m);
 }
@@ -1138,7 +1143,7 @@ async function watcherAction(b) {
 function fullscreenRow() {
   // A kiosk browser is full screen by itself and has no way out of it for a page (D-317): said, not offered.
   return `<div class="row"><span>Fullscreen</span>${browserFull() ? `<span class="faint" data-fs-kiosk>on: this browser shows nothing but the board</span>` : fsDoc.fullscreenEnabled ? `<button data-fs class="${fsDoc.fullscreenElement ? "on" : ""}">${fsDoc.fullscreenElement ? "Leave fullscreen" : "Fullscreen"}</button>` : `<span class="faint">not available in this browser</span>`}</div>
-    ${IN_PLAY ? "" : `<div class="row"><span>Screensaver <span class="faint">· after an hour without input this window goes dark with a clock; a touch brings it back</span></span><button data-screensaver class="${saverOn ? "on" : ""}" role="switch" aria-checked="${saverOn}">${saverOn ? "On" : "Off"}</button></div>`}
+    ${IN_PLAY ? "" : `<div class="row"><span>Screensaver <span class="faint">· after ${saverAfterText()} without input this window goes dark with a clock; a touch brings it back</span></span><button data-screensaver class="${saverOn ? "on" : ""}" role="switch" aria-checked="${saverOn}">${saverOn ? "On" : "Off"}</button></div>`}
     ${fsDoc.fullscreenEnabled ? `<div class="row"><span>Hide the mouse pointer in fullscreen <span class="faint">· for a touchscreen${browserFull() ? "" : "; Esc leaves fullscreen and shows it again"}</span></span><button data-hide-pointer class="${hidePointer ? "on" : ""}" role="switch" aria-checked="${hidePointer}">${hidePointer ? "On" : "Off"}</button></div>` : ""}`;
 }
 function toggleFullscreen() {
@@ -3047,7 +3052,7 @@ function onGameView(fn) {
  * screen in this browser (Settings › Display). Not inside Play from the board, whose deck is input the board can't see.
  */
 const SAVER_KEY = "gametable.screensaver";
-const SAVER_AFTER_MS = 60 * 60 * 1000;
+let SAVER_AFTER_MS = 60 * 60 * 1000; // an hour, or what the table was started with (--screensaver, D-319)
 let saverOn = stored(SAVER_KEY) !== "0";
 let lastInput = Date.now();
 let saverTimer = null;
@@ -3126,9 +3131,14 @@ function noteInput(e) {
   }
   if (!saverTimer) scheduleSaver();
 }
+function saverAfterText() {
+  const min = Math.round(SAVER_AFTER_MS / 60000);
+  return min === 60 ? "an hour" : min === 1 ? "a minute" : min % 60 === 0 ? `${min / 60} hours` : `${min} minutes`;
+}
 function setScreensaver(on) {
   saverOn = on;
   keep(SAVER_KEY, on ? "1" : "0");
+  changedHere("screensaver");
   lastInput = Date.now();
   scheduleSaver();
 }
@@ -3143,6 +3153,51 @@ if (!IN_PLAY) {
   onGameView(() => noteInput(null));
   scheduleSaver();
 }
+
+// ---------- this start's options for the table's screen ----------
+/**
+ * The table can be started with --screensaver, --pointer and --sound (D-319): for the table's own screen, and for
+ * that start only. They win over what this browser keeps and are not written to it; the settings show them as they
+ * are. A setting changed on the board is kept as before, and wins for the rest of that start (a reload included);
+ * the next start begins with its options again.
+ */
+const START_KEY = "gametable.changedThisStart";
+let startOptions = null;
+function changedThisStart() {
+  try {
+    const kept = JSON.parse(stored(START_KEY) ?? "null");
+    return kept && startOptions && kept.start === startOptions.start ? kept : { start: startOptions?.start, changed: [] };
+  } catch {
+    return { start: startOptions?.start, changed: [] };
+  }
+}
+function changedHere(what) {
+  if (!startOptions || startOptions[what] === undefined) return;
+  const kept = changedThisStart();
+  if (!kept.changed.includes(what)) kept.changed.push(what);
+  keep(START_KEY, JSON.stringify(kept));
+}
+function applyStartOptions() {
+  const s = state?.screen;
+  if (REMOTE || !s || startOptions?.start === s.start) return;
+  startOptions = s;
+  const changed = changedThisStart().changed;
+  if (typeof s.pointer === "boolean" && !changed.includes("pointer")) {
+    hidePointer = !s.pointer;
+    applyPointer();
+  }
+  if (typeof s.sound === "number" && !changed.includes("sound")) {
+    masterVolume = Math.min(1, Math.max(0, s.sound / 100));
+    applyMasterVolume();
+  }
+  if (typeof s.screensaver === "number") {
+    if (s.screensaver > 0) SAVER_AFTER_MS = s.screensaver * 60 * 1000;
+    if (!changed.includes("screensaver")) saverOn = s.screensaver > 0;
+    lastInput = Date.now();
+    scheduleSaver();
+  }
+}
+onState(applyStartOptions);
 
 async function refreshGames() {
   games = await api("GET", "/games").catch(() => games);

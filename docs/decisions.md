@@ -2875,3 +2875,30 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   ever, and Esc leaves fullscreen and brings it back. A browser where it was switched off stays off; one where it was
   never touched now hides the pointer in fullscreen.
   *Implementation (Claude):* `hidePointer` in `board.js`. Check: `scripts/e2e/board_screen.py`.
+  *Superseded by D-319: off to begin with again.*
+- **D-319 · 2026-11-22 · Klaus** — **The table's screen can be set at the start: `--screensaver N`, `--pointer on|off`,
+  `--sound N`. "Hide the mouse pointer" is off to begin with again.** "I now want to default again to be Off, but we
+  want to add command line options so that we can launch it the way it is used on the game PC … Setting these
+  options does not save the value, we only save the values when changed manually in the app settings. Commandline
+  options overwrite settings that may be stored, but the indicator on the settings page shows the actual setting."
+  - **`--screensaver N`:** the screensaver (D-298) after N minutes without input; 0: none. **`--pointer off`** hides
+    the pointer on the board and the deck beside it in fullscreen (D-296, D-317), **`--pointer on`** shows it (also
+    yes/no, show/hide). **`--sound X`:** the volume of the screen (D-297) in percent, 0 silent, 100 full. **`--help`**
+    lists every option and ends.
+  - **For the table's own screen, for this start.** The values travel in the lobby state (`screen`), and the board
+    takes them over what its browser keeps, without writing them there. A remote board is someone else's screen and
+    does not take them.
+  - **The settings show what holds**, and can change it. A change made on the board is saved as always, and holds
+    for the rest of that start (a reload included: the board remembers which settings were changed in which start).
+    The next start begins with its options again. Without an option, what the browser keeps decides, as before.
+  - **The pointer shows to begin with** (as before D-318, which this replaces): a table with a touchscreen is started
+    with `--pointer off`, so nothing has to be switched once per browser. A browser where the switch was set keeps
+    it. Switching the screensaver on at a table started with `--screensaver 0` gives the usual hour.
+  - **In the starter and the table host alike:** `game-table --pointer off`, `npm run table -- --pointer off`, or
+    `TABLE_SCREENSAVER`, `TABLE_POINTER`, `TABLE_SOUND` in the environment (the command line wins). A value that can't
+    be read stops the start with what the option needs.
+  - **Documented:** the Options table of the three installation guides, the README's environment table, `--help`. A
+    test keeps the starter's options, its help and the guides in step.
+  *Implementation (Claude):* `apps/table-host/src/screen-options.ts`, `screen` in `TableConfig`/`LobbyState`,
+  `applyStartOptions()` in `board.js`, `launch.ts`, `main.ts`. Checks: `tests/start-options.test.ts`,
+  `scripts/e2e/start_options.py`, `scripts/e2e/board_screen.py`.

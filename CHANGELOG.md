@@ -8,7 +8,8 @@ history.
 
 ## [Unreleased]
 
-- Board: "Hide the mouse pointer in fullscreen" is on unless switched off (D-318).
+- A table can be started with `--screensaver N` (minutes, 0: off), `--pointer on|off` and `--sound N` (percent) for its own screen: they hold for that start and win over the board's saved settings without changing them; the settings show them, and only a change made there is saved. In the packages' starter and the table host (`TABLE_SCREENSAVER`, `TABLE_POINTER`, `TABLE_SOUND`); the installation guides list every option (D-319).
+- Board: "Hide the mouse pointer in fullscreen" is off to begin with again; a table with a touchscreen starts with `--pointer off` (D-319, replaces D-318).
 - Board: a browser that shows nothing but the board (Chrome's kiosk mode, F11) counts as full screen: the mouse pointer hides there with the setting on, and the settings say so instead of offering Fullscreen (D-317).
 - Packages: a start no longer hangs when the GitHub CLI waits for a locked keyring (as after automatic login): after 30 s the starter says so and goes on; the Linux guide shows a read-only token for such a table (D-316).
 - FreeCell: the Linea design's corners are plain red or black, so a card's colour reads at a glance; the faces keep their suits' colours (D-310).
