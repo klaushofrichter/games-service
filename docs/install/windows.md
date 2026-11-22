@@ -228,11 +228,18 @@ Add them to the starter in a terminal: `"%LOCALAPPDATA%\Programs\Game Table\game
 | `--branch main` | Another branch of the game repositories (default `production`) |
 | `--sign-in` | Download the public repositories with your GitHub sign-in too |
 | `--home DIR` | Another folder for downloads and the table's data |
+| `--screensaver 10` | The table's screen goes dark, with a clock, after 10 minutes without input; `--screensaver 0`: never. Without the option: what the board's settings say (an hour to begin with) |
+| `--pointer off` | Hide the mouse pointer on the board, and on the deck beside it, in fullscreen: for a touchscreen. `--pointer on` shows it. Without the option: what the board's settings say (shown to begin with) |
+| `--sound 50` | The volume of the table's screen in percent: `--sound 0` is silent, `--sound 100` full. Without the option: what the board's settings say (full to begin with) |
 | `--service`, `--code ABCD-EFGH` | Join the Game Table service, see below |
 | `--version` | The package's version, and every game on the table with its version and source |
 | `--smoke-test` | Check the installation: start, check that the board answers and the games are there, stop; fails if a named repository is missing |
 | `--expect-games a,b` | With `--smoke-test`: these games (their ids, as `--version` lists them) must be on the table |
 | `--help` | All the options |
+
+`--screensaver`, `--pointer` and `--sound` are for the table's own screen and for this start: they win over what the
+board's browser keeps, and are not saved. The board's settings show them as they are and can change them; a change
+made there is kept as always, and holds until the table is started again with the option.
 
 ## Remote players: the Game Table service
 

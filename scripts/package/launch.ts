@@ -21,6 +21,7 @@ import { fileURLToPath } from "node:url";
 import { gunzipSync } from "node:zlib";
 import JSZip from "jszip";
 import { readTarGz } from "../../packages/protocol/src/bundle.ts";
+import { SCREEN_OPTIONS_HELP, screenOptions } from "../../apps/table-host/src/screen-options.ts";
 
 const OWNER = "klaushofrichter";
 /** Downloaded at every start, no sign-in (D-284): extra-games, and synth-game (FM-1 Synth, a solo game). */
@@ -62,9 +63,13 @@ interface Options {
   smokeTest: boolean;
   expectGames: string[];
   showVersion?: boolean;
+  /** The table's own screen for this start (D-319), as given. */
+  screensaver?: string;
+  pointer?: string;
+  sound?: string;
 }
 
-function parseArgs(argv: string[]): Options {
+export function parseArgs(argv: string[]): Options {
   const o: Options = { noUpdate: false, port: 8080, open: true, branch: "production", signIn: false, service: false, smokeTest: false, expectGames: [] };
   for (let i = 0; i < argv.length; i++) {
     const [flag, inline] = argv[i].includes("=") ? [argv[i].slice(0, argv[i].indexOf("=")), argv[i].slice(argv[i].indexOf("=") + 1)] : [argv[i], undefined];
@@ -84,6 +89,9 @@ function parseArgs(argv: string[]): Options {
       case "service": o.service = true; break;
       case "code": o.code = value(); o.service = true; break;
       case "home": o.home = value(); break;
+      case "screensaver": o.screensaver = value(); break;
+      case "pointer": o.pointer = value(); break;
+      case "sound": o.sound = value(); break;
       case "version": case "v": o.showVersion = true; break;
       case "smoketest": o.smokeTest = true; o.open = false; break;
       case "expectgames": o.expectGames = value().split(",").map((s) => s.trim()).filter(Boolean); break;
@@ -95,10 +103,15 @@ function parseArgs(argv: string[]): Options {
   }
   if (!Number.isInteger(o.port) || o.port < 1 || o.port > 65535) fail("--port needs a port number");
   if (!/^[A-Za-z0-9._/-]+$/.test(o.branch)) fail("--branch needs a branch name");
+  try {
+    screenOptions(o);
+  } catch (e) {
+    fail((e as Error).message);
+  }
   return o;
 }
 
-function readmeText() {
+export function readmeText() {
   return [
     "Game Table on this computer",
     "  --repos \"a b\"     the private game repositories (owner/name or name) for this start, without asking;",
@@ -113,6 +126,7 @@ function readmeText() {
     "  --service         join the Game Table service (remote players); approve the table in the console",
     "  --code ABCD-EFGH  join the service with an access code from the console",
     "  --home DIR        another folder for downloads and data",
+    ...SCREEN_OPTIONS_HELP,
     "  --version         the package's version and the games on the table (MANIFEST.json, games.json)",
     "  --smoke-test      check the installation: start, check the board and the games, stop; fails if a named",
     "                    repository is missing. Uses the saved private repositories without asking or changing them",
@@ -654,6 +668,10 @@ async function main() {
     TABLE_QUIT: "1", // the board's Advanced window can quit this table (D-315): the way out of a kiosk browser
     APP_VERSION: version,
   };
+  // The table's own screen, this start only (D-319).
+  if (o.screensaver !== undefined) env.TABLE_SCREENSAVER = o.screensaver;
+  if (o.pointer !== undefined) env.TABLE_POINTER = o.pointer;
+  if (o.sound !== undefined) env.TABLE_SOUND = o.sound;
   delete env.CLOUD_URL;
   delete env.TABLE_CODE;
   if (o.service) env.CLOUD_URL = SERVICE_URL;

@@ -238,7 +238,7 @@ board() {  # (--password-store=basic: with automatic login the keyring stays loc
 if curl -fs -o /dev/null "$BOARD"; then board; exit; fi
 # A kiosk browser left from an earlier start would take the new window's address and leave this script with nothing.
 pkill -f -- "--user-data-dir=$PROFILE" 2> /dev/null
-~/apps/game-table/game-table --no-open --repos all & TABLE=$!
+~/apps/game-table/game-table --no-open --repos all --pointer off & TABLE=$!
 echo "Starting Game Table…"  # (the wait below is quiet: a line of "connection refused" every second reads like a fault)
 until curl -fs -o /dev/null "$BOARD"; do
   if ! kill -0 "$TABLE" 2> /dev/null; then  # it ended before the board was there: keep what it said on screen
@@ -258,7 +258,9 @@ pkill -f -- "--user-data-dir=$PROFILE" 2> /dev/null
 A kiosk browser has no way out of its own: Esc does nothing, and a page cannot close it. The way out is on the board:
 **Advanced › This computer › Quit the table…** stops Game Table, and the script then closes the browser, back to the
 desktop and its icon. With a keyboard, Alt+F4 closes the browser, and the script stops the table. `--repos all`
-brings every game repository of `klaushofrichter` your sign-in can read; name them instead if you prefer.
+brings every game repository of `klaushofrichter` your sign-in can read; name them instead if you prefer. `--pointer off`
+hides the mouse pointer, which a touchscreen does not need; `--screensaver` and `--sound` set the table's screensaver
+and volume the same way (see [Options](#options)).
 
 **Private repositories on a computer that logs in by itself.** The GitHub CLI keeps its sign-in in the desktop's
 keyring, and with automatic login the keyring stays locked: the start then waits for the keyring's password (the
@@ -403,11 +405,18 @@ still keeps every phone out.
 | `--branch main` | Another branch of the game repositories (default `production`) |
 | `--sign-in` | Download the public repositories with your GitHub sign-in too |
 | `--home DIR` | Another folder for downloads and the table's data |
+| `--screensaver 10` | The table's screen goes dark, with a clock, after 10 minutes without input; `--screensaver 0`: never. Without the option: what the board's settings say (an hour to begin with) |
+| `--pointer off` | Hide the mouse pointer on the board, and on the deck beside it, in fullscreen: for a touchscreen. `--pointer on` shows it. Without the option: what the board's settings say (shown to begin with) |
+| `--sound 50` | The volume of the table's screen in percent: `--sound 0` is silent, `--sound 100` full. Without the option: what the board's settings say (full to begin with) |
 | `--service`, `--code ABCD-EFGH` | Join the Game Table service, see below |
 | `--version` | The package's version, and every game on the table with its version and source |
 | `--smoke-test` | Check the installation: start, check that the board answers and the games are there, stop; fails if a named repository is missing |
 | `--expect-games a,b` | With `--smoke-test`: these games (their ids, as `--version` lists them) must be on the table |
 | `--help` | All the options |
+
+`--screensaver`, `--pointer` and `--sound` are for the table's own screen and for this start: they win over what the
+board's browser keeps, and are not saved. The board's settings show them as they are and can change them; a change
+made there is kept as always, and holds until the table is started again with the option.
 
 ## Remote players: the Game Table service
 

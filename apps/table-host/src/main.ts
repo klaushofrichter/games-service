@@ -1,5 +1,6 @@
 // Table Host entry point. Configuration comes from environment variables (see README).
 import { startHost } from "./host.ts";
+import { SCREEN_OPTIONS_HELP, screenOptions, type ScreenOptions } from "./screen-options.ts";
 
 const env = process.env;
 // Unset values fall back to the defaults in host.ts.
@@ -15,10 +16,25 @@ const arg = (name: string) => {
 // code. The environment wins over the command line, and both win over a code typed on the board (Advanced).
 const accessCode = env.TABLE_CODE || arg("code") || undefined;
 
+if (process.argv.slice(2).some((a) => a === "--help" || a === "-h")) {
+  console.log(["Table Host (configuration: environment variables, see README)", "  --code ABCD-EFGH  join the service with an access code from the console (TABLE_CODE)", ...SCREEN_OPTIONS_HELP,
+    "                    (TABLE_SCREENSAVER, TABLE_POINTER, TABLE_SOUND in the environment; the command line wins)", "  --help            these options"].join("\n"));
+  process.exit(0);
+}
+// The table's own screen for this start (D-319): the command line wins over the environment.
+let screen: ScreenOptions | undefined;
+try {
+  screen = screenOptions({ screensaver: arg("screensaver") ?? env.TABLE_SCREENSAVER, pointer: arg("pointer") ?? env.TABLE_POINTER, sound: arg("sound") ?? env.TABLE_SOUND });
+} catch (e) {
+  console.error(`[table-host] ${(e as Error).message}`);
+  process.exit(1);
+}
+
 // Quit from the board (TABLE_QUIT=1, D-315): the packages' starter sets it; a hosted or Docker table does not.
 let quit = () => {};
 const host = await startHost({
   onQuit: env.TABLE_QUIT === "1" ? () => quit() : undefined,
+  screen,
   port: num(env.PORT),
   tableName: env.TABLE_NAME,
   tableKey: env.TABLE_KEY,
