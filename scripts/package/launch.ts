@@ -4,7 +4,7 @@
 // the GitHub CLI's sign-in), puts all games in one folder and starts the table host without the Game Table service.
 // With --service it joins the service instead (remote players; approval in the console or an access code, D-113).
 //
-//   game-table [--repos "a b" | --repos none] [--no-update] [--port 8080] [--no-open] [--branch production]
+//   game-table [--repos "a b" | --repos all | --repos none] [--no-update] [--port 8080] [--no-open] [--branch production]
 //              [--sign-in] [--service [--code ABCD-EFGH]] [--home DIR] [--smoke-test --expect-games a,b]
 //
 // No npm packages beyond games-service's own runtime ones, no git: repositories come as tarballs of their branch.
@@ -103,6 +103,8 @@ function readmeText() {
     "Game Table on this computer",
     "  --repos \"a b\"     the private game repositories (owner/name or name) for this start, without asking;",
     "                    --repos none: none. The saved list (the answer to the question) stays as it is",
+    `                    --repos all: every game repository of ${OWNER} your GitHub sign-in can read (its name ends`,
+    "                    in -game or -games), so a new one is on the table without naming it",
     "  --no-update       start what was downloaded last time",
     "  --port 8081       another port (default 8080)",
     "  --no-open         don't open the board in the browser",
@@ -241,6 +243,33 @@ function repoName(text: string): string {
   if (!t.includes("/")) t = `${OWNER}/${t}`;
   if (!/^[A-Za-z0-9-]+\/[A-Za-z0-9._-]+$/.test(t)) fail(`'${text}' is not a repository name (owner/name or name).`);
   return t;
+}
+
+/** `--repos all` (D-314): the repositories are found, not named. */
+const wantsAll = (o: Options) => o.repos?.trim().toLowerCase() === "all";
+/** A game repository by its name: `…-game` or `…-games` (traders-game, extra-games). */
+const GAME_REPO = /-games?$/i;
+
+/**
+ * Every game repository of OWNER that this sign-in can read (D-314), by name, the public ones the table has anyway
+ * left out. Asked of GitHub at every start, so a new repository is on the table without anyone naming it.
+ */
+export async function allGameRepos(token: string): Promise<string[]> {
+  const found: string[] = [];
+  for (let page = 1; page <= 10; page++) {
+    const list = JSON.parse((await get(`https://api.github.com/user/repos?per_page=100&page=${page}&affiliation=owner,collaborator,organization_member`, { Accept: "application/vnd.github+json", Authorization: `Bearer ${token}` })).toString("utf8")) as { full_name: string; name: string; archived?: boolean; owner: { login: string } }[];
+    for (const r of list) {
+      if (r.owner.login.toLowerCase() === OWNER && GAME_REPO.test(r.name) && !r.archived && !PUBLIC_REPOS.includes(r.full_name)) found.push(r.full_name);
+    }
+    if (list.length < 100) break;
+  }
+  return found.sort();
+}
+
+/** The game repositories of OWNER downloaded before (for `--repos all` without the network, or with --no-update). */
+export async function downloadedGameRepos(reposDir: string): Promise<string[]> {
+  const names = await readdir(join(reposDir, OWNER), { withFileTypes: true }).catch(() => []);
+  return names.filter((e) => e.isDirectory() && GAME_REPO.test(e.name) && existsSync(join(reposDir, OWNER, e.name, "games"))).map((e) => `${OWNER}/${e.name}`).filter((r) => !PUBLIC_REPOS.includes(r)).sort();
 }
 
 async function choosePrivate(o: Options, savedFile: string): Promise<string[]> {
@@ -523,10 +552,24 @@ async function main() {
     await writeFile(stamp, version + "\n");
   }
 
-  const priv = await choosePrivate(o, join(home, "private-repos.txt"));
-  const repos = [...PUBLIC_REPOS, ...priv];
+  const all = wantsAll(o);
+  let priv = all ? [] : await choosePrivate(o, join(home, "private-repos.txt"));
   let token: string | null = null;
-  if ((priv.length || o.signIn) && !o.noUpdate) token = await githubToken(tools);
+  if ((priv.length || o.signIn || all) && !o.noUpdate) token = await githubToken(tools);
+  // --repos all (D-314): what GitHub lists for this sign-in; without it (no sign-in, no network, --no-update) what was
+  // downloaded before. A repository found this way that has no games on this branch is left out without a fuss.
+  const foundByName = new Set<string>();
+  if (all) {
+    try {
+      priv = token ? await allGameRepos(token) : await downloadedGameRepos(reposDir);
+      if (token) say(`Game repositories of ${OWNER} this sign-in can read: ${priv.map((r) => r.split("/")[1]).join(", ") || "(none besides the public ones)"}`);
+    } catch (e) {
+      priv = await downloadedGameRepos(reposDir);
+      note(`GitHub did not list the repositories (${(e as Error).message}); using those downloaded before: ${priv.join(", ") || "none"}.`);
+    }
+    for (const r of priv) foundByName.add(r);
+  }
+  const repos = [...PUBLIC_REPOS, ...priv];
   const have: string[] = [];
   const missing: string[] = [];
   for (const r of repos) {
@@ -546,6 +589,8 @@ async function main() {
       if (present) {
         note(`${r} could not be downloaded (${why}); using the copy from last time.`);
         have.push(r);
+      } else if (foundByName.has(r)) {
+        say(`${r}: left out (${why})`); // (found by its name, not asked for by name: it need not hold games)
       } else {
         missing.push(r);
         note(`${r} could not be downloaded (${why}): no access with this GitHub account, no branch ${o.branch}, or no network. Its games are left out.`);
@@ -598,6 +643,7 @@ async function main() {
     TABLE_NAME: process.env.TABLE_NAME || (isWin ? process.env.COMPUTERNAME : undefined) || "Game Table",
     SHOW_TEST_GAMES: "0",
     LOCAL_TABLE: "1",
+    TABLE_QUIT: "1", // the board's Advanced window can quit this table (D-315): the way out of a kiosk browser
     APP_VERSION: version,
   };
   delete env.CLOUD_URL;
@@ -694,4 +740,5 @@ async function main() {
   child.on("exit", (code) => process.exit(code ?? 0));
 }
 
-await main().catch((e: Error) => fail(`Game Table could not start: ${e.message}`));
+// (Started as the program; a test imports its parts without starting a table.)
+if (import.meta.main) await main().catch((e: Error) => fail(`Game Table could not start: ${e.message}`));

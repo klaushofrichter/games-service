@@ -2791,3 +2791,49 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
     no longer loaded with the first screen. The hero's count of games is ten (FreeCell).
   *Implementation (Claude):* `home.html`, `sitePage()` and `sendHtml()` in `apps/cloud/src/server.ts`. Checks:
   `tests/website.test.ts`, `scripts/e2e/website.py` (both pages at two widths, the top bar both ways, an old link).
+  - *2026-11-21, Klaus:* "Check all links in the landing page, I think /build#about has no target? … Can we build a
+    test that verifies that all clickable links have a valid target?" Four links in the foot (*The table*, *Game
+    service*, *Game repositories*, *About*) were written for the landing page only and led nowhere from `/build`; they
+    are `/#…` now. And every link is checked from now on:
+    - **Within the website**, with every change: `scripts/e2e/website.py` asks the page as the browser has it (so
+      links the script writes count too), on the landing page, `/build` and the terms, at both widths: the page a link
+      leads to answers, and its `#place` exists there. `tests/website.test.ts` checks the same from the pages' text.
+    - **To other websites**, by hand: `node scripts/check-site-links.mjs` asks each one. Not part of the checks a
+      change must pass: they depend on other people's servers and the network (Cluster's rule: no merge past a flaky
+      check). *(Claude: a weekly run of it could be added as a workflow that blocks nothing.)*
+- **D-313 · 2026-11-21 · Klaus** — **The Linux guide says how to make a computer the table's own.** Klaus asked for
+  his game PC (Debian 13) to log in by itself at power-on and after a reboot, never to lock or log out, and to have an
+  icon on the desktop that starts the table in production. Cluster, which reaches that PC, did it with Klaus (the PC
+  runs XFCE with LightDM, not the GNOME this session had assumed) and sent the steps that worked; they are in
+  `docs/install/linux.md` under *A table of its own*. Nothing in the platform changed. The starter plays the
+  `production` branch by default, so the icon needs no option for it.
+- **D-314 · 2026-11-21 · Klaus** — **The starter's `--repos all`.** Asked by Klaus in Cluster's session and passed on:
+  the Game Table PC starts from a desktop icon with a fixed list of repositories (`--repos "traders-game loopy-game
+  …"`), so a new game repository would be missed. `--repos all` asks GitHub, at every start, for the repositories of
+  `klaushofrichter` the sign-in can read and takes those named `…-game` or `…-games` (the convention all of them
+  follow: traders-game, loopy-game, starforge-game, ge150pro-game, synth-game, extra-games), without the archived
+  ones and without the public ones every table has anyway.
+  - **By name, not by content:** telling a game repository by its `games/` folder would mean downloading every
+    repository of the account at each start. One that carries the name but has no games on the branch is left out
+    with a line, and is not a failure (also not for `--smoke-test`, which fails only for repositories named).
+  - **Without GitHub** (no sign-in, no network, `--no-update`): the game repositories downloaded before.
+  - It is for this start, like every `--repos`: the saved list (the answer to the question) stays as it is.
+  - **Not changed:** `ge150pro-game` is public but not among the repositories every table downloads (extra-games,
+    synth-game, D-284): it needs a pedal. `--repos all` brings it; so does naming it.
+  *Implementation (Claude):* `allGameRepos()`, `downloadedGameRepos()` in `scripts/package/launch.ts`, which now starts
+  a table only when run as the program (`import.meta.main`), so its parts can be tested. Check:
+  `tests/launcher.test.ts`. The packages on the release *local-table* have it once they are built again.
+- **D-315 · 2026-11-21 · Klaus** — **Quit the table from its board.** "The Cluster agent configured kiosk mode, so we
+  will need an 'exit game' in the developer options or some other way to get out of Chrome. Esc does not work
+  anymore." A page cannot close a kiosk window it did not open, so the way out ends at the table itself:
+  - **Advanced › This computer › Quit the table…**, on the table's own board (never a remote board), asked first
+    ("Game Table stops on this computer…; the game that is on ends"). The table closes as on a stop signal (logs and
+    data written) and its program ends; the board says *Game Table has quit*.
+  - **Only where the table was started for it:** `TABLE_QUIT=1`, which the packages' starter sets. A hosted table, a
+    Docker table and a developer's `node …/main.ts` don't offer it (`POST /quit` answers 409).
+  - **The browser** is closed by whatever started it. On Klaus's table PC that is Cluster's start script: it starts
+    the starter and the kiosk Chrome, and when either ends it ends the other (agreed with Cluster, which also saw no
+    conflict with that PC's CI runners: they are containers, the table's program is not).
+  - **Later, if wanted:** a `--kiosk` option of the starter that opens and closes the kiosk browser itself.
+  *Implementation (Claude):* `onQuit` in `HostOptions`/`ServerOptions`, `canQuit` in the lobby state, `quitTable()` in
+  `board.js`, `TABLE_QUIT` in `main.ts` and `launch.ts`. Checks: `tests/quit.test.ts`, `scripts/e2e/quit.py`.

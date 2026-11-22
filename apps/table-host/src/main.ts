@@ -15,7 +15,10 @@ const arg = (name: string) => {
 // code. The environment wins over the command line, and both win over a code typed on the board (Advanced).
 const accessCode = env.TABLE_CODE || arg("code") || undefined;
 
+// Quit from the board (TABLE_QUIT=1, D-315): the packages' starter sets it; a hosted or Docker table does not.
+let quit = () => {};
 const host = await startHost({
+  onQuit: env.TABLE_QUIT === "1" ? () => quit() : undefined,
   port: num(env.PORT),
   tableName: env.TABLE_NAME,
   tableKey: env.TABLE_KEY,
@@ -74,6 +77,10 @@ host.table.on("state", (s) => {
 });
 if (!process.env.TABLE_KEY) console.log(`[table-host] TABLE_KEY not set; generated key for this run: ${host.tableKey}`);
 
+quit = () => {
+  console.log("[table-host] quit from the board");
+  void host.close().finally(() => process.exit(0));
+};
 for (const sig of ["SIGINT", "SIGTERM"] as const) {
   process.on(sig, async () => {
     await host.close();

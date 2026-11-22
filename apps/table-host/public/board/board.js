@@ -293,6 +293,21 @@ document.addEventListener(
   true,
 );
 
+/**
+ * Quit the table from its own board (D-315): where the table's computer shows nothing but the board (a kiosk browser,
+ * which a page cannot close), this is the way out. Asked first; then the table ends, and whatever started it closes
+ * the browser. If the browser stays, the page says what happened.
+ */
+async function quitTable() {
+  if (!(await confirmDialog("Quit the table?", state.phase === "active" || state.phase === "paused" ? "Game Table stops on this computer. The game that is on ends, and the phones lose the table." : "Game Table stops on this computer, and the phones lose the table.", "Quit the table"))) return;
+  try {
+    await api("POST", "/quit");
+  } catch (err) {
+    return toast(err.message || "The table could not be quit");
+  }
+  document.body.innerHTML = `<div id="quit-note" style="position:fixed;inset:0;display:grid;place-items:center;text-align:center;font:28px var(--text);color:var(--ink)"><div><div style="font:600 44px var(--display);margin-bottom:14px">Game Table has quit</div><div style="color:var(--ink-soft)">Start it again from its icon. This window can be closed.</div></div></div>`;
+}
+
 function confirmDialog(title, text, okLabel = "Confirm") {
   return new Promise((resolve) => {
     const d = document.createElement("div");
@@ -2538,6 +2553,8 @@ function openAdvanced() {
         <div class="row" style="margin-top:10px"><span>Play from the board: one player's deck beside the board, no phone</span><button data-adv="board-deck" class="${state.developer?.boardDeck ? "on" : ""}" role="switch" aria-checked="${!!state.developer?.boardDeck}">${state.developer?.boardDeck ? "On" : "Off"}</button></div>
         <div class="faint" style="font-size:.7em;margin-top:6px">For developing games without a phone: the board shows one player's deck, like a remote player's page, and nobody else joins at the table (the QR code goes); remote and AI players as usual. Off again when the table restarts; that player stays.</div>
         <div class="row" style="margin-top:10px"><span>What holds the game up right now: AI players, the board, the phones</span><button data-adv="live">Live status…</button></div></div>`}
+      ${state.canQuit && !REMOTE ? `<div class="group"><div class="eyebrow">This computer</div>
+        <div class="row"><span>Quit the table <span class="faint">· stops Game Table on this computer; a game that is on ends</span></span><button data-adv="quit">Quit the table…</button></div></div>` : ""}
       ${serviceSettings()}
       ${versionsGroup(platform)}
       <div class="actions settings-actions"><button class="primary" data-close-overlay>Done</button></div></div>`);
@@ -2566,6 +2583,7 @@ function openAdvanced() {
     if (a === "sim") return (close(), openSimulation());
     if (a === "logs") return (close(), openGameLogs());
     if (a === "live") return (close(), openLiveStatus());
+    if (a === "quit") return (close(), quitTable());
     if (a === "data") return (close(), openGameData());
     if (b?.dataset.accessCode !== undefined) return openCodePad();
     if (a === "no-local") act("POST", "/developer", { allowNoLocalPlayer: !state.developer?.allowNoLocalPlayer });

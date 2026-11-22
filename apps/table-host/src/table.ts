@@ -73,6 +73,8 @@ export interface TableConfig {
   requireCloud: boolean; // phase 1a dev mode may run without the cloud
   maxRemotePlayers: number;
   showTestGames: boolean; // stub games used by the automated tests
+  /** The table may be quit from its own board (TABLE_QUIT=1, D-315). */
+  canQuit: boolean;
   /** A snapshot of the whole state in the log every N inputs (D-116); 0: none. */
   logSnapshotEvery: number;
   /** The developer setting's value at start (ALLOW_NO_LOCAL_PLAYER, D-118); the board can change it until a restart. */
@@ -250,6 +252,7 @@ export class Table extends EventEmitter {
       away: this.awayPlayers(),
       exchange: this.exchangeInfo(),
       developer: { allowNoLocalPlayer: this.allowNoLocalPlayer, boardDeck: this.boardDeck, protectedPlayer: this.protectedPlayer()?.id ?? null },
+      ...(this.config.canQuit ? { canQuit: true } : {}),
       noSeat: this.noFreeSeat(),
       suggestedName: this.suggestedName(),
       localTable: this.localTable,

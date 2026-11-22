@@ -343,6 +343,8 @@ export interface LobbyState {
    * while a game is chosen or running).
    */
   developer: { allowNoLocalPlayer: boolean; boardDeck: boolean; protectedPlayer: string | null };
+  /** The table may be quit from its own board (D-315): a table on a computer of its own, started with TABLE_QUIT=1. */
+  canQuit?: boolean;
   /** Why nobody can take a seat now (every seat taken, or the chosen game is full), or null (D-129). */
   noSeat: string | null;
   /** "Player N" for someone joining without a name (D-244): the deck's name field and the invite start with it. */

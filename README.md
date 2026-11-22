@@ -114,6 +114,7 @@ board moves there; the table's own window says "The board moved to another scree
 | `BOARD_PACING` | 1 | `0`: AI players don't wait for the board's animations (D-141) |
 | `LOG_SNAPSHOT_EVERY` | 0 | A snapshot of the whole game state in the log every N moves (D-116); 0: only the final state |
 | `SHOW_TEST_GAMES` | 0 | `1` lists the test games (`quartet`, `card-sling`) in the game menu; the tests and `run-all.sh` turn it on |
+| `TABLE_QUIT` | 0 | `1` lets the table be quit from its own board (Advanced › *Quit the table*, asked first): the way out where the browser shows nothing but the board (a kiosk). The packages' starter sets it; a hosted or Docker table does not (D-315) |
 | `DATA_DIR`, `GAMES_DIR` | `<repo>/data`, `<repo>/games` | Logs, saves, the table's identity and a typed access code (`table.json`) and extra-game bundles (`extra-games/`); the built-in games |
 
 ## Board control API
