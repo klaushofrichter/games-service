@@ -8,6 +8,7 @@ history.
 
 ## [Unreleased]
 
+- FreeCell: the Linea design's corners are plain red or black, so a card's colour reads at a glance; the faces keep their suits' colours (D-310).
 - Website: four links in the foot (The table, Game service, Game repositories, About) led nowhere from /build; fixed, and every link within the website is now checked with each change (D-312).
 - Packages: `--repos all` takes every game repository of klaushofrichter the GitHub sign-in can read (named …-game or …-games), so a new one needs no naming (D-314). In the packages once they are built again.
 - Board: Advanced › Quit the table, on a table started by the packages' starter: it stops Game Table on that computer, the way out of a kiosk browser (D-315).
