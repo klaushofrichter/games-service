@@ -51,7 +51,7 @@ try:
         assert "watch=1" in link, link
         board.screenshot(path=os.path.join(OUT, "watch-invite.png"))
 
-        wctx = b.new_context(viewport={"width": 1440, "height": 900})
+        wctx = b.new_context(viewport={"width": 1440, "height": 900}, screen={"width": 2560, "height": 1440})  # a window on a larger screen (D-317)
         wanda = wctx.new_page()
         watch(wanda, "watcher")
         wanda.goto(link)

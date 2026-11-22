@@ -59,10 +59,29 @@ const fsDoc = (() => {
  * left without a pointer; in fullscreen without the setting it shows as the usual arrow. Kept per screen in this
  * browser: it depends on whether that screen is touched.
  */
+/**
+ * A browser started to show nothing but the page (Chrome's --kiosk, an installed app in fullscreen, F11) fills the
+ * screen without the page having asked: `fullscreenElement` stays empty (D-317). Two things tell: the display mode, and
+ * a window exactly as large as the screen (a browser with its tabs and address bar never is). The board is full screen
+ * in any of these cases.
+ */
+const kioskMedia = (() => {
+  try {
+    return (fsDoc.defaultView ?? window).matchMedia("(display-mode: fullscreen)");
+  } catch {
+    return null;
+  }
+})();
+const coversScreen = () => {
+  const w = fsDoc.defaultView ?? window;
+  return w.screen.width > 0 && w.innerWidth === w.screen.width && w.innerHeight === w.screen.height;
+};
+const browserFull = () => !fsDoc.fullscreenElement && (!!kioskMedia?.matches || coversScreen());
+const isFull = () => !!fsDoc.fullscreenElement || browserFull();
 const POINTER_KEY = "gametable.hidePointer";
 let hidePointer = stored(POINTER_KEY) === "1";
 function applyPointer() {
-  const full = !!fsDoc.fullscreenElement;
+  const full = isFull();
   // The page fullscreen applies to too: inside Play from the board, the frame around the board and the deck, and
   // the deck itself (same origin); it is asked again when the deck's page loads.
   let deckDoc = null;
@@ -92,6 +111,8 @@ function setHidePointer(on) {
   applyPointer();
 }
 fsDoc.addEventListener("fullscreenchange", applyPointer);
+kioskMedia?.addEventListener?.("change", applyPointer);
+(fsDoc.defaultView ?? window).addEventListener("resize", applyPointer);
 applyPointer();
 /**
  * Fullscreen across Play from the board (D-299): switching it on or off moves the board to another page (board/play.html
@@ -111,7 +132,7 @@ function noteFullscreenForNextPage() {
   try {
     pending = sessionStorage.getItem(REFULL_KEY) === "1";
   } catch {}
-  if (!pending || !fsDoc.fullscreenEnabled || fsDoc.fullscreenElement) return;
+  if (!pending || !fsDoc.fullscreenEnabled || isFull()) return; // (a kiosk browser is full screen already: nothing to return to)
   const hint = document.createElement("button");
   hint.id = "fullscreen-hint";
   hint.textContent = "⛶ Tap to return to fullscreen";
@@ -1115,9 +1136,10 @@ async function watcherAction(b) {
 }
 /** The settings' Fullscreen row, also in a watcher's window (D-221): the whole page where it applies (D-184). */
 function fullscreenRow() {
-  return `<div class="row"><span>Fullscreen</span>${fsDoc.fullscreenEnabled ? `<button data-fs class="${fsDoc.fullscreenElement ? "on" : ""}">${fsDoc.fullscreenElement ? "Leave fullscreen" : "Fullscreen"}</button>` : `<span class="faint">not available in this browser</span>`}</div>
+  // A kiosk browser is full screen by itself and has no way out of it for a page (D-317): said, not offered.
+  return `<div class="row"><span>Fullscreen</span>${browserFull() ? `<span class="faint" data-fs-kiosk>on: this browser shows nothing but the board</span>` : fsDoc.fullscreenEnabled ? `<button data-fs class="${fsDoc.fullscreenElement ? "on" : ""}">${fsDoc.fullscreenElement ? "Leave fullscreen" : "Fullscreen"}</button>` : `<span class="faint">not available in this browser</span>`}</div>
     ${IN_PLAY ? "" : `<div class="row"><span>Screensaver <span class="faint">· after an hour without input this window goes dark with a clock; a touch brings it back</span></span><button data-screensaver class="${saverOn ? "on" : ""}" role="switch" aria-checked="${saverOn}">${saverOn ? "On" : "Off"}</button></div>`}
-    ${fsDoc.fullscreenEnabled ? `<div class="row"><span>Hide the mouse pointer in fullscreen <span class="faint">· for a touchscreen; Esc leaves fullscreen and shows it again</span></span><button data-hide-pointer class="${hidePointer ? "on" : ""}" role="switch" aria-checked="${hidePointer}">${hidePointer ? "On" : "Off"}</button></div>` : ""}`;
+    ${fsDoc.fullscreenEnabled ? `<div class="row"><span>Hide the mouse pointer in fullscreen <span class="faint">· for a touchscreen${browserFull() ? "" : "; Esc leaves fullscreen and shows it again"}</span></span><button data-hide-pointer class="${hidePointer ? "on" : ""}" role="switch" aria-checked="${hidePointer}">${hidePointer ? "On" : "Off"}</button></div>` : ""}`;
 }
 function toggleFullscreen() {
   (fsDoc.fullscreenElement ? fsDoc.exitFullscreen() : fsDoc.documentElement.requestFullscreen()).catch(() => toast("Fullscreen was refused by the browser"));

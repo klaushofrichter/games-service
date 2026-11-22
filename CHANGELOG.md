@@ -8,6 +8,7 @@ history.
 
 ## [Unreleased]
 
+- Board: a browser that shows nothing but the board (Chrome's kiosk mode, F11) counts as full screen: the mouse pointer hides there with the setting on, and the settings say so instead of offering Fullscreen (D-317).
 - Packages: a start no longer hangs when the GitHub CLI waits for a locked keyring (as after automatic login): after 30 s the starter says so and goes on; the Linux guide shows a read-only token for such a table (D-316).
 - FreeCell: the Linea design's corners are plain red or black, so a card's colour reads at a glance; the faces keep their suits' colours (D-310).
 - Website: four links in the foot (The table, Game service, Game repositories, About) led nowhere from /build; fixed, and every link within the website is now checked with each change (D-312).
