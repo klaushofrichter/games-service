@@ -2752,6 +2752,11 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   `assets/cards.js` and `cards.css` (shared by board and phone), `deck.js`, `deck.css`. Checks:
   `tests/freecell.test.ts`, `scripts/e2e/freecell.py` (each design on the board, kept across a reload; a card taken
   back, undone, refused with the rule off).
+  - *2026-11-22, Klaus:* "The Linea card faces are nice, but in FreeCell it is important to know if a card is red or
+    black … change at least the top left card value colour …, and we can keep the remainder of the face as it is."
+    Linea's corner (rank and suit) is plain red for hearts and diamonds and black for spades and clubs; the pip or
+    the drawing below keeps its suit's colour (blue, pink, orange, green). *(Klaus wrote "red or green"; Claude took
+    it as red and black, the two a FreeCell player tells apart, and said so.)* The website's picture of Linea is new.
 - **D-311 · 2026-11-21 · Klaus** — **The website shows FreeCell's card designs.** "A section in the landing page showing
   these cards as 'customized card designs can be selected in FreeCell', and that users can ask their LLM to add more.
   Mention [the model] … Show the designs in a soft and smooth animation, either time based or synced with scrolling."

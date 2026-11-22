@@ -15,7 +15,7 @@ export const DESIGNS = [
   { id: "plain", name: "Plain", text: "Large, clear, no decoration." },
   { id: "mosaic", name: "Mosaic", text: "Green and gold, with tiled court cards." },
   { id: "botanical", name: "Botanical", text: "A flower for every rank." },
-  { id: "linea", name: "Linea", text: "Line drawings, a colour for each suit." },
+  { id: "linea", name: "Linea", text: "Line drawings in each suit's colour; corners in red and black." },
   { id: "speakeasy", name: "Speakeasy", text: "Sketches from the twenties on old paper." },
 ];
 export const DEFAULT_DESIGN = "classic";
