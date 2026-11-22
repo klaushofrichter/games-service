@@ -81,12 +81,13 @@ try:
         prevented = home.evaluate("""() => { const e = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
           document.querySelector('button.tile').dispatchEvent(e); return e.defaultPrevented; }""")
         assert prevented, "the board lets the browser open its context menu"
-        # The mouse pointer in fullscreen (D-296): hidden only in fullscreen with the setting on, as it is from the start
-        # (D-318); Esc (leaving
-        # fullscreen) always brings it back.
+        # The mouse pointer in fullscreen (D-296): hidden only in fullscreen with the setting on (off to begin with,
+        # D-319); Esc (leaving fullscreen) always brings it back.
         cursor = lambda: home.evaluate("() => getComputedStyle(document.querySelector('button.tile')).cursor")
         home.click("#settings-button")
-        assert home.locator(".overlay.settings button[data-hide-pointer].on").count() == 1, "the switch is not On to begin with (D-318)"
+        assert home.locator(".overlay.settings button[data-hide-pointer].on").count() == 0, "the switch is On to begin with (D-319)"
+        home.click(".overlay.settings button[data-hide-pointer]")
+        assert home.locator(".overlay.settings button[data-hide-pointer].on").count() == 1, "the switch shows On"
         assert cursor() != "none", "the pointer is hidden outside fullscreen"
         home.evaluate("() => document.documentElement.requestFullscreen()")
         home.wait_for_function("document.documentElement.classList.contains('gt-pointer-hidden')")

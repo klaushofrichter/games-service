@@ -1,5 +1,6 @@
 // The table: players, seats, orientation, game selection and the running game.
 // The lobby owns the table; the running game owns everything inside it.
+import type { ScreenOptions } from "./screen-options.ts";
 import { EventEmitter } from "node:events";
 import { createHash, randomBytes, randomInt } from "node:crypto";
 import {
@@ -75,6 +76,8 @@ export interface TableConfig {
   showTestGames: boolean; // stub games used by the automated tests
   /** The table may be quit from its own board (TABLE_QUIT=1, D-315). */
   canQuit: boolean;
+  /** What this start asks of the table's own screen (--screensaver, --pointer, --sound, D-319). */
+  screen?: ScreenOptions;
   /** A snapshot of the whole state in the log every N inputs (D-116); 0: none. */
   logSnapshotEvery: number;
   /** The developer setting's value at start (ALLOW_NO_LOCAL_PLAYER, D-118); the board can change it until a restart. */
@@ -151,6 +154,8 @@ export class Table extends EventEmitter {
   localTable = false;
   readonly metrics = { gamesPlayed: 0, gamesTerminated: 0, totalGameMs: 0, simulations: 0 };
 
+  /** When this table started: tells one start from the next (D-319). */
+  private readonly startedAt = Date.now();
   readonly config: TableConfig;
   readonly games: Map<string, InstalledGame>;
   readonly logs: LogStore;
@@ -253,6 +258,8 @@ export class Table extends EventEmitter {
       exchange: this.exchangeInfo(),
       developer: { allowNoLocalPlayer: this.allowNoLocalPlayer, boardDeck: this.boardDeck, protectedPlayer: this.protectedPlayer()?.id ?? null },
       ...(this.config.canQuit ? { canQuit: true } : {}),
+      // For the table's own screen, this start (D-319); `start` tells the board one start from the next.
+      ...(this.config.screen ? { screen: { start: this.startedAt, ...this.config.screen } } : {}),
       noSeat: this.noFreeSeat(),
       suggestedName: this.suggestedName(),
       localTable: this.localTable,
