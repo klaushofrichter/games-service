@@ -2752,6 +2752,11 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   `assets/cards.js` and `cards.css` (shared by board and phone), `deck.js`, `deck.css`. Checks:
   `tests/freecell.test.ts`, `scripts/e2e/freecell.py` (each design on the board, kept across a reload; a card taken
   back, undone, refused with the rule off).
+  - *2026-11-22, Klaus:* "The Linea card faces are nice, but in FreeCell it is important to know if a card is red or
+    black … change at least the top left card value colour …, and we can keep the remainder of the face as it is."
+    Linea's corner (rank and suit) is plain red for hearts and diamonds and black for spades and clubs; the pip or
+    the drawing below keeps its suit's colour (blue, pink, orange, green). *(Klaus wrote "red or green"; Claude took
+    it as red and black, the two a FreeCell player tells apart, and said so.)* The website's picture of Linea is new.
 - **D-311 · 2026-11-21 · Klaus** — **The website shows FreeCell's card designs.** "A section in the landing page showing
   these cards as 'customized card designs can be selected in FreeCell', and that users can ask their LLM to add more.
   Mention [the model] … Show the designs in a soft and smooth animation, either time based or synced with scrolling."
@@ -2807,6 +2812,11 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   runs XFCE with LightDM, not the GNOME this session had assumed) and sent the steps that worked; they are in
   `docs/install/linux.md` under *A table of its own*. Nothing in the platform changed. The starter plays the
   `production` branch by default, so the icon needs no option for it.
+  - *Follow-up, from Cluster's script on that PC:* the guide's kiosk script also covers three cases that broke a
+    simpler one: the table failing to start (the script waited forever; it now stops and keeps the message on
+    screen), a kiosk browser left from an earlier start (it took the new window's address, the script thought the
+    browser had closed and stopped the fresh table; it is ended first), and the icon tapped while a table runs (only
+    the board is shown again).
 - **D-314 · 2026-11-21 · Klaus** — **The starter's `--repos all`.** Asked by Klaus in Cluster's session and passed on:
   the Game Table PC starts from a desktop icon with a fixed list of repositories (`--repos "traders-game loopy-game
   …"`), so a new game repository would be missed. `--repos all` asks GitHub, at every start, for the repositories of
@@ -2837,3 +2847,12 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   - **Later, if wanted:** a `--kiosk` option of the starter that opens and closes the kiosk browser itself.
   *Implementation (Claude):* `onQuit` in `HostOptions`/`ServerOptions`, `canQuit` in the lobby state, `quitTable()` in
   `board.js`, `TABLE_QUIT` in `main.ts` and `launch.ts`. Checks: `tests/quit.test.ts`, `scripts/e2e/quit.py`.
+- **D-316 · 2026-11-22 · Klaus** — **A table that logs in by itself reads its private repositories with a token of its
+  own.** Found on the game PC, by Cluster and Klaus: with automatic login the desktop's keyring stays locked, the
+  GitHub CLI keeps its sign-in there, and the start with `--repos all` hung ("Can not connect") until the keyring's
+  password was typed. There the start script now exports `GH_TOKEN` from a fine-grained, read-only token (Contents:
+  read, the private game repositories) kept in a file of mode 600; the starter has always taken `GH_TOKEN` first.
+  - **The guide** (`docs/install/linux.md`, *A table of its own*) says how.
+  - **The starter** no longer waits without end for the GitHub CLI: after 30 seconds it says that the keyring may be
+    locked, names `GH_TOKEN`, and starts with the public games, as for any failed sign-in (D-265).
+  *Implementation (Claude):* `githubToken()` in `scripts/package/launch.ts`. In the packages once they are built again.

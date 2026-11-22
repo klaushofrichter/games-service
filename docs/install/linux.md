@@ -229,11 +229,24 @@ without a browser window of its own, then the board in Chrome's kiosk mode with 
 ```sh
 #!/bin/bash
 PROFILE="$HOME/.local/share/game-table/kiosk-browser"
+BOARD=http://localhost:8080/board/
+board() {  # (--password-store=basic: with automatic login the keyring stays locked, and Chrome would ask for its password)
+  google-chrome --user-data-dir="$PROFILE" --kiosk --no-first-run --noerrdialogs --password-store=basic \
+    --autoplay-policy=no-user-gesture-required "$BOARD"
+}
+# The icon tapped while a table runs: only show its board again.
+if curl -fs -o /dev/null "$BOARD"; then board; exit; fi
+# A kiosk browser left from an earlier start would take the new window's address and leave this script with nothing.
+pkill -f -- "--user-data-dir=$PROFILE" 2> /dev/null
 ~/apps/game-table/game-table --no-open --repos all & TABLE=$!
-until curl -fs http://localhost:8080/health > /dev/null; do sleep 1; done
-# (--password-store=basic: with automatic login the keyring stays locked, and Chrome would ask for its password)
-google-chrome --user-data-dir="$PROFILE" --kiosk --no-first-run --noerrdialogs --password-store=basic \
-  --autoplay-policy=no-user-gesture-required http://localhost:8080/board/ & CHROME=$!
+until curl -fs -o /dev/null "$BOARD"; do
+  if ! kill -0 "$TABLE" 2> /dev/null; then  # it ended before the board was there: keep what it said on screen
+    read -r -p "Game Table did not start (see above). Press Enter to close this window. "
+    exit 1
+  fi
+  sleep 1
+done
+board & CHROME=$!
 # The two belong together: when either ends, the other does too.
 wait -n "$TABLE" "$CHROME"
 kill "$TABLE" "$CHROME" 2> /dev/null
@@ -244,6 +257,25 @@ A kiosk browser has no way out of its own: Esc does nothing, and a page cannot c
 **Advanced › This computer › Quit the table…** stops Game Table, and the script then closes the browser, back to the
 desktop and its icon. With a keyboard, Alt+F4 closes the browser, and the script stops the table. `--repos all`
 brings every game repository of `klaushofrichter` your sign-in can read; name them instead if you prefer.
+
+**Private repositories on a computer that logs in by itself.** The GitHub CLI keeps its sign-in in the desktop's
+keyring, and with automatic login the keyring stays locked: the start then waits for the keyring's password (the
+starter says so after 30 seconds and goes on without the private repositories). Give the table a token of its own
+instead. On github.com › Settings › Developer settings › *Fine-grained tokens*, make one that can only read
+(*Contents: Read-only*) the private game repositories, and keep it in a file only you can read:
+
+```sh
+umask 077; printf 'GAME_TABLE_GH_TOKEN=%s\n' 'github_pat_…' > ~/.config/game-table-token
+```
+
+and at the top of `~/apps/game-table-start.sh`, before the table is started:
+
+```sh
+GH_TOKEN=$(sed -n 's/^GAME_TABLE_GH_TOKEN=//p' ~/.config/game-table-token); export GH_TOKEN
+```
+
+The starter uses `GH_TOKEN` when it is set and asks the GitHub CLI nothing. The token can read those repositories and
+nothing else, and is the one thing on this computer to replace when it runs out or the computer changes hands.
 
 **No lock, no blank screen, no sleep.**
 

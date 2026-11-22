@@ -35,14 +35,17 @@
 .fc-d-botanical .fc-flower { left: 22px; top: 34px; width: 110px; height: 140px; object-fit: contain; }
 .fc-d-botanical .fc-caption { display: block; position: absolute; left: 0; right: 0; bottom: 6px; text-align: center; font: 500 11px var(--display); color: #4a4a3c; pointer-events: none; }
 
-/* Linea: rounder white cards, one colour for each suit (the blue and green suits are the "black" ones), outlined pips,
-   court cards as line drawings in the suit's colour. */
+/* Linea: rounder white cards, one colour for each suit on the face (outlined pips, court cards as line drawings in
+   the suit's colour); the corner in plain red or black. */
 .fc-d-linea .fc-card { background: #fff; border: 1px solid #c9cfd6; border-radius: 22px; font-family: var(--text); font-weight: 800; }
 .fc-d-linea .fc-card.fc-s0 { color: #1565a8; }
 .fc-d-linea .fc-card.fc-s1 { color: #d83a62; }
 .fc-d-linea .fc-card.fc-s2 { color: #e8821e; }
 .fc-d-linea .fc-card.fc-s3 { color: #14806a; }
 .fc-d-linea .fc-ix { left: 13px; top: 8px; font-size: 30px; }
+/* The corner says red or black, as FreeCell needs it read at a glance (D-310); the rest of the face keeps its suit's colour. */
+.fc-d-linea .fc-card .fc-ix { color: #16181c; }
+.fc-d-linea .fc-card.red .fc-ix { color: #d81e2c; }
 .fc-d-linea .fc-pip { font-size: 100px; top: 60px; color: transparent; -webkit-text-stroke: 4px currentColor; }
 .fc-d-linea .fc-card.fc-s0 .fc-pip { -webkit-text-stroke-color: #1565a8; }
 .fc-d-linea .fc-card.fc-s1 .fc-pip { -webkit-text-stroke-color: #d83a62; }
