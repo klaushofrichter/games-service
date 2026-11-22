@@ -2823,3 +2823,17 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   *Implementation (Claude):* `allGameRepos()`, `downloadedGameRepos()` in `scripts/package/launch.ts`, which now starts
   a table only when run as the program (`import.meta.main`), so its parts can be tested. Check:
   `tests/launcher.test.ts`. The packages on the release *local-table* have it once they are built again.
+- **D-315 · 2026-11-21 · Klaus** — **Quit the table from its board.** "The Cluster agent configured kiosk mode, so we
+  will need an 'exit game' in the developer options or some other way to get out of Chrome. Esc does not work
+  anymore." A page cannot close a kiosk window it did not open, so the way out ends at the table itself:
+  - **Advanced › This computer › Quit the table…**, on the table's own board (never a remote board), asked first
+    ("Game Table stops on this computer…; the game that is on ends"). The table closes as on a stop signal (logs and
+    data written) and its program ends; the board says *Game Table has quit*.
+  - **Only where the table was started for it:** `TABLE_QUIT=1`, which the packages' starter sets. A hosted table, a
+    Docker table and a developer's `node …/main.ts` don't offer it (`POST /quit` answers 409).
+  - **The browser** is closed by whatever started it. On Klaus's table PC that is Cluster's start script: it starts
+    the starter and the kiosk Chrome, and when either ends it ends the other (agreed with Cluster, which also saw no
+    conflict with that PC's CI runners: they are containers, the table's program is not).
+  - **Later, if wanted:** a `--kiosk` option of the starter that opens and closes the kiosk browser itself.
+  *Implementation (Claude):* `onQuit` in `HostOptions`/`ServerOptions`, `canQuit` in the lobby state, `quitTable()` in
+  `board.js`, `TABLE_QUIT` in `main.ts` and `launch.ts`. Checks: `tests/quit.test.ts`, `scripts/e2e/quit.py`.

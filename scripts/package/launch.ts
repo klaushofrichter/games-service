@@ -643,6 +643,7 @@ async function main() {
     TABLE_NAME: process.env.TABLE_NAME || (isWin ? process.env.COMPUTERNAME : undefined) || "Game Table",
     SHOW_TEST_GAMES: "0",
     LOCAL_TABLE: "1",
+    TABLE_QUIT: "1", // the board's Advanced window can quit this table (D-315): the way out of a kiosk browser
     APP_VERSION: version,
   };
   delete env.CLOUD_URL;

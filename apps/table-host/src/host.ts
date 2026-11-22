@@ -29,6 +29,8 @@ export interface HostOptions extends Partial<TableConfig> {
   gamesDir?: string;
   dataDir?: string;
   allowRemoteBoard?: boolean;
+  /** Quit from the board (TABLE_QUIT=1, D-315): what ends the table when its board asks. Absent: the board can't. */
+  onQuit?: () => void;
   logRetentionDays?: number;
   cloudUrl?: string;
   cloudPollMs?: number;
@@ -65,6 +67,7 @@ export async function startHost(o: HostOptions = {}) {
     requireCloud: o.requireCloud ?? false,
     maxRemotePlayers: o.maxRemotePlayers ?? 4,
     showTestGames: o.showTestGames ?? true,
+    canQuit: !!o.onQuit,
     logSnapshotEvery: o.logSnapshotEvery ?? 0,
     allowNoLocalPlayer: o.allowNoLocalPlayer ?? false,
     boardDeck: o.boardDeck ?? false,
@@ -84,6 +87,7 @@ export async function startHost(o: HostOptions = {}) {
     tableKey,
     publicDir: resolve(join(here, "../public")),
     allowRemoteBoard: o.allowRemoteBoard ?? false,
+    onQuit: o.onQuit,
     createInvite: o.cloudUrl ? () => cloud!.createInvite() : undefined,
     setAccessCode: o.cloudUrl ? (code) => cloud!.setAccessCode(code) : undefined,
   });

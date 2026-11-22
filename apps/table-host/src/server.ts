@@ -20,6 +20,8 @@ export interface ServerOptions {
   tableKey: string;
   publicDir: string;
   allowRemoteBoard: boolean;
+  /** End the table when its own board asks (D-315); absent: the board can't. */
+  onQuit?: () => void;
   /** Ask the cloud for an invite (remote play); absent when the table runs without the cloud. */
   createInvite?: () => Promise<{ token: string; url: string; expiresAt: string }>;
   /** Set or clear the access code typed on the board (D-113); absent when the table runs without the cloud. */
@@ -80,7 +82,7 @@ export function cleanGesture(p: unknown): Record<string, unknown> | null {
 }
 
 /** Reads a remote client may make: lobby and game state, never logs, saves, simulations or local join codes. */
-const REMOTE_DENIED = /^\/(join|simulation|logs|saves|game-data|invites|remote|qr|cloud|developer)(\/|$)/;
+const REMOTE_DENIED = /^\/(join|simulation|logs|saves|game-data|invites|remote|qr|cloud|developer|quit)(\/|$)/;
 /**
  * Changes a remote client may make (an allowlist): seat layout, running games, and players' colours and AI options
  * (D-159). Never turn the table's board (remote boards face their own seat), remove or move players, add AI seats,
@@ -356,6 +358,14 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
       return json(res, 200, { ...table.debugStatus(), decks });
     }
     if (m === "POST" && path === "/developer") return (table.setDeveloper(body), ok());
+    // Quit the table from its own board (D-315): only where the table was started to allow it (TABLE_QUIT=1), as on a
+    // computer of its own whose browser shows nothing but the board. The answer goes out first, then the table ends.
+    if (m === "POST" && path === "/quit") {
+      if (!opts.onQuit) return json(res, 409, { error: "this table can't be quit from its board" });
+      const quit = opts.onQuit;
+      setTimeout(quit, 300);
+      return json(res, 200, { ok: true, quitting: true });
+    }
     if (m === "POST" && path === "/remote") return (table.setRemoteBoardControl(!!body.boardControl), ok());
     if (m === "POST" && path === "/invites") {
       if (!opts.createInvite) throw new TableError(409, "remote play needs the Game Table service (CLOUD_URL)");
