@@ -229,11 +229,24 @@ without a browser window of its own, then the board in Chrome's kiosk mode with 
 ```sh
 #!/bin/bash
 PROFILE="$HOME/.local/share/game-table/kiosk-browser"
+BOARD=http://localhost:8080/board/
+board() {  # (--password-store=basic: with automatic login the keyring stays locked, and Chrome would ask for its password)
+  google-chrome --user-data-dir="$PROFILE" --kiosk --no-first-run --noerrdialogs --password-store=basic \
+    --autoplay-policy=no-user-gesture-required "$BOARD"
+}
+# The icon tapped while a table runs: only show its board again.
+if curl -fs -o /dev/null "$BOARD"; then board; exit; fi
+# A kiosk browser left from an earlier start would take the new window's address and leave this script with nothing.
+pkill -f -- "--user-data-dir=$PROFILE" 2> /dev/null
 ~/apps/game-table/game-table --no-open --repos all & TABLE=$!
-until curl -fs http://localhost:8080/health > /dev/null; do sleep 1; done
-# (--password-store=basic: with automatic login the keyring stays locked, and Chrome would ask for its password)
-google-chrome --user-data-dir="$PROFILE" --kiosk --no-first-run --noerrdialogs --password-store=basic \
-  --autoplay-policy=no-user-gesture-required http://localhost:8080/board/ & CHROME=$!
+until curl -fs -o /dev/null "$BOARD"; do
+  if ! kill -0 "$TABLE" 2> /dev/null; then  # it ended before the board was there: keep what it said on screen
+    read -r -p "Game Table did not start (see above). Press Enter to close this window. "
+    exit 1
+  fi
+  sleep 1
+done
+board & CHROME=$!
 # The two belong together: when either ends, the other does too.
 wait -n "$TABLE" "$CHROME"
 kill "$TABLE" "$CHROME" 2> /dev/null

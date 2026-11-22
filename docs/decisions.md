@@ -2807,6 +2807,11 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   runs XFCE with LightDM, not the GNOME this session had assumed) and sent the steps that worked; they are in
   `docs/install/linux.md` under *A table of its own*. Nothing in the platform changed. The starter plays the
   `production` branch by default, so the icon needs no option for it.
+  - *Follow-up, from Cluster's script on that PC:* the guide's kiosk script also covers three cases that broke a
+    simpler one: the table failing to start (the script waited forever; it now stops and keeps the message on
+    screen), a kiosk browser left from an earlier start (it took the new window's address, the script thought the
+    browser had closed and stopped the fresh table; it is ended first), and the icon tapped while a table runs (only
+    the board is shown again).
 - **D-314 · 2026-11-21 · Klaus** — **The starter's `--repos all`.** Asked by Klaus in Cluster's session and passed on:
   the Game Table PC starts from a desktop icon with a fixed list of repositories (`--repos "traders-game loopy-game
   …"`), so a new game repository would be missed. `--repos all` asks GitHub, at every start, for the repositories of
