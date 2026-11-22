@@ -258,6 +258,25 @@ A kiosk browser has no way out of its own: Esc does nothing, and a page cannot c
 desktop and its icon. With a keyboard, Alt+F4 closes the browser, and the script stops the table. `--repos all`
 brings every game repository of `klaushofrichter` your sign-in can read; name them instead if you prefer.
 
+**Private repositories on a computer that logs in by itself.** The GitHub CLI keeps its sign-in in the desktop's
+keyring, and with automatic login the keyring stays locked: the start then waits for the keyring's password (the
+starter says so after 30 seconds and goes on without the private repositories). Give the table a token of its own
+instead. On github.com › Settings › Developer settings › *Fine-grained tokens*, make one that can only read
+(*Contents: Read-only*) the private game repositories, and keep it in a file only you can read:
+
+```sh
+umask 077; printf 'GAME_TABLE_GH_TOKEN=%s\n' 'github_pat_…' > ~/.config/game-table-token
+```
+
+and at the top of `~/apps/game-table-start.sh`, before the table is started:
+
+```sh
+GH_TOKEN=$(sed -n 's/^GAME_TABLE_GH_TOKEN=//p' ~/.config/game-table-token); export GH_TOKEN
+```
+
+The starter uses `GH_TOKEN` when it is set and asks the GitHub CLI nothing. The token can read those repositories and
+nothing else, and is the one thing on this computer to replace when it runs out or the computer changes hands.
+
 **No lock, no blank screen, no sleep.**
 
 ```sh
