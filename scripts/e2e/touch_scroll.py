@@ -104,7 +104,28 @@ try:
                 vol = page.locator(".overlay.settings input[data-volume]").bounding_box()
                 drag([(vol["x"] + vol["width"] / 2, vol["y"] + vol["height"] / 2)], -80)
                 assert top(sel) == 0, "a drag on the volume slider scrolled the window"
-
+                # After a finger has scrolled the window, the next tap on a field in it still counts: a finger's pan
+                # ends without a click, and "that was a drag" must not swallow the tap that follows. (The events are
+                # made here: a pan that the browser ends with no click, then a press and a click on the slider.)
+                tapped = page.evaluate("""() => {
+                  const panel = document.querySelector('.overlay.settings .panel'), field = panel.querySelector('input[data-volume]');
+                  const r = panel.getBoundingClientRect(), x = r.left + r.width * 0.4, y = r.top + r.height * 0.6;
+                  const ev = (type, target, cx, cy) => target.dispatchEvent(new PointerEvent(type, { bubbles: true, cancelable: true, pointerId: 7, pointerType: 'touch', isPrimary: true, clientX: cx, clientY: cy }));
+                  const under = document.elementFromPoint(x, y);
+                  ev('pointerdown', under, x, y);
+                  for (let k = 1; k <= 6; k++) ev('pointermove', under, x, y - 15 * k);
+                  ev('pointerup', under, x, y - 90);
+                  let heard = false;
+                  field.addEventListener('click', () => (heard = true), { once: true });
+                  const f = field.getBoundingClientRect();
+                  ev('pointerdown', field, f.left + 5, f.top + 5);
+                  ev('pointerup', field, f.left + 5, f.top + 5);
+                  field.click();
+                  return heard;
+                }""")
+                assert tapped, "after a finger scrolled the window, the next tap on a field in it was swallowed"
+                page.wait_for_timeout(700)
+                page.evaluate("(s) => (document.querySelector(s).scrollTop = 0)", sel)
                 # Turned to face north: the window is upside down, and the content still follows the fingers.
                 a("POST", "/face", {"edge": "north"})
                 page.wait_for_function("(s) => getComputedStyle(document.querySelector(s)).transform.startsWith('matrix(-1')", arg=sel)

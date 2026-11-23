@@ -60,10 +60,10 @@ const fsDoc = (() => {
  * browser: it depends on whether that screen is touched.
  */
 /**
- * A browser started to show nothing but the page (Chrome's --kiosk, an installed app in fullscreen, F11) fills the
- * screen without the page having asked: `fullscreenElement` stays empty (D-317). Two things tell: the display mode, and
- * a window exactly as large as the screen (a browser with its tabs and address bar never is). The board is full screen
- * in any of these cases.
+ * A browser that shows nothing but the board fills the screen without the page having asked: `fullscreenElement`
+ * stays empty (D-317). The table says so when it was started for it (`--kiosk`, D-324), and the display mode tells of
+ * a browser's own full screen (F11, an installed app). The board is full screen in either case. (The size of the
+ * window is no sign: it was one once, and a guess.)
  */
 const kioskMedia = (() => {
   try {
@@ -72,14 +72,13 @@ const kioskMedia = (() => {
     return null;
   }
 })();
-const coversScreen = () => {
-  const w = fsDoc.defaultView ?? window;
-  return w.screen.width > 0 && w.innerWidth === w.screen.width && w.innerHeight === w.screen.height;
-};
-const browserFull = () => !fsDoc.fullscreenElement && (!!kioskMedia?.matches || coversScreen());
+/** What this start asks of the table's own screen (D-319), once the table has said it; see applyStartOptions. */
+let startOptions = null;
+const browserFull = () => !fsDoc.fullscreenElement && (!!kioskMedia?.matches || startOptions?.kiosk === true);
 const isFull = () => !!fsDoc.fullscreenElement || browserFull();
 const POINTER_KEY = "gametable.hidePointer";
-let hidePointer = stored(POINTER_KEY) === "1"; // off unless switched on, or the table was started with --pointer off (D-319)
+const keptHidePointer = () => stored(POINTER_KEY) === "1";
+let hidePointer = keptHidePointer(); // off unless switched on, or the table was started with --pointer off (D-319)
 function applyPointer() {
   const full = isFull();
   // The page fullscreen applies to too: inside Play from the board, the frame around the board and the deck, and
@@ -113,7 +112,6 @@ function setHidePointer(on) {
 }
 fsDoc.addEventListener("fullscreenchange", applyPointer);
 kioskMedia?.addEventListener?.("change", applyPointer);
-(fsDoc.defaultView ?? window).addEventListener("resize", applyPointer);
 applyPointer();
 /**
  * Fullscreen across Play from the board (D-299): switching it on or off moves the board to another page (board/play.html
@@ -173,11 +171,12 @@ function noteFullscreenForNextPage() {
  * (D-092) stays the table's.
  */
 const VOLUME_KEY = "gametable.volume";
-let masterVolume = (() => {
+const keptVolume = () => {
   const raw = stored(VOLUME_KEY);
   const v = Number(raw);
   return raw !== null && Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : 1;
-})();
+};
+let masterVolume = keptVolume();
 const masterGains = new Map(); // a context's speakers -> the gain in front of them
 if (typeof AudioNode === "function" && typeof AudioDestinationNode === "function") {
   const connect = AudioNode.prototype.connect;
@@ -279,13 +278,13 @@ function setPanel(o, html) {
     o.innerHTML = html;
     o.dataset.html = html;
     const panel = o.querySelector(".panel");
-    if (panel) panel.scrollTop = top;
+    if (panel) {
+      panel.scrollTop = top;
+      touchScroll(panel); // a wide bar and the fingers themselves, for the table's touchscreen (D-306); drawn anew, so again
+    }
   }
   const panel = o.querySelector(".panel");
-  if (panel) {
-    faceFront(panel);
-    touchScroll(panel); // a wide bar and the fingers themselves, for the table's touchscreen (D-306)
-  }
+  if (panel) faceFront(panel);
 }
 
 /**
@@ -298,7 +297,7 @@ let scrollersDue = 0;
 function findScrollers() {
   cancelAnimationFrame(scrollersDue);
   scrollersDue = requestAnimationFrame(() => {
-    for (const el of document.querySelectorAll(SCROLLERS)) touchScroll(el);
+    for (const el of document.querySelectorAll(SCROLLERS)) if (!el.classList.contains("touch-scroll")) touchScroll(el); // (set up once; it looks after itself)
   });
 }
 new MutationObserver(findScrollers).observe(overlayRoot, { childList: true, subtree: true });
@@ -1215,10 +1214,13 @@ toolsBtn.addEventListener("click", () => openAdvanced());
 
 /**
  * The settings modal: the board's own settings (Fullscreen), then whatever the chosen game adds. A game adds
- * items by exporting settings({ info, setPrefs, confirm }) from its board.js; each item is
+ * items with settings({ info, setPrefs, confirm, remember }): the running game's own (what `mount` returned, D-326),
+ * which knows its view and can act, or else the function its board.js exports; each item is
  *   { type: "toggle", label, value, onChange(next) }   { type: "choice", label, value, options: [{ value, label }], onChange }
  *   { type: "swatches", label, value, options: ["#rrggbb", …], onChange }   { type: "button", label, onChange() }
  * setPrefs(patch) stores display choices for this game on the table; board and decks get them as info.prefs.
+ * remember(patch) keeps settings of the game's manifest for its next game (D-325), for one the game lets change while
+ * it runs; such an item names its setting (`setting: "key"`), and the locked row of that setting is left out.
  */
 let settingsOverlay = null;
 /**
@@ -1238,6 +1240,7 @@ function openSettings() {
   let modFor = null;
   let items = [];
   const setPrefs = (prefs) => act("POST", "/game/prefs", { prefs });
+  const remember = (settings) => act("POST", "/game/settings/remember", { settings });
   const loadGame = () => {
     const g = state?.game;
     const key = g ? `${g.id}@${g.version}` : null;
@@ -1260,7 +1263,9 @@ function openSettings() {
     if (!state) return;
     loadGame();
     try {
-      items = (state.game && mod?.settings?.({ info: gameInfo(), setPrefs, confirm: confirmDialog })) || [];
+      // The game that runs on this board answers for itself (D-326); before one is mounted, its module does.
+      const own = typeof game?.inst?.settings === "function" ? game.inst : mod;
+      items = (state.game && own?.settings?.({ info: gameInfo(), setPrefs, confirm: confirmDialog, remember })) || [];
     } catch (err) {
       console.error("game settings failed", err);
       items = [];
@@ -1313,9 +1318,11 @@ function openSettings() {
           `<button class="swatch ${c === p.color ? "on" : ""}" style="--c:${c}" data-color-player="${esc(p.id)}" data-color="${c}" aria-label="${esc(p.name)}: colour ${i + 1}"></button>`).join("")}</span></div>`).join("")}
         <div class="faint" style="font-size:.7em;margin-top:6px">Picking a colour someone else has swaps the two.</div></div>`;
     };
-    const gameSettings = fields.length
+    // (during a game, a setting the game itself lets change is the game's own item, not a locked row as well)
+    const rows = fields.filter((f) => settingActive(f, cur, fields) && (editable || !items.some((it) => it.setting === f.key)));
+    const gameSettings = rows.length
       ? `<div class="group game-rules ${editable ? "" : "locked"}"><div class="eyebrow">${esc(state.game.name)} · game settings${editable ? "" : ` <span class="lock" aria-label="locked">🔒 locked during the game</span>`}</div>
-          ${fields.filter((f) => settingActive(f, cur, fields)).map((f) => {
+          ${rows.map((f) => {
             // What the choice means (D-246); during a game the game's own items say what it means now (D-249), so the
             // locked row doesn't repeat it.
             const hint = editable ? hintFor(f, cur[f.key] ?? f.default) : "";
@@ -3052,8 +3059,10 @@ function onGameView(fn) {
  * screen in this browser (Settings › Display). Not inside Play from the board, whose deck is input the board can't see.
  */
 const SAVER_KEY = "gametable.screensaver";
-let SAVER_AFTER_MS = 60 * 60 * 1000; // an hour, or what the table was started with (--screensaver, D-319)
-let saverOn = stored(SAVER_KEY) !== "0";
+const SAVER_HOUR_MS = 60 * 60 * 1000;
+let SAVER_AFTER_MS = SAVER_HOUR_MS; // an hour, or what the table was started with (--screensaver, D-319)
+const keptSaver = () => stored(SAVER_KEY) !== "0";
+let saverOn = keptSaver();
 let lastInput = Date.now();
 let saverTimer = null;
 let saverEl = null; // the black layer while it shows
@@ -3162,14 +3171,12 @@ if (!IN_PLAY) {
  * the next start begins with its options again.
  */
 const START_KEY = "gametable.changedThisStart";
-let startOptions = null;
 function changedThisStart() {
   try {
     const kept = JSON.parse(stored(START_KEY) ?? "null");
-    return kept && startOptions && kept.start === startOptions.start ? kept : { start: startOptions?.start, changed: [] };
-  } catch {
-    return { start: startOptions?.start, changed: [] };
-  }
+    if (kept && startOptions && kept.start === startOptions.start) return kept;
+  } catch {}
+  return { start: startOptions?.start, changed: [] };
 }
 function changedHere(what) {
   if (!startOptions || startOptions[what] === undefined) return;
@@ -3177,25 +3184,45 @@ function changedHere(what) {
   if (!kept.changed.includes(what)) kept.changed.push(what);
   keep(START_KEY, JSON.stringify(kept));
 }
+/**
+ * The screen's settings a start can set, each once: `kept` puts back what this browser keeps, `start` takes the
+ * start's value (`changed`: the setting was changed on the board during this start, which then holds), `apply` shows it.
+ */
+const screenSettings = {
+  pointer: {
+    kept: () => (hidePointer = keptHidePointer()),
+    start: (shown, changed) => changed || (hidePointer = !shown),
+    apply: applyPointer,
+  },
+  sound: {
+    kept: () => (masterVolume = keptVolume()),
+    start: (percent, changed) => changed || (masterVolume = Math.min(1, Math.max(0, percent / 100))),
+    apply: applyMasterVolume,
+  },
+  screensaver: {
+    kept: () => ((saverOn = keptSaver()), (SAVER_AFTER_MS = SAVER_HOUR_MS)),
+    start: (minutes, changed) => {
+      if (minutes > 0) SAVER_AFTER_MS = minutes * 60 * 1000; // (switched on again on the board: after these minutes)
+      if (!changed) saverOn = minutes > 0;
+    },
+    apply: () => ((lastInput = Date.now()), scheduleSaver()),
+  },
+};
 function applyStartOptions() {
-  const s = state?.screen;
-  if (REMOTE || !s || startOptions?.start === s.start) return;
+  const s = (!REMOTE && state?.screen) || null;
+  if ((s?.start ?? null) === (startOptions?.start ?? null)) return;
+  const before = startOptions;
   startOptions = s;
   const changed = changedThisStart().changed;
-  if (typeof s.pointer === "boolean" && !changed.includes("pointer")) {
-    hidePointer = !s.pointer;
-    applyPointer();
+  for (const [name, setting] of Object.entries(screenSettings)) {
+    const told = s && s[name] !== undefined && s[name] !== null;
+    if (!told && (!before || before[name] === undefined)) continue; // neither this start nor the one before says anything
+    // The table was started anew while this page stayed open (a kiosk browser): the start before holds no longer.
+    if (before) setting.kept();
+    if (told) setting.start(s[name], changed.includes(name));
+    setting.apply();
   }
-  if (typeof s.sound === "number" && !changed.includes("sound")) {
-    masterVolume = Math.min(1, Math.max(0, s.sound / 100));
-    applyMasterVolume();
-  }
-  if (typeof s.screensaver === "number") {
-    if (s.screensaver > 0) SAVER_AFTER_MS = s.screensaver * 60 * 1000;
-    if (!changed.includes("screensaver")) saverOn = s.screensaver > 0;
-    lastInput = Date.now();
-    scheduleSaver();
-  }
+  if ((s?.kiosk === true) !== (before?.kiosk === true)) applyPointer(); // (full screen or not)
 }
 onState(applyStartOptions);
 

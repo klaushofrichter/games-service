@@ -2941,3 +2941,144 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   *Implementation (Claude):* `SITE_PAGES`, `sitePage()` in `apps/cloud/src/server.ts`; `home.html`. Checks:
   `tests/website.test.ts` (the page, its groups, every inner link has its place), `scripts/e2e/website.py` (both
   widths, links).
+- **D-321 · 2026-11-23 · Klaus** — **A third simplify pass**, over what changed since D-303 (FreeCell, the wide
+  scroll bars, the start options, the website's pages, the starter). "Do a /simplify and /code-review over the
+  games-service and extra-games repositories." Four reviewers (reuse, simplification, efficiency, depth of the fix);
+  extra-games had 28 changed lines and nothing to simplify.
+  - **Done.** FreeCell's solver remembers its answers by position (the rules search again at every replay: the check
+    at a game's end, a restored game, each step in the Game Viewer; 6–480 ms a search), and a second Hint where no way
+    was found does not search again. The search's depth is a field of its nodes. FreeCell's drag uses the kit's
+    `localFrame` instead of its own mapping; `rank`/`suit` come from `cards.js`; the retry for the design stops with
+    the game; the clock writes only a changed text. `touchScroll` moves only its thumb while the content scrolls
+    (it measured the whole bar on every scroll event), and a window not drawn anew is not measured again at every
+    lobby message. `sitePage` takes its markers from `SITE_PAGES`; the outside link check knows `/faq`.
+  - **Not done, on purpose.** FreeCell's own shuffle stays (the SDK's would change which cards a deal number gives).
+    The phone keeps a renamed player's name at once *and* with the table's next message: the reviewer took the first
+    for redundant, `scripts/e2e/names.py` showed it is not. `!important` on `.touch-scroll` stays: it also holds
+    against a game's own scroll bar styles.
+  - **Left for a decision** (each changes behaviour or is a larger rebuild): `touchScroll` watching its own element,
+    so that scanning the windows for scrollers goes; one drag core shared by `touchScroll` and the deck beside the
+    board; a game's `settings()` given its running game (four games keep a module-level `live` for it); settings
+    remembered per game by the platform (FreeCell's house rule is applied by the board today); a `--kiosk` start
+    option instead of guessing full screen from the window's size; the start options driven by one table; the
+    website's pages as files of their own.
+- **D-322 · 2026-11-23 · Klaus** — **The code review that followed D-321** (the same range) found four things, all
+  fixed:
+  1. **A tap after a finger scrolled a window could be lost.** `touchScroll` remembered "that was a drag" until the
+     next click, but a finger's pan ends without one, and a press on a field (checkbox, pulldown, slider) or in a
+     scroller inside left the mark standing: the first tap there was swallowed. The mark now goes with the next press.
+  2. **A board left open across a restart of the table kept the old start's options** (D-319): a start without
+     options said nothing, so the pointer, the volume and the screensaver of the start before stayed until a reload.
+     The board now goes back to what its browser keeps before it takes the new start's options.
+  3. **FreeCell's phone page** could go on asking for the card design every 3 s after the game was gone (the board's
+     copy of this was fixed in D-321).
+  4. **`--repos all`** kept GitHub's spelling of the owner while the public list and the folders on disk use lower
+     case: with another spelling a public repository would have been taken for a private one. One spelling now.
+  Checks: `scripts/e2e/touch_scroll.py` (the tap after a pan; it fails without the fix), `scripts/e2e/start_options.py`
+  (the board stays open over two restarts), `tests/launcher.test.ts`. extra-games: nothing found in its 28 lines.
+- **D-323 · 2026-11-23 · Klaus** — **Each page of the website is a file of its own, in one shared shell.** "The
+  landing page should be separate for smaller size, but these should share a consistent look." Until now all three
+  pages were cut from `home.html` (D-312, D-320), and each carried the styles and the script of the other two.
+  Replaces D-312's "One source file".
+  - **`apps/cloud/public/site-pages/`**: `shell.html` is what every page shares: the head, the styles of the one look
+    (colours, type, buttons, section heads, top bar, PREVIEW sash, foot, reveal on scroll, their media queries), the
+    top bar, the foot, and the script every page uses (reveal on scroll, the top bar, the light under the pointer, the
+    copy buttons). `home.html`, `build.html` and `faq.html` each begin with a comment that names the title and the
+    description, then the styles only that page uses, its `<main>`, and behind it what goes after the foot: its own
+    script, and on the landing page the games' close-up. `home.html` in `public/` is gone.
+  - **What moved to a page:** a style rule whose selectors can match on that page only, judged by the classes and ids
+    in each page's markup and those its script sets. A rule that two pages use stays in the shell, and so does the
+    shared look even where one page alone uses it today (`.btn`). The order within each sheet is the order it had.
+    The script's parts went the same way; the questions and answers need none of their own.
+  - **The top bar's links are one list** in `server.ts` (`SITE_NAV`): a place is `#x` on the landing page and `/#x`
+    elsewhere, and the page itself is marked. Before, each page had its own hand-written copy.
+  - **The service** puts shell and page together once and keeps the result until one of the two files changes
+    (`sitePage()`), then fills in what a request decides (admin link, signed-out note, PREVIEW sash, version) as before.
+  - **Sizes**, text / compressed (gzip), in bytes: `/` 120,526 / 31,924 → 102,435 / 27,958; `/build` 115,822 / 31,641
+    → 66,179 / 19,891; `/faq` 96,306 / 26,111 → 29,502 / 9,854.
+  - **The look is unchanged:** full-page pictures of the three pages at 1440 and 390 px before and after are the same
+    pixel for pixel, and so is every computed style of every element at four widths, with and without reduced
+    motion, and with the close-up, the filters, the lobby demo and the code tabs used.
+  - **Not touched:** `/terms` stays a page of its own (`terms.html`, D-197) with its own short copy of the colours
+    and type; it has no top bar links and no foot to share. One dead rule is kept as it was, with a note: a stray
+    line before `.center-mini .cap` makes browsers drop that rule, and removing the line would change the lobby
+    demo's caption.
+  *Implementation (Claude):* `apps/cloud/public/site-pages/`; `SITE_PAGES`, `SITE_NAV`, `siteNav()`,
+  `assembleSitePage()`, `sitePage()` in `apps/cloud/src/server.ts`. Checks: `tests/website.test.ts` (the same styles,
+  foot and shared script on every page, the top bar's links per page, no page with another's parts, upper bounds for
+  each page's size), `scripts/e2e/website.py`.
+- **D-324 · 2026-11-23 · Klaus** — **`--kiosk`: the starter opens and closes the kiosk browser, and the board is told
+  that it fills the screen.** "Ok to add --kiosk option." D-315 named it as a later step; D-321 found the board guessing
+  full screen from a window exactly as large as the screen (D-317), a guess that made three browser checks fake a
+  larger screen.
+  - **The table says it.** `--kiosk` (or `TABLE_KIOSK=1`) travels with the start's options (`screen.kiosk`, D-319):
+    the board then counts as full screen without having asked, hides the pointer with `--pointer off` and offers no
+    Fullscreen button. A browser's own full screen (F11, an installed app) is still read from the display mode. The
+    window's size is no sign any more. Like the other start options: for the table's own screen, not a remote board.
+  - **The starter opens the browser** with `--kiosk`: Chrome, Chromium or Edge (the first found; `GAME_TABLE_BROWSER`
+    names another), in kiosk mode, with a profile of its own in the table's folder (`kiosk-browser`). The two belong
+    together: the browser closes when the table ends (Quit the table, Ctrl+C), and the table ends when the browser is
+    closed (Alt+F4). A kiosk browser left from a start that was cut off is ended first. Without such a browser, or
+    without an active desktop, the board opens as usual and the starter says so.
+  - **The Linux guide's start script goes**: its icon runs `game-table --kiosk --repos all --pointer off`.
+  - **A kiosk browser started another way** (a script of one's own, as on the game PC until now) is no longer taken
+    for full screen by itself: start the table with `--kiosk` (with `--no-open` if the script opens the browser).
+  *Implementation (Claude):* `kiosk` in `screen-options.ts`, `browserFull()` in `board.js` (`coversScreen` and its
+  `resize` listener are gone), `kioskBrowser()`, `kioskArgs()`, `openKiosk()` in `launch.ts`. Checks:
+  `tests/start-options.test.ts`, `scripts/e2e/start_options.py` (a table started with `TABLE_KIOSK=1`; a window as
+  large as its screen is no kiosk), and by hand with a stand-in browser: started with the board's address, ended by
+  Quit the table, and the table ended when the browser was closed.
+- **D-325 · 2026-11-23 · Klaus** — **A game's settings are remembered by the platform, with the game's data.**
+  "Settings should be remembered persistently using the game platform's storage." D-321 had found FreeCell's board
+  applying the kept house rule itself, by an intent before the first move.
+  - **What:** the settings of the manifest a game was last started with on this table. The next time the game is
+    chosen it begins with them; settings given with the choice win. Kept in the game's data file beside its display
+    choices (`settings`, D-302), so they outlast a restart, travel with an export, and go with *Delete* in the Game
+    data window.
+  - **Not kept:** a setting with `"random": true` (a seed, drawn anew for every game). Kept settings that fit the game
+    no longer (another version of it) are let go without a fuss.
+  - **Changed during a game:** `POST /game/settings/remember` keeps settings of the manifest that a game lets change
+    while it runs; a board's `settings()` gets it as `remember(patch)`. Checked like any setting.
+  - **FreeCell:** *Cards may be taken back from the foundations* is a manifest setting (on to begin with), shown in the
+    lobby; the switch in the settings window during the game stays (D-310), acts by the `rule` intent and asks the
+    table to remember. The board's `applyKeptRule` and the `rules` entry in the game's data are gone; a table that
+    had switched the rule off there starts with it on once.
+  *Implementation (Claude):* `settings` in `GameDataFile`, `GameData.settings()`/`setSettings()`, `selectGame`,
+  `rememberSettings`, `rememberGameSettings` in `table.ts`. Checks: `tests/remembered-settings.test.ts`,
+  `scripts/e2e/freecell.py`.
+- **D-326 · 2026-11-23 · Klaus** — **The settings window asks the running game for its items.** "Ok, do this
+  optimization, but for all games for consistency. Make a note in the README if this is relevant for future game
+  development. We may add a section about how to handle game platform and game specific settings. I believe that does
+  not apply for the DevSettings."
+  - **Before:** the board called `settings()` exported by the game's module, which is not the game that runs: it had no
+    view, no way to act and no store. FreeCell, Backgammon, GE150 Pro and FM-1 Synth each kept their running game in a
+    file-level variable for it.
+  - **Now:** the object `mount` returns may have `settings({ info, setPrefs, confirm, remember })`, and the board asks
+    it first. The module's export is still asked when no game is mounted, so nothing breaks; a table with an older
+    platform asks only the export.
+  - **An item may name a manifest setting** (`setting: "key"`): the locked row of that setting is then left out during
+    the game, since the item is its control.
+  - **All four games** move their items to the running game and drop the variable: FreeCell here, the three others in
+    their repositories once tables have this platform (a table with an older one would show none of their items).
+  - **Documented:** the developer guide's new part *Settings: the table's and the game's* (the table's settings, the
+    game's manifest settings, the game's own items; where each is kept; the developer settings are the platform's
+    alone), and a pointer at the top of the README.
+  *Implementation (Claude):* `openSettings()` in `board.js`; `games/freecell/board.js`. Checks:
+  `scripts/e2e/freecell.py` (the house rule's switch, the deal number), `scripts/e2e/play.py` settings.
+- **D-327 · 2026-11-23 · Klaus** — **Three consolidations from D-321**, "OK with the three suggested consolidations."
+  1. **`touchScroll` looks after its own element.** It watches the element it was called for, puts its bar back when
+     the content was drawn anew and measures again when the content changes; one call lasts the element's life. The
+     board still looks for new scrollers in its windows, but sets each up once and no longer measures all of them at
+     every change in any window. (The room for the bar stays where it was, in each window's styles: moving it into
+     the kit would change the look of games in other repositories that use `touchScroll`.)
+  2. **One set of rules for a drag and a tap.** The kit's scroller and the deck beside the board (D-306) each had
+     their own copy of how far a press may wander and still be a tap, what keeps its own touch (text fields, sliders,
+     pulldowns), and the click swallowed after a drag. They are the kit's now (`SCROLL_SLACK`, `OWN_TOUCH`,
+     `noTapAfterDrag`), used by both. The two scrollers stay two: one is an element with a bar, fingers, a fling and a
+     turned board; the other finds whatever scrolls under a mouse on a page.
+  3. **The start options from one list.** `SCREEN_OPTIONS` in `screen-options.ts` names each option once (its name,
+     its environment variable, how its text is read); the table host, the starter and the test of the guides go by
+     it. On the board, `screenSettings` holds for each setting what the browser keeps, what a start sets and how it
+     shows; one loop applies a start. Another option is one line in each.
+  Checks: `scripts/e2e/touch_scroll.py`, `board_deck.py`, `start_options.py`, `screensaver.py`, `freecell.py`,
+  `viewer.py`; `tests/start-options.test.ts`.

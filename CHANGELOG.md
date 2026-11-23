@@ -8,6 +8,14 @@ history.
 
 ## [Unreleased]
 
+- Website: each page is a file of its own in one shared shell, and carries only its own styles and script; the look is unchanged. Compressed, the landing page went from 32 KB to 28 KB, the developers' page from 32 KB to 20 KB, the questions and answers from 26 KB to 10 KB (D-323).
+- A game begins with the settings it was last played with on this table: kept with the game's data, so they outlast a restart. A seed drawn anew for every game is not kept (D-325).
+- FreeCell: the house rule is a setting of the game now, shown in the lobby before the start; changed during a game, it is kept for the next one by the table (D-325).
+- For games: the board's settings window asks the running game for its items (`settings` on what `mount` returns), and gives it `remember` to keep a setting changed during a game. The developer guide has a new part, "Settings: the table's and the game's" (D-326).
+- `--kiosk`: the starter opens the board in a browser that shows nothing else (Chrome, Chromium or Edge in kiosk mode, a profile of its own) and closes it with the table; closing the browser ends the table. The board is told that it fills the screen, instead of guessing it from the window's size. The Linux guide's start script is no longer needed (D-324).
+- Board: after a finger has scrolled a window, the next tap on a checkbox, pulldown or slider in it is no longer lost (D-322).
+- Board: a board left open while the table is started anew takes the new start's options and drops the old ones (D-322).
+- FreeCell: looking for a way through a deal is remembered, so replaying a game (its check at the end, the Game Viewer) no longer searches again; smoother scrolling in the board's windows (D-321).
 - Website: the questions and answers have a group "How to, with examples": pushing cards from the phone (Last Card), a customizable look (Mexican Train), keeping a choice and a solo game (FreeCell) (D-320).
 - Developer guide: "What a game needs" says what is required of a game (follow the platform, touch alone, an orientation that works, the platform's buttons always visible, rules for players) and what is expected (AI players, drag and drop on the board, results and awards, tests); the website's questions and answers link to it (D-320).
 - Website: a page of questions and answers at `/faq`, in three groups (getting started, developer knowledge, gameplay), linked from the top bar and the foot of every page (D-320).

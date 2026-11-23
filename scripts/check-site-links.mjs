@@ -7,7 +7,7 @@
 // Fails (exit 1) on a link that is gone (404, 410), a server error or a host that does not answer. A page that only
 // refuses a program (401, 403, 429: sign-in walls, rate limits) is listed as not checked.
 const base = (process.argv[2] ?? "https://games.skylar.technology").replace(/\/$/, "");
-const pages = ["/", "/build", "/terms"];
+const pages = ["/", "/build", "/faq", "/terms"];
 const found = new Map(); // url -> the pages that link to it
 for (const path of pages) {
   const r = await fetch(base + path);

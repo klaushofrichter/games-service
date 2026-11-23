@@ -139,7 +139,7 @@ buttons turn them to north, east, south or west (D-080). In code: `seatEdges(lay
 | **Pairing code** | The code a new table shows until an admin approves it in the console. | `pairingCode` | — |
 | **Access code** | A code from the console that approves a table at once and decides its games (D-113). | `accessCode`, `TABLE_CODE` | licence key |
 | **Download token** | A token from the console that lets someone (or an AI agent) download game logs. | `download-tokens` | API key |
-| **Website** | The public page at `/` of the game service, with the terms of service at `/terms`. | `home.html`, `terms.html` | landing page (fine in conversation) |
+| **Website** | The public page at `/` of the game service, with the terms of service at `/terms`. | `site-pages/` (`shell.html` and a file per page), `terms.html` | landing page (fine in conversation) |
 
 ## Where the words still differ
 

@@ -350,7 +350,7 @@ export interface LobbyState {
    * saved: it wins over what the board's browser keeps until the setting is changed on the board. `start` tells one
    * start of the table from the next.
    */
-  screen?: { start: number; screensaver?: number; pointer?: boolean; sound?: number };
+  screen?: { start: number; screensaver?: number; pointer?: boolean; sound?: number; kiosk?: boolean };
   /** Why nobody can take a seat now (every seat taken, or the chosen game is full), or null (D-129). */
   noSeat: string | null;
   /** "Player N" for someone joining without a name (D-244): the deck's name field and the invite start with it. */

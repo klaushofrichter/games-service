@@ -139,7 +139,7 @@ export function apply(p: Position, m: Move): Position {
   return q;
 }
 
-/** The position before a move that was made. `suitHome`: for a move to the foundations, the card is taken back from there. */
+/** The position before a move that was made; `card` is the (first) card it moved: one taken back from the foundations has no other record. */
 export function unapply(p: Position, m: Move, card: number): Position {
   const q = copy(p);
   let cards: number[];
@@ -288,15 +288,34 @@ interface Node {
   /** The moves from the parent: one chosen, then those that follow by themselves. */
   moves: Move[];
   f: number;
+  depth: number;
 }
+
+/**
+ * Ways found before, by exact position and budget: the rules run the search again whenever a game is replayed (the
+ * check at its end, a restored game, every step in the Game Viewer), and a search can take a few hundred milliseconds.
+ * The answer is a function of its input alone, so remembering it changes nothing but the time.
+ */
+const solvedBefore = new Map<string, Move[] | null>();
+const REMEMBERED = 48;
 
 /**
  * A way to solve a position: single-card moves in order (moves that happen by themselves included), or null if none
  * was found within `budget` positions. Not the shortest way, but a sound one. Always the same for the same position.
  */
 export function solve(start: Position, budget = 60000): Move[] | null {
+  const asked = `${budget}:${JSON.stringify([start.cols, start.cells])}`;
+  const known = solvedBefore.get(asked);
+  if (known !== undefined) return known && known.map((m) => ({ ...m }));
+  const found = search(start, budget);
+  if (solvedBefore.size >= REMEMBERED) solvedBefore.delete(solvedBefore.keys().next().value!);
+  solvedBefore.set(asked, found);
+  return found && found.map((m) => ({ ...m }));
+}
+
+function search(start: Position, budget: number): Move[] | null {
   const first = autoMoves(start);
-  const root: Node = { p: first.position, parent: null, moves: first.moves, f: distance(first.position) };
+  const root: Node = { p: first.position, parent: null, moves: first.moves, f: distance(first.position), depth: 0 };
   if (solved(root.p)) return root.moves;
   const seen = new Set<string>([key(root.p)]);
   // a binary heap on f; ties: the newer first (deeper), which keeps the search going down
@@ -329,25 +348,21 @@ export function solve(start: Position, budget = 60000): Move[] | null {
     }
     return top;
   };
-  let depthOf = new Map<Node, number>([[root, 0]]);
   for (let visited = 0; heap.length && visited < budget; visited++) {
     const node = pop();
-    const depth = depthOf.get(node) ?? 0;
     for (const m of candidates(node.p)) {
       const after = autoMoves(apply(node.p, m));
       const k = key(after.position);
       if (seen.has(k)) continue;
       seen.add(k);
-      const child: Node = { p: after.position, parent: node, moves: [m, ...after.moves], f: distance(after.position) + depth * 0.05 };
+      const child: Node = { p: after.position, parent: node, moves: [m, ...after.moves], f: distance(after.position) + node.depth * 0.05, depth: node.depth + 1 };
       if (solved(child.p)) {
         const path: Move[] = [];
         for (let n: Node | null = child; n; n = n.parent) path.unshift(...n.moves);
         return path;
       }
-      depthOf.set(child, depth + 1);
       push(child);
     }
   }
-  depthOf = new Map();
   return null;
 }

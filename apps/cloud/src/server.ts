@@ -5,7 +5,7 @@
 // service still runs as exactly one replica (D-071).
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { createHash, randomBytes } from "node:crypto";
-import { readFile } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import { gzipSync } from "node:zlib";
 import { fileURLToPath } from "node:url";
 import { BlockList, isIPv4, isIPv6 } from "node:net";
@@ -32,22 +32,71 @@ const REMOTE_SW = fileURLToPath(new URL("../public/remote-sw.js", import.meta.ur
 /** The icons: SVG, and for browsers without SVG favicons (Safari) and iOS home screens (D-212). */
 const ICONS: Record<string, string> = { "/favicon.svg": "image/svg+xml", "/favicon.ico": "image/x-icon", "/favicon-32.png": "image/png", "/apple-touch-icon.png": "image/png" };
 const PUBLIC_DIR = fileURLToPath(new URL("../public/", import.meta.url));
-// The public website (D-176): one page and its images.
-const HOME_PAGE = fileURLToPath(new URL("../public/home.html", import.meta.url));
+// The public website (D-176): its pages and their images.
+const SITE_PAGES_DIR = fileURLToPath(new URL("../public/site-pages/", import.meta.url));
 
 /**
- * One of the website's pages (D-312, D-320), all cut from home.html: what stands between `<!--home-->` and
- * `<!--/home-->` is the landing page's only, between `<!--build-->` and `<!--/build-->` the developers' page's only,
- * between `<!--faq-->` and `<!--/faq-->` the questions and answers' only. The rest (styles, top bar, footer) is shared.
+ * The website's pages (D-312, D-320), each a file of its own in public/site-pages/ (D-323): the landing page, the
+ * developers' page and the questions and answers. shell.html there is what they share: the styles of the one look,
+ * the top bar, the foot and the script every page uses. A page's file has its title and description, the styles and
+ * the script only it needs, and its `<main>`, so no page carries another's.
  */
 export const SITE_PAGES = { "/": "home", "/build": "build", "/faq": "faq" } as const;
-export type SitePage = (typeof SITE_PAGES)[keyof typeof SITE_PAGES];
-export function sitePage(source: string, page: SitePage): string {
-  const others = Object.values(SITE_PAGES).filter((x) => x !== page).join("|");
-  return source.replace(new RegExp(`<!--(${others})-->[\\s\\S]*?<!--/\\1-->`, "g"), "").replace(/<!--\/?(?:home|build|faq)-->/g, "");
+export type SitePath = keyof typeof SITE_PAGES;
+
+/** The top bar's links, the same on every page (D-323). "#x" is a place on the landing page; the others are pages. */
+const SITE_NAV: [href: string, label: string][] = [
+  ["#room", "How it plays"],
+  ["#games", "Games"],
+  ["#lobby", "The lobby"],
+  ["/build", "Build a game"],
+  ["#download", "Download"],
+  ["#install", "Docker"],
+  ["#table", "The table"],
+  ["/faq", "FAQ"],
+];
+/** The logo and the links as a page shows them: a place is "#x" on the landing page and "/#x" elsewhere; the page itself is marked. */
+export function siteNav(path: SitePath): string {
+  const home = path === "/";
+  const links = SITE_NAV.map(([href, label]) => {
+    const to = href.startsWith("#") && !home ? `/${href}` : href;
+    return href === path ? `<a class="on" href="${to}" aria-current="page">${label}</a>` : `<a href="${to}">${label}</a>`;
+  });
+  return `<a class="logo" href="${home ? "#" : "/"}"><img src="/favicon.svg" alt="">Game Table</a>\n    <nav class="main" aria-label="Sections">\n      ${links.join("\n      ")}\n    </nav>`;
 }
 
-/** A page of the website, compressed for a browser that takes it (the landing page is 150 KB of text, 40 KB compressed). */
+/**
+ * A page put into the shell. The page's file begins with a comment of "name: value" lines (title, description). What
+ * stands before its `<main>` goes into the head (its styles), what stands after `</main>` goes behind the foot (its
+ * script). What a request fills in ({{admin}}, {{note}}, {{preview}}, {{version}}) is left for the route.
+ */
+export function assembleSitePage(shell: string, page: string, path: SitePath): string {
+  const file = `site-pages/${SITE_PAGES[path]}.html`;
+  const m = page.match(/^<!--\r?\n([\s\S]*?)\r?\n-->\r?\n([\s\S]*?)<main>\r?\n([\s\S]*)\r?\n<\/main>\r?\n([\s\S]*)$/);
+  if (!m) throw new Error(`${file}: no comment with title and description at the top, or no <main>`);
+  const meta: Record<string, string> = {};
+  for (const line of m[1]!.split(/\r?\n/)) {
+    const pair = line.match(/^(\w+):\s*(.*?)\s*$/);
+    if (pair) meta[pair[1]!] = pair[2]!;
+  }
+  if (!meta.title || !meta.description) throw new Error(`${file}: title and description are needed`);
+  const parts: Record<string, string> = { title: esc(meta.title), description: esc(meta.description), style: m[2]!.trim(), nav: siteNav(path), main: m[3]!, tail: m[4]!.trim() };
+  return shell.replace(/\{\{(title|description|style|nav|main|tail)\}\}/g, (_, name: string) => parts[name]!);
+}
+/** A page as put together, kept until one of its two files changes (an edit shows without a restart). */
+const sitePages = new Map<SitePath, { stamp: string; html: string }>();
+export async function sitePage(path: SitePath): Promise<string> {
+  const files = [`${SITE_PAGES_DIR}shell.html`, `${SITE_PAGES_DIR}${SITE_PAGES[path]}.html`];
+  const stamp = (await Promise.all(files.map((f) => stat(f)))).map((s) => `${s.mtimeMs}/${s.size}`).join(" ");
+  const kept = sitePages.get(path);
+  if (kept?.stamp === stamp) return kept.html;
+  const [shell, page] = await Promise.all(files.map((f) => readFile(f, "utf8")));
+  const html = assembleSitePage(shell!, page!, path);
+  sitePages.set(path, { stamp, html });
+  return html;
+}
+
+/** A page of the website, compressed for a browser that takes it (the landing page is 100 KB of text, 28 KB compressed). */
 const zipped = new Map<string, Buffer>();
 function sendHtml(req: IncomingMessage, res: ServerResponse, html: string) {
   const headers = { ...HTML_HEADERS, "cache-control": "no-cache", vary: "accept-encoding" };
@@ -657,7 +706,7 @@ export function startCloud(o: CloudOptions) {
               : `<a id="admin-link" href="/admin">Admin</a>`;
         // The version label is part of the public page (and checked by the deploy's smoke test).
         const preview = o.previewBanner === false ? "" : `<div class="preview-sash" role="note" aria-label="Preview: Game Table is not live yet"><span>PREVIEW / DRAFT<small>NOT LIVE YET</small></span></div>`;
-        const html = sitePage(await readFile(HOME_PAGE, "utf8"), SITE_PAGES[p as keyof typeof SITE_PAGES]).replace("{{admin}}", admin).replace("{{note}}", note).replace("{{preview}}", preview).replace("{{version}}", versionLabel());
+        const html = (await sitePage(p as SitePath)).replace("{{admin}}", admin).replace("{{note}}", note).replace("{{preview}}", preview).replace("{{version}}", versionLabel());
         return sendHtml(req, res, html);
       }
       if (m === "GET" && (match = p.match(/^\/site\/([a-z0-9-]+)\.(webp|png|svg|jpg)$/))) {

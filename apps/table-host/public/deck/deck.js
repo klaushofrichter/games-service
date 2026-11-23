@@ -1,6 +1,6 @@
 // Deck UI: join with a name, lobby with Ready, and the game's own private deck view.
 // A game package may ship deck.js exporting mount(root, ctx) -> { update(view, events, info), destroy() }.
-import { esc, claimServiceWorkerPage, gameStore, inkOn, openTableSocket, playerColor, seatName, seatTitle } from "/shared/board-kit.js";
+import { OWN_TOUCH, SCROLL_SLACK, esc, claimServiceWorkerPage, gameStore, inkOn, noTapAfterDrag, openTableSocket, playerColor, seatName, seatTitle } from "/shared/board-kit.js";
 import { renderRules } from "/shared/markdown.js";
 
 const app = document.getElementById("app");
@@ -21,7 +21,6 @@ const BOARD = params.get("board") === "1" && !REMOTE;
  * fields, sliders and what a game moves by touch itself (`touch-action: none`) keep their own.
  */
 if (BOARD) {
-  const MOVE = 12;
   let drag = null;
   let dragged = false;
   const target = (n) => {
@@ -35,7 +34,7 @@ if (BOARD) {
   addEventListener("pointerdown", (e) => {
     dragged = false;
     drag = null;
-    if (e.pointerType === "touch" || e.button > 0 || e.target.closest?.("input, select, textarea, [contenteditable]")) return;
+    if (e.pointerType === "touch" || e.button > 0 || e.target.closest?.(OWN_TOUCH)) return;
     const el = target(e.target);
     if (el) drag = { el, id: e.pointerId, y: e.clientY, top: el.scrollTop };
   }, true);
@@ -43,17 +42,12 @@ if (BOARD) {
     if (!drag || e.pointerId !== drag.id) return;
     if (!e.buttons) return void (drag = null);
     const dy = e.clientY - drag.y;
-    if (!dragged && Math.abs(dy) < MOVE) return;
+    if (!dragged && Math.abs(dy) < SCROLL_SLACK) return;
     dragged = true;
     drag.el.scrollTop = drag.top - dy;
   }, true);
   for (const type of ["pointerup", "pointercancel"]) addEventListener(type, () => (drag = null), true);
-  addEventListener("click", (e) => {
-    if (!dragged) return;
-    dragged = false;
-    e.stopImmediatePropagation();
-    e.preventDefault();
-  }, true);
+  noTapAfterDrag(window, () => dragged && !(dragged = false));
 }
 const boardKey = () => { try { return window.parent !== window ? window.parent.TABLE_KEY : undefined; } catch { return undefined; } };
 const SESSION_KEY = REMOTE ? `gametable.remote.${params.get("inv") ?? ""}` : BOARD ? `gametable.board-deck.${location.host}` : `gametable.session.${location.host}`;
@@ -404,12 +398,12 @@ function openRename(back) {
     e.preventDefault();
     const r = await send("lobby", "rename", { name: input.value });
     if (r.ok) {
-      // kept for the next time (D-307): at once as typed, then as the table has it with its next message
+      // kept for the next time (D-307): at once as typed (the table's message with the new name may be here already),
+      // then as the table has it with its next message
       ownName.set(input.value.trim().slice(0, 12));
       keepName = true;
-    }
-    if (r.ok) modal.querySelector("[data-close]").click();
-    else bodyEl.querySelector(".join-error").textContent = r.reason;
+      modal.querySelector("[data-close]").click();
+    } else bodyEl.querySelector(".join-error").textContent = r.reason;
   });
 }
 

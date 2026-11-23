@@ -224,10 +224,11 @@ function describeStep(step: StepInfo<State>): StepDescription | null {
 }
 
 export default defineGame<State>({
-  setup(ctx) {
+  setup(ctx, settings) {
     const found = solvable(ctx.randomInt(1, MAX_DEAL));
     const seat = ctx.seats[0]!;
-    return fresh({ seat: seat.seat, name: seat.name, deal: found.n, passed: found.passed, takeBack: true }, found.plan);
+    // The house rule is a setting (D-325): on to begin with, and as the table last had it after that.
+    return fresh({ seat: seat.seat, name: seat.name, deal: found.n, passed: found.passed, takeBack: settings.takeBack !== false }, found.plan);
   },
 
   onIntent(state, seat, intent, ctx) {
@@ -271,6 +272,7 @@ export default defineGame<State>({
         };
       }
       case "hint": {
+        if (state.noWay) return { state, events: [{ name: "noWay" }] }; // searched already: nothing has moved since
         const plan = state.plan?.length ? state.plan : solve(state.pos, HINT_BUDGET);
         if (!plan || !plan.length) return { state: { ...state, hint: null, noWay: true, plan: null }, events: [{ name: "noWay" }] };
         return { state: { ...state, hint: plan[0]!, noWay: false, plan, hints: state.hints + 1 }, events: [{ name: "hint", data: plan[0] }] };

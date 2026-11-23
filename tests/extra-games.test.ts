@@ -1,5 +1,6 @@
 // Extra-game repositories (D-097): the console lists repositories, the service fetches each one's games/ folder as a
 // bundle, an admin ticks repositories per table, and the table installs, updates and drops those games between games.
+import { createServer as createSocketServer, type AddressInfo } from "node:net";
 import { createServer, type Server } from "node:http";
 import { execFile } from "node:child_process";
 import { cp, mkdtemp, readdir, readFile, rm, mkdir, writeFile } from "node:fs/promises";
@@ -744,7 +745,16 @@ describe("the deploy-time repository list", () => {
 
   /** Start the real entry point (main.ts) and return its exit code, or the repos it lists once it answers. */
   async function runMain(env: Record<string, string>): Promise<{ code: number | null; out: string; repos?: { repo: string; ref: string; origin: string }[] }> {
-    const port = 20000 + Math.floor(Math.random() * 20000);
+    // A port that is free now, asked of the system: a number picked at random was now and then another test's server,
+    // whose /health then answered for a service that had refused to start.
+    const port = await new Promise<number>((ok, fail) => {
+      const probe = createSocketServer();
+      probe.once("error", fail);
+      probe.listen(0, "127.0.0.1", () => {
+        const { port } = probe.address() as AddressInfo;
+        probe.close(() => ok(port));
+      });
+    });
     const child = spawn(process.execPath, ["apps/cloud/src/main.ts"], {
       cwd: new URL("..", import.meta.url).pathname,
       env: { ...process.env, PORT: String(port), PUBLIC_URL: `http://127.0.0.1:${port}`, ADMIN_TOKEN: ADMIN, GAME_REPO_API_URL: githubUrl, GAME_REPOS: "", ...env },

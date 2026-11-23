@@ -21,7 +21,7 @@ import { fileURLToPath } from "node:url";
 import { gunzipSync } from "node:zlib";
 import JSZip from "jszip";
 import { readTarGz } from "../../packages/protocol/src/bundle.ts";
-import { SCREEN_OPTIONS_HELP, screenOptions } from "../../apps/table-host/src/screen-options.ts";
+import { SCREEN_OPTIONS, SCREEN_OPTIONS_HELP, screenOptions, type ScreenOptionsGiven } from "../../apps/table-host/src/screen-options.ts";
 
 const OWNER = "klaushofrichter";
 /** Downloaded at every start, no sign-in (D-284): extra-games, and synth-game (FM-1 Synth, a solo game). */
@@ -63,14 +63,12 @@ interface Options {
   smokeTest: boolean;
   expectGames: string[];
   showVersion?: boolean;
-  /** The table's own screen for this start (D-319), as given. */
-  screensaver?: string;
-  pointer?: string;
-  sound?: string;
+  /** The table's own screen for this start (D-319), as given. `kiosk`: this starter also opens and closes the browser (D-324). */
+  screen: ScreenOptionsGiven;
 }
 
 export function parseArgs(argv: string[]): Options {
-  const o: Options = { noUpdate: false, port: 8080, open: true, branch: "production", signIn: false, service: false, smokeTest: false, expectGames: [] };
+  const o: Options = { noUpdate: false, port: 8080, open: true, branch: "production", signIn: false, service: false, smokeTest: false, expectGames: [], screen: {} };
   for (let i = 0; i < argv.length; i++) {
     const [flag, inline] = argv[i].includes("=") ? [argv[i].slice(0, argv[i].indexOf("=")), argv[i].slice(argv[i].indexOf("=") + 1)] : [argv[i], undefined];
     const value = () => {
@@ -89,22 +87,23 @@ export function parseArgs(argv: string[]): Options {
       case "service": o.service = true; break;
       case "code": o.code = value(); o.service = true; break;
       case "home": o.home = value(); break;
-      case "screensaver": o.screensaver = value(); break;
-      case "pointer": o.pointer = value(); break;
-      case "sound": o.sound = value(); break;
       case "version": case "v": o.showVersion = true; break;
       case "smoketest": o.smokeTest = true; o.open = false; break;
       case "expectgames": o.expectGames = value().split(",").map((s) => s.trim()).filter(Boolean); break;
       case "help": case "h": case "?":
         console.log(readmeText());
         process.exit(0);
-      default: fail(`unknown option ${argv[i]} (see --help)`);
+      default: {
+        const screen = SCREEN_OPTIONS.find((s) => s.name === flag.replace(/^-+/, "").toLowerCase());
+        if (!screen) fail(`unknown option ${argv[i]} (see --help)`);
+        o.screen[screen.name] = screen.flag ? "1" : value();
+      }
     }
   }
   if (!Number.isInteger(o.port) || o.port < 1 || o.port > 65535) fail("--port needs a port number");
   if (!/^[A-Za-z0-9._/-]+$/.test(o.branch)) fail("--branch needs a branch name");
   try {
-    screenOptions(o);
+    screenOptions(o.screen);
   } catch (e) {
     fail((e as Error).message);
   }
@@ -127,6 +126,8 @@ export function readmeText() {
     "  --code ABCD-EFGH  join the service with an access code from the console",
     "  --home DIR        another folder for downloads and data",
     ...SCREEN_OPTIONS_HELP,
+    "                    and this starter opens that browser itself (Chrome, Chromium or Edge in kiosk mode, with a",
+    "                    profile of its own) and closes it with the table; closing the browser ends the table",
     "  --version         the package's version and the games on the table (MANIFEST.json, games.json)",
     "  --smoke-test      check the installation: start, check the board and the games, stop; fails if a named",
     "                    repository is missing. Uses the saved private repositories without asking or changing them",
@@ -281,7 +282,9 @@ export async function allGameRepos(token: string): Promise<string[]> {
   for (let page = 1; page <= 10; page++) {
     const list = JSON.parse((await get(`https://api.github.com/user/repos?per_page=100&page=${page}&affiliation=owner,collaborator,organization_member`, { Accept: "application/vnd.github+json", Authorization: `Bearer ${token}` })).toString("utf8")) as { full_name: string; name: string; archived?: boolean; owner: { login: string } }[];
     for (const r of list) {
-      if (r.owner.login.toLowerCase() === OWNER && GAME_REPO.test(r.name) && !r.archived && !PUBLIC_REPOS.includes(r.full_name)) found.push(r.full_name);
+      // (the owner as this starter spells it, whatever case GitHub gives: the public list and the folders on disk use it)
+      const full = `${OWNER}/${r.name}`;
+      if (r.owner.login.toLowerCase() === OWNER && GAME_REPO.test(r.name) && !r.archived && !PUBLIC_REPOS.includes(full)) found.push(full);
     }
     if (list.length < 100) break;
   }
@@ -437,6 +440,56 @@ async function health(port: number): Promise<boolean> {
  * Opens the board in the browser. Without a desktop (no xdg-open, no display: a server, Raspberry Pi OS Lite) it says
  * where the board is and the table keeps running (Linux review, 2026-11-02: a missing xdg-open ended the starter).
  */
+/** A browser that has a kiosk mode (Chrome, Chromium, Edge): GAME_TABLE_BROWSER, or the first one found. */
+export function kioskBrowser(): string | null {
+  const named = process.env.GAME_TABLE_BROWSER;
+  if (named) return existsSync(named) ? named : null;
+  if (isMac) {
+    return ["Google Chrome", "Chromium", "Microsoft Edge"].map((n) => `/Applications/${n}.app/Contents/MacOS/${n}`).find((f) => existsSync(f)) ?? null;
+  }
+  if (isWin) {
+    const roots = [process.env.ProgramFiles, process.env["ProgramFiles(x86)"], process.env.LOCALAPPDATA].filter((r): r is string => !!r);
+    const files = ["Google\\Chrome\\Application\\chrome.exe", "Chromium\\Application\\chrome.exe", "Microsoft\\Edge\\Application\\msedge.exe"];
+    for (const f of files) for (const r of roots) if (existsSync(join(r, f))) return join(r, f);
+    return null;
+  }
+  const dirs = (process.env.PATH ?? "").split(delimiter).filter(Boolean);
+  for (const name of ["google-chrome", "google-chrome-stable", "chromium", "chromium-browser", "microsoft-edge"]) {
+    for (const d of dirs) if (existsSync(join(d, name))) return join(d, name);
+  }
+  return null;
+}
+
+/** How the kiosk browser is started: nothing but the board, a profile of its own (so it is no window of the person's browser). */
+export function kioskArgs(url: string, profile: string): string[] {
+  // --password-store=basic: after an automatic login the keyring stays locked, and Chrome would ask for its password.
+  return ["--kiosk", `--user-data-dir=${profile}`, "--no-first-run", "--noerrdialogs", "--password-store=basic", "--autoplay-policy=no-user-gesture-required", url];
+}
+
+/**
+ * The board in a kiosk browser (D-324): started here, so the two belong together. Returns the browser's process, or
+ * null where there is none to start (no such browser, no active desktop): the board is then opened as usual.
+ */
+function openKiosk(url: string, profile: string): ChildProcess | null {
+  if (!isWin && !isMac && !process.env.DISPLAY && !process.env.WAYLAND_DISPLAY) return null;
+  if (!isWin && !isMac && !desktopActive()) return null;
+  const browser = kioskBrowser();
+  if (!browser) {
+    note("--kiosk: no Chrome, Chromium or Edge was found here (GAME_TABLE_BROWSER names another); the board opens in the usual browser instead.");
+    return null;
+  }
+  // A kiosk browser left from a start that was cut off would take the new window's address and end at once, and the
+  // table with it: it goes first.
+  if (!isWin) spawnSync("pkill", ["-f", "--", `--user-data-dir=${profile}`], { stdio: "ignore", timeout: 5000 });
+  try {
+    const child = spawn(browser, kioskArgs(url, profile), { stdio: "ignore" });
+    child.on("error", () => note(`--kiosk: ${browser} could not be started; open ${url} in a browser on this computer.`));
+    return child;
+  } catch {
+    return null;
+  }
+}
+
 function openBrowser(url: string) {
   const manual = () => note(`Couldn't open a browser here: open ${url} in a browser on this computer, or show the board on another screen.`);
   if (!isWin && !isMac && !process.env.DISPLAY && !process.env.WAYLAND_DISPLAY) return manual();
@@ -669,9 +722,7 @@ async function main() {
     APP_VERSION: version,
   };
   // The table's own screen, this start only (D-319).
-  if (o.screensaver !== undefined) env.TABLE_SCREENSAVER = o.screensaver;
-  if (o.pointer !== undefined) env.TABLE_POINTER = o.pointer;
-  if (o.sound !== undefined) env.TABLE_SOUND = o.sound;
+  for (const s of SCREEN_OPTIONS) if (o.screen[s.name] !== undefined) env[s.env] = o.screen[s.name];
   delete env.CLOUD_URL;
   delete env.TABLE_CODE;
   if (o.service) env.CLOUD_URL = SERVICE_URL;
@@ -710,7 +761,9 @@ async function main() {
   child.on("exit", () => (exited = true));
   // Closing the Terminal window sends SIGHUP: the table host stops with the launcher, whichever signal ends it.
   for (const sig of ["SIGINT", "SIGTERM", "SIGHUP"] as const) process.on(sig, () => child.kill(sig === "SIGHUP" ? "SIGTERM" : sig));
+  let kiosk: ChildProcess | null = null;
   process.on("exit", () => {
+    kiosk?.kill("SIGTERM");
     if (!exited) child.kill("SIGTERM");
   });
 
@@ -759,6 +812,14 @@ async function main() {
   if (!up) {
     if (exited) fail(`The table host stopped (exit ${child.exitCode}); see the messages above.`);
     note(`The table host does not answer yet; open http://localhost:${o.port}/board/ yourself when it does.`);
+  } else if (o.open && o.screen.kiosk && (kiosk = openKiosk(`http://localhost:${o.port}/board/`, join(home, "kiosk-browser")))) {
+    // The two belong together: the table ends when its browser is closed, and the browser when the table ends
+    // (Quit the table on the board, Ctrl+C here).
+    say("The board is open in a kiosk browser. To leave it: Advanced › Quit the table… on the board, or Alt+F4.");
+    kiosk.on("exit", () => {
+      kiosk = null;
+      if (!exited) child.kill("SIGTERM");
+    });
   } else if (o.open) {
     openBrowser(`http://localhost:${o.port}/board/`);
     say(`No board window? Open http://localhost:${o.port}/board/ in a browser on this computer.`);

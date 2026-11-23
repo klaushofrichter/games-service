@@ -11,7 +11,7 @@ One table at a time on port 8159 (what a browser keeps is per address).
 """
 import os, sys, tempfile
 from playwright.sync_api import sync_playwright
-from common import errors, start_table, watch
+from common import errors, start_table, wait, watch
 
 OUT = sys.argv[1] if len(sys.argv) > 1 else "e2e-out"
 os.makedirs(OUT, exist_ok=True)
@@ -47,7 +47,7 @@ table = start(TABLE_SCREENSAVER="2", TABLE_POINTER="off", TABLE_SOUND="40")
 try:
     with sync_playwright() as p:
         br = p.chromium.launch()
-        ctx = br.new_context(viewport={"width": 1920, "height": 1080}, screen={"width": 2560, "height": 1440})
+        ctx = br.new_context(viewport={"width": 1920, "height": 1080})
         page = ctx.new_page()
         watch(page, "board", ignore=("WebSocket", "ERR_CONNECTION_REFUSED", "Failed to load resource", "Failed to fetch"))
 
@@ -89,16 +89,32 @@ try:
         assert volume == 70 and hide and saver, f"after a reload: volume {volume}, pointer hidden {hide}, screensaver {saver}"
 
         # The next start begins with its options again.
+        # A board left open (a kiosk browser) takes the next start's options too, and drops those of the start before.
         stop(table)
         table = start(TABLE_SOUND="20")
+        wait(lambda: page.evaluate(LEVEL) == 20, 40, "the open board to take the next start's --sound 20")
+        assert not page.evaluate("() => document.documentElement.classList.contains('gt-pointer-hidden')")
         hide, volume, saver, text = settings(page)
         assert volume == 20, f"the next start's --sound 20 shows as {volume}"
         assert not hide and not saver and "after an hour" in text, f"options not given come from the browser: pointer hidden {hide}, screensaver {saver}, {text!r}"
         assert page.evaluate(KEPT) == ["0", "0.7", "0"]
 
+        # Started for a kiosk (--kiosk, D-324): the board is full screen without having asked, so with --pointer off
+        # the pointer is hidden at once, and the settings say so instead of offering Fullscreen. A window's size is
+        # no sign of it (this window is exactly as large as its screen all along).
+        assert page.evaluate("() => innerWidth === screen.width && innerHeight === screen.height") and page.locator(".overlay.settings [data-fs]").count() == 1, "a window as large as its screen is taken for a kiosk"
+        stop(table)
+        table = start(TABLE_KIOSK="1", TABLE_POINTER="off")
+        page.wait_for_function("document.documentElement.classList.contains('gt-pointer-hidden')", timeout=40000)
+        assert page.evaluate("() => document.fullscreenElement") is None
+        hide, volume, saver, text = settings(page)
+        assert hide and page.locator(".overlay.settings [data-fs-kiosk]").count() == 1 and page.locator(".overlay.settings [data-fs]").count() == 0, "a kiosk is offered Fullscreen"
+        assert page.evaluate("() => getComputedStyle(document.querySelector('.overlay.settings')).cursor") == "none", "the pointer shows in a kiosk started with --pointer off"
+
         # A start without options: what the browser keeps.
         stop(table)
         table = start()
+        wait(lambda: page.evaluate(LEVEL) == 70, 40, "the open board to go back to what the browser keeps")
         hide, volume, saver, text = settings(page)
         assert (hide, volume, saver) == (False, 70, False), f"without options: pointer hidden {hide}, volume {volume}, screensaver {saver}"
         # And a browser that keeps nothing shows the pointer (D-319), plays at full volume, and has the screensaver.

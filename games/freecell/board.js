@@ -2,8 +2,8 @@
 // foundations on top, eight columns below. A card (or a run of cards) is dragged to where it should go, or tapped to
 // go where it fits best. The 52 cards are 52 elements that stay: a move only changes where they lie, so every move,
 // undo and card going home slides there by itself.
-import { html, ping, playSound, seatPlates, useStyles } from "/shared/board-kit.js";
-import { DEFAULT_DESIGN, DESIGNS, RANKS, SUITS, cardClass, face, isDesign } from "/games/freecell/assets/cards.js";
+import { html, localFrame, ping, playSound, seatPlates, useStyles } from "/shared/board-kit.js";
+import { DEFAULT_DESIGN, DESIGNS, RANKS, SUITS, cardClass, face, isDesign, rank, suit } from "/games/freecell/assets/cards.js";
 
 const W = 140, H = 196, GAP = 22; // a card, and the gap between columns
 const X0 = (1920 - (8 * W + 7 * GAP)) / 2;
@@ -15,8 +15,6 @@ const HOME = 12;
 const SLIDE = 230; // ms a card takes to slide to its place
 const DRAG_START = 8; // px a press may wander and still be a tap
 
-const rank = (c) => c >> 2;
-const suit = (c) => c & 3;
 const cardName = (c) => `${RANKS[rank(c)]}${SUITS[suit(c)]}`;
 const colX = (i) => X0 + i * (W + GAP);
 const placeName = (p) => (p === HOME ? "its foundation" : p >= 8 ? "a free cell" : `column ${p + 1}`);
@@ -30,9 +28,6 @@ function homeSound(ctx, t, out) {
 function winSound(ctx, t, out) {
   [1047, 1319, 1568, 2093].forEach((f, i) => ping(ctx, out, t + i * 0.13, { freq: f, decay: 0.5, gain: 0.25 }));
 }
-
-/** The game on this board, for the settings window (which is the platform's, outside `mount`). */
-let live = null;
 
 export function mount(root, ctx) {
   useStyles("/games/freecell/assets/cards.css");
@@ -82,7 +77,7 @@ export function mount(root, ctx) {
   let drag = null; // { id, cards, from, n, x, y: the press (board pixels), moved, targets }
   let confirm = null; // { what, timer }: "Start again" and "Give up" ask once more
   let received = 0; // performance.now() when the latest view came
-  let dealt = false;
+  let gone = false; // unmounted: nothing asks the table again
 
   // The cards' design (D-310): chosen on the phone, kept on the table (`design` in the game's data), changed at any
   // time. This screen reads it at the start and hears of every change.
@@ -96,36 +91,18 @@ export function mount(root, ctx) {
     for (let c = 0; c < 52; c++) cards[c].innerHTML = face(c, design);
   }
   setDesign(DEFAULT_DESIGN);
-  const readDesign = () => ctx.store?.get("design").then(setDesign, () => setTimeout(readDesign, 3000));
+  let designRetry = null;
+  const readDesign = () => ctx.store?.get("design").then(setDesign, () => { if (!gone) designRetry = setTimeout(readDesign, 3000); });
   readDesign();
   const stopStore = ctx.store?.onChange((key, value) => {
     if (key === "design") setDesign(value);
     else if (key === null) readDesign();
   });
-  // The house rule kept on the table (D-310) holds for a new game: asked for once, before the first move.
-  let ruleRead = false;
-  async function applyKeptRule() {
-    if (ruleRead || !ctx.store || !mine() || view.moves > 0) return;
-    ruleRead = true;
-    try {
-      const kept = await ctx.store.get("rules");
-      if (typeof kept?.takeBack === "boolean" && kept.takeBack !== view.takeBack && mine()) ctx.act(view.seat, "rule", { takeBack: kept.takeBack });
-    } catch {
-      ruleRead = false; // the table gave no answer: with the next update
-    }
-  }
-
   const mine = () => !!view && !!info && info.controlSeats?.includes(view.seat) && !view.over;
   const north = () => info?.rotation === 180;
 
-  /** A point of the screen in the board's own 1920 × 1080, whichever way it is turned. */
-  function local(e) {
-    const r = root.getBoundingClientRect();
-    let x = ((e.clientX - r.left) / r.width) * 1920;
-    let y = ((e.clientY - r.top) / r.height) * 1080;
-    if (north()) (x = 1920 - x), (y = 1080 - y);
-    return { x, y };
-  }
+  /** How far the pointer has gone since a drag began, in the board's own pixels, whichever way the board is turned. */
+  const dragged = (d, e) => d.frame(e.clientX - d.x, e.clientY - d.y);
 
   const fan = (n) => (n <= 1 ? FAN : Math.min(FAN, (TAB_END - TAB - H) / (n - 1)));
 
@@ -234,8 +211,10 @@ export function mount(root, ctx) {
     let ms = view.firstAt === null ? 0 : view.lastAt - view.firstAt;
     if (view.firstAt !== null && !view.over) ms += performance.now() - received; // (runs on between moves)
     const s = Math.max(0, Math.floor(ms / 1000));
-    box.querySelector(".fc-time").textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+    const text = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+    if (text !== timeEl.textContent) timeEl.textContent = text;
   }
+  const timeEl = box.querySelector(".fc-time");
   const ticking = setInterval(clock, 1000);
 
   async function act(name, payload) {
@@ -281,16 +260,14 @@ export function mount(root, ctx) {
     if (!el) return;
     const g = grab(Number(el.dataset.card));
     if (!g) return;
-    const at = local(e);
-    drag = { ...g, id: e.pointerId, x: at.x, y: at.y, moved: false, targets: view.legal?.[`${g.from}:${g.n}`] ?? [] };
+    drag = { ...g, id: e.pointerId, x: e.clientX, y: e.clientY, frame: localFrame(layer), moved: false, targets: view.legal?.[`${g.from}:${g.n}`] ?? [] };
     layer.setPointerCapture?.(e.pointerId);
     e.preventDefault();
   });
 
   layer.addEventListener("pointermove", (e) => {
     if (!drag || e.pointerId !== drag.id) return;
-    const at = local(e);
-    const dx = at.x - drag.x, dy = at.y - drag.y;
+    const { x: dx, y: dy } = dragged(drag, e);
     if (!drag.moved) {
       if (Math.hypot(dx, dy) < DRAG_START || drag.fixed) return;
       drag.moved = true;
@@ -303,13 +280,13 @@ export function mount(root, ctx) {
       cards[c].style.zIndex = String(900 + i);
     });
     // the place under the cards lights up
-    const over = dropPlace(at, dx, dy);
+    const over = dropPlace(drag, dx, dy);
     for (const el of box.querySelectorAll(".fc-over")) el.classList.remove("fc-over");
     if (over !== null) target(over, drag.cards[0])?.classList.add("fc-over");
   });
 
   /** The place the dragged cards are over, if they may go there: by the middle of the first card. */
-  function dropPlace(at, dx, dy) {
+  function dropPlace(drag, dx, dy) {
     const p = where.get(drag.cards[0]);
     const cx = p.x + dx + W / 2, cy = p.y + dy + H / 2;
     let best = null, bestD = Infinity;
@@ -337,10 +314,8 @@ export function mount(root, ctx) {
       if (!cancelled && !d.dragOnly) act("tap", { from: d.from, n: d.n });
       return;
     }
-    const at = local(e);
-    drag = d; // (dropPlace reads it)
-    const to = cancelled ? null : dropPlace(at, at.x - d.x, at.y - d.y);
-    drag = null;
+    const by = dragged(d, e);
+    const to = cancelled ? null : dropPlace(d, by.x, by.y);
     if (to === null) return draw(); // back to where they were
     // They stay where they were let go until the table answers; then they slide into place (or back).
     for (const c of d.cards) cards[c].classList.remove("fc-drag");
@@ -355,7 +330,6 @@ export function mount(root, ctx) {
       const first = !view;
       view = v;
       info = i;
-      live = { view: v, act: (name, payload) => ctx.act(v.seat, name, payload), store: ctx.store };
       received = performance.now();
       box.classList.toggle("fc-north", north());
       seatPlates(root, info).classList.toggle("fc-north", north());
@@ -368,8 +342,7 @@ export function mount(root, ctx) {
         if (ev.name === "home") playSound(info, "fc-home", homeSound);
         if (ev.name === "won") playSound(info, "fc-won", winSound);
       }
-      if (first && !dealt) {
-        dealt = true;
+      if (first) {
         if (v.moves === 0 && !v.over) {
           // from the middle of the top row, card by card
           for (let c = 0; c < 52; c++) cards[c].style.transform = `translate(${1920 / 2 - W / 2}px, ${TOP}px)`;
@@ -384,51 +357,53 @@ export function mount(root, ctx) {
       }
       draw(delays);
       status();
-      applyKeptRule();
     },
     whenIdle() {
       const wait = idleAt - performance.now();
       return wait > 0 ? new Promise((r) => setTimeout(r, wait)) : Promise.resolve();
     },
+    /**
+     * The board's settings window during a game (the platform asks the game that runs here, D-326): the house rule,
+     * and the deal's number to play a deal again. The number is typed on the board's number pad; another number ends
+     * the game that is on, so the board asks first.
+     */
+    settings({ info, confirm, remember }) {
+      const v = view;
+      if (!v) return [];
+      if (v.over || !info?.controlSeats?.includes(v.seat)) return [{ type: "text", label: "Deal number", value: `#${v.deal}` }];
+      return [
+        {
+          type: "toggle",
+          setting: "takeBack", // (the manifest's setting, changed while the game runs: the rules take it, the table keeps it)
+          label: "Cards may be taken back from the foundations",
+          hint: "A house rule: drag a foundation's top card to a column or a free cell. Kept for the next games.",
+          value: v.takeBack,
+          onChange: async (on) => {
+            const r = await ctx.act(v.seat, "rule", { takeBack: !!on });
+            if (r?.ok) remember?.({ takeBack: !!on });
+          },
+        },
+        {
+          type: "number",
+          label: "Deal number",
+          hint: "Enter a number to play that deal. The game that is on ends.",
+          value: v.deal,
+          min: 1,
+          max: 999999,
+          onChange: async (n) => {
+            if (gone || n === view.deal) return;
+            if (await confirm(`Play deal #${n}?`, `The game that is on (deal #${view.deal}) ends without a result.`, `Play deal #${n}`)) ctx.act(view.seat, "deal", { n });
+          },
+        },
+      ];
+    },
     destroy() {
-      live = null;
+      gone = true;
+      clearTimeout(designRetry);
       stopStore?.();
       clearInterval(ticking);
       clearTimeout(confirm?.timer);
       box.remove();
     },
   };
-}
-
-/**
- * The board's settings window during a game: the deal's number, to play a deal again. Typed on the board's number pad;
- * another number ends the game that is on, so the board asks first.
- */
-export function settings({ info, confirm }) {
-  const v = live?.view;
-  if (!v || v.over || !info?.controlSeats?.includes(v.seat)) return v ? [{ type: "text", label: "Deal number", value: `#${v.deal}` }] : [];
-  return [
-    {
-      type: "toggle",
-      label: "Cards may be taken back from the foundations",
-      hint: "A house rule: drag a foundation's top card to a column or a free cell. Kept for the next games.",
-      value: v.takeBack,
-      onChange: async (on) => {
-        const r = await live?.act("rule", { takeBack: !!on });
-        if (r?.ok) live?.store?.set("rules", { takeBack: !!on });
-      },
-    },
-    {
-      type: "number",
-      label: "Deal number",
-      hint: "Enter a number to play that deal. The game that is on ends.",
-      value: v.deal,
-      min: 1,
-      max: 999999,
-      onChange: async (n) => {
-        if (!live || n === live.view.deal) return;
-        if (await confirm(`Play deal #${n}?`, `The game that is on (deal #${live.view.deal}) ends without a result.`, `Play deal #${n}`)) live?.act("deal", { n });
-      },
-    },
-  ];
 }

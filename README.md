@@ -18,6 +18,11 @@ Game Table platform: a touchscreen **board** lying flat on a table, players' pho
 
 This repository implements phases 1a, 1b and 1c of the *Game Table — Concept & Architecture* document: lobby, seats, game selection, the game runtime with replayable logs, AI-only simulation, the board control API, pause on a lost service connection, the console, a table PC kit, **remote play** over WebRTC, automated tests, and four playable games with their own board and phone UIs and rules for players: **Roulette**, **Pachisi**, **Hold'em** and **Coin Flip**. More games can come from other repositories, private ones included (*Extra-game repositories* below); [`klaushofrichter/extra-games`](https://github.com/klaushofrichter/extra-games) is the public example, with Chess, Liar's Dice, Backgammon, Mexican Train and Last Card; [`klaushofrichter/synth-game`](https://github.com/klaushofrichter/synth-game) adds FM-1 Synth, a pocket synthesizer for one player (D-284). Decisions are recorded in [`docs/decisions.md`](docs/decisions.md); the words for the platform's parts (board, deck, seat plate, watcher, sling, console, the seat names…) are in the [glossary](docs/glossary.md). New here? The [cookbook](docs/cookbook.md) says what to ask an AI agent to play, build a game, keep games private, host a game service or ship a change, and the [architecture overview](docs/architecture.md) shows how a game works with the platform.
 
+**Writing or changing a game?** The contract between a game and the platform is the
+[developer guide](docs/developers/game-development.md) (written for an AI agent to read). It starts with what a game
+needs, and its part *Settings: the table's and the game's* says which settings are the platform's, which are the
+game's, and where each is kept.
+
 ## Quick start
 
 Requires Node.js 26 (TypeScript runs natively, no build step).
@@ -121,6 +126,7 @@ board moves there; the table's own window says "The board moved to another scree
 | `TABLE_QUIT` | 0 | `1` lets the table be quit from its own board (Advanced › *Quit the table*, asked first): the way out where the browser shows nothing but the board (a kiosk). The packages' starter sets it; a hosted or Docker table does not (D-315) |
 | `TABLE_SCREENSAVER` | – | Minutes without input until the table's screen goes dark; `0`: never. For this start, not saved; without it the board's settings decide. Also `--screensaver 10` on the command line, which wins (`npm run table -- --screensaver 10`), as in the packages (D-319) |
 | `TABLE_POINTER` | – | `off` hides the mouse pointer on the board (and the deck beside it) in fullscreen, `on` shows it. For this start, not saved. Also `--pointer off` (D-319) |
+| `TABLE_KIOSK` | 0 | `1` (or `--kiosk`): the board's browser shows nothing but the board, so the board counts as full screen without asking for it. The packages' starter opens that browser itself with `--kiosk` (D-324) |
 | `TABLE_SOUND` | – | The volume of the table's screen in percent (`0` silent, `100` full). For this start, not saved. Also `--sound 50` (D-319) |
 | `DATA_DIR`, `GAMES_DIR` | `<repo>/data`, `<repo>/games` | Logs, saves, the table's identity and a typed access code (`table.json`) and extra-game bundles (`extra-games/`); the built-in games |
 
