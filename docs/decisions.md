@@ -2932,6 +2932,9 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
     with game examples: push cards from the deck to the board → Last Card; look-and-feel customization → Mexican
     Train." Each answer names the game to read and the guide's part. Added by Claude: keeping a choice for the next
     game, and a game for one player on the board (both FreeCell).
+  - **"Can I build a game that may be under copyright?"** (Klaus, the same day): "such games can not be in the
+    public repository. If you build something that is not to be distributed, use a private repository." The answer
+    adds that nothing on the page is legal advice.
   *Implementation (Claude):* `SITE_PAGES`, `sitePage()` in `apps/cloud/src/server.ts`; `home.html`. Checks:
   `tests/website.test.ts` (the page, its groups, every inner link has its place), `scripts/e2e/website.py` (both
   widths, links).
