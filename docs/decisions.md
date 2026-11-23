@@ -2941,3 +2941,24 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   *Implementation (Claude):* `SITE_PAGES`, `sitePage()` in `apps/cloud/src/server.ts`; `home.html`. Checks:
   `tests/website.test.ts` (the page, its groups, every inner link has its place), `scripts/e2e/website.py` (both
   widths, links).
+- **D-321 · 2026-11-23 · Klaus** — **A third simplify pass**, over what changed since D-303 (FreeCell, the wide
+  scroll bars, the start options, the website's pages, the starter). "Do a /simplify and /code-review over the
+  games-service and extra-games repositories." Four reviewers (reuse, simplification, efficiency, depth of the fix);
+  extra-games had 28 changed lines and nothing to simplify.
+  - **Done.** FreeCell's solver remembers its answers by position (the rules search again at every replay: the check
+    at a game's end, a restored game, each step in the Game Viewer; 6–480 ms a search), and a second Hint where no way
+    was found does not search again. The search's depth is a field of its nodes. FreeCell's drag uses the kit's
+    `localFrame` instead of its own mapping; `rank`/`suit` come from `cards.js`; the retry for the design stops with
+    the game; the clock writes only a changed text. `touchScroll` moves only its thumb while the content scrolls
+    (it measured the whole bar on every scroll event), and a window not drawn anew is not measured again at every
+    lobby message. `sitePage` takes its markers from `SITE_PAGES`; the outside link check knows `/faq`.
+  - **Not done, on purpose.** FreeCell's own shuffle stays (the SDK's would change which cards a deal number gives).
+    The phone keeps a renamed player's name at once *and* with the table's next message: the reviewer took the first
+    for redundant, `scripts/e2e/names.py` showed it is not. `!important` on `.touch-scroll` stays: it also holds
+    against a game's own scroll bar styles.
+  - **Left for a decision** (each changes behaviour or is a larger rebuild): `touchScroll` watching its own element,
+    so that scanning the windows for scrollers goes; one drag core shared by `touchScroll` and the deck beside the
+    board; a game's `settings()` given its running game (four games keep a module-level `live` for it); settings
+    remembered per game by the platform (FreeCell's house rule is applied by the board today); a `--kiosk` start
+    option instead of guessing full screen from the window's size; the start options driven by one table; the
+    website's pages as files of their own.

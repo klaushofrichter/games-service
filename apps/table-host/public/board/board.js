@@ -279,13 +279,13 @@ function setPanel(o, html) {
     o.innerHTML = html;
     o.dataset.html = html;
     const panel = o.querySelector(".panel");
-    if (panel) panel.scrollTop = top;
+    if (panel) {
+      panel.scrollTop = top;
+      touchScroll(panel); // a wide bar and the fingers themselves, for the table's touchscreen (D-306); drawn anew, so again
+    }
   }
   const panel = o.querySelector(".panel");
-  if (panel) {
-    faceFront(panel);
-    touchScroll(panel); // a wide bar and the fingers themselves, for the table's touchscreen (D-306)
-  }
+  if (panel) faceFront(panel);
 }
 
 /**
@@ -3166,10 +3166,9 @@ let startOptions = null;
 function changedThisStart() {
   try {
     const kept = JSON.parse(stored(START_KEY) ?? "null");
-    return kept && startOptions && kept.start === startOptions.start ? kept : { start: startOptions?.start, changed: [] };
-  } catch {
-    return { start: startOptions?.start, changed: [] };
-  }
+    if (kept && startOptions && kept.start === startOptions.start) return kept;
+  } catch {}
+  return { start: startOptions?.start, changed: [] };
 }
 function changedHere(what) {
   if (!startOptions || startOptions[what] === undefined) return;

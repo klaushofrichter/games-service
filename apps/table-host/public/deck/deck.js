@@ -404,12 +404,12 @@ function openRename(back) {
     e.preventDefault();
     const r = await send("lobby", "rename", { name: input.value });
     if (r.ok) {
-      // kept for the next time (D-307): at once as typed, then as the table has it with its next message
+      // kept for the next time (D-307): at once as typed (the table's message with the new name may be here already),
+      // then as the table has it with its next message
       ownName.set(input.value.trim().slice(0, 12));
       keepName = true;
-    }
-    if (r.ok) modal.querySelector("[data-close]").click();
-    else bodyEl.querySelector(".join-error").textContent = r.reason;
+      modal.querySelector("[data-close]").click();
+    } else bodyEl.querySelector(".join-error").textContent = r.reason;
   });
 }
 

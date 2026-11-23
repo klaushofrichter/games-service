@@ -271,6 +271,7 @@ export default defineGame<State>({
         };
       }
       case "hint": {
+        if (state.noWay) return { state, events: [{ name: "noWay" }] }; // searched already: nothing has moved since
         const plan = state.plan?.length ? state.plan : solve(state.pos, HINT_BUDGET);
         if (!plan || !plan.length) return { state: { ...state, hint: null, noWay: true, plan: null }, events: [{ name: "noWay" }] };
         return { state: { ...state, hint: plan[0]!, noWay: false, plan, hints: state.hints + 1 }, events: [{ name: "hint", data: plan[0] }] };
