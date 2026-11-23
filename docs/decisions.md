@@ -2976,6 +2976,37 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
      case: with another spelling a public repository would have been taken for a private one. One spelling now.
   Checks: `scripts/e2e/touch_scroll.py` (the tap after a pan; it fails without the fix), `scripts/e2e/start_options.py`
   (the board stays open over two restarts), `tests/launcher.test.ts`. extra-games: nothing found in its 28 lines.
+- **D-323 · 2026-11-23 · Klaus** — **Each page of the website is a file of its own, in one shared shell.** "The
+  landing page should be separate for smaller size, but these should share a consistent look." Until now all three
+  pages were cut from `home.html` (D-312, D-320), and each carried the styles and the script of the other two.
+  Replaces D-312's "One source file".
+  - **`apps/cloud/public/site-pages/`**: `shell.html` is what every page shares: the head, the styles of the one look
+    (colours, type, buttons, section heads, top bar, PREVIEW sash, foot, reveal on scroll, their media queries), the
+    top bar, the foot, and the script every page uses (reveal on scroll, the top bar, the light under the pointer, the
+    copy buttons). `home.html`, `build.html` and `faq.html` each begin with a comment that names the title and the
+    description, then the styles only that page uses, its `<main>`, and behind it what goes after the foot: its own
+    script, and on the landing page the games' close-up. `home.html` in `public/` is gone.
+  - **What moved to a page:** a style rule whose selectors can match on that page only, judged by the classes and ids
+    in each page's markup and those its script sets. A rule that two pages use stays in the shell, and so does the
+    shared look even where one page alone uses it today (`.btn`). The order within each sheet is the order it had.
+    The script's parts went the same way; the questions and answers need none of their own.
+  - **The top bar's links are one list** in `server.ts` (`SITE_NAV`): a place is `#x` on the landing page and `/#x`
+    elsewhere, and the page itself is marked. Before, each page had its own hand-written copy.
+  - **The service** puts shell and page together once and keeps the result until one of the two files changes
+    (`sitePage()`), then fills in what a request decides (admin link, signed-out note, PREVIEW sash, version) as before.
+  - **Sizes**, text / compressed (gzip), in bytes: `/` 120,526 / 31,924 → 102,435 / 27,958; `/build` 115,822 / 31,641
+    → 66,179 / 19,891; `/faq` 96,306 / 26,111 → 29,502 / 9,854.
+  - **The look is unchanged:** full-page pictures of the three pages at 1440 and 390 px before and after are the same
+    pixel for pixel, and so is every computed style of every element at four widths, with and without reduced
+    motion, and with the close-up, the filters, the lobby demo and the code tabs used.
+  - **Not touched:** `/terms` stays a page of its own (`terms.html`, D-197) with its own short copy of the colours
+    and type; it has no top bar links and no foot to share. One dead rule is kept as it was, with a note: a stray
+    line before `.center-mini .cap` makes browsers drop that rule, and removing the line would change the lobby
+    demo's caption.
+  *Implementation (Claude):* `apps/cloud/public/site-pages/`; `SITE_PAGES`, `SITE_NAV`, `siteNav()`,
+  `assembleSitePage()`, `sitePage()` in `apps/cloud/src/server.ts`. Checks: `tests/website.test.ts` (the same styles,
+  foot and shared script on every page, the top bar's links per page, no page with another's parts, upper bounds for
+  each page's size), `scripts/e2e/website.py`.
 - **D-324 · 2026-11-23 · Klaus** — **`--kiosk`: the starter opens and closes the kiosk browser, and the board is told
   that it fills the screen.** "Ok to add --kiosk option." D-315 named it as a later step; D-321 found the board guessing
   full screen from a window exactly as large as the screen (D-317), a guess that made three browser checks fake a

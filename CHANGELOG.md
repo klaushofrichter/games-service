@@ -8,6 +8,7 @@ history.
 
 ## [Unreleased]
 
+- Website: each page is a file of its own in one shared shell, and carries only its own styles and script; the look is unchanged. Compressed, the landing page went from 32 KB to 28 KB, the developers' page from 32 KB to 20 KB, the questions and answers from 26 KB to 10 KB (D-323).
 - A game begins with the settings it was last played with on this table: kept with the game's data, so they outlast a restart. A seed drawn anew for every game is not kept (D-325).
 - FreeCell: the house rule is a setting of the game now, shown in the lobby before the start; changed during a game, it is kept for the next one by the table (D-325).
 - For games: the board's settings window asks the running game for its items (`settings` on what `mount` returns), and gives it `remember` to keep a setting changed during a game. The developer guide has a new part, "Settings: the table's and the game's" (D-326).

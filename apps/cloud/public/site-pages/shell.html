@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{title}}</title>
+<meta name="description" content="{{description}}">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<!-- The public website (D-176): what every page shares (D-323). The styles here, the top bar, the foot and the script
+     below are the one look of all pages. A page is a file beside this one (home.html: "/", build.html: "/build",
+     faq.html: "/faq") with its title and description, the styles only it uses, its <main> and, after that, what goes
+     behind the foot (its script). server.ts puts the two together (sitePage) and fills in the top bar's links, the
+     admin link, the signed-out note and the version label. A rule that more than one page uses belongs here.
+     Images live in ../site/ (scripts/site-screenshots.py makes them). No external requests. -->
+<style>
+:root {
+  --felt: #0f2a24; --felt-deep: #0a1d19; --felt-mid: #133a31; --line: #1f4a40; --line-2: #2f6457;
+  --ink: #f3eee2; --soft: #b9b3a3; --faint: #7d8a83; --brass: #d6a94a; --brass-deep: #a57c28; --brass-hi: #f0c86a;
+  --ruby: #d2574a; --jade: #5fbf8f; --sky: #63a8e0; --violet: #9b7be0;
+  --display: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+  --text: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --wrap: 1180px;
+}
+* { box-sizing: border-box; }
+html { color-scheme: dark; scroll-behavior: smooth; scrollbar-color: var(--line-2) var(--felt-deep); scroll-padding-top: 72px; }
+body { margin: 0; background: var(--felt-deep); color: var(--ink); font: 17px/1.6 var(--text); }
+main { overflow-x: clip; }
+a { color: var(--brass-hi); text-decoration: none; }
+a:hover { text-decoration: underline; }
+img { display: block; max-width: 100%; height: auto; }
+img[hidden] { display: none; } /* the game close-up hides its phone image with [hidden]; display:block above would keep the last game's phone */
+code, pre { font-family: var(--mono); }
+h1, h2, h3 { font-family: var(--display); font-weight: 600; line-height: 1.12; margin: 0; letter-spacing: .005em; }
+h2 { font-size: clamp(34px, 4vw, 52px); }
+h3 { font-size: 24px; }
+p { margin: 0; }
+.wrap { width: min(var(--wrap), calc(100% - 48px)); margin: 0 auto; }
+.eyebrow { font: 600 13px/1 var(--text); letter-spacing: .22em; text-transform: uppercase; color: var(--brass); }
+.lede { font-size: 20px; color: var(--soft); max-width: 720px; }
+.muted { color: var(--soft); }
+.faint { color: var(--faint); }
+.btn { display: inline-flex; align-items: center; gap: 10px; padding: 14px 24px; border-radius: 999px; font-weight: 600; border: 1px solid var(--line-2); color: var(--ink); background: rgba(255,255,255,.03); transition: transform .2s, background .2s, border-color .2s, box-shadow .2s; }
+.btn:hover { text-decoration: none; transform: translateY(-2px); border-color: var(--brass-deep); }
+.btn.primary { background: var(--brass); color: #1b1407; border-color: var(--brass); box-shadow: 0 10px 30px rgba(214,169,74,.25); }
+.btn.primary:hover { background: var(--brass-hi); box-shadow: 0 14px 40px rgba(214,169,74,.35); }
+.btn svg { width: 18px; height: 18px; }
+section { position: relative; padding: 120px 0; }
+.section-head { display: grid; gap: 18px; margin-bottom: 56px; max-width: 820px; }
+
+/* ---------- top bar ---------- */
+header.top { position: fixed; inset: 0 0 auto 0; z-index: 50; transition: background .3s, border-color .3s, backdrop-filter .3s; border-bottom: 1px solid transparent; }
+header.top.scrolled { background: rgba(10,29,25,.82); backdrop-filter: blur(14px); border-color: var(--line); }
+.top .wrap { display: flex; align-items: center; height: 68px; gap: 28px; }
+.logo { display: flex; align-items: center; gap: 12px; color: var(--ink); font: 600 21px/1 var(--display); }
+.logo:hover { text-decoration: none; }
+.logo img { width: 30px; height: 30px; }
+nav.main { display: flex; gap: 24px; margin-left: 12px; }
+nav.main a { color: var(--soft); font-size: 15px; }
+nav.main a:hover, nav.main a.on { color: var(--ink); text-decoration: none; }
+.top .spacer { flex: 1; }
+.top .gh { color: var(--soft); font-size: 15px; display: flex; align-items: center; gap: 8px; }
+.top .gh svg { width: 18px; height: 18px; }
+#admin-link { color: var(--faint); font-size: 13px; padding: 5px 11px; border: 1px solid var(--line); border-radius: 999px; }
+#admin-link:hover { color: var(--soft); border-color: var(--line-2); text-decoration: none; }
+/* PREVIEW / DRAFT sash across the top right corner while the service is not live (D-177); server.ts adds it (PREVIEW_BANNER).
+   Clicks pass through it; the top bar moves its right end clear of it where the page margin is narrower than the sash. */
+.preview-sash { position: fixed; top: 0; right: 0; width: 210px; height: 210px; overflow: hidden; z-index: 70; pointer-events: none; transform: scale(.8); transform-origin: top right; }
+.preview-sash span { position: absolute; top: 52px; right: -62px; width: 300px; transform: rotate(45deg); text-align: center; padding: 8px 0 7px; background: repeating-linear-gradient(-45deg, #e0b453 0 10px, #cfa040 10px 20px); color: #1b1407; font: 800 12px/1.15 var(--text); letter-spacing: .2em; box-shadow: 0 6px 18px rgba(0,0,0,.45); border-block: 1px solid rgba(27,20,7,.35); }
+.preview-sash small { display: block; font-weight: 600; font-size: 9.5px; letter-spacing: .14em; opacity: .8; }
+body:has(.preview-sash) .top .wrap { padding-right: clamp(0px, calc(150px - (100vw - var(--wrap)) / 2), 126px); }
+.note-toast { position: fixed; top: 78px; right: 24px; z-index: 60; background: var(--felt); border: 1px solid var(--line-2); padding: 10px 16px; border-radius: 12px; color: var(--soft); font-size: 14px; animation: toast 6s forwards; }
+@keyframes toast { 0%, 85% { opacity: 1; } 100% { opacity: 0; visibility: hidden; } }
+/* a soft light that follows the pointer over cards */
+.spot { position: relative; isolation: isolate; }
+.spot::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: radial-gradient(360px circle at var(--mx, -999px) var(--my, -999px), rgba(214,169,74,.13), transparent 60%); pointer-events: none; z-index: -1; opacity: 0; transition: opacity .3s; }
+.spot:hover::after { opacity: 1; }
+.aw-code { display: block; max-width: 100%; margin-top: 16px; padding: 12px 16px; border-radius: 12px; background: #06120f; border: 1px solid var(--line); font-size: 13.5px; color: var(--soft); overflow-x: auto; white-space: pre; }
+.aw-code b { color: var(--brass-hi); font-weight: 600; }
+.aw-ribbon { position: absolute; top: -16px; left: -10px; z-index: 2; font: 700 12px/1 var(--text); letter-spacing: .14em; text-transform: uppercase; color: #1b1407; background: var(--brass); padding: 8px 14px; border-radius: 999px; box-shadow: 0 10px 24px rgba(0,0,0,.4); }
+
+/* ---------- build ---------- */
+.build { background: linear-gradient(180deg, var(--felt-deep), #0d241f 30%, var(--felt-deep)); }
+.build::before { content: ""; position: absolute; inset: 0; background: radial-gradient(50% 40% at 80% 10%, rgba(214,169,74,.10), transparent 70%); pointer-events: none; }
+.copy { position: absolute; top: 14px; right: 14px; font: inherit; font-size: 13px; color: var(--soft); background: transparent; border: 1px solid var(--line-2); border-radius: 999px; padding: 5px 12px; cursor: pointer; }
+.copy:hover { color: var(--ink); border-color: var(--brass-deep); }
+.show-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+.show-list li { color: var(--soft); font-size: 15.5px; padding-left: 18px; border-left: 2px solid var(--brass-deep); }
+.show-list b { color: var(--ink); font-weight: 600; }
+
+/* ---------- footer ---------- */
+footer { border-top: 1px solid var(--line); padding: 60px 0 50px; color: var(--faint); font-size: 14.5px; }
+footer .wrap { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 30px; }
+footer h4 { font: 600 13px var(--text); letter-spacing: .14em; text-transform: uppercase; color: var(--soft); margin: 0 0 12px; }
+footer a { color: var(--faint); display: block; margin: 6px 0; }
+footer a:hover { color: var(--ink); }
+footer .version { display: inline; margin: 0; }
+footer a.terms { display: inline; margin: 0; }
+
+/* ---------- reveal on scroll ---------- */
+.js .rv { opacity: 0; transform: translateY(30px); transition: opacity .9s cubic-bezier(.2,.7,.2,1), transform .9s cubic-bezier(.2,.7,.2,1); transition-delay: var(--d, 0s); }
+.js .rv.in { opacity: 1; transform: none; }
+
+@media (max-width: 1080px) {
+  nav.main { display: none; }
+  footer .wrap { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 640px) {
+  .wrap { width: calc(100% - 32px); }
+  section { padding: 80px 0; }
+  .top .gh span { display: none; }
+  .logo { white-space: nowrap; }
+  .preview-sash { transform: scale(.55); }
+  body:has(.preview-sash) .top .wrap { padding-right: 100px; gap: 10px; }
+}
+@media (min-width: 641px) and (max-width: 1320px) {
+  body:has(.preview-sash) .top .wrap { gap: 18px; }
+  body:has(.preview-sash) nav.main { gap: 16px; margin-left: 4px; }
+  body:has(.preview-sash) nav.main a { white-space: nowrap; }
+}
+@media (max-width: 360px) { body:has(.preview-sash) .top .gh { display: none; } }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+  .js .rv { opacity: 1; transform: none; }
+}
+</style>
+{{style}}
+</head>
+<body>
+
+<header class="top" id="top">
+  <div class="wrap">
+    {{nav}}
+    <span class="spacer"></span>
+    <a class="gh" href="https://github.com/klaushofrichter/games-service" target="_blank" rel="noopener noreferrer"><svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg><span>GitHub</span></a>
+    {{admin}}
+  </div>
+</header>
+{{note}}
+{{preview}}
+
+<main>
+{{main}}
+</main>
+
+<footer>
+  <div class="wrap">
+    <div>
+      <a class="logo" href="/" style="margin:0 0 14px"><img src="/favicon.svg" alt="">Game Table</a>
+      <p>Board and card games around one touchscreen, with phones as private hands. Free and open source under the MIT licence, with no warranty.</p>
+      <p style="margin-top:14px">Version {{version}} · <a class="terms" href="/terms">Terms of service</a></p>
+    </div>
+    <div><h4>Play</h4><a href="/#games">Games</a><a href="/#download">Download</a><a href="/#install">Docker</a><a href="/docs/local-docker.md">Local runbook</a><a href="/#table">The table</a><a href="/#service">Game service</a><a href="/faq">Questions and answers</a></div>
+    <div><h4>Build</h4><a href="/build">Build a game</a><a href="/docs/game-development.md">Developer guide</a><a href="/llms.txt">llms.txt</a><a href="/llms-full.txt">llms-full.txt</a><a href="/#repos">Game repositories</a><a href="https://github.com/klaushofrichter/games-service/blob/main/docs/decisions.md" target="_blank" rel="noopener noreferrer">Decision records</a></div>
+    <div><h4>Source</h4><a href="https://github.com/klaushofrichter/games-service" target="_blank" rel="noopener noreferrer">games-service</a><a href="https://github.com/klaushofrichter/extra-games" target="_blank" rel="noopener noreferrer">extra-games</a><a href="https://github.com/klaushofrichter/games-service/releases" target="_blank" rel="noopener noreferrer">Releases</a><a href="https://github.com/klaushofrichter/games-service/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">MIT licence</a><a href="/#about">About</a></div>
+  </div>
+</footer>
+
+<script>
+// What every page uses (D-323). A page's own script, in its file, follows this one and takes the helpers from `site`.
+const site = (() => {
+  "use strict";
+  // Sections fade in as they scroll into view; without this script everything simply shows.
+  document.documentElement.classList.add("js");
+  const $ = (s, r = document) => r.querySelector(s);
+  const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+  const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  // Top bar turns solid once scrolled.
+  const top = $("#top");
+  const onScroll = () => top.classList.toggle("scrolled", scrollY > 30);
+  addEventListener("scroll", onScroll, { passive: true }); onScroll();
+
+  // Reveal on scroll.
+  const io = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); } }), { threshold: 0.12 });
+  $$(".rv").forEach((el) => io.observe(el));
+
+  // A soft light follows the pointer over cards.
+  document.addEventListener("pointermove", (e) => {
+    const c = e.target.closest && e.target.closest(".spot");
+    if (!c) return;
+    const r = c.getBoundingClientRect();
+    c.style.setProperty("--mx", `${e.clientX - r.left}px`); c.style.setProperty("--my", `${e.clientY - r.top}px`);
+  }, { passive: true });
+
+  // Copy buttons: a text of their own, or that of the element they name (its data-text, where it types itself).
+  $$(".copy").forEach((b) => b.addEventListener("click", async () => {
+    const text = b.dataset.copyText ?? ((el) => el.dataset.text ?? el.textContent)($(b.dataset.copy));
+    try { await navigator.clipboard.writeText(text); b.textContent = "Copied"; } catch { b.textContent = "Select and copy"; }
+    setTimeout(() => (b.textContent = "Copy"), 1600);
+  }));
+
+  return { $, $$, still, io };
+})();
+</script>
+{{tail}}
+</body>
+</html>
