@@ -2923,9 +2923,15 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
     used) and softer: provide AI Players to allow single player mode, provide Awards/Results, and possibly others."
     And: "Another requirement: provide a rules file that is shown on the deck." The developer guide has it as
     *What a game needs* (required: follow the platform, touch alone, an orientation that works ("right, the
-    orientation needs to work"), rules for players in `how-to-play.md`; expected: AI players, results and awards,
+    orientation needs to work"), the platform's buttons visible at all times ("Keep the Lobby button and the three buttons (rotate, game settings,
+    dev setting) visible at all times"), rules for players in `how-to-play.md`; expected: AI players, drag and drop
+    on the board ("Another soft requirement: do drag/drop on the board where possible"), results and awards,
     settings, tests), and the page's answer sums it up and
     links there. The table itself starts a game without the rules file (D-099); the requirement is the guide's.
+  - **A fourth group, "How to, with examples"** (Klaus, the same day): "We can add a developer section for How to
+    with game examples: push cards from the deck to the board → Last Card; look-and-feel customization → Mexican
+    Train." Each answer names the game to read and the guide's part. Added by Claude: keeping a choice for the next
+    game, and a game for one player on the board (both FreeCell).
   *Implementation (Claude):* `SITE_PAGES`, `sitePage()` in `apps/cloud/src/server.ts`; `home.html`. Checks:
   `tests/website.test.ts` (the page, its groups, every inner link has its place), `scripts/e2e/website.py` (both
   widths, links).

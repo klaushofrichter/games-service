@@ -8,7 +8,8 @@ history.
 
 ## [Unreleased]
 
-- Developer guide: "What a game needs" says what is required of a game (follow the platform, touch alone, an orientation that works, rules for players) and what is expected (AI players, results and awards, tests); the website's questions and answers link to it (D-320).
+- Website: the questions and answers have a group "How to, with examples": pushing cards from the phone (Last Card), a customizable look (Mexican Train), keeping a choice and a solo game (FreeCell) (D-320).
+- Developer guide: "What a game needs" says what is required of a game (follow the platform, touch alone, an orientation that works, the platform's buttons always visible, rules for players) and what is expected (AI players, drag and drop on the board, results and awards, tests); the website's questions and answers link to it (D-320).
 - Website: a page of questions and answers at `/faq`, in three groups (getting started, developer knowledge, gameplay), linked from the top bar and the foot of every page (D-320).
 - A table can be started with `--screensaver N` (minutes, 0: off), `--pointer on|off` and `--sound N` (percent) for its own screen: they hold for that start and win over the board's saved settings without changing them; the settings show them, and only a change made there is saved. In the packages' starter and the table host (`TABLE_SCREENSAVER`, `TABLE_POINTER`, `TABLE_SOUND`); the installation guides list every option (D-319).
 - Board: "Hide the mouse pointer in fullscreen" is off to begin with again; a table with a touchscreen starts with `--pointer off` (D-319, replaces D-318).
