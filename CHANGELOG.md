@@ -8,6 +8,9 @@ history.
 
 ## [Unreleased]
 
+- Board: after a finger has scrolled a window, the next tap on a checkbox, pulldown or slider in it is no longer lost (D-322).
+- Board: a board left open while the table is started anew takes the new start's options and drops the old ones (D-322).
+- FreeCell: looking for a way through a deal is remembered, so replaying a game (its check at the end, the Game Viewer) no longer searches again; smoother scrolling in the board's windows (D-321).
 - Website: the questions and answers have a group "How to, with examples": pushing cards from the phone (Last Card), a customizable look (Mexican Train), keeping a choice and a solo game (FreeCell) (D-320).
 - Developer guide: "What a game needs" says what is required of a game (follow the platform, touch alone, an orientation that works, the platform's buttons always visible, rules for players) and what is expected (AI players, drag and drop on the board, results and awards, tests); the website's questions and answers link to it (D-320).
 - Website: a page of questions and answers at `/faq`, in three groups (getting started, developer knowledge, gameplay), linked from the top bar and the foot of every page (D-320).

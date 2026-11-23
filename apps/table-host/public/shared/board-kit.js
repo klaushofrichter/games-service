@@ -403,14 +403,19 @@ export function touchScroll(el) {
     rail.style.height = `${padTop}px`;
     rail.style.marginTop = rail.style.top = `${-padTop}px`;
     bar.style.right = `${6 - (parseFloat(cs.paddingRight) || 0)}px`;
-    const track = el.clientHeight - 16;
+    track = el.clientHeight - 16;
     bar.style.height = `${track}px`;
-    const h = Math.max(90, (track * el.clientHeight) / el.scrollHeight);
-    thumb.style.height = `${h}px`;
-    thumb.style.transform = `translateY(${((track - h) * el.scrollTop) / room()}px)`;
+    thumbH = Math.max(90, (track * el.clientHeight) / el.scrollHeight);
+    thumb.style.height = `${thumbH}px`;
+    span = room();
+    place();
   }
+  // While the content scrolls (every frame of a drag or a fling) only the thumb moves; the bar is measured again
+  // when there is more or less to scroll than when it was measured.
+  let track = 0, thumbH = 0, span = 0;
+  const place = () => (thumb.style.transform = `translateY(${((track - thumbH) * el.scrollTop) / span}px)`);
   el.classList.add("touch-scroll");
-  el.addEventListener("scroll", update, { passive: true });
+  el.addEventListener("scroll", () => (room() === span && span > 1 ? place() : update()), { passive: true });
   if (typeof ResizeObserver === "function") {
     const ro = new ResizeObserver(() => (el.isConnected ? update() : ro.disconnect()));
     ro.observe(el);
@@ -430,10 +435,13 @@ export function touchScroll(el) {
     drag = { frame: drag?.frame ?? localFrame(el), x: m.x, y: m.y, top: el.scrollTop, left: el.scrollLeft, last: m.y, lastX: m.x, t, v: 0 };
   };
   el.addEventListener("pointerdown", (e) => {
+    // A finger's pan ends without a click, so "that was a drag" is forgotten with the next press: also one on a field
+    // or in a scroller inside this one, which this element leaves alone.
+    if (!fingers.size) dragged = false;
     if (e.button > 0 || e.gtScrolls || e.target.closest?.(".scroll-rail, input, select, textarea, [contenteditable]")) return;
     if (room() > 1) e.gtScrolls = true; // (not also the scrolling element around this one)
     stop();
-    if (!fingers.size) (dragged = false), (drag = null);
+    if (!fingers.size) drag = null;
     fingers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     touchReleases.add(release);
     restart(e.timeStamp); // (a second finger: from where the two are now, without a jump)
@@ -448,7 +456,11 @@ export function touchScroll(el) {
     if (!dragged && Math.abs(d.y) < MOVE && !(el.scrollWidth > el.clientWidth + 1 && Math.abs(d.x) >= MOVE)) return;
     if (!dragged) {
       dragged = true;
-      for (const id of fingers.keys()) el.setPointerCapture?.(id);
+      for (const id of fingers.keys()) {
+        try {
+          el.setPointerCapture?.(id);
+        } catch {} // (a finger that is gone by now: its release comes by the window anyway)
+      }
     }
     el.scrollTop = drag.top - d.y;
     el.scrollLeft = drag.left - d.x;

@@ -43,8 +43,9 @@ const HOME_PAGE = fileURLToPath(new URL("../public/home.html", import.meta.url))
 export const SITE_PAGES = { "/": "home", "/build": "build", "/faq": "faq" } as const;
 export type SitePage = (typeof SITE_PAGES)[keyof typeof SITE_PAGES];
 export function sitePage(source: string, page: SitePage): string {
-  const others = Object.values(SITE_PAGES).filter((x) => x !== page).join("|");
-  return source.replace(new RegExp(`<!--(${others})-->[\\s\\S]*?<!--/\\1-->`, "g"), "").replace(/<!--\/?(?:home|build|faq)-->/g, "");
+  const all = Object.values(SITE_PAGES);
+  const others = all.filter((x) => x !== page).join("|");
+  return source.replace(new RegExp(`<!--(${others})-->[\\s\\S]*?<!--/\\1-->`, "g"), "").replace(new RegExp(`<!--/?(?:${all.join("|")})-->`, "g"), "");
 }
 
 /** A page of the website, compressed for a browser that takes it (the landing page is 150 KB of text, 40 KB compressed). */

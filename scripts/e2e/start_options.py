@@ -11,7 +11,7 @@ One table at a time on port 8159 (what a browser keeps is per address).
 """
 import os, sys, tempfile
 from playwright.sync_api import sync_playwright
-from common import errors, start_table, watch
+from common import errors, start_table, wait, watch
 
 OUT = sys.argv[1] if len(sys.argv) > 1 else "e2e-out"
 os.makedirs(OUT, exist_ok=True)
@@ -89,8 +89,11 @@ try:
         assert volume == 70 and hide and saver, f"after a reload: volume {volume}, pointer hidden {hide}, screensaver {saver}"
 
         # The next start begins with its options again.
+        # A board left open (a kiosk browser) takes the next start's options too, and drops those of the start before.
         stop(table)
         table = start(TABLE_SOUND="20")
+        wait(lambda: page.evaluate(LEVEL) == 20, 40, "the open board to take the next start's --sound 20")
+        assert not page.evaluate("() => document.documentElement.classList.contains('gt-pointer-hidden')")
         hide, volume, saver, text = settings(page)
         assert volume == 20, f"the next start's --sound 20 shows as {volume}"
         assert not hide and not saver and "after an hour" in text, f"options not given come from the browser: pointer hidden {hide}, screensaver {saver}, {text!r}"
@@ -99,6 +102,7 @@ try:
         # A start without options: what the browser keeps.
         stop(table)
         table = start()
+        wait(lambda: page.evaluate(LEVEL) == 70, 40, "the open board to go back to what the browser keeps")
         hide, volume, saver, text = settings(page)
         assert (hide, volume, saver) == (False, 70, False), f"without options: pointer hidden {hide}, volume {volume}, screensaver {saver}"
         # And a browser that keeps nothing shows the pointer (D-319), plays at full volume, and has the screensaver.

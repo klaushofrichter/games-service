@@ -12,9 +12,9 @@
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-<!-- The public website (D-176), two pages from this one file (D-312): the landing page at "/" and the developers' page
-     at "/build". What stands between a "home" comment and its closing one is on the landing page only, between "build"
-     comments on the developers' page only; the styles, the top bar, the foot and the script are shared.
+<!-- The public website (D-176), three pages from this one file (D-312, D-320): the landing page at "/", the developers' page
+     at "/build" and the questions and answers at "/faq". What stands between a "home" comment and its closing one is
+     on the landing page only, and so for "build" and "faq"; the styles, the top bar, the foot and the script are shared.
      server.ts cuts the page and fills in the admin link, the signed-out note and the version label. Images live in site/ (scripts/site-screenshots.py makes them). No external requests. -->
 <style>
 :root {
@@ -1484,7 +1484,7 @@ docker compose -f deploy/local/docker-compose.yml up -d --build">Copy</button></
   const io = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); } }), { threshold: 0.12 });
   $$(".rv, #explode").forEach((el) => io.observe(el));
 
-  // What follows is for whichever of the two pages has it (D-312): each part looks for its own elements first.
+  // What follows is for whichever of the pages has it (D-312): each part looks for its own elements first.
   // Hero: the board cycles through the games; the table follows the mouse a little.
   if ($("#hero")) {
   const shots = $$("#hero-shots img");
@@ -1664,7 +1664,8 @@ docker compose -f deploy/local/docker-compose.yml up -d --build">Copy</button></
     const KEY = "gametable.site.cards";
     const kept = () => { try { const n = Number(sessionStorage.getItem(KEY)); return sessionStorage.getItem(KEY) !== null && Number.isInteger(n) && n >= 0 && n < imgs.length ? n : null; } catch { return null; } };
     const first = Math.max(0, imgs.findIndex((im) => im.dataset.design === "Botanical"));
-    let at = kept() ?? first, timer = 0, auto = !still, seen = kept() !== null;
+    const was = kept();
+    let at = was ?? first, timer = 0, auto = !still, seen = was !== null;
     const show = (i) => {
       at = i;
       try { sessionStorage.setItem(KEY, String(i)); } catch {}
@@ -1764,9 +1765,8 @@ docker compose -f deploy/local/docker-compose.yml up -d --build">Copy</button></
   // The prompt types itself once it scrolls into view.
   const say = $("#say");
   const full = say?.dataset.text ?? "";
-  if (!say) {}
-  else if (still) say.textContent = full;
-  else new IntersectionObserver(([e], obs) => {
+  if (say && still) say.textContent = full;
+  else if (say) new IntersectionObserver(([e], obs) => {
     if (!e.isIntersecting) return;
     obs.disconnect();
     let n = 0;

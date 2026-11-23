@@ -21,8 +21,8 @@ export const DESIGNS = [
 export const DEFAULT_DESIGN = "classic";
 export const isDesign = (id) => DESIGNS.some((d) => d.id === id);
 
-const rank = (c) => c >> 2;
-const suit = (c) => c & 3;
+export const rank = (c) => c >> 2;
+export const suit = (c) => c & 3;
 const img = (file, cls) => `<img class="fc-art ${cls}" src="${ART}${file}.webp" alt="" draggable="false">`;
 
 /** What lies under a card's corner in a design: a picture where the design has one, else the suit. */

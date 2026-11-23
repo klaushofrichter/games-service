@@ -32,8 +32,8 @@ export function mount(root, ctx) {
     }
   };
   show(DEFAULT_DESIGN);
-  const read = () => ctx.store?.get("design").then(show, () => (retry = setTimeout(read, 3000)));
-  let retry = null;
+  let retry = null, gone = false;
+  const read = () => ctx.store?.get("design").then(show, () => { if (!gone) retry = setTimeout(read, 3000); });
   read();
   const stop = ctx.store?.onChange((key, value) => (key === "design" ? show(value) : key === null ? read() : null));
   root.querySelector(".fcd-list").addEventListener("click", async (e) => {
@@ -54,6 +54,7 @@ export function mount(root, ctx) {
       root.querySelector(".fcd-state").textContent = view.over === "won" ? `Deal ${view.deal} is solved.` : view.over ? `Deal ${view.deal} is over.` : `Deal ${view.deal} · ${home} of 52 cards home`;
     },
     destroy() {
+      gone = true;
       stop?.();
       clearTimeout(retry);
     },
