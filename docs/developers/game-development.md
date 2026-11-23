@@ -70,6 +70,26 @@ replay, statistics, rules for players, settings and remote play.
 6. **People first at a real table.** The board is read from every side and from a distance; phones are small. Short
    texts, large touch targets, nothing important only by colour.
 
+### What a game needs
+
+**Required**, or the game does not belong on a table:
+
+- **It follows the platform.** Everything in this guide that says *must*: the manifest, deterministic rules, private
+  views, every intent checked, and nothing about players reimplemented (the platform owns the lobby, seats, joining,
+  leaving and away phones; section 6). The [checklist](#16-checklist-before-a-pull-request) and the test kit
+  (section 14) check most of it.
+- **It is played by touch alone.** The board is a touchscreen and a hand is a phone: no keyboard, no mouse, no hover,
+  no right click. Large targets, and lists that scroll under a finger (sections 9 and 10).
+
+**Expected**, and what makes a game feel at home here:
+
+- **AI players** (section 7), so that one person can play, a table can fill its empty seats, and whole games can be
+  simulated in the tests. A game for one player needs none.
+- **Results and awards** (section 8): a summary sentence, a result table, and awards for the statistics.
+- **Rules for players** (`how-to-play.md`, section 11), read on the board and the phones.
+- **A board readable from every side**, and settings for what a table may want to choose (section 4).
+- **Tests** of a whole game, exact replay and private views (section 14).
+
 ## 3. A game's folder
 
 A game is one folder; the folder name is the game's id (`a-z`, `0-9`, `-`).

@@ -2918,6 +2918,12 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
     repository, testing alone, which AI agent; an away player, FreeCell's solvable deals and card designs, how a card
     is played in Last Card. Klaus's "all games can be used with a single player and AI" reads "most games", since
     FreeCell has no AI players.
+  - **"What are the requirements for a game?"** (Klaus, the same day): "The answer should actually be in Github.
+    Summarizing: comply with the platform (mandatory), make it touch-screen enabled (no keyboard or mouse can to be
+    used) and softer: provide AI Players to allow single player mode, provide Awards/Results, and possibly others."
+    The developer guide has it as *What a game needs* (required: follow the platform, touch alone; expected: AI
+    players, results and awards, rules for players, a board readable from every side, tests), and the page's answer
+    sums it up and links there.
   *Implementation (Claude):* `SITE_PAGES`, `sitePage()` in `apps/cloud/src/server.ts`; `home.html`. Checks:
   `tests/website.test.ts` (the page, its groups, every inner link has its place), `scripts/e2e/website.py` (both
   widths, links).
