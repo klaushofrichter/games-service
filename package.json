@@ -18,7 +18,7 @@
     "google-auth-library": "^11.3.4",
     "jszip": "^3.10.1",
     "qrcode": "^1.5.4",
-    "werift": "^0.27.0",
+    "werift": "^0.28.0",
     "ws": "^8.23.0",
     "zod": "^4.6.7"
   },
@@ -27,6 +27,6 @@
     "@types/qrcode": "^1.5.5",
     "@types/ws": "^8.5.13",
     "typescript": "^7.0.2",
-    "vitest": "^5.1.0"
+    "vitest": "^5.1.1"
   }
 }
