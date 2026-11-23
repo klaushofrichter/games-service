@@ -3,8 +3,8 @@
 // in the three installation guides.
 import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { screenOptions } from "../apps/table-host/src/screen-options.ts";
-import { parseArgs, readmeText } from "../scripts/package/launch.ts";
+import { SCREEN_OPTIONS, screenOptions, screenOptionsGiven } from "../apps/table-host/src/screen-options.ts";
+import { kioskArgs, kioskBrowser, parseArgs, readmeText } from "../scripts/package/launch.ts";
 import { testHost } from "./helpers.ts";
 
 describe("the options for the table's screen", () => {
@@ -32,9 +32,9 @@ describe("a table started with them", () => {
   afterEach(async () => { await t?.close(); t = undefined; });
 
   it("tells its board, with a mark of this start; a table started without says nothing", async () => {
-    t = await testHost({ screen: { screensaver: 10, pointer: false, sound: 50 } });
+    t = await testHost({ screen: { screensaver: 10, pointer: false, sound: 50, kiosk: true } });
     const { screen } = await t.ok("GET", "/state");
-    expect(screen).toMatchObject({ screensaver: 10, pointer: false, sound: 50 });
+    expect(screen).toMatchObject({ screensaver: 10, pointer: false, sound: 50, kiosk: true });
     expect(typeof screen.start).toBe("number");
     await t.close();
     t = await testHost();
@@ -46,8 +46,26 @@ describe("the starter", () => {
   afterEach(() => vi.restoreAllMocks());
 
   it("takes the three options, in either spelling", () => {
-    expect(parseArgs(["--screensaver", "10", "--pointer=off", "--sound", "50"])).toMatchObject({ screensaver: "10", pointer: "off", sound: "50" });
-    expect(parseArgs([]).pointer).toBeUndefined();
+    expect(parseArgs(["--screensaver", "10", "--pointer=off", "--sound", "50"]).screen).toEqual({ screensaver: "10", pointer: "off", sound: "50" });
+    expect(parseArgs([]).screen).toEqual({});
+  });
+
+  it("--kiosk: a flag, said to the board, and a browser that shows nothing but the board (D-324)", () => {
+    expect(parseArgs(["--kiosk", "--pointer", "off"]).screen).toEqual({ kiosk: "1", pointer: "off" });
+    expect(screenOptions({ kiosk: "1" })).toEqual({ kiosk: true });
+    expect(screenOptions({})).toBeUndefined();
+    // The table host's own start: its command line, then its environment.
+    expect(screenOptionsGiven(["--kiosk", "--sound=30"], { TABLE_SOUND: "80", TABLE_POINTER: "off" })).toEqual({ kiosk: "1", sound: "30", pointer: "off" });
+    const args = kioskArgs("http://localhost:8080/board/", "/home/x/kiosk-browser");
+    expect(args[0]).toBe("--kiosk");
+    expect(args).toContain("--user-data-dir=/home/x/kiosk-browser"); // a profile of its own: no window of the person's browser
+    expect(args.at(-1)).toBe("http://localhost:8080/board/");
+    // The browser: the one named, or none when that is not there (the board then opens as usual).
+    vi.stubEnv("GAME_TABLE_BROWSER", process.execPath);
+    expect(kioskBrowser()).toBe(process.execPath);
+    vi.stubEnv("GAME_TABLE_BROWSER", "/no/such/browser");
+    expect(kioskBrowser()).toBeNull();
+    vi.unstubAllEnvs();
   });
 
   it("stops at a value it can't read", () => {
@@ -59,7 +77,7 @@ describe("the starter", () => {
   });
 
   it("names every option in --help and in the three guides", () => {
-    const options = [...readFileSync(new URL("../scripts/package/launch.ts", import.meta.url), "utf8").matchAll(/^\s+case "([a-z]+)":/gm)].map((m) => m[1]).filter((o) => !["v", "h", "?"].includes(o));
+    const options = [...readFileSync(new URL("../scripts/package/launch.ts", import.meta.url), "utf8").matchAll(/^\s+case "([a-z]+)":/gm)].map((m) => m[1]).filter((o) => !["v", "h", "?"].includes(o)).concat(SCREEN_OPTIONS.map((o) => o.name));
     expect(options).toContain("screensaver");
     const squash = (s: string) => [...s.matchAll(/--([a-z-]+)/g)].map((m) => m[1].replace(/-/g, ""));
     const help = squash(readmeText());

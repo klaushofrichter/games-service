@@ -1,6 +1,6 @@
 // Table Host entry point. Configuration comes from environment variables (see README).
 import { startHost } from "./host.ts";
-import { SCREEN_OPTIONS_HELP, screenOptions, type ScreenOptions } from "./screen-options.ts";
+import { SCREEN_OPTIONS, SCREEN_OPTIONS_HELP, screenOptions, screenOptionsGiven, type ScreenOptions } from "./screen-options.ts";
 
 const env = process.env;
 // Unset values fall back to the defaults in host.ts.
@@ -18,13 +18,13 @@ const accessCode = env.TABLE_CODE || arg("code") || undefined;
 
 if (process.argv.slice(2).some((a) => a === "--help" || a === "-h")) {
   console.log(["Table Host (configuration: environment variables, see README)", "  --code ABCD-EFGH  join the service with an access code from the console (TABLE_CODE)", ...SCREEN_OPTIONS_HELP,
-    "                    (TABLE_SCREENSAVER, TABLE_POINTER, TABLE_SOUND in the environment; the command line wins)", "  --help            these options"].join("\n"));
+    `                    (in the environment: ${SCREEN_OPTIONS.map((o) => (o.flag ? `${o.env}=1` : o.env)).join(", ")}; the command line wins)`, "  --help            these options"].join("\n"));
   process.exit(0);
 }
 // The table's own screen for this start (D-319): the command line wins over the environment.
 let screen: ScreenOptions | undefined;
 try {
-  screen = screenOptions({ screensaver: arg("screensaver") ?? env.TABLE_SCREENSAVER, pointer: arg("pointer") ?? env.TABLE_POINTER, sound: arg("sound") ?? env.TABLE_SOUND });
+  screen = screenOptions(screenOptionsGiven(process.argv.slice(2), env));
 } catch (e) {
   console.error(`[table-host] ${(e as Error).message}`);
   process.exit(1);

@@ -42,6 +42,8 @@ export interface GameDataFile {
   updatedAt: string;
   data: Record<string, unknown>;
   prefs: Record<string, unknown>;
+  /** The game's settings as last used on this table (D-325): the next game begins with them. */
+  settings?: Record<string, unknown>;
   /** In an export only: when, and from which table. */
   exportedAt?: string;
   tableName?: string;
@@ -99,6 +101,8 @@ export class GameData {
     if (id !== undefined && gameId !== id) throw new GameDataError(400, `the file is for ${gameId}, not ${id}`);
     const data = plain(raw.data) ? raw.data : {};
     const prefs = plain(raw.prefs) ? raw.prefs : {};
+    // (the settings are checked against the game's manifest when they are used; here only their size)
+    const settings = plain(raw.settings) && size(raw.settings) <= 4096 ? raw.settings : {};
     for (const [k, v] of Object.entries(data)) {
       if (!KEY.test(k)) throw new GameDataError(400, `bad key "${k.slice(0, 40)}"`);
       if (v === null || size(v) > GAME_DATA_LIMITS.entry) throw new GameDataError(413, `the entry "${k}" is empty or larger than ${GAME_DATA_LIMITS.entry / 1024} KB`);
@@ -116,6 +120,7 @@ export class GameData {
       updatedAt: Number.isNaN(date.getTime()) ? new Date().toISOString() : date.toISOString(),
       data: JSON.parse(JSON.stringify(data)),
       prefs: JSON.parse(JSON.stringify(prefs)),
+      ...(Object.keys(settings).length ? { settings: JSON.parse(JSON.stringify(settings)) } : {}),
     };
   }
 
@@ -217,10 +222,23 @@ export class GameData {
     this.touch(f, game);
   }
 
+  /** A game's settings as last used on this table (D-325), or none. */
+  settings(gameId: string): Record<string, unknown> {
+    return JSON.parse(JSON.stringify(this.files.get(gameId)?.settings ?? {}));
+  }
+
+  /** Keep a game's settings for its next game (the table has checked them against the manifest). */
+  setSettings(game: GameRef, settings: Record<string, unknown>) {
+    const f = this.fileFor(game);
+    if (JSON.stringify(f.settings ?? {}) === JSON.stringify(settings)) return;
+    f.settings = JSON.parse(JSON.stringify(settings));
+    this.touch(f, game);
+  }
+
   /** Games that keep something here, by name. */
   list(): GameDataEntry[] {
     return [...this.files.values()]
-      .filter((f) => Object.keys(f.data).length || Object.keys(f.prefs).length)
+      .filter((f) => Object.keys(f.data).length || Object.keys(f.prefs).length || Object.keys(f.settings ?? {}).length)
       .map((f) => ({ gameId: f.gameId, gameName: f.gameName, gameVersion: f.gameVersion, updatedAt: f.updatedAt, entries: Object.keys(f.data).length, prefs: Object.keys(f.prefs).length, bytes: size(f.data) + size(f.prefs) }))
       .sort((a, b) => a.gameName.localeCompare(b.gameName));
   }
@@ -228,7 +246,7 @@ export class GameData {
   /** A game's data as a file to keep elsewhere, or null if it keeps nothing. */
   export(gameId: string, tableName: string): GameDataFile | null {
     const f = this.files.get(gameId);
-    if (!f || !(Object.keys(f.data).length || Object.keys(f.prefs).length)) return null;
+    if (!f || !(Object.keys(f.data).length || Object.keys(f.prefs).length || Object.keys(f.settings ?? {}).length)) return null;
     return { ...JSON.parse(JSON.stringify(f)), exportedAt: new Date().toISOString(), tableName };
   }
 

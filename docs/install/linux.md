@@ -222,45 +222,24 @@ A finger's tap is one click, so let one click start it:
 xfconf-query -c xfce4-desktop -n -t bool -p /desktop-icons/single-click -s true
 ```
 
-**The board full screen, without the browser's frame** (a kiosk). Let the icon run a small script instead: the table
-without a browser window of its own, then the board in Chrome's kiosk mode with a profile of its own. Save it as
-`~/apps/game-table-start.sh`, make it executable, and put its path in the icon's `Exec=`:
+**The board full screen, without the browser's frame** (a kiosk). Start the table with `--kiosk`: put it in the
+icon's `Exec=` line.
 
-```sh
-#!/bin/bash
-PROFILE="$HOME/.local/share/game-table/kiosk-browser"
-BOARD=http://localhost:8080/board/
-board() {  # (--password-store=basic: with automatic login the keyring stays locked, and Chrome would ask for its password)
-  google-chrome --user-data-dir="$PROFILE" --kiosk --no-first-run --noerrdialogs --password-store=basic \
-    --autoplay-policy=no-user-gesture-required "$BOARD"
-}
-# The icon tapped while a table runs: only show its board again.
-if curl -fs -o /dev/null "$BOARD"; then board; exit; fi
-# A kiosk browser left from an earlier start would take the new window's address and leave this script with nothing.
-pkill -f -- "--user-data-dir=$PROFILE" 2> /dev/null
-~/apps/game-table/game-table --no-open --repos all --pointer off & TABLE=$!
-echo "Starting Game Table…"  # (the wait below is quiet: a line of "connection refused" every second reads like a fault)
-until curl -fs -o /dev/null "$BOARD"; do
-  if ! kill -0 "$TABLE" 2> /dev/null; then  # it ended before the board was there: keep what it said on screen
-    read -r -p "Game Table did not start (see above). Press Enter to close this window. "
-    exit 1
-  fi
-  sleep 1
-done
-echo "Opening the board."
-board & CHROME=$!
-# The two belong together: when either ends, the other does too.
-wait -n "$TABLE" "$CHROME"
-kill "$TABLE" "$CHROME" 2> /dev/null
-pkill -f -- "--user-data-dir=$PROFILE" 2> /dev/null
+```ini
+Exec=/home/YOU/apps/game-table/game-table --kiosk --repos all --pointer off
 ```
 
+With `--kiosk` the starter opens the board itself in Chrome, Chromium or Edge in kiosk mode (the first one it finds;
+`GAME_TABLE_BROWSER=/path/to/browser` names another), with a browser profile of its own under the table's folder, so
+it is no window of your own browser. The two belong together: when the table ends the browser closes, and when the
+browser is closed the table ends. The board knows it fills the screen, so it offers no Fullscreen button.
+
 A kiosk browser has no way out of its own: Esc does nothing, and a page cannot close it. The way out is on the board:
-**Advanced › This computer › Quit the table…** stops Game Table, and the script then closes the browser, back to the
-desktop and its icon. With a keyboard, Alt+F4 closes the browser, and the script stops the table. `--repos all`
-brings every game repository of `klaushofrichter` your sign-in can read; name them instead if you prefer. `--pointer off`
-hides the mouse pointer, which a touchscreen does not need; `--screensaver` and `--sound` set the table's screensaver
-and volume the same way (see [Options](#options)).
+**Advanced › This computer › Quit the table…** stops Game Table and closes the browser, back to the desktop and its
+icon. With a keyboard, Alt+F4 closes the browser, and the table stops with it. `--repos all` brings every game
+repository of `klaushofrichter` your sign-in can read; name them instead if you prefer. `--pointer off` hides the
+mouse pointer, which a touchscreen does not need; `--screensaver` and `--sound` set the table's screensaver and volume
+the same way (see [Options](#options)).
 
 **Private repositories on a computer that logs in by itself.** The GitHub CLI keeps its sign-in in the desktop's
 keyring, and with automatic login the keyring stays locked: the start then waits for the keyring's password (the
@@ -408,6 +387,7 @@ still keeps every phone out.
 | `--screensaver 10` | The table's screen goes dark, with a clock, after 10 minutes without input; `--screensaver 0`: never. Without the option: what the board's settings say (an hour to begin with) |
 | `--pointer off` | Hide the mouse pointer on the board, and on the deck beside it, in fullscreen: for a touchscreen. `--pointer on` shows it. Without the option: what the board's settings say (shown to begin with) |
 | `--sound 50` | The volume of the table's screen in percent: `--sound 0` is silent, `--sound 100` full. Without the option: what the board's settings say (full to begin with) |
+| `--kiosk` | The board in a browser that shows nothing else, full screen: the starter opens Chrome, Chromium or Edge in kiosk mode itself (with a profile of its own; `GAME_TABLE_BROWSER` names another browser) and closes it when the table ends; closing the browser ends the table. Leave it with **Advanced › Quit the table…** on the board. Without such a browser the board opens as usual |
 | `--service`, `--code ABCD-EFGH` | Join the Game Table service, see below |
 | `--version` | The package's version, and every game on the table with its version and source |
 | `--smoke-test` | Check the installation: start, check that the board answers and the games are there, stop; fails if a named repository is missing |

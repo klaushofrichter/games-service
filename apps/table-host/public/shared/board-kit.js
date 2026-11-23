@@ -367,8 +367,8 @@ export function localFrame(el) {
  * touch. The mouse wheel and the keyboard scroll as always. Wider content also moves sideways with the fingers. A
  * scrolling element inside another: the inner one takes the fingers while it has something to scroll.
  *
- * Call it again after the element's content was drawn anew (it puts its bar back and measures); it is set up once per
- * element. The element gets the classes `touch-scroll` and, while there is something to scroll, `scrolls`; style the
+ * Call it once for an element: it watches the element, puts its bar back when the content was drawn anew, and
+ * measures again when the content or the element's size changes. (Calling it again does no harm; it measures.) The element gets the classes `touch-scroll` and, while there is something to scroll, `scrolls`; style the
  * room for the bar with those (shared/theme.css has the bar itself).
  */
 const touchScrolls = new WeakMap(); // element -> its update()
@@ -377,10 +377,27 @@ const touchReleases = new Set();
 if (typeof window !== "undefined") {
   for (const type of ["pointerup", "pointercancel"]) window.addEventListener(type, (e) => touchReleases.forEach((fn) => fn(e)), true);
 }
+/** What scrolling with a finger takes for a drag and what for a tap, wherever it is done (here, and the deck beside the board). */
+export const SCROLL_SLACK = 12; // px a press may wander and still be a tap
+/** What keeps its own touch: a drag that starts there does not scroll. */
+export const OWN_TOUCH = "input, select, textarea, [contenteditable]";
+/** A drag is not a tap on what it started on: the click that ends one (`wasDrag()` says so, and forgets) goes nowhere. */
+export function noTapAfterDrag(target, wasDrag) {
+  target.addEventListener(
+    "click",
+    (e) => {
+      if (!wasDrag()) return;
+      e.stopImmediatePropagation();
+      e.preventDefault();
+    },
+    true,
+  );
+}
+
 export function touchScroll(el) {
   const known = touchScrolls.get(el);
   if (known) return known();
-  const MOVE = 12; // px a press may wander and still be a tap
+  const MOVE = SCROLL_SLACK;
   const rail = document.createElement("div");
   rail.className = "scroll-rail";
   rail.innerHTML = `<div class="scroll-bar" hidden><i class="scroll-thumb"></i></div>`;
@@ -438,7 +455,7 @@ export function touchScroll(el) {
     // A finger's pan ends without a click, so "that was a drag" is forgotten with the next press: also one on a field
     // or in a scroller inside this one, which this element leaves alone.
     if (!fingers.size) dragged = false;
-    if (e.button > 0 || e.gtScrolls || e.target.closest?.(".scroll-rail, input, select, textarea, [contenteditable]")) return;
+    if (e.button > 0 || e.gtScrolls || e.target.closest?.(`.scroll-rail, ${OWN_TOUCH}`)) return;
     if (room() > 1) e.gtScrolls = true; // (not also the scrolling element around this one)
     stop();
     if (!fingers.size) drag = null;
@@ -486,17 +503,7 @@ export function touchScroll(el) {
     };
     if (Math.abs(v) > 0.1) fling = requestAnimationFrame(run);
   };
-  // a drag is not a tap on what it started on
-  el.addEventListener(
-    "click",
-    (e) => {
-      if (!dragged) return;
-      dragged = false;
-      e.stopImmediatePropagation();
-      e.preventDefault();
-    },
-    true,
-  );
+  noTapAfterDrag(el, () => dragged && !(dragged = false));
 
   // The bar: drag its thumb, or tap the track above or below it for a page.
   let grab = null;
@@ -523,6 +530,14 @@ export function touchScroll(el) {
   bar.addEventListener("pointercancel", letGo);
   bar.addEventListener("click", (e) => e.stopPropagation()); // (not a tap on the window behind it)
 
+  // Content drawn anew or grown: the bar goes back in and is measured again, by itself (D-327).
+  if (typeof MutationObserver === "function") {
+    let due = 0;
+    new MutationObserver(() => {
+      cancelAnimationFrame(due);
+      due = requestAnimationFrame(update);
+    }).observe(el, { childList: true, subtree: true });
+  }
   touchScrolls.set(el, update);
   update();
 }

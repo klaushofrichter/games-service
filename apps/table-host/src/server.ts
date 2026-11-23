@@ -447,6 +447,8 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
     if (m === "POST" && path === "/rules") return (table.setRules(body), ok());
     if (m === "POST" && path === "/game/settings") return (table.updateSettings(body.settings), ok());
     if (m === "POST" && path === "/game/prefs") return (table.setPrefs(body.prefs), ok());
+    // A setting the game changed while it runs, kept for its next game (D-325).
+    if (m === "POST" && path === "/game/settings/remember") return (table.rememberGameSettings(body.settings), ok());
     if (m === "POST" && path === "/game/close") return (table.close(), ok());
     if (m === "POST" && path === "/game/resume") return (table.resumeGame(), ok());
     // An AI player is out of time (D-112): play the game's quick move for it instead of waiting.

@@ -213,7 +213,8 @@ try:
         drag(f["x"], f["y"], f["cx"], f["cy"])
         settle()
         assert state()["home"] == before["home"], "with the house rule off a card left its foundation"
-        assert a("GET", "/game-data/freecell")["data"].get("rules") == {"takeBack": False}, "the table does not keep the house rule"
+        # The table keeps it with the game's settings (D-325): the next game begins with the rule as it was left.
+        wait(lambda: a("GET", "/game-data/freecell").get("settings") == {"takeBack": False}, 5, "the table to keep the house rule")
         house_rule(True)
         assert board.evaluate(FOUND)["movable"]
 
