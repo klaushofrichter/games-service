@@ -297,7 +297,7 @@ let scrollersDue = 0;
 function findScrollers() {
   cancelAnimationFrame(scrollersDue);
   scrollersDue = requestAnimationFrame(() => {
-    for (const el of document.querySelectorAll(SCROLLERS)) touchScroll(el);
+    for (const el of document.querySelectorAll(SCROLLERS)) if (!el.classList.contains("touch-scroll")) touchScroll(el); // (set up once; it looks after itself)
   });
 }
 new MutationObserver(findScrollers).observe(overlayRoot, { childList: true, subtree: true });
@@ -3184,39 +3184,45 @@ function changedHere(what) {
   if (!kept.changed.includes(what)) kept.changed.push(what);
   keep(START_KEY, JSON.stringify(kept));
 }
+/**
+ * The screen's settings a start can set, each once: `kept` puts back what this browser keeps, `start` takes the
+ * start's value (`changed`: the setting was changed on the board during this start, which then holds), `apply` shows it.
+ */
+const screenSettings = {
+  pointer: {
+    kept: () => (hidePointer = keptHidePointer()),
+    start: (shown, changed) => changed || (hidePointer = !shown),
+    apply: applyPointer,
+  },
+  sound: {
+    kept: () => (masterVolume = keptVolume()),
+    start: (percent, changed) => changed || (masterVolume = Math.min(1, Math.max(0, percent / 100))),
+    apply: applyMasterVolume,
+  },
+  screensaver: {
+    kept: () => ((saverOn = keptSaver()), (SAVER_AFTER_MS = SAVER_HOUR_MS)),
+    start: (minutes, changed) => {
+      if (minutes > 0) SAVER_AFTER_MS = minutes * 60 * 1000; // (switched on again on the board: after these minutes)
+      if (!changed) saverOn = minutes > 0;
+    },
+    apply: () => ((lastInput = Date.now()), scheduleSaver()),
+  },
+};
 function applyStartOptions() {
   const s = (!REMOTE && state?.screen) || null;
   if ((s?.start ?? null) === (startOptions?.start ?? null)) return;
-  if (startOptions) {
-    // The table was started anew while this page stayed open (a kiosk browser): the start before holds no longer.
-    hidePointer = keptHidePointer();
-    masterVolume = keptVolume();
-    saverOn = keptSaver();
-    SAVER_AFTER_MS = SAVER_HOUR_MS;
-    applyPointer();
-    applyMasterVolume();
-    lastInput = Date.now();
-    scheduleSaver();
-  }
-  const kiosk = startOptions?.kiosk === true;
+  const before = startOptions;
   startOptions = s;
-  if ((s?.kiosk === true) !== kiosk) applyPointer(); // (full screen or not: the pointer, and the settings when next drawn)
-  if (!s) return;
   const changed = changedThisStart().changed;
-  if (typeof s.pointer === "boolean" && !changed.includes("pointer")) {
-    hidePointer = !s.pointer;
-    applyPointer();
+  for (const [name, setting] of Object.entries(screenSettings)) {
+    const told = s && s[name] !== undefined && s[name] !== null;
+    if (!told && (!before || before[name] === undefined)) continue; // neither this start nor the one before says anything
+    // The table was started anew while this page stayed open (a kiosk browser): the start before holds no longer.
+    if (before) setting.kept();
+    if (told) setting.start(s[name], changed.includes(name));
+    setting.apply();
   }
-  if (typeof s.sound === "number" && !changed.includes("sound")) {
-    masterVolume = Math.min(1, Math.max(0, s.sound / 100));
-    applyMasterVolume();
-  }
-  if (typeof s.screensaver === "number") {
-    if (s.screensaver > 0) SAVER_AFTER_MS = s.screensaver * 60 * 1000;
-    if (!changed.includes("screensaver")) saverOn = s.screensaver > 0;
-    lastInput = Date.now();
-    scheduleSaver();
-  }
+  if ((s?.kiosk === true) !== (before?.kiosk === true)) applyPointer(); // (full screen or not)
 }
 onState(applyStartOptions);
 

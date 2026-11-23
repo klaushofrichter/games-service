@@ -21,7 +21,7 @@ import { fileURLToPath } from "node:url";
 import { gunzipSync } from "node:zlib";
 import JSZip from "jszip";
 import { readTarGz } from "../../packages/protocol/src/bundle.ts";
-import { SCREEN_OPTIONS_HELP, screenOptions } from "../../apps/table-host/src/screen-options.ts";
+import { SCREEN_OPTIONS, SCREEN_OPTIONS_HELP, screenOptions, type ScreenOptionsGiven } from "../../apps/table-host/src/screen-options.ts";
 
 const OWNER = "klaushofrichter";
 /** Downloaded at every start, no sign-in (D-284): extra-games, and synth-game (FM-1 Synth, a solo game). */
@@ -63,16 +63,12 @@ interface Options {
   smokeTest: boolean;
   expectGames: string[];
   showVersion?: boolean;
-  /** The table's own screen for this start (D-319), as given. */
-  screensaver?: string;
-  pointer?: string;
-  sound?: string;
-  /** The board in a browser that shows nothing else (D-324): opened and closed by this starter. */
-  kiosk?: boolean;
+  /** The table's own screen for this start (D-319), as given. `kiosk`: this starter also opens and closes the browser (D-324). */
+  screen: ScreenOptionsGiven;
 }
 
 export function parseArgs(argv: string[]): Options {
-  const o: Options = { noUpdate: false, port: 8080, open: true, branch: "production", signIn: false, service: false, smokeTest: false, expectGames: [] };
+  const o: Options = { noUpdate: false, port: 8080, open: true, branch: "production", signIn: false, service: false, smokeTest: false, expectGames: [], screen: {} };
   for (let i = 0; i < argv.length; i++) {
     const [flag, inline] = argv[i].includes("=") ? [argv[i].slice(0, argv[i].indexOf("=")), argv[i].slice(argv[i].indexOf("=") + 1)] : [argv[i], undefined];
     const value = () => {
@@ -91,23 +87,23 @@ export function parseArgs(argv: string[]): Options {
       case "service": o.service = true; break;
       case "code": o.code = value(); o.service = true; break;
       case "home": o.home = value(); break;
-      case "screensaver": o.screensaver = value(); break;
-      case "pointer": o.pointer = value(); break;
-      case "sound": o.sound = value(); break;
-      case "kiosk": o.kiosk = true; break;
       case "version": case "v": o.showVersion = true; break;
       case "smoketest": o.smokeTest = true; o.open = false; break;
       case "expectgames": o.expectGames = value().split(",").map((s) => s.trim()).filter(Boolean); break;
       case "help": case "h": case "?":
         console.log(readmeText());
         process.exit(0);
-      default: fail(`unknown option ${argv[i]} (see --help)`);
+      default: {
+        const screen = SCREEN_OPTIONS.find((s) => s.name === flag.replace(/^-+/, "").toLowerCase());
+        if (!screen) fail(`unknown option ${argv[i]} (see --help)`);
+        o.screen[screen.name] = screen.flag ? "1" : value();
+      }
     }
   }
   if (!Number.isInteger(o.port) || o.port < 1 || o.port > 65535) fail("--port needs a port number");
   if (!/^[A-Za-z0-9._/-]+$/.test(o.branch)) fail("--branch needs a branch name");
   try {
-    screenOptions(o);
+    screenOptions(o.screen);
   } catch (e) {
     fail((e as Error).message);
   }
@@ -726,10 +722,7 @@ async function main() {
     APP_VERSION: version,
   };
   // The table's own screen, this start only (D-319).
-  if (o.screensaver !== undefined) env.TABLE_SCREENSAVER = o.screensaver;
-  if (o.pointer !== undefined) env.TABLE_POINTER = o.pointer;
-  if (o.sound !== undefined) env.TABLE_SOUND = o.sound;
-  if (o.kiosk) env.TABLE_KIOSK = "1";
+  for (const s of SCREEN_OPTIONS) if (o.screen[s.name] !== undefined) env[s.env] = o.screen[s.name];
   delete env.CLOUD_URL;
   delete env.TABLE_CODE;
   if (o.service) env.CLOUD_URL = SERVICE_URL;
@@ -819,7 +812,7 @@ async function main() {
   if (!up) {
     if (exited) fail(`The table host stopped (exit ${child.exitCode}); see the messages above.`);
     note(`The table host does not answer yet; open http://localhost:${o.port}/board/ yourself when it does.`);
-  } else if (o.open && o.kiosk && (kiosk = openKiosk(`http://localhost:${o.port}/board/`, join(home, "kiosk-browser")))) {
+  } else if (o.open && o.screen.kiosk && (kiosk = openKiosk(`http://localhost:${o.port}/board/`, join(home, "kiosk-browser")))) {
     // The two belong together: the table ends when its browser is closed, and the browser when the table ends
     // (Quit the table on the board, Ctrl+C here).
     say("The board is open in a kiosk browser. To leave it: Advanced › Quit the table… on the board, or Alt+F4.");

@@ -3034,3 +3034,20 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
     alone), and a pointer at the top of the README.
   *Implementation (Claude):* `openSettings()` in `board.js`; `games/freecell/board.js`. Checks:
   `scripts/e2e/freecell.py` (the house rule's switch, the deal number), `scripts/e2e/play.py` settings.
+- **D-327 · 2026-11-23 · Klaus** — **Three consolidations from D-321**, "OK with the three suggested consolidations."
+  1. **`touchScroll` looks after its own element.** It watches the element it was called for, puts its bar back when
+     the content was drawn anew and measures again when the content changes; one call lasts the element's life. The
+     board still looks for new scrollers in its windows, but sets each up once and no longer measures all of them at
+     every change in any window. (The room for the bar stays where it was, in each window's styles: moving it into
+     the kit would change the look of games in other repositories that use `touchScroll`.)
+  2. **One set of rules for a drag and a tap.** The kit's scroller and the deck beside the board (D-306) each had
+     their own copy of how far a press may wander and still be a tap, what keeps its own touch (text fields, sliders,
+     pulldowns), and the click swallowed after a drag. They are the kit's now (`SCROLL_SLACK`, `OWN_TOUCH`,
+     `noTapAfterDrag`), used by both. The two scrollers stay two: one is an element with a bar, fingers, a fling and a
+     turned board; the other finds whatever scrolls under a mouse on a page.
+  3. **The start options from one list.** `SCREEN_OPTIONS` in `screen-options.ts` names each option once (its name,
+     its environment variable, how its text is read); the table host, the starter and the test of the guides go by
+     it. On the board, `screenSettings` holds for each setting what the browser keeps, what a start sets and how it
+     shows; one loop applies a start. Another option is one line in each.
+  Checks: `scripts/e2e/touch_scroll.py`, `board_deck.py`, `start_options.py`, `screensaver.py`, `freecell.py`,
+  `viewer.py`; `tests/start-options.test.ts`.
