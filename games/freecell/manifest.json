@@ -1,7 +1,7 @@
 {
   "id": "freecell",
   "name": "FreeCell",
-  "version": "2026.11.23.1",
+  "version": "2026.11.23.2",
   "sdk": "^0.1",
   "description": "Solitaire for one, played on the board: sort all 52 cards onto the foundations, with four free cells to help. Every deal can be solved.",
   "players": {
