@@ -159,7 +159,7 @@ try:
         wait(lambda: page.evaluate("() => document.fullscreenElement === document.documentElement"), 5, "the page to go fullscreen")
         box = page.locator("#deck-wrap").bounding_box()
         assert box and box["width"] > 300 and box["x"] + box["width"] <= 1600, f"the deck is not on screen in fullscreen: {box}"
-        assert board.locator(".overlay.settings [data-fs]").inner_text() == "Leave fullscreen"
+        board.locator(".overlay.settings [data-fs]", has_text="Leave fullscreen").wait_for()  # (drawn anew when the page has gone fullscreen)
         page.screenshot(path=os.path.join(OUT, "board-deck-fullscreen.png"))
         board.locator(".overlay.settings [data-fs]").click()
         wait(lambda: page.evaluate("() => document.fullscreenElement === null"), 5, "the page to leave fullscreen")
