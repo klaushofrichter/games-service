@@ -59,7 +59,7 @@ try:
             page.goto(BASE + "/faq")
             page.wait_for_selector("#faq h2")
             page.evaluate("document.documentElement.style.scrollBehavior = 'auto'")
-            assert page.locator(".faq-group").count() == 3 and page.locator(".qa").count() >= 10, "the questions are not there"
+            assert page.locator(".faq-group").count() == 4 and page.locator(".qa").count() >= 10, "the questions are not there"
             for y in range(0, page.evaluate("document.body.scrollHeight"), 500):
                 page.evaluate(f"window.scrollTo(0, {y})")
                 page.wait_for_timeout(120)

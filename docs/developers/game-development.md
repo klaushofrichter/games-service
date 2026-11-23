@@ -70,6 +70,38 @@ replay, statistics, rules for players, settings and remote play.
 6. **People first at a real table.** The board is read from every side and from a distance; phones are small. Short
    texts, large touch targets, nothing important only by colour.
 
+### What a game needs
+
+**Required**, or the game does not belong on a table:
+
+- **It follows the platform.** Everything in this guide that says *must*: the manifest, deterministic rules, private
+  views, every intent checked, and nothing about players reimplemented (the platform owns the lobby, seats, joining,
+  leaving and away phones; section 6). The [checklist](#16-checklist-before-a-pull-request) and the test kit
+  (section 14) check most of it.
+- **It is played by touch alone.** The board is a touchscreen and a hand is a phone: no keyboard, no mouse, no hover,
+  no right click. Large targets, and lists that scroll under a finger (sections 9 and 10).
+- **Its orientation works.** The table is sat at from every side. The board faces north or south and turns when
+  asked (or any of the four edges, `facing: "any"`), a remote board turns to its player, and touches land where the
+  finger is whichever way the board faces (`info.frontEdge`, `info.rotation`; section 9). What belongs to a player
+  faces that player.
+- **The platform's buttons stay visible, always.** The *Lobby* button in its corner and the three buttons along the
+  bottom edge (turn the board, settings, Advanced) are the table's way out of any situation: a game draws nothing
+  over them and never hides them, in any phase, window or animation (section 9, *Platform buttons*; `lobbyButton` in the
+  manifest chooses the corner).
+- **It brings its rules for players.** `how-to-play.md` in the game's folder (section 11): every phone shows it
+  behind its **Rules** button, with the table's settings on top. The table starts a game without the file, and the
+  button then has nothing to show; a game for others to play has it.
+
+**Expected**, and what makes a game feel at home here:
+
+- **AI players** (section 7), so that one person can play, a table can fill its empty seats, and whole games can be
+  simulated in the tests. A game for one player needs none.
+- **Drag and drop on the board, where the game allows it:** pieces, cards and tiles are moved with a finger, as on
+  a real table (Chess, Backgammon, FreeCell), with a touch on the piece and then its place as the other way.
+- **Results and awards** (section 8): a summary sentence, a result table, and awards for the statistics.
+- **Settings** for what a table may want to choose (section 4).
+- **Tests** of a whole game, exact replay and private views (section 14).
+
 ## 3. A game's folder
 
 A game is one folder; the folder name is the game's id (`a-z`, `0-9`, `-`).
