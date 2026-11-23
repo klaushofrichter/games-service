@@ -2921,9 +2921,10 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   - **"What are the requirements for a game?"** (Klaus, the same day): "The answer should actually be in Github.
     Summarizing: comply with the platform (mandatory), make it touch-screen enabled (no keyboard or mouse can to be
     used) and softer: provide AI Players to allow single player mode, provide Awards/Results, and possibly others."
-    The developer guide has it as *What a game needs* (required: follow the platform, touch alone; expected: AI
-    players, results and awards, rules for players, a board readable from every side, tests), and the page's answer
-    sums it up and links there.
+    And: "Another requirement: provide a rules file that is shown on the deck." The developer guide has it as
+    *What a game needs* (required: follow the platform, touch alone, rules for players in `how-to-play.md`; expected:
+    AI players, results and awards, a board readable from every side, tests), and the page's answer sums it up and
+    links there. The table itself starts a game without the rules file (D-099); the requirement is the guide's.
   *Implementation (Claude):* `SITE_PAGES`, `sitePage()` in `apps/cloud/src/server.ts`; `home.html`. Checks:
   `tests/website.test.ts` (the page, its groups, every inner link has its place), `scripts/e2e/website.py` (both
   widths, links).

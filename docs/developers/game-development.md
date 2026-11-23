@@ -80,13 +80,15 @@ replay, statistics, rules for players, settings and remote play.
   (section 14) check most of it.
 - **It is played by touch alone.** The board is a touchscreen and a hand is a phone: no keyboard, no mouse, no hover,
   no right click. Large targets, and lists that scroll under a finger (sections 9 and 10).
+- **It brings its rules for players.** `how-to-play.md` in the game's folder (section 11): every phone shows it
+  behind its **Rules** button, with the table's settings on top. The table starts a game without the file, and the
+  button then has nothing to show; a game for others to play has it.
 
 **Expected**, and what makes a game feel at home here:
 
 - **AI players** (section 7), so that one person can play, a table can fill its empty seats, and whole games can be
   simulated in the tests. A game for one player needs none.
 - **Results and awards** (section 8): a summary sentence, a result table, and awards for the statistics.
-- **Rules for players** (`how-to-play.md`, section 11), read on the board and the phones.
 - **A board readable from every side**, and settings for what a table may want to choose (section 4).
 - **Tests** of a whole game, exact replay and private views (section 14).
 
