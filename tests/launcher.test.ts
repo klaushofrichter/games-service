@@ -21,7 +21,7 @@ describe("the starter's --repos all", () => {
       const page = Number(new URL(url).searchParams.get("page"));
       return new Response(JSON.stringify(pages[page - 1] ?? []), { status: 200 });
     });
-    expect(await allGameRepos("tok")).toEqual(["KlausHofrichter/ge150pro-game", "klaushofrichter/loopy-game", "klaushofrichter/traders-game"]);
+    expect(await allGameRepos("tok")).toEqual(["klaushofrichter/ge150pro-game", "klaushofrichter/loopy-game", "klaushofrichter/traders-game"]); // (the owner in one spelling)
     expect(asked.map((a) => new URL(a.url).searchParams.get("page"))).toEqual(["1", "2"]); // a short page is the last
     expect(asked.every((a) => a.auth === "Bearer tok" && a.url.startsWith("https://api.github.com/user/repos?"))).toBe(true);
   });

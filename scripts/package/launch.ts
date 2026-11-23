@@ -281,7 +281,9 @@ export async function allGameRepos(token: string): Promise<string[]> {
   for (let page = 1; page <= 10; page++) {
     const list = JSON.parse((await get(`https://api.github.com/user/repos?per_page=100&page=${page}&affiliation=owner,collaborator,organization_member`, { Accept: "application/vnd.github+json", Authorization: `Bearer ${token}` })).toString("utf8")) as { full_name: string; name: string; archived?: boolean; owner: { login: string } }[];
     for (const r of list) {
-      if (r.owner.login.toLowerCase() === OWNER && GAME_REPO.test(r.name) && !r.archived && !PUBLIC_REPOS.includes(r.full_name)) found.push(r.full_name);
+      // (the owner as this starter spells it, whatever case GitHub gives: the public list and the folders on disk use it)
+      const full = `${OWNER}/${r.name}`;
+      if (r.owner.login.toLowerCase() === OWNER && GAME_REPO.test(r.name) && !r.archived && !PUBLIC_REPOS.includes(full)) found.push(full);
     }
     if (list.length < 100) break;
   }

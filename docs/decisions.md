@@ -2962,3 +2962,17 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
     remembered per game by the platform (FreeCell's house rule is applied by the board today); a `--kiosk` start
     option instead of guessing full screen from the window's size; the start options driven by one table; the
     website's pages as files of their own.
+- **D-322 · 2026-11-23 · Klaus** — **The code review that followed D-321** (the same range) found four things, all
+  fixed:
+  1. **A tap after a finger scrolled a window could be lost.** `touchScroll` remembered "that was a drag" until the
+     next click, but a finger's pan ends without one, and a press on a field (checkbox, pulldown, slider) or in a
+     scroller inside left the mark standing: the first tap there was swallowed. The mark now goes with the next press.
+  2. **A board left open across a restart of the table kept the old start's options** (D-319): a start without
+     options said nothing, so the pointer, the volume and the screensaver of the start before stayed until a reload.
+     The board now goes back to what its browser keeps before it takes the new start's options.
+  3. **FreeCell's phone page** could go on asking for the card design every 3 s after the game was gone (the board's
+     copy of this was fixed in D-321).
+  4. **`--repos all`** kept GitHub's spelling of the owner while the public list and the folders on disk use lower
+     case: with another spelling a public repository would have been taken for a private one. One spelling now.
+  Checks: `scripts/e2e/touch_scroll.py` (the tap after a pan; it fails without the fix), `scripts/e2e/start_options.py`
+  (the board stays open over two restarts), `tests/launcher.test.ts`. extra-games: nothing found in its 28 lines.

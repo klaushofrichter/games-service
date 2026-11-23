@@ -79,7 +79,8 @@ const coversScreen = () => {
 const browserFull = () => !fsDoc.fullscreenElement && (!!kioskMedia?.matches || coversScreen());
 const isFull = () => !!fsDoc.fullscreenElement || browserFull();
 const POINTER_KEY = "gametable.hidePointer";
-let hidePointer = stored(POINTER_KEY) === "1"; // off unless switched on, or the table was started with --pointer off (D-319)
+const keptHidePointer = () => stored(POINTER_KEY) === "1";
+let hidePointer = keptHidePointer(); // off unless switched on, or the table was started with --pointer off (D-319)
 function applyPointer() {
   const full = isFull();
   // The page fullscreen applies to too: inside Play from the board, the frame around the board and the deck, and
@@ -173,11 +174,12 @@ function noteFullscreenForNextPage() {
  * (D-092) stays the table's.
  */
 const VOLUME_KEY = "gametable.volume";
-let masterVolume = (() => {
+const keptVolume = () => {
   const raw = stored(VOLUME_KEY);
   const v = Number(raw);
   return raw !== null && Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : 1;
-})();
+};
+let masterVolume = keptVolume();
 const masterGains = new Map(); // a context's speakers -> the gain in front of them
 if (typeof AudioNode === "function" && typeof AudioDestinationNode === "function") {
   const connect = AudioNode.prototype.connect;
@@ -3052,8 +3054,10 @@ function onGameView(fn) {
  * screen in this browser (Settings › Display). Not inside Play from the board, whose deck is input the board can't see.
  */
 const SAVER_KEY = "gametable.screensaver";
-let SAVER_AFTER_MS = 60 * 60 * 1000; // an hour, or what the table was started with (--screensaver, D-319)
-let saverOn = stored(SAVER_KEY) !== "0";
+const SAVER_HOUR_MS = 60 * 60 * 1000;
+let SAVER_AFTER_MS = SAVER_HOUR_MS; // an hour, or what the table was started with (--screensaver, D-319)
+const keptSaver = () => stored(SAVER_KEY) !== "0";
+let saverOn = keptSaver();
 let lastInput = Date.now();
 let saverTimer = null;
 let saverEl = null; // the black layer while it shows
@@ -3177,9 +3181,21 @@ function changedHere(what) {
   keep(START_KEY, JSON.stringify(kept));
 }
 function applyStartOptions() {
-  const s = state?.screen;
-  if (REMOTE || !s || startOptions?.start === s.start) return;
+  const s = (!REMOTE && state?.screen) || null;
+  if ((s?.start ?? null) === (startOptions?.start ?? null)) return;
+  if (startOptions) {
+    // The table was started anew while this page stayed open (a kiosk browser): the start before holds no longer.
+    hidePointer = keptHidePointer();
+    masterVolume = keptVolume();
+    saverOn = keptSaver();
+    SAVER_AFTER_MS = SAVER_HOUR_MS;
+    applyPointer();
+    applyMasterVolume();
+    lastInput = Date.now();
+    scheduleSaver();
+  }
   startOptions = s;
+  if (!s) return;
   const changed = changedThisStart().changed;
   if (typeof s.pointer === "boolean" && !changed.includes("pointer")) {
     hidePointer = !s.pointer;
