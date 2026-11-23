@@ -2935,6 +2935,9 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   - **"Can I build a game that may be under copyright?"** (Klaus, the same day): "such games can not be in the
     public repository. If you build something that is not to be distributed, use a private repository." The answer
     adds that nothing on the page is legal advice.
+  - **The developer guide is made for an AI agent, and "What tech stack is used?"** (Klaus, the same day): the answer
+    on changing the games says that the guide is written for an AI agent to read; the new question names the stack
+    and begins with "you don't need to code, your LLM will handle any coding."
   *Implementation (Claude):* `SITE_PAGES`, `sitePage()` in `apps/cloud/src/server.ts`; `home.html`. Checks:
   `tests/website.test.ts` (the page, its groups, every inner link has its place), `scripts/e2e/website.py` (both
   widths, links).
