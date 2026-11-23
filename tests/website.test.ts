@@ -37,16 +37,24 @@ describe("the public website (D-176)", () => {
     for (const id of ["hero", "games-grid", "demo", "repos"]) expect(build).not.toContain(`id="${id}"`);
     expect(build).toContain("<title>Build a game · Game Table</title>");
     expect(html).toContain("<title>Game Table: board games around one screen</title>");
-    for (const page of [html, build]) {
-      expect(page).not.toMatch(/<!--\/?(home|build)-->/);
+    // The questions and answers (D-320): a third page from the same file, with its three groups.
+    const faq = await (await get("/faq")).text();
+    for (const id of ["faq", "faq-start", "faq-dev", "faq-play"]) expect(faq).toContain(`id="${id}"`);
+    for (const id of ["hero", "games-grid", "showcase", "debug"]) expect(faq).not.toContain(`id="${id}"`);
+    for (const page of [html, build]) expect(page).not.toContain('id="faq"');
+    expect(faq).toContain("<title>Questions and answers · Game Table</title>");
+    expect(faq.match(/<title>/g)).toHaveLength(1);
+    for (const page of [html, build, faq]) {
+      expect(page).toContain('href="/faq"');
+      expect(page).not.toMatch(/<!--\/?(home|build|faq)-->/);
       expect(page).not.toMatch(/\{\{\w+\}\}/);
       expect(page).toContain('class="version"');
     }
     // Every link to a place within the website has its place (D-312: the foot is on both pages, its links must work
     // from both): "#x" on the page itself, "/#x" on the landing page, "/build#x" on the developers' page.
     const ids = (page: string) => new Set([...page.matchAll(/\sid="([^"]+)"/g)].map((m) => m[1]));
-    const places: Record<string, Set<string | undefined>> = { "/": ids(html), "/build": ids(build) };
-    for (const [path, page] of [["/", html], ["/build", build]] as const) {
+    const places: Record<string, Set<string | undefined>> = { "/": ids(html), "/build": ids(build), "/faq": ids(faq) };
+    for (const [path, page] of [["/", html], ["/build", build], ["/faq", faq]] as const) {
       for (const [, href] of page.matchAll(/<a\b[^>]*\shref="([^"]+)"/g)) {
         if (/^(https?:|mailto:)/.test(href!) || href!.includes("${")) continue; // (not the links the script writes: the browser check has those)
         const [to, anchor] = href!.split("#");
