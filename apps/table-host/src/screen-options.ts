@@ -10,6 +10,8 @@ export interface ScreenOptions {
   pointer?: boolean;
   /** The volume of the table's screen in percent; 0: silent. */
   sound?: number;
+  /** The board's browser shows nothing but the board (a kiosk): the board is full screen without asking for it. */
+  kiosk?: boolean;
 }
 
 const whole = (name: string, raw: string, max: number, what: string) => {
@@ -19,7 +21,7 @@ const whole = (name: string, raw: string, max: number, what: string) => {
 };
 
 /** The options as given (text); throws an Error that says what an option needs. Undefined when none is given. */
-export function screenOptions(given: { screensaver?: string; pointer?: string; sound?: string }): ScreenOptions | undefined {
+export function screenOptions(given: { screensaver?: string; pointer?: string; sound?: string; kiosk?: boolean }): ScreenOptions | undefined {
   const o: ScreenOptions = {};
   if (given.screensaver) o.screensaver = whole("screensaver", given.screensaver, 1440, "minutes (0 to 1440; 0 is off)");
   if (given.pointer) {
@@ -29,6 +31,7 @@ export function screenOptions(given: { screensaver?: string; pointer?: string; s
     else throw new Error("--pointer needs on or off");
   }
   if (given.sound) o.sound = whole("sound", given.sound, 100, "a level in percent (0 to 100; 0 is off)");
+  if (given.kiosk) o.kiosk = true;
   return Object.keys(o).length ? o : undefined;
 }
 
@@ -42,4 +45,6 @@ export const SCREEN_OPTIONS_HELP = [
   "                    settings say, full to begin with)",
   "                    These three hold for this start and are not saved. The board's settings show them and can",
   "                    change them; only a change made there is kept.",
+  "  --kiosk           the board's browser shows nothing but the board: the board counts as full screen (the",
+  "                    pointer hides with --pointer off; no Fullscreen button)",
 ];

@@ -231,6 +231,7 @@ Add them to the starter in a terminal: `"%LOCALAPPDATA%\Programs\Game Table\game
 | `--screensaver 10` | The table's screen goes dark, with a clock, after 10 minutes without input; `--screensaver 0`: never. Without the option: what the board's settings say (an hour to begin with) |
 | `--pointer off` | Hide the mouse pointer on the board, and on the deck beside it, in fullscreen: for a touchscreen. `--pointer on` shows it. Without the option: what the board's settings say (shown to begin with) |
 | `--sound 50` | The volume of the table's screen in percent: `--sound 0` is silent, `--sound 100` full. Without the option: what the board's settings say (full to begin with) |
+| `--kiosk` | The board in a browser that shows nothing else, full screen: the starter opens Chrome, Chromium or Edge in kiosk mode itself (with a profile of its own; `GAME_TABLE_BROWSER` names another browser) and closes it when the table ends; closing the browser ends the table. Leave it with **Advanced › Quit the table…** on the board. Without such a browser the board opens as usual |
 | `--service`, `--code ABCD-EFGH` | Join the Game Table service, see below |
 | `--version` | The package's version, and every game on the table with its version and source |
 | `--smoke-test` | Check the installation: start, check that the board answers and the games are there, stop; fails if a named repository is missing |

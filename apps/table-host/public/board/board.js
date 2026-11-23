@@ -60,10 +60,10 @@ const fsDoc = (() => {
  * browser: it depends on whether that screen is touched.
  */
 /**
- * A browser started to show nothing but the page (Chrome's --kiosk, an installed app in fullscreen, F11) fills the
- * screen without the page having asked: `fullscreenElement` stays empty (D-317). Two things tell: the display mode, and
- * a window exactly as large as the screen (a browser with its tabs and address bar never is). The board is full screen
- * in any of these cases.
+ * A browser that shows nothing but the board fills the screen without the page having asked: `fullscreenElement`
+ * stays empty (D-317). The table says so when it was started for it (`--kiosk`, D-324), and the display mode tells of
+ * a browser's own full screen (F11, an installed app). The board is full screen in either case. (The size of the
+ * window is no sign: it was one once, and a guess.)
  */
 const kioskMedia = (() => {
   try {
@@ -72,11 +72,9 @@ const kioskMedia = (() => {
     return null;
   }
 })();
-const coversScreen = () => {
-  const w = fsDoc.defaultView ?? window;
-  return w.screen.width > 0 && w.innerWidth === w.screen.width && w.innerHeight === w.screen.height;
-};
-const browserFull = () => !fsDoc.fullscreenElement && (!!kioskMedia?.matches || coversScreen());
+/** What this start asks of the table's own screen (D-319), once the table has said it; see applyStartOptions. */
+let startOptions = null;
+const browserFull = () => !fsDoc.fullscreenElement && (!!kioskMedia?.matches || startOptions?.kiosk === true);
 const isFull = () => !!fsDoc.fullscreenElement || browserFull();
 const POINTER_KEY = "gametable.hidePointer";
 const keptHidePointer = () => stored(POINTER_KEY) === "1";
@@ -114,7 +112,6 @@ function setHidePointer(on) {
 }
 fsDoc.addEventListener("fullscreenchange", applyPointer);
 kioskMedia?.addEventListener?.("change", applyPointer);
-(fsDoc.defaultView ?? window).addEventListener("resize", applyPointer);
 applyPointer();
 /**
  * Fullscreen across Play from the board (D-299): switching it on or off moves the board to another page (board/play.html
@@ -3166,7 +3163,6 @@ if (!IN_PLAY) {
  * the next start begins with its options again.
  */
 const START_KEY = "gametable.changedThisStart";
-let startOptions = null;
 function changedThisStart() {
   try {
     const kept = JSON.parse(stored(START_KEY) ?? "null");
@@ -3194,7 +3190,9 @@ function applyStartOptions() {
     lastInput = Date.now();
     scheduleSaver();
   }
+  const kiosk = startOptions?.kiosk === true;
   startOptions = s;
+  if ((s?.kiosk === true) !== kiosk) applyPointer(); // (full screen or not: the pointer, and the settings when next drawn)
   if (!s) return;
   const changed = changedThisStart().changed;
   if (typeof s.pointer === "boolean" && !changed.includes("pointer")) {

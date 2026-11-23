@@ -67,6 +67,8 @@ interface Options {
   screensaver?: string;
   pointer?: string;
   sound?: string;
+  /** The board in a browser that shows nothing else (D-324): opened and closed by this starter. */
+  kiosk?: boolean;
 }
 
 export function parseArgs(argv: string[]): Options {
@@ -92,6 +94,7 @@ export function parseArgs(argv: string[]): Options {
       case "screensaver": o.screensaver = value(); break;
       case "pointer": o.pointer = value(); break;
       case "sound": o.sound = value(); break;
+      case "kiosk": o.kiosk = true; break;
       case "version": case "v": o.showVersion = true; break;
       case "smoketest": o.smokeTest = true; o.open = false; break;
       case "expectgames": o.expectGames = value().split(",").map((s) => s.trim()).filter(Boolean); break;
@@ -127,6 +130,8 @@ export function readmeText() {
     "  --code ABCD-EFGH  join the service with an access code from the console",
     "  --home DIR        another folder for downloads and data",
     ...SCREEN_OPTIONS_HELP,
+    "                    and this starter opens that browser itself (Chrome, Chromium or Edge in kiosk mode, with a",
+    "                    profile of its own) and closes it with the table; closing the browser ends the table",
     "  --version         the package's version and the games on the table (MANIFEST.json, games.json)",
     "  --smoke-test      check the installation: start, check the board and the games, stop; fails if a named",
     "                    repository is missing. Uses the saved private repositories without asking or changing them",
@@ -439,6 +444,56 @@ async function health(port: number): Promise<boolean> {
  * Opens the board in the browser. Without a desktop (no xdg-open, no display: a server, Raspberry Pi OS Lite) it says
  * where the board is and the table keeps running (Linux review, 2026-11-02: a missing xdg-open ended the starter).
  */
+/** A browser that has a kiosk mode (Chrome, Chromium, Edge): GAME_TABLE_BROWSER, or the first one found. */
+export function kioskBrowser(): string | null {
+  const named = process.env.GAME_TABLE_BROWSER;
+  if (named) return existsSync(named) ? named : null;
+  if (isMac) {
+    return ["Google Chrome", "Chromium", "Microsoft Edge"].map((n) => `/Applications/${n}.app/Contents/MacOS/${n}`).find((f) => existsSync(f)) ?? null;
+  }
+  if (isWin) {
+    const roots = [process.env.ProgramFiles, process.env["ProgramFiles(x86)"], process.env.LOCALAPPDATA].filter((r): r is string => !!r);
+    const files = ["Google\\Chrome\\Application\\chrome.exe", "Chromium\\Application\\chrome.exe", "Microsoft\\Edge\\Application\\msedge.exe"];
+    for (const f of files) for (const r of roots) if (existsSync(join(r, f))) return join(r, f);
+    return null;
+  }
+  const dirs = (process.env.PATH ?? "").split(delimiter).filter(Boolean);
+  for (const name of ["google-chrome", "google-chrome-stable", "chromium", "chromium-browser", "microsoft-edge"]) {
+    for (const d of dirs) if (existsSync(join(d, name))) return join(d, name);
+  }
+  return null;
+}
+
+/** How the kiosk browser is started: nothing but the board, a profile of its own (so it is no window of the person's browser). */
+export function kioskArgs(url: string, profile: string): string[] {
+  // --password-store=basic: after an automatic login the keyring stays locked, and Chrome would ask for its password.
+  return ["--kiosk", `--user-data-dir=${profile}`, "--no-first-run", "--noerrdialogs", "--password-store=basic", "--autoplay-policy=no-user-gesture-required", url];
+}
+
+/**
+ * The board in a kiosk browser (D-324): started here, so the two belong together. Returns the browser's process, or
+ * null where there is none to start (no such browser, no active desktop): the board is then opened as usual.
+ */
+function openKiosk(url: string, profile: string): ChildProcess | null {
+  if (!isWin && !isMac && !process.env.DISPLAY && !process.env.WAYLAND_DISPLAY) return null;
+  if (!isWin && !isMac && !desktopActive()) return null;
+  const browser = kioskBrowser();
+  if (!browser) {
+    note("--kiosk: no Chrome, Chromium or Edge was found here (GAME_TABLE_BROWSER names another); the board opens in the usual browser instead.");
+    return null;
+  }
+  // A kiosk browser left from a start that was cut off would take the new window's address and end at once, and the
+  // table with it: it goes first.
+  if (!isWin) spawnSync("pkill", ["-f", "--", `--user-data-dir=${profile}`], { stdio: "ignore", timeout: 5000 });
+  try {
+    const child = spawn(browser, kioskArgs(url, profile), { stdio: "ignore" });
+    child.on("error", () => note(`--kiosk: ${browser} could not be started; open ${url} in a browser on this computer.`));
+    return child;
+  } catch {
+    return null;
+  }
+}
+
 function openBrowser(url: string) {
   const manual = () => note(`Couldn't open a browser here: open ${url} in a browser on this computer, or show the board on another screen.`);
   if (!isWin && !isMac && !process.env.DISPLAY && !process.env.WAYLAND_DISPLAY) return manual();
@@ -674,6 +729,7 @@ async function main() {
   if (o.screensaver !== undefined) env.TABLE_SCREENSAVER = o.screensaver;
   if (o.pointer !== undefined) env.TABLE_POINTER = o.pointer;
   if (o.sound !== undefined) env.TABLE_SOUND = o.sound;
+  if (o.kiosk) env.TABLE_KIOSK = "1";
   delete env.CLOUD_URL;
   delete env.TABLE_CODE;
   if (o.service) env.CLOUD_URL = SERVICE_URL;
@@ -712,7 +768,9 @@ async function main() {
   child.on("exit", () => (exited = true));
   // Closing the Terminal window sends SIGHUP: the table host stops with the launcher, whichever signal ends it.
   for (const sig of ["SIGINT", "SIGTERM", "SIGHUP"] as const) process.on(sig, () => child.kill(sig === "SIGHUP" ? "SIGTERM" : sig));
+  let kiosk: ChildProcess | null = null;
   process.on("exit", () => {
+    kiosk?.kill("SIGTERM");
     if (!exited) child.kill("SIGTERM");
   });
 
@@ -761,6 +819,14 @@ async function main() {
   if (!up) {
     if (exited) fail(`The table host stopped (exit ${child.exitCode}); see the messages above.`);
     note(`The table host does not answer yet; open http://localhost:${o.port}/board/ yourself when it does.`);
+  } else if (o.open && o.kiosk && (kiosk = openKiosk(`http://localhost:${o.port}/board/`, join(home, "kiosk-browser")))) {
+    // The two belong together: the table ends when its browser is closed, and the browser when the table ends
+    // (Quit the table on the board, Ctrl+C here).
+    say("The board is open in a kiosk browser. To leave it: Advanced › Quit the table… on the board, or Alt+F4.");
+    kiosk.on("exit", () => {
+      kiosk = null;
+      if (!exited) child.kill("SIGTERM");
+    });
   } else if (o.open) {
     openBrowser(`http://localhost:${o.port}/board/`);
     say(`No board window? Open http://localhost:${o.port}/board/ in a browser on this computer.`);

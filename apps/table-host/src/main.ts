@@ -18,13 +18,13 @@ const accessCode = env.TABLE_CODE || arg("code") || undefined;
 
 if (process.argv.slice(2).some((a) => a === "--help" || a === "-h")) {
   console.log(["Table Host (configuration: environment variables, see README)", "  --code ABCD-EFGH  join the service with an access code from the console (TABLE_CODE)", ...SCREEN_OPTIONS_HELP,
-    "                    (TABLE_SCREENSAVER, TABLE_POINTER, TABLE_SOUND in the environment; the command line wins)", "  --help            these options"].join("\n"));
+    "                    (TABLE_SCREENSAVER, TABLE_POINTER, TABLE_SOUND, TABLE_KIOSK=1 in the environment; the command line wins)", "  --help            these options"].join("\n"));
   process.exit(0);
 }
 // The table's own screen for this start (D-319): the command line wins over the environment.
 let screen: ScreenOptions | undefined;
 try {
-  screen = screenOptions({ screensaver: arg("screensaver") ?? env.TABLE_SCREENSAVER, pointer: arg("pointer") ?? env.TABLE_POINTER, sound: arg("sound") ?? env.TABLE_SOUND });
+  screen = screenOptions({ screensaver: arg("screensaver") ?? env.TABLE_SCREENSAVER, pointer: arg("pointer") ?? env.TABLE_POINTER, sound: arg("sound") ?? env.TABLE_SOUND, kiosk: process.argv.includes("--kiosk") || env.TABLE_KIOSK === "1" });
 } catch (e) {
   console.error(`[table-host] ${(e as Error).message}`);
   process.exit(1);

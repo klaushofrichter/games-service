@@ -73,7 +73,7 @@ try:
     assert status(f"{SCREEN}/board/screen?key=wrong") == 403, "a wrong key opened the board"
     with sync_playwright() as p:
         br = p.chromium.launch(**({"executable_path": CHROMIUM} if CHROMIUM else {}))
-        home = br.new_page(viewport={"width": 1920, "height": 1080}, screen={"width": 2560, "height": 1440})  # a window on a larger screen (D-317)
+        home = br.new_page(viewport={"width": 1920, "height": 1080})
         watch(home, "table's window")
         home.goto(HOME + "/board/")
         home.wait_for_selector("button.tile")
@@ -101,28 +101,6 @@ try:
         assert cursor() != "none", "the pointer is hidden in fullscreen with the setting off"
         home.evaluate("() => document.exitFullscreen()")
         home.wait_for_function("!document.fullscreenElement")
-        # A browser that shows nothing but the board (Chrome's --kiosk, D-317) is full screen without the page having
-        # asked: its window is exactly the screen. The pointer hides there too, the settings say so instead of
-        # offering Fullscreen, and in a window smaller than the screen the pointer is back.
-        dev = home.context.new_cdp_session(home)
-        on_screen = lambda w, h: dev.send("Emulation.setDeviceMetricsOverride", {"width": 1920, "height": 1080, "deviceScaleFactor": 1, "mobile": False, "screenWidth": w, "screenHeight": h})
-        home.click(".overlay.settings button[data-hide-pointer]")  # On
-        assert cursor() != "none", "the pointer is hidden in a window"
-        on_screen(1920, 1080)
-        home.evaluate("() => dispatchEvent(new Event('resize'))")  # (the screen changed under the window, not the window)
-        home.wait_for_function("document.documentElement.classList.contains('gt-pointer-hidden')")
-        assert cursor() == "none" and home.evaluate("() => document.fullscreenElement") is None, "the pointer shows in a kiosk browser"
-        home.click(".overlay.settings [data-close-overlay]")
-        home.click("#settings-button")
-        assert home.locator(".overlay.settings [data-fs-kiosk]").count() == 1 and home.locator(".overlay.settings [data-fs]").count() == 0, "a kiosk browser is offered Fullscreen"
-        on_screen(2560, 1440)
-        home.evaluate("() => dispatchEvent(new Event('resize'))")
-        home.wait_for_function("!document.documentElement.classList.contains('gt-pointer-hidden')")
-        assert cursor() != "none", "the pointer stays hidden out of the kiosk"
-        home.click(".overlay.settings [data-close-overlay]")
-        home.click("#settings-button")
-        assert home.locator(".overlay.settings [data-fs]").count() == 1
-        home.click(".overlay.settings button[data-hide-pointer]")  # back to Off
         # The master volume of this screen (D-297): every sound the page sends to the speakers is scaled by it, also a
         # game's own Web Audio. A constant 1.0 rendered offline comes out at the slider's value.
         level = """async () => { const c = new OfflineAudioContext(1, 256, 8000); const s = c.createConstantSource();

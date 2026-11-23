@@ -8,6 +8,7 @@ history.
 
 ## [Unreleased]
 
+- `--kiosk`: the starter opens the board in a browser that shows nothing else (Chrome, Chromium or Edge in kiosk mode, a profile of its own) and closes it with the table; closing the browser ends the table. The board is told that it fills the screen, instead of guessing it from the window's size. The Linux guide's start script is no longer needed (D-324).
 - Board: after a finger has scrolled a window, the next tap on a checkbox, pulldown or slider in it is no longer lost (D-322).
 - Board: a board left open while the table is started anew takes the new start's options and drops the old ones (D-322).
 - FreeCell: looking for a way through a deal is remembered, so replaying a game (its check at the end, the Game Viewer) no longer searches again; smoother scrolling in the board's windows (D-321).

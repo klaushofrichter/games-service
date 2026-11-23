@@ -2976,3 +2976,24 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
      case: with another spelling a public repository would have been taken for a private one. One spelling now.
   Checks: `scripts/e2e/touch_scroll.py` (the tap after a pan; it fails without the fix), `scripts/e2e/start_options.py`
   (the board stays open over two restarts), `tests/launcher.test.ts`. extra-games: nothing found in its 28 lines.
+- **D-324 · 2026-11-23 · Klaus** — **`--kiosk`: the starter opens and closes the kiosk browser, and the board is told
+  that it fills the screen.** "Ok to add --kiosk option." D-315 named it as a later step; D-321 found the board guessing
+  full screen from a window exactly as large as the screen (D-317), a guess that made three browser checks fake a
+  larger screen.
+  - **The table says it.** `--kiosk` (or `TABLE_KIOSK=1`) travels with the start's options (`screen.kiosk`, D-319):
+    the board then counts as full screen without having asked, hides the pointer with `--pointer off` and offers no
+    Fullscreen button. A browser's own full screen (F11, an installed app) is still read from the display mode. The
+    window's size is no sign any more. Like the other start options: for the table's own screen, not a remote board.
+  - **The starter opens the browser** with `--kiosk`: Chrome, Chromium or Edge (the first found; `GAME_TABLE_BROWSER`
+    names another), in kiosk mode, with a profile of its own in the table's folder (`kiosk-browser`). The two belong
+    together: the browser closes when the table ends (Quit the table, Ctrl+C), and the table ends when the browser is
+    closed (Alt+F4). A kiosk browser left from a start that was cut off is ended first. Without such a browser, or
+    without an active desktop, the board opens as usual and the starter says so.
+  - **The Linux guide's start script goes**: its icon runs `game-table --kiosk --repos all --pointer off`.
+  - **A kiosk browser started another way** (a script of one's own, as on the game PC until now) is no longer taken
+    for full screen by itself: start the table with `--kiosk` (with `--no-open` if the script opens the browser).
+  *Implementation (Claude):* `kiosk` in `screen-options.ts`, `browserFull()` in `board.js` (`coversScreen` and its
+  `resize` listener are gone), `kioskBrowser()`, `kioskArgs()`, `openKiosk()` in `launch.ts`. Checks:
+  `tests/start-options.test.ts`, `scripts/e2e/start_options.py` (a table started with `TABLE_KIOSK=1`; a window as
+  large as its screen is no kiosk), and by hand with a stand-in browser: started with the board's address, ended by
+  Quit the table, and the table ended when the browser was closed.
