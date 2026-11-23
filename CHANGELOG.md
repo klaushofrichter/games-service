@@ -8,6 +8,7 @@ history.
 
 ## [Unreleased]
 
+- Website: a page of questions and answers at `/faq`, in three groups (getting started, developer knowledge, gameplay), linked from the top bar and the foot of every page (D-320).
 - A table can be started with `--screensaver N` (minutes, 0: off), `--pointer on|off` and `--sound N` (percent) for its own screen: they hold for that start and win over the board's saved settings without changing them; the settings show them, and only a change made there is saved. In the packages' starter and the table host (`TABLE_SCREENSAVER`, `TABLE_POINTER`, `TABLE_SOUND`); the installation guides list every option (D-319).
 - Board: "Hide the mouse pointer in fullscreen" is off to begin with again; a table with a touchscreen starts with `--pointer off` (D-319, replaces D-318).
 - Board: a browser that shows nothing but the board (Chrome's kiosk mode, F11) counts as full screen: the mouse pointer hides there with the setting on, and the settings say so instead of offering Fullscreen (D-317).
