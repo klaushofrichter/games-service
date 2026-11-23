@@ -39,7 +39,7 @@ describe("the public website (D-176)", () => {
     expect(html).toContain("<title>Game Table: board games around one screen</title>");
     // The questions and answers (D-320): a third page from the same file, with its three groups.
     const faq = await (await get("/faq")).text();
-    for (const id of ["faq", "faq-start", "faq-dev", "faq-play"]) expect(faq).toContain(`id="${id}"`);
+    for (const id of ["faq", "faq-start", "faq-dev", "faq-howto", "faq-play"]) expect(faq).toContain(`id="${id}"`);
     for (const id of ["hero", "games-grid", "showcase", "debug"]) expect(faq).not.toContain(`id="${id}"`);
     for (const page of [html, build]) expect(page).not.toContain('id="faq"');
     expect(faq).toContain("<title>Questions and answers · Game Table</title>");
