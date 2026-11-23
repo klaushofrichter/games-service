@@ -8,6 +8,9 @@ history.
 
 ## [Unreleased]
 
+- A game begins with the settings it was last played with on this table: kept with the game's data, so they outlast a restart. A seed drawn anew for every game is not kept (D-325).
+- FreeCell: the house rule is a setting of the game now, shown in the lobby before the start; changed during a game, it is kept for the next one by the table (D-325).
+- For games: the board's settings window asks the running game for its items (`settings` on what `mount` returns), and gives it `remember` to keep a setting changed during a game. The developer guide has a new part, "Settings: the table's and the game's" (D-326).
 - `--kiosk`: the starter opens the board in a browser that shows nothing else (Chrome, Chromium or Edge in kiosk mode, a profile of its own) and closes it with the table; closing the browser ends the table. The board is told that it fills the screen, instead of guessing it from the window's size. The Linux guide's start script is no longer needed (D-324).
 - Board: after a finger has scrolled a window, the next tap on a checkbox, pulldown or slider in it is no longer lost (D-322).
 - Board: a board left open while the table is started anew takes the new start's options and drops the old ones (D-322).

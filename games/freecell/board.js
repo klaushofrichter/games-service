@@ -29,9 +29,6 @@ function winSound(ctx, t, out) {
   [1047, 1319, 1568, 2093].forEach((f, i) => ping(ctx, out, t + i * 0.13, { freq: f, decay: 0.5, gain: 0.25 }));
 }
 
-/** The game on this board, for the settings window (which is the platform's, outside `mount`). */
-let live = null;
-
 export function mount(root, ctx) {
   useStyles("/games/freecell/assets/cards.css");
   useStyles("/games/freecell/board.css");
@@ -101,19 +98,6 @@ export function mount(root, ctx) {
     if (key === "design") setDesign(value);
     else if (key === null) readDesign();
   });
-  // The house rule kept on the table (D-310) holds for a new game: asked for once, before the first move.
-  let ruleRead = false;
-  async function applyKeptRule() {
-    if (ruleRead || !ctx.store || !mine() || view.moves > 0) return;
-    ruleRead = true;
-    try {
-      const kept = await ctx.store.get("rules");
-      if (typeof kept?.takeBack === "boolean" && kept.takeBack !== view.takeBack && mine()) ctx.act(view.seat, "rule", { takeBack: kept.takeBack });
-    } catch {
-      ruleRead = false; // the table gave no answer: with the next update
-    }
-  }
-
   const mine = () => !!view && !!info && info.controlSeats?.includes(view.seat) && !view.over;
   const north = () => info?.rotation === 180;
 
@@ -346,7 +330,6 @@ export function mount(root, ctx) {
       const first = !view;
       view = v;
       info = i;
-      live = { view: v, act: (name, payload) => ctx.act(v.seat, name, payload), store: ctx.store };
       received = performance.now();
       box.classList.toggle("fc-north", north());
       seatPlates(root, info).classList.toggle("fc-north", north());
@@ -374,14 +357,47 @@ export function mount(root, ctx) {
       }
       draw(delays);
       status();
-      applyKeptRule();
     },
     whenIdle() {
       const wait = idleAt - performance.now();
       return wait > 0 ? new Promise((r) => setTimeout(r, wait)) : Promise.resolve();
     },
+    /**
+     * The board's settings window during a game (the platform asks the game that runs here, D-326): the house rule,
+     * and the deal's number to play a deal again. The number is typed on the board's number pad; another number ends
+     * the game that is on, so the board asks first.
+     */
+    settings({ info, confirm, remember }) {
+      const v = view;
+      if (!v) return [];
+      if (v.over || !info?.controlSeats?.includes(v.seat)) return [{ type: "text", label: "Deal number", value: `#${v.deal}` }];
+      return [
+        {
+          type: "toggle",
+          setting: "takeBack", // (the manifest's setting, changed while the game runs: the rules take it, the table keeps it)
+          label: "Cards may be taken back from the foundations",
+          hint: "A house rule: drag a foundation's top card to a column or a free cell. Kept for the next games.",
+          value: v.takeBack,
+          onChange: async (on) => {
+            const r = await ctx.act(v.seat, "rule", { takeBack: !!on });
+            if (r?.ok) remember?.({ takeBack: !!on });
+          },
+        },
+        {
+          type: "number",
+          label: "Deal number",
+          hint: "Enter a number to play that deal. The game that is on ends.",
+          value: v.deal,
+          min: 1,
+          max: 999999,
+          onChange: async (n) => {
+            if (gone || n === view.deal) return;
+            if (await confirm(`Play deal #${n}?`, `The game that is on (deal #${view.deal}) ends without a result.`, `Play deal #${n}`)) ctx.act(view.seat, "deal", { n });
+          },
+        },
+      ];
+    },
     destroy() {
-      live = null;
       gone = true;
       clearTimeout(designRetry);
       stopStore?.();
@@ -390,37 +406,4 @@ export function mount(root, ctx) {
       box.remove();
     },
   };
-}
-
-/**
- * The board's settings window during a game: the deal's number, to play a deal again. Typed on the board's number pad;
- * another number ends the game that is on, so the board asks first.
- */
-export function settings({ info, confirm }) {
-  const v = live?.view;
-  if (!v || v.over || !info?.controlSeats?.includes(v.seat)) return v ? [{ type: "text", label: "Deal number", value: `#${v.deal}` }] : [];
-  return [
-    {
-      type: "toggle",
-      label: "Cards may be taken back from the foundations",
-      hint: "A house rule: drag a foundation's top card to a column or a free cell. Kept for the next games.",
-      value: v.takeBack,
-      onChange: async (on) => {
-        const r = await live?.act("rule", { takeBack: !!on });
-        if (r?.ok) live?.store?.set("rules", { takeBack: !!on });
-      },
-    },
-    {
-      type: "number",
-      label: "Deal number",
-      hint: "Enter a number to play that deal. The game that is on ends.",
-      value: v.deal,
-      min: 1,
-      max: 999999,
-      onChange: async (n) => {
-        if (!live || n === live.view.deal) return;
-        if (await confirm(`Play deal #${n}?`, `The game that is on (deal #${live.view.deal}) ends without a result.`, `Play deal #${n}`)) live?.act("deal", { n });
-      },
-    },
-  ];
 }

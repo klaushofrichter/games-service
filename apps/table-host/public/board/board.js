@@ -1214,10 +1214,13 @@ toolsBtn.addEventListener("click", () => openAdvanced());
 
 /**
  * The settings modal: the board's own settings (Fullscreen), then whatever the chosen game adds. A game adds
- * items by exporting settings({ info, setPrefs, confirm }) from its board.js; each item is
+ * items with settings({ info, setPrefs, confirm, remember }): the running game's own (what `mount` returned, D-326),
+ * which knows its view and can act, or else the function its board.js exports; each item is
  *   { type: "toggle", label, value, onChange(next) }   { type: "choice", label, value, options: [{ value, label }], onChange }
  *   { type: "swatches", label, value, options: ["#rrggbb", …], onChange }   { type: "button", label, onChange() }
  * setPrefs(patch) stores display choices for this game on the table; board and decks get them as info.prefs.
+ * remember(patch) keeps settings of the game's manifest for its next game (D-325), for one the game lets change while
+ * it runs; such an item names its setting (`setting: "key"`), and the locked row of that setting is left out.
  */
 let settingsOverlay = null;
 /**
@@ -1237,6 +1240,7 @@ function openSettings() {
   let modFor = null;
   let items = [];
   const setPrefs = (prefs) => act("POST", "/game/prefs", { prefs });
+  const remember = (settings) => act("POST", "/game/settings/remember", { settings });
   const loadGame = () => {
     const g = state?.game;
     const key = g ? `${g.id}@${g.version}` : null;
@@ -1259,7 +1263,9 @@ function openSettings() {
     if (!state) return;
     loadGame();
     try {
-      items = (state.game && mod?.settings?.({ info: gameInfo(), setPrefs, confirm: confirmDialog })) || [];
+      // The game that runs on this board answers for itself (D-326); before one is mounted, its module does.
+      const own = typeof game?.inst?.settings === "function" ? game.inst : mod;
+      items = (state.game && own?.settings?.({ info: gameInfo(), setPrefs, confirm: confirmDialog, remember })) || [];
     } catch (err) {
       console.error("game settings failed", err);
       items = [];
@@ -1312,9 +1318,11 @@ function openSettings() {
           `<button class="swatch ${c === p.color ? "on" : ""}" style="--c:${c}" data-color-player="${esc(p.id)}" data-color="${c}" aria-label="${esc(p.name)}: colour ${i + 1}"></button>`).join("")}</span></div>`).join("")}
         <div class="faint" style="font-size:.7em;margin-top:6px">Picking a colour someone else has swaps the two.</div></div>`;
     };
-    const gameSettings = fields.length
+    // (during a game, a setting the game itself lets change is the game's own item, not a locked row as well)
+    const rows = fields.filter((f) => settingActive(f, cur, fields) && (editable || !items.some((it) => it.setting === f.key)));
+    const gameSettings = rows.length
       ? `<div class="group game-rules ${editable ? "" : "locked"}"><div class="eyebrow">${esc(state.game.name)} · game settings${editable ? "" : ` <span class="lock" aria-label="locked">🔒 locked during the game</span>`}</div>
-          ${fields.filter((f) => settingActive(f, cur, fields)).map((f) => {
+          ${rows.map((f) => {
             // What the choice means (D-246); during a game the game's own items say what it means now (D-249), so the
             // locked row doesn't repeat it.
             const hint = editable ? hintFor(f, cur[f.key] ?? f.default) : "";

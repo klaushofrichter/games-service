@@ -1682,6 +1682,40 @@ export class Table extends EventEmitter {
   }
 
   /**
+   * Keep a game's settings for its next game on this table (D-325), with the game's data. A setting drawn anew for
+   * every game (`random`, a seed) is not kept.
+   */
+  private rememberSettings(m: Manifest, settings: Record<string, unknown>) {
+    const keep: Record<string, unknown> = {};
+    for (const s of m.settings) if (!s.random && settings[s.key] !== undefined) keep[s.key] = settings[s.key];
+    if (!m.settings.length) return;
+    try {
+      this.data.setSettings(this.gameRef(m), keep);
+    } catch (e) {
+      console.error(`[table-host] the settings of ${m.id} were not kept: ${(e as Error).message}`);
+    }
+  }
+
+  /**
+   * A setting changed during a game by the game itself (a house rule switched in its settings window), kept for the
+   * next game (D-325): only settings of the manifest, checked like the others.
+   */
+  rememberGameSettings(patch: unknown) {
+    const game = this.runningGame ?? this.selected?.game;
+    if (!game) throw new TableError(409, "no game is chosen");
+    if (!patch || typeof patch !== "object" || Array.isArray(patch)) throw new TableError(400, "settings must be an object");
+    const known = new Set(game.manifest.settings.map((s) => s.key));
+    for (const k of Object.keys(patch)) if (!known.has(k)) throw new TableError(400, `${game.manifest.name} has no setting "${k.slice(0, 40)}"`);
+    let merged: Record<string, unknown>;
+    try {
+      merged = settingsWithDefaults(game.manifest, { ...this.data.settings(game.manifest.id), ...(patch as Record<string, unknown>) });
+    } catch (e) {
+      throw new TableError(400, (e as Error).message);
+    }
+    this.rememberSettings(game.manifest, merged);
+  }
+
+  /**
    * Change the chosen game's settings before it starts (D-090), from the board's settings. Only the keys given
    * change; everyone's Ready stays, since the game itself is the same.
    */
@@ -1703,9 +1737,15 @@ export class Table extends EventEmitter {
     if (!g) throw new TableError(404, "no such game");
     const reasons = this.blockersFor(g.manifest);
     if (reasons.length) throw new TableError(409, `${g.manifest.name} ${reasons.join("; ")}`);
+    // A game begins with the settings it was last played with on this table (D-325); what is given here wins. Kept
+    // settings that fit the game no longer (another version of it) are let go.
     let merged: Record<string, unknown>;
     try {
-      merged = settingsWithDefaults(g.manifest, settings);
+      try {
+        merged = settingsWithDefaults(g.manifest, { ...this.data.settings(g.manifest.id), ...settings });
+      } catch {
+        merged = settingsWithDefaults(g.manifest, settings);
+      }
     } catch (e) {
       throw new TableError(400, (e as Error).message);
     }
@@ -1750,6 +1790,7 @@ export class Table extends EventEmitter {
     this.aiTrace = [];
     this.endedSessions.clear();
     this.beginLog(rt, game, settings, aiOptions);
+    this.rememberSettings(game.manifest, settings);
     this.phase = "active";
     rt.onChange((kind, events) => {
       if (kind === "over") void this.onGameOver(events);

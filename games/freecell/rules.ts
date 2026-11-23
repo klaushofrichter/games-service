@@ -224,10 +224,11 @@ function describeStep(step: StepInfo<State>): StepDescription | null {
 }
 
 export default defineGame<State>({
-  setup(ctx) {
+  setup(ctx, settings) {
     const found = solvable(ctx.randomInt(1, MAX_DEAL));
     const seat = ctx.seats[0]!;
-    return fresh({ seat: seat.seat, name: seat.name, deal: found.n, passed: found.passed, takeBack: true }, found.plan);
+    // The house rule is a setting (D-325): on to begin with, and as the table last had it after that.
+    return fresh({ seat: seat.seat, name: seat.name, deal: found.n, passed: found.passed, takeBack: settings.takeBack !== false }, found.plan);
   },
 
   onIntent(state, seat, intent, ctx) {

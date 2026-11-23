@@ -2997,3 +2997,40 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   `tests/start-options.test.ts`, `scripts/e2e/start_options.py` (a table started with `TABLE_KIOSK=1`; a window as
   large as its screen is no kiosk), and by hand with a stand-in browser: started with the board's address, ended by
   Quit the table, and the table ended when the browser was closed.
+- **D-325 · 2026-11-23 · Klaus** — **A game's settings are remembered by the platform, with the game's data.**
+  "Settings should be remembered persistently using the game platform's storage." D-321 had found FreeCell's board
+  applying the kept house rule itself, by an intent before the first move.
+  - **What:** the settings of the manifest a game was last started with on this table. The next time the game is
+    chosen it begins with them; settings given with the choice win. Kept in the game's data file beside its display
+    choices (`settings`, D-302), so they outlast a restart, travel with an export, and go with *Delete* in the Game
+    data window.
+  - **Not kept:** a setting with `"random": true` (a seed, drawn anew for every game). Kept settings that fit the game
+    no longer (another version of it) are let go without a fuss.
+  - **Changed during a game:** `POST /game/settings/remember` keeps settings of the manifest that a game lets change
+    while it runs; a board's `settings()` gets it as `remember(patch)`. Checked like any setting.
+  - **FreeCell:** *Cards may be taken back from the foundations* is a manifest setting (on to begin with), shown in the
+    lobby; the switch in the settings window during the game stays (D-310), acts by the `rule` intent and asks the
+    table to remember. The board's `applyKeptRule` and the `rules` entry in the game's data are gone; a table that
+    had switched the rule off there starts with it on once.
+  *Implementation (Claude):* `settings` in `GameDataFile`, `GameData.settings()`/`setSettings()`, `selectGame`,
+  `rememberSettings`, `rememberGameSettings` in `table.ts`. Checks: `tests/remembered-settings.test.ts`,
+  `scripts/e2e/freecell.py`.
+- **D-326 · 2026-11-23 · Klaus** — **The settings window asks the running game for its items.** "Ok, do this
+  optimization, but for all games for consistency. Make a note in the README if this is relevant for future game
+  development. We may add a section about how to handle game platform and game specific settings. I believe that does
+  not apply for the DevSettings."
+  - **Before:** the board called `settings()` exported by the game's module, which is not the game that runs: it had no
+    view, no way to act and no store. FreeCell, Backgammon, GE150 Pro and FM-1 Synth each kept their running game in a
+    file-level variable for it.
+  - **Now:** the object `mount` returns may have `settings({ info, setPrefs, confirm, remember })`, and the board asks
+    it first. The module's export is still asked when no game is mounted, so nothing breaks; a table with an older
+    platform asks only the export.
+  - **An item may name a manifest setting** (`setting: "key"`): the locked row of that setting is then left out during
+    the game, since the item is its control.
+  - **All four games** move their items to the running game and drop the variable: FreeCell here, the three others in
+    their repositories once tables have this platform (a table with an older one would show none of their items).
+  - **Documented:** the developer guide's new part *Settings: the table's and the game's* (the table's settings, the
+    game's manifest settings, the game's own items; where each is kept; the developer settings are the platform's
+    alone), and a pointer at the top of the README.
+  *Implementation (Claude):* `openSettings()` in `board.js`; `games/freecell/board.js`. Checks:
+  `scripts/e2e/freecell.py` (the house rule's switch, the deal number), `scripts/e2e/play.py` settings.

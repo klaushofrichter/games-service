@@ -379,9 +379,9 @@ export function mount(root, ctx) {
     destroy() { /* stop timers, remove listeners */ },
     whenIdle() { return Promise.resolve(); }, // optional: resolves once everything sent so far has been shown
     gesture(seat, data) { /* optional: a phone's live gesture, e.g. a card being slung (section 10) */ },
+    settings({ info, setPrefs, confirm, remember }) { return []; }, // optional: the game's items in the settings window
   };
 }
-export function settings({ info, setPrefs, confirm }) { return []; } // optional: items for the board's settings window
 ```
 
 - **The surface** is 1920 × 1080 logical pixels, scaled to the screen; `root` covers it. Seats sit around the edges
@@ -416,7 +416,9 @@ export function settings({ info, setPrefs, confirm }) { return []; } // optional
   turned back before it is used.
 - **Skipping a wait:** list timer ids in `skipTimers`; `ctx.skipTimer(id)` fires it now when `info.boardControl` is
   true (not while the game is paused) and resolves with `{ ok, reason }`. Use it for a pause on a result ("Next hand").
-- **Settings:** `settings({ info, setPrefs })` returns items `{ type: "toggle" | "choice" | "swatches" | "button" |
+- **Settings:** the object `mount` returns may have `settings({ info, setPrefs, confirm, remember })`: the board asks
+  the game that runs on it, which knows its view and can act (*Settings: the table's and the game's* below says what
+  belongs where). It returns items `{ type: "toggle" | "choice" | "swatches" | "button" |
   "text", label, value, options, onChange }`: a `choice` takes `options: [{ value, label, hint? }]` (a pulldown above three; the chosen option's `hint` shows under it),
   `swatches` takes `options: ["#rrggbb", …]`, a `button` shows `action` (or `label`) and calls `onChange()`, a
   `text` only shows its `value` (e.g. a board's seed), and a `number` shows its `value` and opens the board's number pad
@@ -429,6 +431,33 @@ export function settings({ info, setPrefs, confirm }) { return []; } // optional
 - **Performance:** the board may be a modest PC driving a large screen. Avoid endless CSS animations on large layers
   and rebuilding big SVG or DOM trees per frame; split static and moving layers, update only what changed, and move
   pieces with transforms or the Web Animations API (one animation along the whole path, not a step per frame).
+
+### Settings: the table's and the game's
+
+The gear on the board opens one window. What is in it comes from three places, and a game only writes the last two.
+
+| | Whose | Set | Kept |
+| --- | --- | --- | --- |
+| **The table's settings**: sound and volume, fullscreen, the pointer, the screensaver, player colours, the table's rules (an away player replaced by an AI, AI play styles) | the platform's | on the board, any time | by the platform (the table, or this screen's browser) |
+| **The game's settings**: `settings` in the manifest (section 4): how long, how many points, a variant, a house rule | the game's, drawn by the platform | on the board before the start; locked while the game runs | by the platform, per game: the next game begins with what the last one used |
+| **The game's own items**: what `settings()` returns: display choices, things to do (*Deal number*, *Connect again*), a rule that may change during a game | the game's | on the board during the game | display choices with `setPrefs`; a manifest setting with `remember`; anything else in the game's data (section *Data the game keeps on the table*) |
+
+- **A game stores nothing of the table's settings and draws none of them.** It reads what it needs from `info`
+  (`info.sound`, `info.rotation`, `info.prefs`) and uses the kit (`playSound`, `seatPlates`).
+- **Rules go in the manifest.** A setting there reaches `setup(ctx, settings)` and the log, shows in the lobby and on
+  the phones' Rules sheet, and is remembered by the table without the game doing anything. A setting with
+  `"random": true` (a seed) is drawn anew for every game and not remembered.
+- **`settings()` belongs to the running game.** Put it on the object `mount` returns: it then has the view, `ctx.act`
+  and `ctx.store` at hand. (A function `settings` exported by the module is still asked when no game is mounted, and
+  by tables with an older platform; a game needs no file-level variable to reach its running game any more.)
+- **Looks are prefs, not rules.** `setPrefs({ theme: "night" })` keeps a display choice for this game on the table;
+  boards and phones get it as `info.prefs`. It never changes what the rules do, and it is not in the log.
+- **A rule that may change while the game runs** is still a manifest setting, so that the table can begin the next game
+  with it. Its item names the setting, acts, and asks the table to remember it:
+  `{ type: "toggle", setting: "takeBack", label, value: view.takeBack, onChange: async (on) => { if ((await ctx.act(seat, "rule", { takeBack: on })).ok) remember({ takeBack: on }); } }`.
+  The locked row of that setting is left out while the item is there. FreeCell's house rule is the example.
+- **The developer settings** (the tools button › Advanced) are the platform's alone: games without a player at the
+  table, play from the board, the Game Viewer, simulations. A game adds nothing there and need not know them.
 
 ### Badges on seat plates
 
