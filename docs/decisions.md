@@ -2902,3 +2902,22 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   *Implementation (Claude):* `apps/table-host/src/screen-options.ts`, `screen` in `TableConfig`/`LobbyState`,
   `applyStartOptions()` in `board.js`, `launch.ts`, `main.ts`. Checks: `tests/start-options.test.ts`,
   `scripts/e2e/start_options.py`, `scripts/e2e/board_screen.py`.
+- **D-320 · 2026-11-23 · Klaus** — **The website has a page of questions and answers, `/faq`.** "I would like to add
+  a FAQ page to the landing page, as separate page. It can be a long list for now, with three sections: Getting
+  started, Developer Knowledge, Gameplay - for specific games." Klaus gave the first questions and their answers
+  (whether a game service is needed, joining the existing one, a local installation, whether a real table is needed;
+  changing the games, pull requests, a new game mentioned on the site), and left it to Claude to add what users and
+  developers may ask.
+  - **A third page from the same file** (D-312): `<!--faq-->…<!--/faq-->` in `home.html`, with the shared styles, top
+    bar and foot. "FAQ" is in the top bar of all three pages, "Questions and answers" in the foot.
+  - **One long list**, three groups with a link to each at the top; every question has its own anchor (`#faq-…`), so
+    an answer can be linked.
+  - **Contact is a GitHub issue**, as elsewhere on the site (access codes, game repositories): no e-mail address on
+    the page.
+  - **Added by Claude:** phones need no app, what it costs, start options; what a game is, games in your own
+    repository, testing alone, which AI agent; an away player, FreeCell's solvable deals and card designs, how a card
+    is played in Last Card. Klaus's "all games can be used with a single player and AI" reads "most games", since
+    FreeCell has no AI players.
+  *Implementation (Claude):* `SITE_PAGES`, `sitePage()` in `apps/cloud/src/server.ts`; `home.html`. Checks:
+  `tests/website.test.ts` (the page, its groups, every inner link has its place), `scripts/e2e/website.py` (both
+  widths, links).

@@ -36,12 +36,15 @@ const PUBLIC_DIR = fileURLToPath(new URL("../public/", import.meta.url));
 const HOME_PAGE = fileURLToPath(new URL("../public/home.html", import.meta.url));
 
 /**
- * One of the website's two pages (D-312), both cut from home.html: what stands between `<!--home-->` and `<!--/home-->`
- * is the landing page's only, between `<!--build-->` and `<!--/build-->` the developers' page's only.
+ * One of the website's pages (D-312, D-320), all cut from home.html: what stands between `<!--home-->` and
+ * `<!--/home-->` is the landing page's only, between `<!--build-->` and `<!--/build-->` the developers' page's only,
+ * between `<!--faq-->` and `<!--/faq-->` the questions and answers' only. The rest (styles, top bar, footer) is shared.
  */
-export function sitePage(source: string, page: "home" | "build"): string {
-  const other = page === "home" ? "build" : "home";
-  return source.replace(new RegExp(`<!--${other}-->[\\s\\S]*?<!--/${other}-->`, "g"), "").replace(/<!--\/?(?:home|build)-->/g, "");
+export const SITE_PAGES = { "/": "home", "/build": "build", "/faq": "faq" } as const;
+export type SitePage = (typeof SITE_PAGES)[keyof typeof SITE_PAGES];
+export function sitePage(source: string, page: SitePage): string {
+  const others = Object.values(SITE_PAGES).filter((x) => x !== page).join("|");
+  return source.replace(new RegExp(`<!--(${others})-->[\\s\\S]*?<!--/\\1-->`, "g"), "").replace(/<!--\/?(?:home|build|faq)-->/g, "");
 }
 
 /** A page of the website, compressed for a browser that takes it (the landing page is 150 KB of text, 40 KB compressed). */
@@ -639,8 +642,8 @@ export function startCloud(o: CloudOptions) {
         return res.end();
       }
       if (await auth.handle(req, res, p)) return;
-      if (m === "GET" && (p === "/" || p === "/build")) {
-        // The public website (D-176), its landing page and the developers' page (D-312); "/" is also where logout lands (200, never a bounce to Google) when the console has no
+      if (m === "GET" && p in SITE_PAGES) {
+        // The public website (D-176), its landing page, the developers' page (D-312) and the questions and answers (D-320); "/" is also where logout lands (200, never a bounce to Google) when the console has no
         // host of its own. The admin sign-in is a small link in the top right corner; with CONSOLE_URL this host can't
         // see the session, so it is a plain link to the console's host.
         const signedIn = consoleHost ? null : auth.session(req);
@@ -654,7 +657,7 @@ export function startCloud(o: CloudOptions) {
               : `<a id="admin-link" href="/admin">Admin</a>`;
         // The version label is part of the public page (and checked by the deploy's smoke test).
         const preview = o.previewBanner === false ? "" : `<div class="preview-sash" role="note" aria-label="Preview: Game Table is not live yet"><span>PREVIEW / DRAFT<small>NOT LIVE YET</small></span></div>`;
-        const html = sitePage(await readFile(HOME_PAGE, "utf8"), p === "/build" ? "build" : "home").replace("{{admin}}", admin).replace("{{note}}", note).replace("{{preview}}", preview).replace("{{version}}", versionLabel());
+        const html = sitePage(await readFile(HOME_PAGE, "utf8"), SITE_PAGES[p as keyof typeof SITE_PAGES]).replace("{{admin}}", admin).replace("{{note}}", note).replace("{{preview}}", preview).replace("{{version}}", versionLabel());
         return sendHtml(req, res, html);
       }
       if (m === "GET" && (match = p.match(/^\/site\/([a-z0-9-]+)\.(webp|png|svg|jpg)$/))) {

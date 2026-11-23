@@ -51,6 +51,31 @@ try:
         b = p.chromium.launch()
         # The developers' page (D-312), at both widths: every picture loads, nothing sticks out sideways, every part
         # shows itself, and the page's text comes compressed.
+        # The questions and answers (D-320), at both widths: its three groups, nothing sticks out sideways, every link
+        # has a place to go, and the top bar marks the page.
+        for width, height in [(1440, 900), (390, 844)]:
+            page = b.new_page(viewport={"width": width, "height": height})
+            watch(page, f"faq {width}")
+            page.goto(BASE + "/faq")
+            page.wait_for_selector("#faq h2")
+            page.evaluate("document.documentElement.style.scrollBehavior = 'auto'")
+            assert page.locator(".faq-group").count() == 3 and page.locator(".qa").count() >= 10, "the questions are not there"
+            for y in range(0, page.evaluate("document.body.scrollHeight"), 500):
+                page.evaluate(f"window.scrollTo(0, {y})")
+                page.wait_for_timeout(120)
+            wide = page.evaluate("document.documentElement.scrollWidth - innerWidth")
+            assert wide <= 0, f"the questions' page scrolls sideways by {wide}px at {width}px"
+            hidden = page.evaluate("[...document.querySelectorAll('.rv')].filter((e) => getComputedStyle(e).opacity === '0').length")
+            assert hidden == 0, f"faq: {hidden} elements never revealed at {width}px"
+            check_links(page, f"/faq at {width}px")
+            page.evaluate("window.scrollTo(0, 0)")
+            page.wait_for_timeout(300)
+            page.screenshot(path=os.path.join(OUT, f"website-faq-{width}.png"))
+            if width == 1440:
+                assert page.get_attribute("nav.main a.on", "href") == "/faq"
+                page.click(".faq-toc a >> text=Gameplay")
+                page.wait_for_function("document.getElementById('faq-play').getBoundingClientRect().top < innerHeight / 2")
+            page.close()
         for width, height in [(1440, 900), (390, 844)]:
             page = b.new_page(viewport={"width": width, "height": height})
             watch(page, f"build {width}")
