@@ -3113,10 +3113,16 @@ function showSaver() {
   saverTick = setInterval(tick, 1000);
   saverEl.getBoundingClientRect(); // start the fade from transparent
   saverEl.classList.add("on");
+  tellResting(true);
   // Once black, stop painting the board underneath (its animations, a game's canvas).
   saverEl.addEventListener("transitionend", () => saverEl && document.documentElement.classList.add("gt-saver-dark"), { once: true });
 }
+/** The phones at the table rest with the board (D-328); a remote board is someone's own screen and says nothing. */
+function tellResting(on) {
+  if (!REMOTE) act("POST", "/board/resting", { on }).catch(() => {});
+}
 function hideSaver() {
+  if (saverEl) tellResting(false);
   clearInterval(saverTick);
   saverEl?.remove();
   saverEl = null;
@@ -3151,6 +3157,8 @@ function setScreensaver(on) {
   lastInput = Date.now();
   scheduleSaver();
 }
+// A board that was reloaded (or started anew) while the table thought it rested: it rests no more (D-328).
+if (!IN_PLAY && !REMOTE) onState(() => state?.boardResting && !saverEl && tellResting(false));
 if (!IN_PLAY) {
   for (const type of ["pointerdown", "pointermove", "pointerup", "mousedown", "mouseup", "click", "keydown", "wheel", "touchstart", "touchend"]) {
     window.addEventListener(type, (e) => {

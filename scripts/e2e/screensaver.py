@@ -10,7 +10,7 @@
 """
 import os, sys
 from playwright.sync_api import sync_playwright
-from common import errors, start_table, watch
+from common import api, errors, join_deck, start_table, watch
 
 OUT = sys.argv[1] if len(sys.argv) > 1 else "e2e-out"
 os.makedirs(OUT, exist_ok=True)
@@ -18,7 +18,8 @@ PORT = 8149
 HOME = f"http://127.0.0.1:{PORT}"
 CHROMIUM = os.environ.get("CHROMIUM_PATH")
 
-proc = start_table(PORT, TABLE_KEY="saver-e2e-key")
+proc = start_table(PORT, TABLE_KEY="saver-e2e-key", PUBLIC_URL=HOME)
+A = lambda m, path: api(m, path, base=HOME, key="saver-e2e-key")
 try:
     with sync_playwright() as p:
         br = p.chromium.launch(**({"executable_path": CHROMIUM} if CHROMIUM else {}))
@@ -59,6 +60,42 @@ try:
         page.keyboard.press("Shift")
         assert saver.count() == 0, "a key did not end the screensaver"
         page.wait_for_timeout(800)  # the rest of the waking input is swallowed for a moment
+
+        # The phones at the table rest with the board (D-328): a clock and a line saying the board rests. A touch on
+        # the phone wakes the phone only (the touch presses nothing); a minute later it rests again; the board waking
+        # wakes every phone. A remote player's phone does not rest.
+        phone = br.new_page(viewport={"width": 390, "height": 844}, has_touch=True)
+        watch(phone, "phone")
+        phone.clock.install()
+        join_deck(phone, A("GET", "/join")["url"], "Ann")
+        rest = phone.locator("#phone-rest")
+        assert rest.count() == 0, "the phone rests while the board is awake"
+        page.clock.run_for("01:01:00")
+        page.wait_for_selector("#gt-saver.on")
+        phone.wait_for_selector("#phone-rest.on", timeout=10000)
+        assert "board is resting" in phone.locator("#phone-rest .why").inner_text()
+        assert phone.locator("#phone-rest .time").inner_text().strip(), "the phone's screensaver shows no clock"
+        phone.wait_for_timeout(2500)  # (the fade to black runs in real time)
+        assert phone.evaluate("() => getComputedStyle(document.getElementById('phone-rest')).opacity") == "1", "the phone's screensaver is not black"
+        assert phone.locator("#phone-rest .time").evaluate("(e) => e.getBoundingClientRect().height") < 100, "the clock wraps onto two lines"
+        phone.screenshot(path=os.path.join(OUT, "screensaver-phone.png"))
+        ready = phone.locator("#ready")
+        box = ready.bounding_box() if ready.count() else None
+        phone.mouse.click(box["x"] + 10, box["y"] + 10) if box else phone.mouse.click(195, 420)
+        assert rest.count() == 0, "a touch did not wake the phone"
+        assert page.locator("#gt-saver").count() == 1, "a touch on the phone woke the board"
+        phone.wait_for_timeout(300)
+        assert not any(p.get("ready") for p in A("GET", "/state")["players"]), "the waking touch also pressed Ready"
+        phone.clock.run_for("00:50")
+        assert rest.count() == 0, "the phone rested again before a minute"
+        phone.clock.run_for("00:15")
+        phone.wait_for_selector("#phone-rest.on")
+        # The board wakes: so does the phone.
+        page.keyboard.press("Shift")
+        phone.wait_for_selector("#phone-rest", state="detached", timeout=10000)
+        assert page.locator("#gt-saver").count() == 0
+        phone.close()
+        page.wait_for_timeout(800)
 
         # Off in the settings: nothing after hours; kept after a reload.
         page.click("#settings-button")

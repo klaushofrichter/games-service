@@ -263,6 +263,7 @@ export class Table extends EventEmitter {
       noSeat: this.noFreeSeat(),
       suggestedName: this.suggestedName(),
       localTable: this.localTable,
+      ...(this.boardResting ? { boardResting: true } : {}),
       checkouts: this.checkouts,
       remote: {
         boardControl: this.remoteBoardControl,
@@ -1984,6 +1985,8 @@ export class Table extends EventEmitter {
   private boardShown = 0; // the last one it reported as shown
   private boardSentAt = 0;
   private localBoard = false;
+  /** The table's own board shows its screensaver (D-328). */
+  private boardResting = false;
   /** The number for the next game message to the boards. */
   nextBoardMessage() {
     this.boardSent++;
@@ -1996,9 +1999,16 @@ export class Table extends EventEmitter {
     this.boardShown = n;
     this.emit("boardShown", n);
   }
+  /** The table's own board starts or ends its screensaver (D-328); the phones at the table hear of it. */
+  setBoardResting(on: boolean) {
+    if (this.boardResting === on) return;
+    this.boardResting = on;
+    this.changed();
+  }
   /** Whether a local board is connected. */
   setLocalBoard(connected: boolean) {
     this.localBoard = connected;
+    if (!connected && this.boardResting) this.setBoardResting(false); // (a board that is gone rests no more)
     if (!connected) {
       this.boardShown = this.boardSent;
       this.emit("boardShown", this.boardShown);
