@@ -3082,3 +3082,21 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
      shows; one loop applies a start. Another option is one line in each.
   Checks: `scripts/e2e/touch_scroll.py`, `board_deck.py`, `start_options.py`, `screensaver.py`, `freecell.py`,
   `viewer.py`; `tests/start-options.test.ts`.
+- **D-328 · 2026-11-25 · Klaus** — **The phones at the table rest with the board.** "When the game board enters
+  screensaver mode, and there are connected decks (phones), these should also show a screensaver: a similar clock,
+  moving around, plus the notice that the board is in screensaver mode. When touching the deck, the phone screensaver
+  goes away, but the board screensaver stays on, and the phone goes again into screensaver mode after a minute. When
+  the board screensaver goes away, the phone screensavers should also go away."
+  - **The board says it.** The table's own board tells the table when its screensaver (D-298) starts and ends
+    (`POST /board/resting`); the lobby state carries `boardResting` to the phones. A board that was reloaded while the
+    table thought it rested says it rests no more; when the table's last own board goes, it rests no more either. A
+    remote board is someone's own screen and says nothing.
+  - **The phone:** black, with a dim clock and the date drifting slowly across it (a few pixels a second, light on the
+    battery) and the line "The board is resting. Touch the board to wake it, or this phone to use it." A touch wakes
+    the phone only: the board stays dark, and the touch presses nothing under it. After a minute without a touch or a
+    scroll, while the board still rests, the phone rests again. When the board wakes, every phone does.
+  - **Not:** a remote player's phone (not at the table) and the deck beside the board (it is on the board's screen).
+  - The phone's own screen lock is the phone's: a page cannot keep it on or turn it off.
+  *Implementation (Claude):* `setBoardResting` in `table.ts`, `boardResting` in the lobby state, `tellResting()` in
+  `board.js`, `phoneRests()` in `deck.js`, `#phone-rest` in `deck.css`. Checks: `tests/board-resting.test.ts`,
+  `scripts/e2e/screensaver.py`.

@@ -362,6 +362,8 @@ export interface LobbyState {
   checkouts: { name: string; path?: string; branch: string; commit: string; changed: boolean; games: string[]; platform?: boolean }[];
   /** A table of scripts/local-table.sh (LOCAL_TABLE=1, D-251): the board says once that it is local. */
   localTable: boolean;
+  /** The table's own board shows its screensaver (D-328): phones at the table rest too. */
+  boardResting?: boolean;
 }
 
 export interface CloudStatus {

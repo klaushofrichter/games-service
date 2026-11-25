@@ -216,6 +216,7 @@ function connect(hello) {
       // The name the player gave, as the table took it (trimmed, cut to its length).
       if (keepName && !removed && self()) (ownName.set(self().name), (keepName = false));
       if (state.phase !== "active" && state.phase !== "paused") gameMsg = null;
+      phoneRests(!!state.boardResting);
     } else if (m.ch === "store" && m.type === "changed") {
       game?.store?.changed(m.payload); // the game's data on the table changed (D-302)
     } else if (m.ch === "game" && m.type === "view") {
@@ -820,4 +821,91 @@ function fetchSuggested() {
       if (field && !field.value) field.value = suggested;
     })
     .catch(() => {});
+}
+
+// ---------- resting with the board (D-328) ----------
+/**
+ * While the table's own board shows its screensaver, a phone at the table rests too: black, with a dim clock drifting
+ * slowly across it and a line saying that the board rests. A touch brings this phone back (and does nothing else); the
+ * board stays dark, and after a minute without a touch here the phone rests again. When the board wakes, every phone
+ * does. A remote player's phone and the deck beside the board (it is on the board's own screen) don't rest.
+ */
+const PHONE_REST_AFTER_MS = 60 * 1000;
+let boardResting = false;
+let restEl = null;
+let restTick = 0;
+let restTimer = 0;
+let restSwallowUntil = 0;
+function phoneRests(on) {
+  if (REMOTE || BOARD) return;
+  if (on === boardResting) return;
+  boardResting = on;
+  clearTimeout(restTimer);
+  if (on) showRest();
+  else hideRest();
+}
+function showRest() {
+  if (restEl) return;
+  restEl = document.createElement("div");
+  restEl.id = "phone-rest";
+  restEl.innerHTML = `<div class="clock"><div class="time"></div><div class="date"></div><div class="why">The board is resting. Touch the board to wake it, or this phone to use it.</div></div>`;
+  document.body.appendChild(restEl);
+  const clock = restEl.firstElementChild;
+  const pos = { x: innerWidth / 2, y: innerHeight / 2, vx: 1.2, vy: 1.6 };
+  let shown = "";
+  const tick = () => {
+    const now = new Date();
+    const text = now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    if (text !== shown) {
+      shown = text;
+      clock.querySelector(".time").textContent = text;
+      clock.querySelector(".date").textContent = now.toLocaleDateString([], { weekday: "long", day: "numeric", month: "long" });
+    }
+    // Drift, turning back at the screen's edges (a few pixels a second: light on the battery).
+    const hw = clock.offsetWidth / 2, hh = clock.offsetHeight / 2;
+    const maxX = Math.max(hw, innerWidth - hw), maxY = Math.max(hh, innerHeight - hh);
+    pos.x += pos.vx;
+    pos.y += pos.vy;
+    if (pos.x <= hw || pos.x >= maxX) pos.vx = -pos.vx;
+    if (pos.y <= hh || pos.y >= maxY) pos.vy = -pos.vy;
+    pos.x = Math.min(maxX, Math.max(hw, pos.x));
+    pos.y = Math.min(maxY, Math.max(hh, pos.y));
+    clock.style.transform = `translate(${Math.round(pos.x)}px, ${Math.round(pos.y)}px) translate(-50%, -50%)`;
+  };
+  tick();
+  restTick = setInterval(tick, 1000);
+  restEl.getBoundingClientRect(); // fade in from transparent
+  restEl.classList.add("on");
+}
+function hideRest() {
+  clearInterval(restTick);
+  restEl?.remove();
+  restEl = null;
+}
+/** Any touch or key on this phone: it wakes, and rests again after a minute without one while the board still rests. */
+function phoneInput(e) {
+  if (!boardResting) return;
+  if (restEl) {
+    hideRest();
+    // The touch that wakes the phone is only that: it presses nothing under it.
+    restSwallowUntil = Date.now() + 700;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+  } else if (restSwallowUntil > Date.now() && e.type !== "pointermove") {
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    return;
+  }
+  clearTimeout(restTimer);
+  restTimer = setTimeout(() => boardResting && showRest(), PHONE_REST_AFTER_MS);
+}
+if (!REMOTE && !BOARD) {
+  for (const type of ["pointerdown", "pointerup", "click", "keydown", "touchstart", "touchend", "wheel"]) {
+    window.addEventListener(type, (e) => {
+      // A release or click doesn't wake the phone on its own; it ends a touch that did, or is swallowed after one.
+      if (/^(pointerup|click|touchend)/.test(type) && !restEl && restSwallowUntil <= Date.now()) return;
+      phoneInput(e);
+    }, { capture: true, passive: false });
+  }
+  addEventListener("scroll", () => boardResting && !restEl && phoneInput({ type: "scroll", preventDefault() {}, stopImmediatePropagation() {} }), { passive: true, capture: true });
 }
