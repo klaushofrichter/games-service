@@ -366,6 +366,8 @@ export function startServer(table: Table, logs: LogStore, opts: ServerOptions) {
       setTimeout(quit, 300);
       return json(res, 200, { ok: true, quitting: true });
     }
+    // The table's own board starts or ends its screensaver (D-328); never a remote board (that is someone's own screen).
+    if (m === "POST" && path === "/board/resting" && !remote) return (table.setBoardResting(body.on === true), ok());
     if (m === "POST" && path === "/remote") return (table.setRemoteBoardControl(!!body.boardControl), ok());
     if (m === "POST" && path === "/invites") {
       if (!opts.createInvite) throw new TableError(409, "remote play needs the Game Table service (CLOUD_URL)");
