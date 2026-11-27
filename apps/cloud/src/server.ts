@@ -39,9 +39,12 @@ const SITE_PAGES_DIR = fileURLToPath(new URL("../public/site-pages/", import.met
  * The website's pages (D-312, D-320), each a file of its own in public/site-pages/ (D-323): the landing page, the
  * developers' page and the questions and answers. shell.html there is what they share: the styles of the one look,
  * the top bar, the foot and the script every page uses. A page's file has its title and description, the styles and
- * the script only it needs, and its `<main>`, so no page carries another's.
+ * the script only it needs, and its `<main>`, so no page carries another's. "/build-the-table" (D-329) is served but
+ * not linked yet.
  */
-export const SITE_PAGES = { "/": "home", "/build": "build", "/faq": "faq" } as const;
+export const SITE_PAGES = { "/": "home", "/build": "build", "/faq": "faq", "/build-the-table": "table" } as const;
+/** Pages that are served but not linked from the top bar or the foot yet (D-329). */
+export const SITE_UNLISTED: SitePath[] = ["/build-the-table"];
 export type SitePath = keyof typeof SITE_PAGES;
 
 /** The top bar's links, the same on every page (D-323). "#x" is a place on the landing page; the others are pages. */

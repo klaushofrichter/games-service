@@ -3100,3 +3100,25 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   *Implementation (Claude):* `setBoardResting` in `table.ts`, `boardResting` in the lobby state, `tellResting()` in
   `board.js`, `phoneRests()` in `deck.js`, `#phone-rest` in `deck.css`. Checks: `tests/board-resting.test.ts`,
   `scripts/e2e/screensaver.py`.
+- **D-329 · 2026-11-27 · Klaus** — **A page on building the table, `/build-the-table`, not linked yet.** "We now have
+  a game table, mostly ready. I would like to prepare an extra page on the landing site that discusses how to build the
+  table. Please prepare the page, but don't link it yet. The page will have a photo gallery (perhaps 10 pictures) …
+  descriptions come later. We also replace the pics. We want to build a construction guide, and tool guide (what tools
+  are needed). There is a component list, with links to Amazon - we are going to use links that link to Amazon as
+  affiliate/partner link, so that we earn a bit. A disclaimer about that is needed."
+  - **The page** (`site-pages/table.html`, one more file in the shared shell, D-323): a gallery of ten places (three
+    photos of the table now, the rest "Photo to come"; captions empty until written; a photo opens large), the parts
+    with a column for the shop link ("link to come" for now), the tools, the construction steps in outline (marked
+    Draft: measurements and step photos to come), and the software (the package and the Linux guide's *A table of its
+    own*, `--kiosk`).
+  - **Not linked:** served at `/build-the-table` but in neither the top bar nor the foot nor any page, and marked
+    `noindex` for search engines until it is linked (`SITE_UNLISTED`). Linking it later: add it to `SITE_NAV` or the
+    foot, and drop the `noindex` line.
+  - **Affiliate links:** a disclosure beside the parts list with the wording Amazon's Associates programme asks for
+    ("as an Amazon Associate we earn from qualifying purchases"); each Amazon link is to carry `rel="sponsored
+    noopener"` and open in a new tab (the test checks both). Which programme account and tag go into the links is
+    Klaus's to give.
+  - **Photos:** made smaller for the web (1600 px and 640 px WebP, `site/table-build-*.webp`), without the camera's
+    metadata (place, device).
+  Checks: `tests/website.test.ts` (served, unlinked, `noindex`, the disclosure, Amazon links marked, ten gallery
+  places), `scripts/e2e/website.py`, and a look at 1440 and 390 px.

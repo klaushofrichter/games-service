@@ -1,0 +1,157 @@
+<!--
+title: Build the table · Game Table
+description: How to build a Game Table: a wooden table with a touchscreen set flat into its top, a small computer underneath, and phones as the players' hands. Photos, parts, tools and the steps.
+-->
+<!-- Not linked from the site yet (D-329): search engines are asked to leave it out until it is. -->
+<meta name="robots" content="noindex">
+<style>
+/* Build the table (/build-the-table, D-329): a gallery, the parts with shop links, the tools, the steps. */
+.tb { padding-top: 150px; }
+.tb-toc { display: flex; flex-wrap: wrap; gap: 10px; }
+.tb-toc a { padding: 8px 16px; border: 1px solid var(--line-2); border-radius: 999px; color: var(--ink); font-size: 15px; }
+.tb-toc a:hover { border-color: var(--brass-deep); text-decoration: none; }
+.tb-part { margin-bottom: 72px; scroll-margin-top: 90px; }
+.tb-part > h3 { font: 600 30px/1.2 var(--display); margin: 0 0 10px; color: var(--brass-hi); }
+.tb-part > p { color: var(--soft); max-width: 820px; }
+.tb-note { color: var(--faint); font-size: 15px; }
+/* the gallery: tiles that open large */
+.tb-gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; margin-top: 22px; }
+.tb-shot { margin: 0; border-radius: 14px; overflow: hidden; background: rgba(255,255,255,.03); border: 1px solid var(--line-2); }
+.tb-shot button { display: block; width: 100%; padding: 0; border: 0; background: none; cursor: zoom-in; }
+.tb-shot img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; }
+.tb-shot figcaption { padding: 10px 12px 12px; font-size: 14px; color: var(--soft); }
+.tb-shot figcaption:empty { display: none; } /* (the descriptions come later) */
+.tb-shot.empty { display: grid; place-items: center; aspect-ratio: 4 / 3; color: var(--faint); font-size: 14px; border-style: dashed; }
+.tb-view { position: fixed; inset: 0; z-index: 100; display: none; place-items: center; background: rgba(5,12,10,.9); backdrop-filter: blur(8px); padding: 24px; }
+.tb-view.open { display: grid; }
+.tb-view img { max-width: min(1600px, 100%); max-height: calc(100vh - 120px); border-radius: 10px; }
+.tb-view p { color: var(--soft); text-align: center; margin: 12px 0 0; }
+.tb-view .close { position: absolute; top: 16px; right: 16px; }
+/* parts and tools */
+.tb-table { width: 100%; max-width: 980px; border-collapse: collapse; margin-top: 18px; font-size: 16px; }
+.tb-table th { text-align: left; font: 600 12px/1 var(--text); letter-spacing: .16em; text-transform: uppercase; color: var(--brass); padding: 0 12px 10px 0; }
+.tb-table td { padding: 12px 12px 12px 0; border-top: 1px solid var(--line-2); vertical-align: top; color: var(--soft); }
+.tb-table td:first-child { color: var(--ink); font-weight: 600; }
+.tb-table .shop a { white-space: nowrap; }
+.tb-table .tbd { color: var(--faint); font-style: italic; }
+.tb-disclosure { max-width: 820px; margin-top: 18px; padding: 14px 18px; border-left: 3px solid var(--brass-deep); background: rgba(214,169,74,.06); color: var(--soft); font-size: 15px; border-radius: 0 10px 10px 0; }
+.tb-tools { columns: 2 280px; gap: 32px; max-width: 900px; color: var(--soft); padding-left: 1.1em; }
+.tb-tools li { margin: 0 0 8px; break-inside: avoid; }
+.tb-tools b { color: var(--ink); font-weight: 600; }
+/* the steps */
+.tb-steps { counter-reset: step; list-style: none; padding: 0; max-width: 860px; }
+.tb-steps > li { counter-increment: step; position: relative; padding: 18px 0 18px 64px; border-top: 1px solid var(--line-2); }
+.tb-steps > li::before { content: counter(step); position: absolute; left: 0; top: 16px; width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; font: 600 18px/1 var(--display); color: #1b1407; background: var(--brass); }
+.tb-steps h4 { font: 600 19px/1.4 var(--text); margin: 0 0 6px; color: var(--ink); }
+.tb-steps p { margin: 0 0 6px; color: var(--soft); }
+.tb-draft { display: inline-block; margin-left: 8px; padding: 2px 8px; border-radius: 999px; font: 600 11px/1.6 var(--text); letter-spacing: .1em; text-transform: uppercase; color: var(--brass); border: 1px solid var(--brass-deep); vertical-align: middle; }
+</style>
+<main>
+<!-- ============ BUILD THE TABLE ============ -->
+<section class="tb" id="build-the-table">
+  <div class="wrap">
+    <div class="section-head">
+      <p class="eyebrow rv">Build the table</p>
+      <h2 class="rv" style="--d:.06s">A touchscreen, set into a table.</h2>
+      <p class="lede rv" style="--d:.12s">The Game Table we play on: a wooden table with a touchscreen set flat into its top, a small computer underneath that runs Game Table, a power outlet and a volume knob in the side, and the players' phones as their hands. This page shows how it is built: the photos, the parts, the tools and the steps.</p>
+      <p class="tb-toc rv" style="--d:.18s"><a href="#tb-photos">Photos</a><a href="#tb-parts">Parts</a><a href="#tb-tools">Tools</a><a href="#tb-steps">Step by step</a><a href="#tb-software">The software</a></p>
+    </div>
+
+    <div class="tb-part" id="tb-photos">
+      <h3>Photos</h3>
+      <p>Tap a photo to see it large.</p>
+      <div class="tb-gallery" id="tb-gallery">
+        <figure class="tb-shot"><button type="button" data-full="/site/table-build-1.webp"><img src="/site/table-build-1-small.webp" alt="The table from above: a chess game on the touchscreen set into the wooden top, a phone in a stand beside it" loading="lazy" width="640" height="480"></button><figcaption></figcaption></figure>
+        <figure class="tb-shot"><button type="button" data-full="/site/table-build-2.webp"><img src="/site/table-build-2-small.webp" alt="The whole table: the screen in an aluminium frame in the top, the cables running down behind the legs" loading="lazy" width="640" height="480"></button><figcaption></figcaption></figure>
+        <figure class="tb-shot"><button type="button" data-full="/site/table-build-3.webp"><img src="/site/table-build-3-small.webp" alt="The table's side: a power outlet with a USB port and a round volume knob set into the wood" loading="lazy" width="640" height="480"></button><figcaption></figcaption></figure>
+        <figure class="tb-shot empty">Photo to come</figure>
+        <figure class="tb-shot empty">Photo to come</figure>
+        <figure class="tb-shot empty">Photo to come</figure>
+        <figure class="tb-shot empty">Photo to come</figure>
+        <figure class="tb-shot empty">Photo to come</figure>
+        <figure class="tb-shot empty">Photo to come</figure>
+        <figure class="tb-shot empty">Photo to come</figure>
+      </div>
+    </div>
+
+    <div class="tb-part" id="tb-parts">
+      <h3>Parts</h3>
+      <p>What went into this table. Sizes depend on the screen you choose: pick the screen first, then the table and the frame around it.</p>
+      <table class="tb-table">
+        <thead><tr><th>Part</th><th>What it does</th><th>Where to get it</th></tr></thead>
+        <tbody>
+          <tr><td>Touchscreen monitor</td><td>The board: lies flat in the table's top. A multi-touch screen with a thin, flat front works best; it is the one part to choose with care.</td><td class="shop"><span class="tbd">link to come</span></td></tr>
+          <tr><td>Small computer</td><td>Runs Game Table under the table (any small PC that runs Linux, Windows or macOS; this one runs Debian).</td><td class="shop"><span class="tbd">link to come</span></td></tr>
+          <tr><td>Table</td><td>A sturdy wooden table with a top thick enough to take the screen's opening.</td><td class="shop"><span class="tbd">link to come</span></td></tr>
+          <tr><td>Aluminium edge trim</td><td>The frame around the screen: covers the cut edge of the opening.</td><td class="shop"><span class="tbd">link to come</span></td></tr>
+          <tr><td>Desk power outlet with USB</td><td>Power at the table, set into its side.</td><td class="shop"><span class="tbd">link to come</span></td></tr>
+          <tr><td>Volume knob</td><td>Turns the table's sound up and down, set into its side.</td><td class="shop"><span class="tbd">link to come</span></td></tr>
+          <tr><td>Phone stand with charger</td><td>Keeps a phone upright and charged beside the board.</td><td class="shop"><span class="tbd">link to come</span></td></tr>
+          <tr><td>Cables</td><td>Video and USB (for touch) from the computer to the screen, power, and a network cable if the table has no Wi-Fi.</td><td class="shop"><span class="tbd">link to come</span></td></tr>
+          <tr><td>Supports for the screen</td><td>Wooden strips or brackets under the opening that carry the screen at the right height.</td><td class="shop"><span class="tbd">link to come</span></td></tr>
+          <tr><td>Cable clips and ties</td><td>Keep the cables under the table out of the way of knees and feet.</td><td class="shop"><span class="tbd">link to come</span></td></tr>
+        </tbody>
+      </table>
+      <p class="tb-disclosure" id="tb-disclosure"><b>About the shop links.</b> The links to Amazon on this page are affiliate links: as an Amazon Associate we earn from qualifying purchases. If you buy through one, we may get a small commission at no extra cost to you. It helps keep Game Table free. The parts are what we used, not the only ones that work; buy wherever you like.</p>
+    </div>
+
+    <div class="tb-part" id="tb-tools">
+      <h3>Tools</h3>
+      <p>Ordinary woodworking tools. Measure twice: the opening for the screen is the one cut that can't be undone.</p>
+      <ul class="tb-tools">
+        <li><b>Tape measure, steel ruler and square</b>, and a pencil, to mark the opening</li>
+        <li><b>Drill</b> with wood bits, to start the cut in the corners and to screw the supports</li>
+        <li><b>Jigsaw</b> with a fine wood blade, to cut the opening (or a router with a template, for the cleanest edge)</li>
+        <li><b>Hole saws</b> in the sizes of the power outlet and the volume knob</li>
+        <li><b>Clamps</b>, to hold a straight edge or the supports while you work</li>
+        <li><b>Hacksaw or mitre saw</b> with a blade for aluminium, and a <b>mitre box</b>, for the frame's corners</li>
+        <li><b>File and sandpaper</b>, for the cut edges of wood and metal</li>
+        <li><b>Screwdrivers</b></li>
+        <li><b>Masking tape</b>, to mark on and to keep the top from splintering along the cut</li>
+        <li><b>Safety glasses</b> and <b>hearing protection</b></li>
+      </ul>
+    </div>
+
+    <div class="tb-part" id="tb-steps">
+      <h3>Step by step <span class="tb-draft">Draft</span></h3>
+      <p class="tb-note">The steps in outline. Measurements, photos of each step and what we learned on the way are still to come.</p>
+      <ol class="tb-steps">
+        <li><h4>Choose the screen, then plan around it</h4><p>Measure the screen's front, its depth, and where its cables and buttons are. Decide where it sits in the top, how far its front stands above the wood (flush is nicest), and where the computer, the outlet and the knob go.</p></li>
+        <li><h4>Mark the opening</h4><p>Tape the top, then draw the opening a little larger than the screen's front so that it drops in. Check the corners with the square, and measure again.</p></li>
+        <li><h4>Cut the opening</h4><p>Drill a hole inside each corner, then cut from hole to hole along a clamped straight edge. File and sand the edges.</p></li>
+        <li><h4>Fit the supports</h4><p>Screw strips or brackets under the opening so that the screen rests at the right height and can't drop through. Leave room for its cables and for air to reach its back.</p></li>
+        <li><h4>Frame the opening</h4><p>Cut the aluminium trim with mitred corners and fit it around the opening: it covers the wood's cut edge and gives the screen a clean border.</p></li>
+        <li><h4>Outlet and volume knob</h4><p>Drill the holes in the table's side with the hole saws and fit the power outlet and the volume knob.</p></li>
+        <li><h4>The computer and the cables</h4><p>Fix the small computer under the top, connect the screen (video and touch), the knob and the power, and clip the cables along the frame, away from knees and feet.</p></li>
+        <li><h4>Put the screen in and test</h4><p>Lay the screen in, start the computer, and check that a touch lands where the finger is, in every corner.</p></li>
+      </ol>
+    </div>
+
+    <div class="tb-part" id="tb-software">
+      <h3>The software</h3>
+      <p>Install Game Table on the table's computer with the package for its system (<a href="/#download">Download</a>). The installation guide for Linux shows how to make it <a href="https://github.com/klaushofrichter/games-service/blob/main/docs/install/linux.md#a-table-of-its-own-an-icon-on-the-desktop-no-lock-log-in-by-itself" target="_blank" rel="noopener noreferrer">a table of its own</a>: it logs in by itself, starts from one icon with the board full screen (<code>--kiosk</code>), and never locks. Players join with their phones by scanning the code on the board.</p>
+    </div>
+  </div>
+</section>
+<div class="tb-view" id="tb-view" role="dialog" aria-modal="true" aria-label="Photo"><button class="btn close" type="button" id="tb-close">Close ✕</button><div><img id="tb-view-img" alt=""><p id="tb-view-text"></p></div></div>
+</main>
+<script>
+(() => {
+  "use strict";
+  // The gallery: a photo opens large; Close, a tap beside it or Escape closes it.
+  const view = document.getElementById("tb-view"), img = document.getElementById("tb-view-img"), text = document.getElementById("tb-view-text");
+  const close = () => view.classList.remove("open");
+  document.getElementById("tb-gallery").addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-full]");
+    if (!b) return;
+    const small = b.querySelector("img");
+    img.src = b.dataset.full;
+    img.alt = small.alt;
+    text.textContent = b.parentElement.querySelector("figcaption")?.textContent ?? "";
+    view.classList.add("open");
+  });
+  document.getElementById("tb-close").addEventListener("click", close);
+  view.addEventListener("click", (e) => e.target === view && close());
+  addEventListener("keydown", (e) => e.key === "Escape" && close());
+})();
+</script>
