@@ -8,6 +8,7 @@ history.
 
 ## [Unreleased]
 
+- Website, the table page (not linked yet): the photos in a stack with arrows and swipe, and a banner photo at half height (D-330).
 - Website: a page on building the table (`/build-the-table`): photos, parts with shop links to come, tools and the steps in outline; not linked yet and not for search engines (D-329).
 - Phones at the table rest with the board: while the board shows its screensaver, they show a dim drifting clock and say that the board rests; a touch wakes the phone for a minute, and they wake with the board (D-328).
 - Website: each page is a file of its own in one shared shell, and carries only its own styles and script; the look is unchanged. Compressed, the landing page went from 32 KB to 28 KB, the developers' page from 32 KB to 20 KB, the questions and answers from 26 KB to 10 KB (D-323).

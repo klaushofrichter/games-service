@@ -167,7 +167,8 @@ describe("the public website (D-176)", () => {
     // The shop links: the disclosure is on the page, and any Amazon link is marked as sponsored and opens apart.
     expect(table).toContain("as an Amazon Associate we earn from qualifying purchases");
     for (const [a] of table.matchAll(/<a\b[^>]*href="https:\/\/(?:www\.)?amazon\.[^"]*"[^>]*>/g)) expect(a, a).toMatch(/rel="sponsored[^"]*"/);
-    expect(table.match(/class="tb-shot/g)).toHaveLength(10); // ten photos (some still to come)
+    expect(table.match(/class="tb-shot/g)).toHaveLength(10); // ten photos (some still to come), in a stack (D-330)
+    expect(table).toContain('class="tb-hero"'); // and one as the banner
     // A page's own styles and script follow the shared ones; no page carries another's.
     const own = (page: string) => (page.match(/<style>/g)!.length > 1 ? cut(page, "<style>", "</style>", 1) : "");
     expect(own(pages["/"]!)).toContain(".hero-pin {");

@@ -6,7 +6,7 @@ description: How to build a Game Table: a wooden table with a touchscreen set fl
 <meta name="robots" content="noindex">
 <style>
 /* Build the table (/build-the-table, D-329): a gallery, the parts with shop links, the tools, the steps. */
-.tb { padding-top: 150px; }
+.tb { padding-top: 40px; }
 .tb-toc { display: flex; flex-wrap: wrap; gap: 10px; }
 .tb-toc a { padding: 8px 16px; border: 1px solid var(--line-2); border-radius: 999px; color: var(--ink); font-size: 15px; }
 .tb-toc a:hover { border-color: var(--brass-deep); text-decoration: none; }
@@ -14,14 +14,32 @@ description: How to build a Game Table: a wooden table with a touchscreen set fl
 .tb-part > h3 { font: 600 30px/1.2 var(--display); margin: 0 0 10px; color: var(--brass-hi); }
 .tb-part > p { color: var(--soft); max-width: 820px; }
 .tb-note { color: var(--faint); font-size: 15px; }
-/* the gallery: tiles that open large */
-.tb-gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; margin-top: 22px; }
-.tb-shot { margin: 0; border-radius: 14px; overflow: hidden; background: rgba(255,255,255,.03); border: 1px solid var(--line-2); }
+/* the hero: one photo across the page, half the window's height */
+.tb-hero { position: relative; height: max(280px, 50vh); overflow: hidden; background: #0b1714; }
+.tb-hero img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.tb-hero::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(10,29,25,.9) 0, rgba(10,29,25,.6) 80px, rgba(10,29,25,0) 32%, rgba(10,29,25,0) 60%, var(--felt-deep) 100%); } /* (dark under the top bar, so its links read on any photo) */
+/* the photos: a stack, one at a time; the arrows, a swipe or the keys go left and right */
+.tb-stack { position: relative; margin-top: 22px; max-width: 980px; outline: none; }
+.tb-frame { position: relative; overflow: hidden; border-radius: 16px; border: 1px solid var(--line-2); background: rgba(255,255,255,.03); touch-action: pan-y; user-select: none; -webkit-user-select: none; }
+.tb-track { display: flex; transition: transform .35s ease; }
+.tb-track.dragging { transition: none; }
+.tb-shot { flex: 0 0 100%; margin: 0; }
 .tb-shot button { display: block; width: 100%; padding: 0; border: 0; background: none; cursor: zoom-in; }
-.tb-shot img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; }
-.tb-shot figcaption { padding: 10px 12px 12px; font-size: 14px; color: var(--soft); }
-.tb-shot figcaption:empty { display: none; } /* (the descriptions come later) */
-.tb-shot.empty { display: grid; place-items: center; aspect-ratio: 4 / 3; color: var(--faint); font-size: 14px; border-style: dashed; }
+.tb-shot img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; pointer-events: none; }
+.tb-shot.empty { display: grid; place-items: center; aspect-ratio: 4 / 3; color: var(--faint); font-size: 16px; }
+.tb-nav { position: absolute; top: 50%; transform: translateY(-50%); width: 52px; height: 52px; border-radius: 50%; border: 1px solid var(--line-2); background: rgba(10,29,25,.72); backdrop-filter: blur(6px); color: var(--ink); font-size: 26px; line-height: 1; cursor: pointer; display: grid; place-items: center; }
+.tb-nav:hover { border-color: var(--brass-deep); }
+.tb-nav:disabled { opacity: .3; cursor: default; }
+.tb-prev { left: 12px; }
+.tb-next { right: 12px; }
+.tb-below { display: flex; align-items: baseline; gap: 16px; margin-top: 12px; min-height: 1.6em; }
+.tb-caption { flex: 1; margin: 0; color: var(--soft); font-size: 15px; }
+.tb-count { color: var(--faint); font-size: 14px; font-variant-numeric: tabular-nums; }
+.tb-dots { display: flex; gap: 8px; justify-content: center; margin-top: 12px; }
+.tb-dots button { width: 10px; height: 10px; padding: 0; border-radius: 50%; border: 0; background: var(--line-2); cursor: pointer; }
+.tb-dots button[aria-current="true"] { background: var(--brass); }
+@media (max-width: 640px) { .tb-nav { width: 42px; height: 42px; font-size: 22px; } .tb-prev { left: 6px; } .tb-next { right: 6px; } }
+@media (prefers-reduced-motion: reduce) { .tb-track { transition: none; } }
 .tb-view { position: fixed; inset: 0; z-index: 100; display: none; place-items: center; background: rgba(5,12,10,.9); backdrop-filter: blur(8px); padding: 24px; }
 .tb-view.open { display: grid; }
 .tb-view img { max-width: min(1600px, 100%); max-height: calc(100vh - 120px); border-radius: 10px; }
@@ -48,6 +66,8 @@ description: How to build a Game Table: a wooden table with a touchscreen set fl
 </style>
 <main>
 <!-- ============ BUILD THE TABLE ============ -->
+<!-- The banner: one photo, half the window's height (a photo of its own comes later, D-330). -->
+<div class="tb-hero"><img src="/site/table-build-1.webp" alt="The Game Table: a wooden table with a touchscreen set into its top, a chess game on it" fetchpriority="high"></div>
 <section class="tb" id="build-the-table">
   <div class="wrap">
     <div class="section-head">
@@ -59,18 +79,26 @@ description: How to build a Game Table: a wooden table with a touchscreen set fl
 
     <div class="tb-part" id="tb-photos">
       <h3>Photos</h3>
-      <p>Tap a photo to see it large.</p>
-      <div class="tb-gallery" id="tb-gallery">
-        <figure class="tb-shot"><button type="button" data-full="/site/table-build-1.webp"><img src="/site/table-build-1-small.webp" alt="The table from above: a chess game on the touchscreen set into the wooden top, a phone in a stand beside it" loading="lazy" width="640" height="480"></button><figcaption></figcaption></figure>
-        <figure class="tb-shot"><button type="button" data-full="/site/table-build-2.webp"><img src="/site/table-build-2-small.webp" alt="The whole table: the screen in an aluminium frame in the top, the cables running down behind the legs" loading="lazy" width="640" height="480"></button><figcaption></figcaption></figure>
-        <figure class="tb-shot"><button type="button" data-full="/site/table-build-3.webp"><img src="/site/table-build-3-small.webp" alt="The table's side: a power outlet with a USB port and a round volume knob set into the wood" loading="lazy" width="640" height="480"></button><figcaption></figcaption></figure>
-        <figure class="tb-shot empty">Photo to come</figure>
-        <figure class="tb-shot empty">Photo to come</figure>
-        <figure class="tb-shot empty">Photo to come</figure>
-        <figure class="tb-shot empty">Photo to come</figure>
-        <figure class="tb-shot empty">Photo to come</figure>
-        <figure class="tb-shot empty">Photo to come</figure>
-        <figure class="tb-shot empty">Photo to come</figure>
+      <p>Go through them with the arrows or by swiping; tap a photo to see it large.</p>
+      <div class="tb-stack" id="tb-gallery" role="region" aria-roledescription="carousel" aria-label="Photos of the table" tabindex="0">
+        <div class="tb-frame">
+          <div class="tb-track">
+            <figure class="tb-shot" data-caption=""><button type="button" data-full="/site/table-build-1.webp"><img src="/site/table-build-1.webp" alt="The table from above: a chess game on the touchscreen set into the wooden top, a phone in a stand beside it" width="1600" height="1200"></button></figure>
+            <figure class="tb-shot" data-caption=""><button type="button" data-full="/site/table-build-2.webp"><img src="/site/table-build-2.webp" alt="The whole table: the screen in an aluminium frame in the top, the cables running down behind the legs" loading="lazy" width="1600" height="1200"></button></figure>
+            <figure class="tb-shot" data-caption=""><button type="button" data-full="/site/table-build-3.webp"><img src="/site/table-build-3.webp" alt="The table's side: a power outlet with a USB port and a round volume knob set into the wood" loading="lazy" width="1600" height="1200"></button></figure>
+            <figure class="tb-shot empty" data-caption="">Photo to come</figure>
+            <figure class="tb-shot empty" data-caption="">Photo to come</figure>
+            <figure class="tb-shot empty" data-caption="">Photo to come</figure>
+            <figure class="tb-shot empty" data-caption="">Photo to come</figure>
+            <figure class="tb-shot empty" data-caption="">Photo to come</figure>
+            <figure class="tb-shot empty" data-caption="">Photo to come</figure>
+            <figure class="tb-shot empty" data-caption="">Photo to come</figure>
+          </div>
+          <button class="tb-nav tb-prev" type="button" aria-label="Previous photo">&#8249;</button>
+          <button class="tb-nav tb-next" type="button" aria-label="Next photo">&#8250;</button>
+        </div>
+        <div class="tb-below"><p class="tb-caption" aria-live="polite"></p><span class="tb-count"></span></div>
+        <div class="tb-dots" aria-label="Choose a photo"></div>
       </div>
     </div>
 
@@ -138,20 +166,88 @@ description: How to build a Game Table: a wooden table with a touchscreen set fl
 <script>
 (() => {
   "use strict";
-  // The gallery: a photo opens large; Close, a tap beside it or Escape closes it.
-  const view = document.getElementById("tb-view"), img = document.getElementById("tb-view-img"), text = document.getElementById("tb-view-text");
-  const close = () => view.classList.remove("open");
-  document.getElementById("tb-gallery").addEventListener("click", (e) => {
-    const b = e.target.closest("button[data-full]");
-    if (!b) return;
-    const small = b.querySelector("img");
-    img.src = b.dataset.full;
-    img.alt = small.alt;
-    text.textContent = b.parentElement.querySelector("figcaption")?.textContent ?? "";
-    view.classList.add("open");
+  // The photos (D-330): one at a time. The arrows, a swipe (the photo follows the finger), the dots or the arrow keys
+  // go to the next or the one before; a tap opens it large.
+  const stack = document.getElementById("tb-gallery");
+  const track = stack.querySelector(".tb-track"), frame = stack.querySelector(".tb-frame");
+  const shots = [...track.children], prev = stack.querySelector(".tb-prev"), next = stack.querySelector(".tb-next");
+  const caption = stack.querySelector(".tb-caption"), count = stack.querySelector(".tb-count"), dots = stack.querySelector(".tb-dots");
+  let at = 0;
+  dots.innerHTML = shots.map((_, i) => `<button type="button" aria-label="Photo ${i + 1}"></button>`).join("");
+  const show = (i) => {
+    at = Math.max(0, Math.min(shots.length - 1, i));
+    track.style.transform = `translateX(${-100 * at}%)`;
+    prev.disabled = at === 0;
+    next.disabled = at === shots.length - 1;
+    caption.textContent = shots[at].dataset.caption || "";
+    count.textContent = `${at + 1} / ${shots.length}`;
+    [...dots.children].forEach((d, k) => d.setAttribute("aria-current", String(k === at)));
+  };
+  prev.addEventListener("click", () => show(at - 1));
+  next.addEventListener("click", () => show(at + 1));
+  dots.addEventListener("click", (e) => {
+    const d = e.target.closest("button");
+    if (d) show([...dots.children].indexOf(d));
   });
+  stack.addEventListener("keydown", (e) => {
+    if (view.classList.contains("open")) return;
+    if (e.key === "ArrowLeft") (show(at - 1), e.preventDefault());
+    if (e.key === "ArrowRight") (show(at + 1), e.preventDefault());
+  });
+  // A swipe: the photo follows the finger; past a fifth of its width (or a quick flick) it goes on, else back. A swipe
+  // is not a tap: it opens nothing.
+  let drag = null, swiped = false;
+  frame.addEventListener("pointerdown", (e) => {
+    if (e.button > 0 || e.target.closest(".tb-nav")) return;
+    swiped = false;
+    drag = { id: e.pointerId, x: e.clientX, y: e.clientY, t: e.timeStamp, dx: 0, moved: false };
+  });
+  frame.addEventListener("pointermove", (e) => {
+    if (!drag || e.pointerId !== drag.id) return;
+    drag.dx = e.clientX - drag.x;
+    if (!drag.moved) {
+      if (Math.abs(drag.dx) < 8) return;
+      if (Math.abs(e.clientY - drag.y) > Math.abs(drag.dx)) return void (drag = null); // (scrolling the page)
+      drag.moved = swiped = true;
+      frame.setPointerCapture?.(e.pointerId);
+      track.classList.add("dragging");
+    }
+    const edge = (at === 0 && drag.dx > 0) || (at === shots.length - 1 && drag.dx < 0) ? 0.3 : 1;
+    track.style.transform = `translateX(calc(${-100 * at}% + ${drag.dx * edge}px))`;
+  });
+  const end = (e) => {
+    if (!drag || e.pointerId !== drag.id) return;
+    const d = drag;
+    drag = null;
+    if (!d.moved) return;
+    track.classList.remove("dragging");
+    const fast = Math.abs(d.dx) > 40 && Math.abs(d.dx) / Math.max(1, e.timeStamp - d.t) > 0.5; // (a flick, not a nudge)
+    const far = Math.abs(d.dx) > frame.clientWidth / 5;
+    show(far || fast ? at - Math.sign(d.dx) : at);
+  };
+  frame.addEventListener("pointerup", end);
+  frame.addEventListener("pointercancel", end);
+
+  // Large: Close, a tap beside the photo or Escape closes it; the arrow keys go on in the large view too.
+  const view = document.getElementById("tb-view"), img = document.getElementById("tb-view-img"), text = document.getElementById("tb-view-text");
+  const open = () => {
+    const b = shots[at].querySelector("button[data-full]");
+    if (!b) return close();
+    img.src = b.dataset.full;
+    img.alt = b.querySelector("img").alt;
+    text.textContent = shots[at].dataset.caption || "";
+    view.classList.add("open");
+  };
+  const close = () => view.classList.remove("open");
+  track.addEventListener("click", (e) => !swiped && e.target.closest("button[data-full]") && open());
   document.getElementById("tb-close").addEventListener("click", close);
   view.addEventListener("click", (e) => e.target === view && close());
-  addEventListener("keydown", (e) => e.key === "Escape" && close());
+  addEventListener("keydown", (e) => {
+    if (!view.classList.contains("open")) return;
+    if (e.key === "Escape") close();
+    if (e.key === "ArrowLeft" || e.key === "ArrowRight") (show(at + (e.key === "ArrowLeft" ? -1 : 1)), open());
+  });
+  show(0);
 })();
 </script>
+
