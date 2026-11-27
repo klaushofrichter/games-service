@@ -3122,3 +3122,16 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
     metadata (place, device).
   Checks: `tests/website.test.ts` (served, unlinked, `noindex`, the disclosure, Amazon links marked, ten gallery
   places), `scripts/e2e/website.py`, and a look at 1440 and 390 px.
+- **D-330 · 2026-11-27 · Klaus** — **The table page: the photos in a stack, and a banner.** "I would like the
+  pictures in a stack with left/right navigation and swipe. We should have one of the pics as banner or hero image.
+  Perhaps 1/2 height, I provide it later, you can put one of the existing pics in."
+  - **The stack:** one photo at a time, as large as the column (4:3), with arrows left and right, dots to jump to
+    one, "3 / 10", and the caption under it. A swipe moves the photo with the finger; past a fifth of its width, or a
+    quick flick, it goes on, else it springs back (a short nudge stays). At the ends the photo gives a little and
+    springs back. A swipe opens nothing; a tap opens the photo large, where the arrow keys go on too. The arrow keys
+    work on the stack when it has the focus. A vertical drag scrolls the page as usual.
+  - **The banner:** one photo across the page, half the window's height (at least 280 px), darker under the top bar so
+    its links read, fading into the page below. The table from above for now; Klaus gives the real one later.
+  - The smaller copies of the photos (D-329) are gone: the stack shows the large ones.
+  Checks: `tests/website.test.ts`; by hand at 1440 and 390 px: arrows, a swipe, a short nudge, the dots, the large view
+  and its keys.
