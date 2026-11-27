@@ -119,7 +119,7 @@ describe("the public website (D-176)", () => {
     await start();
     const pages: Record<string, string> = {};
     for (const path of Object.keys(SITE_PAGES)) pages[path] = await (await get(path)).text();
-    expect(Object.keys(pages)).toEqual(["/", "/build", "/faq"]);
+    expect(Object.keys(pages)).toEqual(["/", "/build", "/faq", "/build-the-table"]);
     const cut = (page: string, from: string, to: string, nth = 0) => {
       let at = -1;
       for (let i = 0; i <= nth; i++) at = page.indexOf(from, at + 1);
@@ -155,6 +155,19 @@ describe("the public website (D-176)", () => {
       expect(links.filter((a) => a.on).map((a) => a.href), path).toEqual([path]);
       expect(pages[path], path).toContain('<a class="logo" href="/"><img src="/favicon.svg" alt="">Game Table</a>');
     }
+    // Build the table (D-329): served with the shared top bar, but not linked from it, the foot or another page yet,
+    // and search engines are asked to leave it out until it is.
+    const table = pages["/build-the-table"]!;
+    expect(nav(table).map((a) => a.label)).toEqual(home.map((a) => a.label));
+    expect(nav(table).some((a) => a.on)).toBe(false);
+    for (const page of [pages["/"]!, pages["/build"]!, pages["/faq"]!, table]) expect(page).not.toContain('href="/build-the-table');
+    expect(table).toContain('<meta name="robots" content="noindex">');
+    expect(table.lastIndexOf('<meta name="robots"')).toBeLessThan(table.indexOf("</head>"));
+    for (const page of [pages["/"]!, pages["/build"]!, pages["/faq"]!]) expect(page).not.toContain('name="robots"');
+    // The shop links: the disclosure is on the page, and any Amazon link is marked as sponsored and opens apart.
+    expect(table).toContain("as an Amazon Associate we earn from qualifying purchases");
+    for (const [a] of table.matchAll(/<a\b[^>]*href="https:\/\/(?:www\.)?amazon\.[^"]*"[^>]*>/g)) expect(a, a).toMatch(/rel="sponsored[^"]*"/);
+    expect(table.match(/class="tb-shot/g)).toHaveLength(10); // ten photos (some still to come)
     // A page's own styles and script follow the shared ones; no page carries another's.
     const own = (page: string) => (page.match(/<style>/g)!.length > 1 ? cut(page, "<style>", "</style>", 1) : "");
     expect(own(pages["/"]!)).toContain(".hero-pin {");
