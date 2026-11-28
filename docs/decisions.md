@@ -3168,3 +3168,6 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   oscillating tool.
   The outlet's opening: a drilled pilot hole, then routed from the outside. The knob: a pocket routed from the inside
   for the unit, a small hole for its LED and shaft, and the detachable knob put on from the outside.
+  The top is nearly as thick as the screen and the side panels are wide, so everything fits inside the table. The
+  aluminium frame is sawn, filed by hand to 45 degrees, hot-glued (a RYOBI ONE+ glue gun; its link once Klaus names the
+  model), and wide enough to hide an uneven cut.
