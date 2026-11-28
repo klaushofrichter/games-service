@@ -3143,7 +3143,7 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   with `rel="sponsored noopener noreferrer"` and `target="_blank"`; the page keeps an example in a comment above the
   parts list. `tests/website.test.ts` refuses an Amazon link without the ID, the rel or the new tab. The disclosure
   (D-329) stays beside the list. Neither ID is a secret: it is in every link. The parts Klaus named, with their
-  links: the touchscreen (HP E24t G5), the mini PC (C3) and a Samsung 8 GB memory module for it, the table (Little Tree, 39 inches), adhesive rubber strips,
+  links: the touchscreen (HP E24t G5), the mini PC (C3) and a second Samsung 8 GB memory module for it (16 GB in all), the table (Little Tree, 39 inches), adhesive rubber strips,
   the desk power grommet, a power strip, the USB volume knob (DROK), and right-angle DisplayPort, USB-B and IEC power
   adapters. The tools, with links: a RYOBI ONE+ HP compact router and a 24-piece bit set, a RYOBI ONE+ HP oscillating
   multi-tool, a Bosch 1191VSRK hammer drill, a Freud 1-1/2 inch Forstner bit and a LIBRATON set of files (the steps now say router, multi-tool
