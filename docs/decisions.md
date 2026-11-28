@@ -3135,3 +3135,28 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   - The smaller copies of the photos (D-329) are gone: the stack shows the large ones.
   Checks: `tests/website.test.ts`; by hand at 1440 and 390 px: arrows, a swipe, a short nudge, the dots, the large view
   and its keys.
+- **D-331 · 2026-11-28 · Klaus** — **The table page's shop links carry the Amazon Associates tracking ID
+  `game-table-20`.** "I now have a Amazon associate Store ID: klaushofricht-20", then: "I created a new tracking ID
+  game-table-20 which I would like to use." The store (`klaushofricht-20`) is the account; a tracking ID is the `tag`
+  in a link, and Amazon's reports are split by it, so the table page's earnings show apart. A link to a part is
+  `https://www.amazon.com/dp/<ASIN>?tag=game-table-20` (or an `amzn.to` short link made with that ID in SiteStripe),
+  with `rel="sponsored noopener noreferrer"` and `target="_blank"`; the page keeps an example in a comment above the
+  parts list. `tests/website.test.ts` refuses an Amazon link without the ID, the rel or the new tab. The disclosure
+  (D-329) stays beside the list. Neither ID is a secret: it is in every link. The parts Klaus named, with their
+  links: the touchscreen (HP E24t G5), the mini PC (C3) and a second Samsung 8 GB memory module for it (16 GB in all), the table (Little Tree, 39 inches), adhesive rubber strips,
+  the desk power grommet, a power strip, the USB volume knob (DROK), and right-angle DisplayPort, USB-B and IEC power
+  adapters. The tools, with links: a RYOBI ONE+ HP compact router and a 24-piece bit set, a RYOBI ONE+ HP oscillating
+  multi-tool, a Bosch 1191VSRK hammer drill, a Freud 1-1/2 inch Forstner bit and a LIBRATON set of files (the steps now say router, multi-tool
+  and Forstner bit instead of the jigsaw and hole saws first guessed). Still to come: the aluminium trim, the phone stand, the screen's supports, cable clips. No product
+  pictures from Amazon: its terms allow its images only through its own link tools; photos of our own parts instead.
+  The software section lists the table computer's setup, from Cluster's inventory of the game PC (2026-11-28): Debian
+  13 with XFCE and LightDM, automatic login and power-on after a power cut, no lock or sleep, single-tap icons and
+  `game-table --kiosk`, Chrome from Google, `onboard` as the on-screen keyboard, the read-only GitHub token in a file,
+  sound over DisplayPort, network, unattended security updates and SSH. Left out: the PC's other jobs, and anything
+  secret or naming the house's network.
+  Klaus, the same day: the mini PC is the one bought by that link (the page keeps its Amazon name; it may be sold
+  under another brand, as Cluster read it), with a second 8 GB module for 16 GB; the DROK knob works plug and play;
+  the sound comes from a Dell AC511 USB soundbar inside the table (added with its link). A fourth photo shows the
+  table from underneath.
+  And: the monitor's back cover is off, for air and so that two wooden bars across its back carry it in the middle;
+  the rubber strips level the screen's edges with the top (the page says so, in the parts and the steps).
