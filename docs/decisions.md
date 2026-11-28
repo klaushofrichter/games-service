@@ -3174,3 +3174,6 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   The glue gun is the RYOBI ONE+ P307 (B09MDLTYFX).
   The aluminium trim is 1/2 inch wide, from Home Depot. The knob's small hole is drilled with a Kreg KDG-6000 drilling
   guide, linked to Home Depot as a plain link (not an affiliate link, so not marked sponsored).
+  Measurements (Klaus): the table is 39 1/2 by 19 3/4 inches and 30 inches high (to be shortened a little later); the
+  top is 1 inch thick; the side panels are 4 1/2 inches high. The Bluetooth keyboard note is left out: the page says
+  what is there, not what didn't work.
