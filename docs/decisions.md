@@ -3158,3 +3158,5 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   under another brand, as Cluster read it), with a second 8 GB module for 16 GB; the DROK knob works plug and play;
   the sound comes from a Dell AC511 USB soundbar inside the table (added with its link). A fourth photo shows the
   table from underneath.
+  And: the monitor's back cover is off, for air and so that two wooden bars across its back carry it in the middle;
+  the rubber strips level the screen's edges with the top (the page says so, in the parts and the steps).
