@@ -3146,6 +3146,6 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   links: the touchscreen (HP E24t G5), the mini PC (C3), the table (Little Tree, 39 inches), adhesive rubber strips,
   the desk power grommet, a power strip, the USB volume knob (DROK), and right-angle DisplayPort, USB-B and IEC power
   adapters. The tools, with links: a RYOBI ONE+ HP compact router and a 24-piece bit set, a RYOBI ONE+ HP oscillating
-  multi-tool, a Bosch 1191VSRK hammer drill and a Freud 1-1/2 inch Forstner bit (the steps now say router, multi-tool
+  multi-tool, a Bosch 1191VSRK hammer drill, a Freud 1-1/2 inch Forstner bit and a LIBRATON set of files (the steps now say router, multi-tool
   and Forstner bit instead of the jigsaw and hole saws first guessed). Still to come: the aluminium trim, the phone stand, the screen's supports, cable clips. No product
   pictures from Amazon: its terms allow its images only through its own link tools; photos of our own parts instead.
