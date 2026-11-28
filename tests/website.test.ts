@@ -166,9 +166,10 @@ describe("the public website (D-176)", () => {
     for (const page of [pages["/"]!, pages["/build"]!, pages["/faq"]!]) expect(page).not.toContain('name="robots"');
     // The shop links: the disclosure is on the page, and any Amazon link is marked as sponsored and opens apart.
     expect(table).toContain("as an Amazon Associate we earn from qualifying purchases");
-    // Every Amazon link carries the Associates store ID (D-331), is marked as sponsored and opens apart. (The comment in
-    // the page that shows how to write one is left out: only real links count.)
-    const links = [...table.replace(/<!--[\s\S]*?-->/g, "").matchAll(/<a\b[^>]*href="(https:\/\/(?:www\.)?(?:amazon\.[a-z.]+|amzn\.to)[^"]*)"[^>]*>/g)];
+    // Every Amazon link carries the Associates tracking ID (D-331), is marked as sponsored and opens apart. Links in the
+    // page outside the parts list count too; the example in the comment above the list does not.
+    const shown = table.slice(0, table.indexOf("<!-- Shop links")) + table.slice(table.indexOf('<table class="tb-table">'));
+    const links = [...shown.matchAll(/<a\b[^>]*href="(https:\/\/(?:www\.)?(?:amazon\.[a-z.]+|amzn\.to)[^"]*)"[^>]*>/g)];
     for (const [a, href] of links) {
       expect(a, a).toMatch(/rel="sponsored[^"]*"/);
       expect(a, a).toContain('target="_blank"');
