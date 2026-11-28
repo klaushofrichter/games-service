@@ -3154,3 +3154,7 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   `game-table --kiosk`, Chrome from Google, `onboard` as the on-screen keyboard, the read-only GitHub token in a file,
   sound over DisplayPort, network, unattended security updates and SSH. Left out: the PC's other jobs, and anything
   secret or naming the house's network.
+  Klaus, the same day: the mini PC is the one bought by that link (the page keeps its Amazon name; it may be sold
+  under another brand, as Cluster read it), with a second 8 GB module for 16 GB; the DROK knob works plug and play;
+  the sound comes from a Dell AC511 USB soundbar inside the table (added with its link). A fourth photo shows the
+  table from underneath.
