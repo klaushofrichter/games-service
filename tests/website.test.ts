@@ -172,7 +172,7 @@ describe("the public website (D-176)", () => {
     for (const [a, href] of links) {
       expect(a, a).toMatch(/rel="sponsored[^"]*"/);
       expect(a, a).toContain('target="_blank"');
-      expect(href!.startsWith("https://amzn.to/") || new URL(href!.replaceAll("&amp;", "&")).searchParams.get("tag") === "klaushofricht-20", href).toBe(true);
+      expect(href!.startsWith("https://amzn.to/") || new URL(href!.replaceAll("&amp;", "&")).searchParams.get("tag") === "game-table-20", href).toBe(true);
     }
     expect(table.match(/class="tb-shot/g)).toHaveLength(10); // ten photos (some still to come), in a stack (D-330)
     expect(table).toContain('class="tb-hero"'); // and one as the banner
