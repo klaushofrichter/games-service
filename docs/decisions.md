@@ -3171,3 +3171,4 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   The top is nearly as thick as the screen and the side panels are wide, so everything fits inside the table. The
   aluminium frame is sawn, filed by hand to 45 degrees, hot-glued (a RYOBI ONE+ glue gun; its link once Klaus names the
   model), and wide enough to hide an uneven cut.
+  The glue gun is the RYOBI ONE+ P307 (B09MDLTYFX).
