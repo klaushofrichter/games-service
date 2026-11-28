@@ -3160,3 +3160,7 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   table from underneath.
   And: the monitor's back cover is off, for air and so that two wooden bars across its back carry it in the middle;
   the rubber strips level the screen's edges with the top (the page says so, in the parts and the steps).
+  And (Klaus): the opening is stepped — a screen-size pocket routed from the top down to a 1/8-inch rim, and a smaller
+  opening from below that leaves a 1-inch ledge; the bars keep the weight off the ledge alone, and the rubber strips
+  make up for the screen's narrower frame at left and right and make the bars carry. The table comes square with a
+  two-half top; one half is used, two rails are shortened, and the Forstner bit drills their fresh ends for the legs.
