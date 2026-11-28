@@ -3135,3 +3135,10 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   - The smaller copies of the photos (D-329) are gone: the stack shows the large ones.
   Checks: `tests/website.test.ts`; by hand at 1440 and 390 px: arrows, a swipe, a short nudge, the dots, the large view
   and its keys.
+- **D-331 · 2026-11-28 · Klaus** — **The table page's shop links carry the Amazon Associates store ID
+  `klaushofricht-20`** ("I now have a Amazon associate Store ID"). A link to a part is
+  `https://www.amazon.com/dp/<ASIN>?tag=klaushofricht-20` (or an `amzn.to` short link made in the Associates site,
+  which carries the ID itself), with `rel="sponsored noopener noreferrer"` and `target="_blank"`; the page keeps an
+  example in a comment above the parts list. `tests/website.test.ts` refuses an Amazon link without the ID, the rel
+  or the new tab. The disclosure (D-329) stays beside the list. The store ID is not a secret: it is in every link.
+  The parts still say "link to come" until Klaus names the products.
