@@ -3142,5 +3142,8 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   `https://www.amazon.com/dp/<ASIN>?tag=game-table-20` (or an `amzn.to` short link made with that ID in SiteStripe),
   with `rel="sponsored noopener noreferrer"` and `target="_blank"`; the page keeps an example in a comment above the
   parts list. `tests/website.test.ts` refuses an Amazon link without the ID, the rel or the new tab. The disclosure
-  (D-329) stays beside the list. Neither ID is a secret: it is in every link. First part with a link: the touchscreen,
-  an HP E24t G5 (B0D96Q89CZ).
+  (D-329) stays beside the list. Neither ID is a secret: it is in every link. The parts Klaus named, with their
+  links: the touchscreen (HP E24t G5), the mini PC (C3), the table (Little Tree, 39 inches), adhesive rubber strips,
+  the desk power grommet, a power strip, the USB volume knob (DROK), and right-angle DisplayPort, USB-B and IEC power
+  adapters. Still to come: the aluminium trim, the phone stand, the screen's supports, cable clips. No product
+  pictures from Amazon: its terms allow its images only through its own link tools; photos of our own parts instead.
