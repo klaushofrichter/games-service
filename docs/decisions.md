@@ -3172,3 +3172,5 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   aluminium frame is sawn, filed by hand to 45 degrees, hot-glued (a RYOBI ONE+ glue gun; its link once Klaus names the
   model), and wide enough to hide an uneven cut.
   The glue gun is the RYOBI ONE+ P307 (B09MDLTYFX).
+  The aluminium trim is 1/2 inch wide, from Home Depot. The knob's small hole is drilled with a Kreg KDG-6000 drilling
+  guide, linked to Home Depot as a plain link (not an affiliate link, so not marked sponsored).
