@@ -3164,3 +3164,5 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   opening from below that leaves a 1-inch ledge; the bars keep the weight off the ledge alone, and the rubber strips
   make up for the screen's narrower frame at left and right and make the bars carry. The table comes square with a
   two-half top; one half is used, two rails are shortened, and the Forstner bit drills their fresh ends for the legs.
+  The top is a thin wood layer over a pressed wood-fibre core: stable and heavy, easy to rout, fine-tuned with the
+  oscillating tool.
