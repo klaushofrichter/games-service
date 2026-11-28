@@ -3166,3 +3166,5 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   two-half top; one half is used, two rails are shortened, and the Forstner bit drills their fresh ends for the legs.
   The top is a thin wood layer over a pressed wood-fibre core: stable and heavy, easy to rout, fine-tuned with the
   oscillating tool.
+  The outlet's opening: a drilled pilot hole, then routed from the outside. The knob: a pocket routed from the inside
+  for the unit, a small hole for its LED and shaft, and the detachable knob put on from the outside.
