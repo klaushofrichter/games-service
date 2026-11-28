@@ -167,7 +167,24 @@ description: How to build a Game Table: a wooden table with a touchscreen set fl
 
     <div class="tb-part" id="tb-software">
       <h3>The software</h3>
-      <p>Install Game Table on the table's computer with the package for its system (<a href="/#download">Download</a>). The installation guide for Linux shows how to make it <a href="https://github.com/klaushofrichter/games-service/blob/main/docs/install/linux.md#a-table-of-its-own-an-icon-on-the-desktop-no-lock-log-in-by-itself" target="_blank" rel="noopener noreferrer">a table of its own</a>: it logs in by itself, starts from one icon with the board full screen (<code>--kiosk</code>), and never locks. Players join with their phones by scanning the code on the board.</p>
+      <p>Install Game Table on the table's computer with the package for its system (<a href="/#download">Download</a>). The installation guide for Linux shows how to make it <a href="https://github.com/klaushofrichter/games-service/blob/main/docs/install/linux.md#a-table-of-its-own-an-icon-on-the-desktop-no-lock-log-in-by-itself" target="_blank" rel="noopener noreferrer">a table of its own</a>, step by step. Players join with their phones by scanning the code on the board.</p>
+      <p>What runs on our table's computer:</p>
+      <table class="tb-table">
+        <thead><tr><th>What</th><th>How we set it up</th></tr></thead>
+        <tbody>
+          <tr><td>Operating system</td><td>Debian 13 ("trixie") with the XFCE desktop and the LightDM login manager. The touchscreen works out of the box, without calibration.</td></tr>
+          <tr><td>Logs in by itself</td><td>LightDM logs the table's user in at start-up, and the computer's BIOS is set to switch it on again after a power cut: the table comes back on its own.</td></tr>
+          <tr><td>Never locks or sleeps</td><td>The screen lock (light-locker) is off, screen blanking and power saving are off (<code>xset s off -dpms</code> at login, and XFCE's power manager in presentation mode).</td></tr>
+          <tr><td>One tap to start</td><td>Desktop icons open with a single tap, since a double tap on a touchscreen is not always caught. The Game Table icon starts <code>game-table --kiosk --repos all --pointer off</code>: the board full screen in Chrome, without a mouse pointer. <b>Quit the table</b> on the board, or closing the browser, ends it.</td></tr>
+          <tr><td>Browser</td><td>Google Chrome from Google's own package source, not Debian's Chromium: kiosk mode, and the USB devices some games use, need it.</td></tr>
+          <tr><td>On-screen keyboard</td><td><code>onboard</code>, started at login; it comes up by itself when a text field is touched. A desktop icon opens it by hand.</td></tr>
+          <tr><td>Private games</td><td>A GitHub token that can only read the private game repositories, kept in a file only the start script reads. (With automatic login the desktop's keyring stays locked, so GitHub's own sign-in would stop the start.)</td></tr>
+          <tr><td>Sound</td><td>Through the monitor's speakers over DisplayPort; the volume knob in the table's side works like the volume keys of a keyboard.</td></tr>
+          <tr><td>Network</td><td>A network cable; Wi-Fi works too. The phones need the same network as the table.</td></tr>
+          <tr><td>Looking after it</td><td>Security updates install themselves (unattended-upgrades), and SSH lets us look after the table from another computer.</td></tr>
+        </tbody>
+      </table>
+      <p class="tb-note">Bluetooth keyboards: an old one (from 2011) paired but would not stay connected. A keyboard with a USB receiver, or a newer Bluetooth one, works.</p>
     </div>
   </div>
 </section>

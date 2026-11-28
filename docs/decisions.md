@@ -3149,3 +3149,8 @@ Klaus asked for the repo to follow kube-setup's conventions (its Obsidian vault 
   multi-tool, a Bosch 1191VSRK hammer drill, a Freud 1-1/2 inch Forstner bit and a LIBRATON set of files (the steps now say router, multi-tool
   and Forstner bit instead of the jigsaw and hole saws first guessed). Still to come: the aluminium trim, the phone stand, the screen's supports, cable clips. No product
   pictures from Amazon: its terms allow its images only through its own link tools; photos of our own parts instead.
+  The software section lists the table computer's setup, from Cluster's inventory of the game PC (2026-11-28): Debian
+  13 with XFCE and LightDM, automatic login and power-on after a power cut, no lock or sleep, single-tap icons and
+  `game-table --kiosk`, Chrome from Google, `onboard` as the on-screen keyboard, the read-only GitHub token in a file,
+  sound over DisplayPort, network, unattended security updates and SSH. Left out: the PC's other jobs, and anything
+  secret or naming the house's network.
